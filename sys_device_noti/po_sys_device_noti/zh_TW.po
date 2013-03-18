@@ -1,6 +1,0 @@
-msgid "IDS_IDLE_POP_BATTERY_FULLY_CAHRGED"
-msgstr "電池已完全充電"
-
-msgid "IDS_QP_BODY_UNPLUG_CHARGER"
-msgstr "斷開充電器"
-

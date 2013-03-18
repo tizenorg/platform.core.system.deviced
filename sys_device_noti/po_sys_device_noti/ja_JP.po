@@ -1,6 +1,0 @@
-msgid "IDS_IDLE_POP_BATTERY_FULLY_CAHRGED"
-msgstr "バッテリ​充電​完了"
-
-msgid "IDS_QP_BODY_UNPLUG_CHARGER"
-msgstr "充電​器​を​取り​外し​て​ください。"
-

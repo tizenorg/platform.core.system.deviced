@@ -1,6 +1,0 @@
-msgid "IDS_IDLE_POP_BATTERY_FULLY_CAHRGED"
-msgstr "Baterija skroz napunjena"
-
-msgid "IDS_QP_BODY_UNPLUG_CHARGER"
-msgstr "Otkači punjač"
-

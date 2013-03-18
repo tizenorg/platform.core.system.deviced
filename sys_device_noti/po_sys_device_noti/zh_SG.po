@@ -1,6 +1,0 @@
-msgid "IDS_IDLE_POP_BATTERY_FULLY_CAHRGED"
-msgstr "充电完毕"
-
-msgid "IDS_QP_BODY_UNPLUG_CHARGER"
-msgstr "拔下充电器"
-

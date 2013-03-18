@@ -132,7 +132,6 @@ INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/systemd/system-server.socket  DESTINAT
 ADD_SUBDIRECTORY(restarter)
 ADD_SUBDIRECTORY(sys_event)
 ADD_SUBDIRECTORY(pm_event)
-ADD_SUBDIRECTORY(sys_device_noti)
 ADD_SUBDIRECTORY(sys_pci_noti)
 ADD_SUBDIRECTORY(sysman)
 ADD_SUBDIRECTORY(libslp-pm)

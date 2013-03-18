@@ -1,6 +1,0 @@
-msgid "IDS_IDLE_POP_BATTERY_FULLY_CAHRGED"
-msgstr "배터리가 충전되었습니다"
-
-msgid "IDS_QP_BODY_UNPLUG_CHARGER"
-msgstr "충전기 분리"
-

@@ -20,7 +20,6 @@ BuildRequires:  pkgconfig(edbus)
 BuildRequires:  pkgconfig(dlog)
 BuildRequires:  pkgconfig(syspopup-caller)
 BuildRequires:  pkgconfig(x11)
-BuildRequires:  pkgconfig(svi)
 BuildRequires:  pkgconfig(notification)
 BuildRequires:  pkgconfig(usbutils)
 BuildRequires:  pkgconfig(udev)
@@ -212,7 +211,6 @@ systemctl daemon-reload
 %{_bindir}/movi_format.sh
 %{_bindir}/sys_event
 %{_bindir}/pm_event
-%{_bindir}/sys_device_noti
 %{_bindir}/sys_pci_noti
 %{_bindir}/mmc-smack-label
 %{_bindir}/device-daemon
@@ -220,9 +218,7 @@ systemctl daemon-reload
 %{_libdir}/systemd/system/sockets.target.wants/system-server.socket
 %{_libdir}/systemd/system/system-server.service
 %{_libdir}/systemd/system/system-server.socket
-%{_datadir}/system-server/sys_device_noti/batt_full_icon.png
 %{_datadir}/system-server/udev-rules/91-system-server.rules
-%{_datadir}/system-server/sys_device_noti/res/locale/*/LC_MESSAGES/*.mo
 %{_datadir}/system-server/sys_pci_noti/res/locale/*/LC_MESSAGES/*.mo
 %config %{_sysconfdir}/dbus-1/system.d/system-server.conf
 

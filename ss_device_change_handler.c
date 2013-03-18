@@ -35,7 +35,6 @@
 #include "device-node.h"
 #include "ss_noti.h"
 #include "include/ss_data.h"
-#include "sys_device_noti/sys_device_noti.h"
 #include "sys_pci_noti/sys_pci_noti.h"
 #include "ss_predefine.h"
 #include "poll.h"
@@ -57,6 +56,18 @@ struct input_event {
 	unsigned short code;
 	int value;
 };
+
+typedef enum {
+    DEVICE_NOTI_BATT_CHARGE = 0,
+    DEVICE_NOTI_BATT_LOW,
+    DEVICE_NOTI_BATT_FULL,
+    DEVICE_NOTI_MAX,
+} cb_noti_type;
+
+typedef enum {
+    DEVICE_NOTI_OFF = 0,
+    DEVICE_NOTI_ON  = 1,
+} cb_noti_onoff_type;
 
 enum snd_jack_types {
 	SND_JACK_HEADPHONE = 0x0001,
@@ -148,7 +159,7 @@ static void usb_chgdet_cb(struct ss_main_data *ad)
 		PRT_TRACE("jack - usb changed %d",val);
 		check_lowbat_charge_device(val);
 		if (val==1) {
-			snprintf(params, sizeof(params), "%d", CB_NOTI_BATT_CHARGE);
+			snprintf(params, sizeof(params), "%d", DEVICE_NOTI_BATT_CHARGE);
 			ss_launch_if_noexist("/usr/bin/sys_device_noti", params);
 			PRT_TRACE("usb device notification");
 		}
@@ -191,7 +202,7 @@ static void ta_chgdet_cb(struct ss_main_data *ad)
 			pm_unlock_internal(LCD_OFF, STAY_CUR_STATE);
 		} else {
 			pm_lock_internal(LCD_OFF, STAY_CUR_STATE, 0);
-			snprintf(params, sizeof(params), "%d", CB_NOTI_BATT_CHARGE);
+			snprintf(params, sizeof(params), "%d", DEVICE_NOTI_BATT_CHARGE);
 			ss_launch_if_noexist("/usr/bin/sys_device_noti", params);
 			PRT_TRACE("ta device notification");
 		}
@@ -364,7 +375,7 @@ static void charge_cb(struct ss_main_data *ad)
 	device_get_property(DEVICE_TYPE_POWER, PROP_POWER_CHARGE_FULL, &val);
 	if (val==0) {
 		if (bat_full_noti==1) {
-			snprintf(params, sizeof(params), "%d %d", CB_NOTI_BATT_FULL, CB_NOTI_OFF);
+			snprintf(params, sizeof(params), "%d %d", DEVICE_NOTI_BATT_FULL, DEVICE_NOTI_OFF);
 			ss_launch_if_noexist("/usr/bin/sys_device_noti", params);
 		}
 		bat_full_noti = 0;
@@ -372,7 +383,7 @@ static void charge_cb(struct ss_main_data *ad)
 		if (val==1 && bat_full_noti==0) {
 			bat_full_noti = 1;
 			PRT_TRACE("battery full noti");
-			snprintf(params, sizeof(params), "%d %d", CB_NOTI_BATT_FULL, CB_NOTI_ON);
+			snprintf(params, sizeof(params), "%d %d", DEVICE_NOTI_BATT_FULL, DEVICE_NOTI_ON);
 			ss_launch_if_noexist("/usr/bin/sys_device_noti", params);
 		}
 	}

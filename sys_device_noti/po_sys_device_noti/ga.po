@@ -1,6 +1,0 @@
-msgid "IDS_IDLE_POP_BATTERY_FULLY_CAHRGED"
-msgstr "Ceallra lánluchtaithe"
-
-msgid "IDS_QP_BODY_UNPLUG_CHARGER"
-msgstr "Díphlugáil an luchtaire"
-

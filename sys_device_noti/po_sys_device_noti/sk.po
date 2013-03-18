@@ -1,6 +1,0 @@
-msgid "IDS_IDLE_POP_BATTERY_FULLY_CAHRGED"
-msgstr "Batéria je plne nabitá"
-
-msgid "IDS_QP_BODY_UNPLUG_CHARGER"
-msgstr "Odpojte nabíjačku"
-
