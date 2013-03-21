@@ -1436,6 +1436,7 @@ void start_pm_main(void)
 {
 	int ret, i;
 	unsigned int flags = (WITHOUT_STARTNOTI | FLAG_X_DPMS);
+	int timeout = 0;
 
 	LOGINFO("Start power manager");
 
@@ -1479,7 +1480,13 @@ void start_pm_main(void)
 			LOGINFO("Start Power managing without noti");
 			pm_cur_state = S_NORMAL;
 			set_setting_pmstate(pm_cur_state);
-			reset_timeout(states[S_NORMAL].timeout);
+
+			timeout = states[S_NORMAL].timeout;
+			/* check minimun lcd on time */
+			if (timeout < DEFAULT_NORMAL_TIMEOUT)
+				timeout = DEFAULT_NORMAL_TIMEOUT;
+
+			reset_timeout(timeout);
 		}
 		start_battinfo_gathering(30);
 	}
