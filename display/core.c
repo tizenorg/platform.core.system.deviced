@@ -336,7 +336,7 @@ static int proc_condition(PMMsg *data)
 			tmp->timeout_id = cond_timeout_id;
 			tmp->holdkey_block = 0;
 		}
-		set_process_active(EINA_TRUE, (pid_t)data);
+		set_process_active(EINA_TRUE, pid);
 
 		/* for debug */
 		LOGINFO("[%s] locked by pid %d - process %s\n", "S_LCDOFF", pid,
@@ -360,7 +360,7 @@ static int proc_condition(PMMsg *data)
 	if (val & MASK_SLP) {
 		tmp = find_node(S_SLEEP, pid);
 		del_node(S_SLEEP, tmp);
-		set_process_active(EINA_FALSE, (pid_t)data);
+		set_process_active(EINA_FALSE, pid);
 
 		LOGINFO("[%s] unlocked by pid %d - process %s\n", "S_LCDOFF",
 			pid, pname);
