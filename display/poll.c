@@ -1,6 +1,7 @@
 /*
- * power-manager
- * Copyright (c) 2012 Samsung Electronics Co., Ltd.
+ *  deviced
+ *
+ * Copyright (c) 2011 - 2013 Samsung Electronics Co., Ltd. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +14,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
 */
 
 
@@ -140,11 +142,12 @@ int init_pm_poll(int (*pm_callback) (int, PMMsg *))
 
 	Ecore_Fd_Handler *fd_handler;
 	int fd = -1;
+	indev *new_dev = NULL;
 
 	g_pm_callback = pm_callback;
 
 	LOGINFO
-	    ("initialize pm poll - input devices and domain socket(libpmapi)");
+	    ("initialize pm poll - input devices and domain socket(deviced)");
 
 	pm_input_env = getenv("PM_INPUT");
 	if ((pm_input_env != NULL) && (strlen(pm_input_env) < 1024)) {
@@ -153,11 +156,15 @@ int init_pm_poll(int (*pm_callback) (int, PMMsg *))
 		/* Add 2 bytes for following strncat() */
 		dev_paths_size =  strlen(pm_input_env) + strlen(SOCK_PATH) + strlen(DEV_PATH_DLM) + 1;
 		dev_paths = (char *)malloc(dev_paths_size);
+		if (!dev_paths)
+			return -1;
 		snprintf(dev_paths, dev_paths_size, "%s", pm_input_env);
 	} else {
 		/* Add 2 bytes for following strncat() */
 		dev_paths_size = strlen(DEFAULT_DEV_PATH) + strlen(SOCK_PATH) + strlen(DEV_PATH_DLM) + 1;
 		dev_paths = (char *)malloc(dev_paths_size);
+		if (!dev_paths)
+			return -1;
 		snprintf(dev_paths, dev_paths_size, "%s", DEFAULT_DEV_PATH);
 	}
 
@@ -169,25 +176,28 @@ int init_pm_poll(int (*pm_callback) (int, PMMsg *))
 	path_tok = strtok_r(dev_paths, DEV_PATH_DLM, &save_ptr);
 	if (path_tok == NULL) {
 		LOGERR("Device Path Tokeninzing Failed");
-		free(dev_paths);
-		return -1;
+		goto err_devpaths;
 	}
 
 	do {
+		char *path, *new_path;
+		int len;
+
 		if (strcmp(path_tok, SOCK_PATH) == 0) {
 			fd = init_sock(SOCK_PATH);
+			path = SOCK_PATH;
 			LOGINFO("pm_poll domain socket file: %s, fd: %d",
 			       path_tok, fd);
 		} else {
 			fd = open(path_tok, O_RDONLY);
+			path = path_tok;
 			LOGINFO("pm_poll input device file: %s, fd: %d",
 			       path_tok, fd);
 		}
 
 		if (fd == -1) {
 			LOGERR("Cannot open the file: %s", path_tok);
-			free(dev_paths);
-			return -1;
+			goto err_devpaths;
 		}
 
 		fd_handler = ecore_main_fd_handler_add(fd,
@@ -195,18 +205,59 @@ int init_pm_poll(int (*pm_callback) (int, PMMsg *))
 				    pm_handler, fd, NULL, NULL);
 		if (fd_handler == NULL) {
 			LOGERR("Failed ecore_main_handler_add() in init_pm_poll()");
-			free(dev_paths);
-			return -1;
+			goto err_fd;
 		}
+
+		new_dev = (indev *)malloc(sizeof(indev));
+		if (!new_dev) {
+			LOGERR("Fail to malloc for new_dev %s", path);
+			goto err_fdhandler;
+		}
+
+		memset(new_dev, 0, sizeof(indev));
+		len = strlen(path) + 1;
+		new_path = (char*) malloc(len);
+		if (!new_path) {
+			LOGERR("Fail to malloc for dev_path %s", path);
+			goto err_dev;
+		}
+
+		strncpy(new_path, path, len);
+		new_dev->dev_path = new_path;
+		new_dev->fd = fd;
+		new_dev->dev_fd = fd_handler;
+		indev_list = eina_list_append(indev_list, new_dev);
 
 	} while ((path_tok = strtok_r(NULL, DEV_PATH_DLM, &save_ptr)));
 
 	free(dev_paths);
 	return 0;
+
+err_dev:
+	free(new_dev);
+err_fdhandler:
+	ecore_main_fd_handler_del(fd_handler);
+err_fd:
+	fclose(fd);
+err_devpaths:
+	free(dev_paths);
+	return -1;
 }
 
 int exit_pm_poll(void)
 {
+	Eina_List *l = NULL;
+	Eina_List *l_next = NULL;
+	indev *data = NULL;
+
+	EINA_LIST_FOREACH_SAFE(indev_list, l, l_next, data) {
+		ecore_main_fd_handler_del(data->dev_fd);
+		close(data->fd);
+		free(data->dev_path);
+		free(data);
+		indev_list = eina_list_remove_list(indev_list, l);
+	}
+
 	close(sockfd);
 	unlink(SOCK_PATH);
 	LOGINFO("pm_poll is finished");

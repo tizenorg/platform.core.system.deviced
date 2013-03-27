@@ -629,6 +629,9 @@ void print_info(int fd)
 			t = t->next;
 		}
 	}
+
+	print_dev_list(fd);
+
 #ifdef ENABLE_PM_LOG
 	pm_history_print(fd, 250);
 #endif
@@ -1258,7 +1261,7 @@ static char *errMSG[INIT_END] = {
 };
 
 /* logging indev_list for debug */
-void printlist()
+void print_dev_list(int fd)
 {
 	int i;
 	unsigned int total = 0;
@@ -1270,6 +1273,12 @@ void printlist()
 		tmp = (indev*)eina_list_nth(indev_list, i);
 		LOGINFO("* %d | path:%s, fd:%d, dev_fd:%d",
 			i, tmp->dev_path, tmp->fd, tmp->dev_fd);
+		if (fd >= 0) {
+			char buf[255];
+			snprintf(buf, sizeof(buf), " %2d| path:%s, fd:%d, dev_fd:%d\n",
+				i, tmp->dev_path, tmp->fd, tmp->dev_fd);
+			write(fd, buf, strlen(buf));
+		}
 	}
 	LOGINFO("***************************\n");
 }
@@ -1293,6 +1302,7 @@ static int input_action(char* input_act, char* input_path)
 				ecore_main_fd_handler_del(data->dev_fd);
 				close(data->fd);
 				free(data->dev_path);
+				free(data);
 				indev_list = eina_list_remove_list(indev_list, l);
 			}
 		ret = 0;
@@ -1364,7 +1374,7 @@ static void input_cb(void* data)
 				ret = input_action(input_act, input_path);
 
 				/* debug */
-				printlist();
+				print_dev_list(-1);
 				break;
 			}
 		}
