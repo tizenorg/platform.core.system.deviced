@@ -18,10 +18,10 @@
 */
 
 
-#ifndef ___SYSTEM_INTERNAL___
-#define ___SYSTEM_INTERNAL___
+#ifndef __DEVICED_INTERNAL__
+#define __DEVICED_INTERNAL__
 #include <sys/types.h>
-#include "dd-system.h"
+#include "dd-deviced.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,4 +36,4 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
-#endif				/* ___SYSTEM_INTERNAL___ */
+#endif				/* __DEVICED_INTERNAL__ */

@@ -22,8 +22,7 @@
 #include <device-node.h>
 
 #include "log.h"
-#include "dd-system.h"
-#include "dd-led.h"
+#include "dd-deviced.h"
 
 #define PREDEF_LED			"led"
 
@@ -64,5 +63,5 @@ API int led_set_brightness(int val)
 	snprintf(buf_pid, sizeof(buf_pid), "%d", getpid());
 	snprintf(buf_prop, sizeof(buf_prop), "%d", SET_BRT);
 	snprintf(buf_val, sizeof(buf_val), "%d", val);
-	return system_call_predef_action(PREDEF_LED, 3, buf_pid, buf_prop, buf_val);
+	return deviced_call_predef_action(PREDEF_LED, 3, buf_pid, buf_prop, buf_val);
 }

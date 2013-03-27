@@ -35,10 +35,10 @@
 
 #include <vconf.h>
 #include "log.h"
-#include "dd-system.h"
-#include "system-priv.h"
+#include "dd-deviced.h"
+#include "deviced-priv.h"
 
-API int system_get_pid(const char *execpath)
+API int deviced_get_pid(const char *execpath)
 {
 	DIR *dp;
 	struct dirent *dentry;
@@ -79,7 +79,7 @@ API int system_get_pid(const char *execpath)
 	return -1;
 }
 
-API int system_get_cmdline_name(pid_t pid, char *cmdline, size_t cmdline_size)
+API int deviced_get_cmdline_name(pid_t pid, char *cmdline, size_t cmdline_size)
 {
 	int fd, ret;
 	char buf[PATH_MAX + 1];
@@ -112,7 +112,7 @@ API int system_get_cmdline_name(pid_t pid, char *cmdline, size_t cmdline_size)
 	return 0;
 }
 
-API int system_get_apppath(pid_t pid, char *app_path, size_t app_path_size)
+API int deviced_get_apppath(pid_t pid, char *app_path, size_t app_path_size)
 {
 	char buf[PATH_MAX];
 	int ret;

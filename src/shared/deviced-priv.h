@@ -18,8 +18,8 @@
  */
 
 
-#ifndef __SYSTEM_PRIVATE__
-#define __SYSTEM_PRIVATE__
+#ifndef __DEVICED_PRIVATE__
+#define __DEVICED_PRIVATE__
 
 #include "common.h"
 
@@ -45,4 +45,4 @@ struct sysnoti {
 #ifdef __cplusplus
 }
 #endif
-#endif				/* __SYSTEM_PRIVATE__ */
+#endif				/* __DEVICED_PRIVATE__ */

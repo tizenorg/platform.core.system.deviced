@@ -28,8 +28,8 @@
 #include <vconf.h>
 #include <vconf-keys.h>
 
-#include "dd-system.h"
-#include "system-priv.h"
+#include "dd-deviced.h"
+#include "deviced-priv.h"
 #include "log.h"
 
 #define PREDEF_PWROFF_POPUP			"pwroff-popup"
@@ -51,9 +51,9 @@
 #define PREDEF_RELEASE_MAX_FREQUENCY		"release_max_frequency"
 #define PREDEF_RELEASE_MIN_FREQUENCY		"release_min_frequency"
 
-enum system_noti_cmd {
-	ADD_SYSTEM_ACTION,
-	CALL_SYSTEM_ACTION
+enum deviced_noti_cmd {
+	ADD_DEVICED_ACTION,
+	CALL_DEVICED_ACTION
 };
 
 #define SYSTEM_NOTI_SOCKET_PATH "/tmp/sn"
@@ -81,7 +81,7 @@ static inline int send_str(int fd, char *str)
 	return ret;
 }
 
-static int system_noti_send(struct sysnoti *msg)
+static int deviced_noti_send(struct sysnoti *msg)
 {
 	PRT_TRACE_ERR("--- %s: start", __FUNCTION__);
 	int client_len;
@@ -142,7 +142,7 @@ static int system_noti_send(struct sysnoti *msg)
 	return result;
 }
 
-API int system_call_predef_action(const char *type, int num, ...)
+API int deviced_call_predef_action(const char *type, int num, ...)
 {
 	PRT_TRACE_ERR("--- %s: start", __FUNCTION__);
 	struct sysnoti *msg;
@@ -165,7 +165,7 @@ API int system_call_predef_action(const char *type, int num, ...)
 	}
 
 	msg->pid = getpid();
-	msg->cmd = CALL_SYSTEM_ACTION;
+	msg->cmd = CALL_DEVICED_ACTION;
 	msg->type = (char *)type;
 	msg->path = NULL;
 
@@ -178,80 +178,80 @@ API int system_call_predef_action(const char *type, int num, ...)
 	va_end(argptr);
 
 	PRT_TRACE_ERR("--- %s: send msg", __FUNCTION__);
-	ret = system_noti_send(msg);
+	ret = deviced_noti_send(msg);
 	free(msg);
 
 	PRT_TRACE_ERR("--- %s: end", __FUNCTION__);
 	return ret;
 }
 
-API int system_inform_foregrd(void)
+API int deviced_inform_foregrd(void)
 {
 	char buf[255];
 	snprintf(buf, sizeof(buf), "%d", getpid());
-	return system_call_predef_action(PREDEF_FOREGRD, 1, buf);
+	return deviced_call_predef_action(PREDEF_FOREGRD, 1, buf);
 }
 
-API int system_inform_backgrd(void)
+API int deviced_inform_backgrd(void)
 {
 	char buf[255];
 	snprintf(buf, sizeof(buf), "%d", getpid());
-	return system_call_predef_action(PREDEF_BACKGRD, 1, buf);
+	return deviced_call_predef_action(PREDEF_BACKGRD, 1, buf);
 }
 
-API int system_inform_active(pid_t pid)
+API int deviced_inform_active(pid_t pid)
 {
 	char buf[255];
 	snprintf(buf, sizeof(buf), "%d", pid);
-	return system_call_predef_action(PREDEF_ACTIVE, 1, buf);
+	return deviced_call_predef_action(PREDEF_ACTIVE, 1, buf);
 }
 
-API int system_inform_inactive(pid_t pid)
+API int deviced_inform_inactive(pid_t pid)
 {
 	char buf[255];
 	snprintf(buf, sizeof(buf), "%d", pid);
-	return system_call_predef_action(PREDEF_INACTIVE, 1, buf);
+	return deviced_call_predef_action(PREDEF_INACTIVE, 1, buf);
 }
 
-API int system_request_poweroff(void)
+API int deviced_request_poweroff(void)
 {
-	return system_call_predef_action(PREDEF_PWROFF_POPUP, 0);
+	return deviced_call_predef_action(PREDEF_PWROFF_POPUP, 0);
 }
 
-API int system_request_entersleep(void)
+API int deviced_request_entersleep(void)
 {
-	return system_call_predef_action(PREDEF_ENTERSLEEP, 0);
+	return deviced_call_predef_action(PREDEF_ENTERSLEEP, 0);
 }
 
-API int system_request_leavesleep(void)
+API int deviced_request_leavesleep(void)
 {
-	return system_call_predef_action(PREDEF_LEAVESLEEP, 0);
+	return deviced_call_predef_action(PREDEF_LEAVESLEEP, 0);
 }
 
-API int system_request_reboot(void)
+API int deviced_request_reboot(void)
 {
-	return system_call_predef_action(PREDEF_REBOOT, 0);
+	return deviced_call_predef_action(PREDEF_REBOOT, 0);
 }
 
-API int system_set_datetime(time_t timet)
+API int deviced_set_datetime(time_t timet)
 {
 	if (timet < 0L)
 		return -1;
 	char buf[255] = { 0 };
 	snprintf(buf, sizeof(buf), "%ld", timet);
-	return system_call_predef_action(PREDEF_SET_DATETIME, 1, buf);
+	return deviced_call_predef_action(PREDEF_SET_DATETIME, 1, buf);
 }
 
-API int system_set_timezone(char *tzpath_str)
+API int deviced_set_timezone(char *tzpath_str)
 {
 	if (tzpath_str == NULL)
 		return -1;
 	char buf[255];
 	snprintf(buf, sizeof(buf), "%s", tzpath_str);
-	return system_call_predef_action(PREDEF_SET_TIMEZONE, 1, buf);
+	return deviced_call_predef_action(PREDEF_SET_TIMEZONE, 1, buf);
 }
 
-static int system_noti_mount_mmc_cb(keynode_t *key_nodes, void *data)
+static int deviced_noti_mount_mmc_cb(keynode_t *key_nodes, void *data)
 {
 	struct mmc_contents *mmc_data;
 	int mmc_err = 0;
@@ -271,19 +271,19 @@ static int system_noti_mount_mmc_cb(keynode_t *key_nodes, void *data)
 		(mmc_data->mmc_cb)(mmc_err, mmc_data->user_data);
 	}
 	vconf_ignore_key_changed(VCONFKEY_SYSMAN_MMC_MOUNT,
-				 (void *)system_noti_mount_mmc_cb);
+				 (void *)deviced_noti_mount_mmc_cb);
 	return 0;
 }
 
-API int system_request_mount_mmc(struct mmc_contents *mmc_data)
+API int deviced_request_mount_mmc(struct mmc_contents *mmc_data)
 {
 	if (mmc_data != NULL && mmc_data->mmc_cb != NULL)
 		vconf_notify_key_changed(VCONFKEY_SYSMAN_MMC_MOUNT,
-					 (void *)system_noti_mount_mmc_cb, (void *)mmc_data);
-	return system_call_predef_action(PREDEF_MOUNT_MMC, 0);
+					 (void *)deviced_noti_mount_mmc_cb, (void *)mmc_data);
+	return deviced_call_predef_action(PREDEF_MOUNT_MMC, 0);
 }
 
-static int system_noti_unmount_mmc_cb(keynode_t *key_nodes, void *data)
+static int deviced_noti_unmount_mmc_cb(keynode_t *key_nodes, void *data)
 {
 	struct mmc_contents *mmc_data;
 	int mmc_err = 0;
@@ -299,11 +299,11 @@ static int system_noti_unmount_mmc_cb(keynode_t *key_nodes, void *data)
 		(mmc_data->mmc_cb)(mmc_err, mmc_data->user_data);
 	}
 	vconf_ignore_key_changed(VCONFKEY_SYSMAN_MMC_UNMOUNT,
-				 (void *)system_noti_unmount_mmc_cb);
+				 (void *)deviced_noti_unmount_mmc_cb);
 	return 0;
 }
 
-API int system_request_unmount_mmc(struct mmc_contents *mmc_data, int option)
+API int deviced_request_unmount_mmc(struct mmc_contents *mmc_data, int option)
 {
 	char buf[255];
 	if (option != 1 && option != 2) {
@@ -314,12 +314,12 @@ API int system_request_unmount_mmc(struct mmc_contents *mmc_data, int option)
 
 	if (mmc_data != NULL && mmc_data->mmc_cb != NULL)
 		vconf_notify_key_changed(VCONFKEY_SYSMAN_MMC_UNMOUNT,
-					 (void *)system_noti_unmount_mmc_cb,
+					 (void *)deviced_noti_unmount_mmc_cb,
 					 (void *)mmc_data);
-	return system_call_predef_action(PREDEF_UNMOUNT_MMC, 1, buf);
+	return deviced_call_predef_action(PREDEF_UNMOUNT_MMC, 1, buf);
 }
 
-static int system_noti_format_mmc_cb(keynode_t *key_nodes, void *data)
+static int deviced_noti_format_mmc_cb(keynode_t *key_nodes, void *data)
 {
 	struct mmc_contents *mmc_data;
 	mmc_data = (struct mmc_contents *)data;
@@ -334,20 +334,20 @@ static int system_noti_format_mmc_cb(keynode_t *key_nodes, void *data)
 		(mmc_data->mmc_cb)(-1, mmc_data->user_data);
 	}
 	vconf_ignore_key_changed(VCONFKEY_SYSMAN_MMC_FORMAT,
-				 (void *)system_noti_format_mmc_cb);
+				 (void *)deviced_noti_format_mmc_cb);
 	return 0;
 }
 
-API int system_request_format_mmc(struct mmc_contents *mmc_data)
+API int deviced_request_format_mmc(struct mmc_contents *mmc_data)
 {
 	if (mmc_data != NULL && mmc_data->mmc_cb != NULL)
 		vconf_notify_key_changed(VCONFKEY_SYSMAN_MMC_FORMAT,
-					 (void *)system_noti_format_mmc_cb,
+					 (void *)deviced_noti_format_mmc_cb,
 					 (void *)mmc_data);
-	return system_call_predef_action(PREDEF_FORMAT_MMC, 0);
+	return deviced_call_predef_action(PREDEF_FORMAT_MMC, 0);
 }
 
-API int system_request_set_cpu_max_frequency(int val)
+API int deviced_request_set_cpu_max_frequency(int val)
 {
 	char buf_pid[8];
 	char buf_freq[256];
@@ -356,10 +356,10 @@ API int system_request_set_cpu_max_frequency(int val)
 	snprintf(buf_pid, sizeof(buf_pid), "%d", getpid());
 	snprintf(buf_freq, sizeof(buf_freq), "%d", val * 1000);
 
-	return system_call_predef_action(PREDEF_SET_MAX_FREQUENCY, 2, buf_pid, buf_freq);
+	return deviced_call_predef_action(PREDEF_SET_MAX_FREQUENCY, 2, buf_pid, buf_freq);
 }
 
-API int system_request_set_cpu_min_frequency(int val)
+API int deviced_request_set_cpu_min_frequency(int val)
 {
 	char buf_pid[8];
 	char buf_freq[256];
@@ -368,23 +368,23 @@ API int system_request_set_cpu_min_frequency(int val)
 	snprintf(buf_pid, sizeof(buf_pid), "%d", getpid());
 	snprintf(buf_freq, sizeof(buf_freq), "%d", val * 1000);
 
-	return system_call_predef_action(PREDEF_SET_MIN_FREQUENCY, 2, buf_pid, buf_freq);
+	return deviced_call_predef_action(PREDEF_SET_MIN_FREQUENCY, 2, buf_pid, buf_freq);
 }
 
-API int system_release_cpu_max_frequency()
+API int deviced_release_cpu_max_frequency()
 {
 	char buf_pid[8];
 
 	snprintf(buf_pid, sizeof(buf_pid), "%d", getpid());
 
-	return system_call_predef_action(PREDEF_RELEASE_MAX_FREQUENCY, 1, buf_pid);
+	return deviced_call_predef_action(PREDEF_RELEASE_MAX_FREQUENCY, 1, buf_pid);
 }
 
-API int system_release_cpu_min_frequency()
+API int deviced_release_cpu_min_frequency()
 {
 	char buf_pid[8];
 
 	snprintf(buf_pid, sizeof(buf_pid), "%d", getpid());
 
-	return system_call_predef_action(PREDEF_RELEASE_MIN_FREQUENCY, 1, buf_pid);
+	return deviced_call_predef_action(PREDEF_RELEASE_MIN_FREQUENCY, 1, buf_pid);
 }

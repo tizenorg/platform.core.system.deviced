@@ -26,8 +26,8 @@
 #include <limits.h>
 
 #include "log.h"
-#include "system-priv.h"
-#include "dd-system.h"
+#include "deviced-priv.h"
+#include "dd-deviced.h"
 
 #define PERMANENT_DIR		"/tmp/permanent"
 #define VIP_DIR			"/tmp/vip"
@@ -50,7 +50,7 @@ int util_oomadj_set(int pid, int oomadj_val)
 
 	snprintf(buf1, sizeof(buf1), "%d", pid);
 	snprintf(buf2, sizeof(buf2), "%d", oomadj_val);
-	return system_call_predef_action(OOMADJ_SET, 2, buf1, buf2);
+	return deviced_call_predef_action(OOMADJ_SET, 2, buf1, buf2);
 }
 
 int util_process_group_set(const char* name, int pid)
@@ -66,10 +66,10 @@ int util_process_group_set(const char* name, int pid)
 	snprintf(buf, sizeof(buf), "%d", pid);
 	PRT_TRACE_ERR("pid(%d) is inserted at vip", pid);
 
-	return system_call_predef_action(PROCESS_GROUP_SET, 2, buf, name);
+	return deviced_call_predef_action(PROCESS_GROUP_SET, 2, buf, name);
 }
 
-API int system_conf_set_mempolicy_bypid(int pid, enum mem_policy mempol)
+API int deviced_conf_set_mempolicy_bypid(int pid, enum mem_policy mempol)
 {
 	if (pid < 1)
 		return -1;
@@ -90,9 +90,9 @@ API int system_conf_set_mempolicy_bypid(int pid, enum mem_policy mempol)
 	return util_oomadj_set(pid, oomadj_val);
 }
 
-API int system_conf_set_mempolicy(enum mem_policy mempol)
+API int deviced_conf_set_mempolicy(enum mem_policy mempol)
 {
-	return system_conf_set_mempolicy_bypid(getpid(), mempol);
+	return deviced_conf_set_mempolicy_bypid(getpid(), mempol);
 }
 
 static int already_permanent(int pid)
@@ -160,7 +160,7 @@ static int copy_cmdline(int pid)
 	return 0;
 }
 
-API int system_conf_set_vip(int pid)
+API int deviced_conf_set_vip(int pid)
 {
 	char buf[BUFF_MAX];
 	int fd;
@@ -193,7 +193,7 @@ API int system_conf_set_vip(int pid)
 	return 0;
 }
 
-API int system_conf_is_vip(int pid)
+API int deviced_conf_is_vip(int pid)
 {
 	if (pid < 1)
 		return -1;
@@ -208,7 +208,7 @@ API int system_conf_is_vip(int pid)
 		return 0;
 }
 
-API int system_conf_set_permanent_bypid(int pid)
+API int deviced_conf_set_permanent_bypid(int pid)
 {
 	int fd;
 	if (already_permanent(pid))
@@ -228,8 +228,8 @@ API int system_conf_set_permanent_bypid(int pid)
 	return 0;
 }
 
-API int system_conf_set_permanent()
+API int deviced_conf_set_permanent()
 {
 	pid_t pid = getpid();
-	return system_conf_set_permanent_bypid(pid);
+	return deviced_conf_set_permanent_bypid(pid);
 }

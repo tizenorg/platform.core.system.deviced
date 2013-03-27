@@ -27,8 +27,8 @@
 #include <aul.h>
 #include <bundle.h>
 #include <dirent.h>
-#include "dd-system.h"
 #include <libudev.h>
+#include "dd-deviced.h"
 #include "ss_queue.h"
 #include "ss_log.h"
 #include "ss_device_handler.h"

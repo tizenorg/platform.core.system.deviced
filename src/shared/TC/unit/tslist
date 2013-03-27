@@ -1,8 +1,8 @@
-/unit/utc_SystemFW_sysconf_is_vip_func
-/unit/utc_SystemFW_sysconf_set_permanent_bypid_func
-/unit/utc_SystemFW_sysconf_set_permanent_func
-/unit/utc_SystemFW_sysman_get_apppath_func
-/unit/utc_SystemFW_sysman_get_cmdline_name_func
-/unit/utc_SystemFW_sysman_get_pid_func
-/unit/utc_SystemFW_sysman_set_datetime_func
+/unit/utc_SystemFW_system_conf_is_vip_func
+/unit/utc_SystemFW_system_conf_set_permanent_bypid_func
+/unit/utc_SystemFW_system_conf_set_permanent_func
+/unit/utc_SystemFW_system_get_apppath_func
+/unit/utc_SystemFW_system_get_cmdline_name_func
+/unit/utc_SystemFW_system_get_pid_func
+/unit/utc_SystemFW_system_set_datetime_func
 

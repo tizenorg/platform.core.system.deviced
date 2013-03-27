@@ -355,11 +355,11 @@ systemctl daemon-reload
 %files -n libdeviced-devel
 %defattr(-,root,root,-)
 %{_includedir}/deviced/dd-battery.h
+%{_includedir}/deviced/dd-deviced.h
+%{_includedir}/deviced/dd-deviced-managed.h
 %{_includedir}/deviced/dd-display.h
 %{_includedir}/deviced/dd-haptic.h
 %{_includedir}/deviced/dd-led.h
-%{_includedir}/deviced/dd-system.h
-%{_includedir}/deviced/dd-system-managed.h
 %{_includedir}/deviced/haptic-module.h
 %{_includedir}/deviced/haptic-plugin-intf.h
 %{_libdir}/libdeviced.so

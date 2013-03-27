@@ -18,14 +18,14 @@
 */
 
 
-#ifndef __DD_SYSTEM_MANAGED__
-#define __DD_SYSTEM_MANAGED__
+#ifndef __DD_DEVICED_MANAGED__
+#define __DD_DEVICED_MANAGED__
 
 #include <sys/time.h>
 
 /**
- * @file        dd-system-managed.h
- * @ingroup     libdeviced System Native library
+ * @file        dd-deviced-managed.h
+ * @ingroup     libdeviced Device Daemon library
  * @brief       This library provides APIs related with memory, performance, processes, and so on.
  * @author      SLP2.0
  * @date        2010-01-24
@@ -37,23 +37,23 @@ extern "C" {
 #endif
 
 /**
- * @fn int system_get_pid(const char *execpath)
+ * @fn int deviced_get_pid(const char *execpath)
  * @brief This API is used to get the pid of the process which has the specified execpath.\n
  * 		Internally, this API searches /proc/{pid}/cmdline and compares the parameter execpath with 1st argument of cmdline. \n
  * 		If there is no process that has same execpath in /proc/{pid}/cmdline, it will return -1.
  * @param[in] execpath program path which you want to know whether it is run or not
  * @return pid when the program is running, -1 if it is not.
  */
-int system_get_pid(const char *execpath);
+int deviced_get_pid(const char *execpath);
 
 /**
- * @fn int system_set_datetime(time_t timet)
+ * @fn int deviced_set_datetime(time_t timet)
  * @brief This API is used to set date time.\n
  * 		Internally, this API call predefined action API. That is send a notify message. \n
  * @param[in] time_t type of time which you want to set.
  * @return pid when the program is running, -1 if param is less than 0 or when failed set datetime.
  */
-int system_set_datetime(time_t timet);
+int deviced_set_datetime(time_t timet);
 
 /**
  * @brief This structure defines the data for receive result of mmc operations(mount/unmount/format)
@@ -64,10 +64,10 @@ struct mmc_contents {
 };
 
 /**
- * @fn int system_request_mount_mmc(struct system_mmc_contents *mmc_data)
+ * @fn int deviced_request_mount_mmc(struct deviced_mmc_contents *mmc_data)
  * @brief This API is used to mount mmc.\n
  * 		Internally, this API call predefined action API. That is send a notify message. \n
- * 		and when mount operation is finished, cb of system_mmc_content struct is called with cb's param1(result). \n
+ * 		and when mount operation is finished, cb of deviced_mmc_content struct is called with cb's param1(result). \n
  * 		means of param1 - 0(mount success) ,  -2(already mounted), non-zero except (-2) (mount fail) \n
  * 		[mount fail value] \n
  * 		1 : operation not permmitted \n
@@ -88,13 +88,13 @@ struct mmc_contents {
  * @param[in] mmc_data for receive result of mount operation
  * @return  non-zero on success message sending, -1 if message sending is failed.
  */
-int system_request_mount_mmc(struct mmc_contents *mmc_data);
+int deviced_request_mount_mmc(struct mmc_contents *mmc_data);
 
 /**
- * @fn int system_request_unmount_mmc(struct system_mmc_contents *mmc_data,int option)
+ * @fn int deviced_request_unmount_mmc(struct deviced_mmc_contents *mmc_data,int option)
  * @brief This API is used to unmount mmc.\n
  * 		Internally, this API call predefined action API. That is send a notify message. \n
- * 		and when unmount opeation is finished, cb of system_mmc_content struct is called with cb's param1(result). \n
+ * 		and when unmount opeation is finished, cb of deviced_mmc_content struct is called with cb's param1(result). \n
  * 		means of param1 - 0(unmount success) , non-zero(unmount fail) \n
  * 		[unmount fail value] \n
  * 		1 : operation not permmitted \n
@@ -109,19 +109,19 @@ int system_request_mount_mmc(struct mmc_contents *mmc_data);
  * @param[in] option is must be 1(just only support for force unmount)
  * @return  non-zero on success message sending, -1 if message sending is failed.
  */
-int system_request_unmount_mmc(struct mmc_contents *mmc_data, int option);
+int deviced_request_unmount_mmc(struct mmc_contents *mmc_data, int option);
 /**
- * @fn int system_request_format_mmc(struct system_mmc_contents *mmc_data)
+ * @fn int deviced_request_format_mmc(struct deviced_mmc_contents *mmc_data)
  * @brief This API is used to format mmc.\n
  * 		Internally, this API call predefined action API. That is send a notify message. \n
- * 		and when format opeation is finished, cb of system_mmc_content struct is called with cb's param1(result). \n
+ * 		and when format opeation is finished, cb of deviced_mmc_content struct is called with cb's param1(result). \n
  * 		means of param1 - 0(format success) , -1(format fail)
  * @param[in] mmc_data for receive result of format operation
  * @return  non-zero on success message sending, -1 if message sending is failed.
  */
-int system_request_format_mmc(struct mmc_contents *mmc_data);
+int deviced_request_format_mmc(struct mmc_contents *mmc_data);
 
 #ifdef __cplusplus
 }
 #endif
-#endif /* __DD_SYSTEM_MANAGED__ */
+#endif /* __DD_DEVICED_MANAGED__ */

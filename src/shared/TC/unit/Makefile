@@ -1,17 +1,17 @@
 CC ?= gcc
 
-TARGETS = utc_SystemFW_sysconf_is_vip_func	\
-	  utc_SystemFW_sysconf_set_mempolicy_bypid_func	\
-	  utc_SystemFW_sysconf_set_mempolicy_func	\
-	  utc_SystemFW_sysconf_set_permanent_bypid_func	\
-	  utc_SystemFW_sysconf_set_permanent_func	\
-	  utc_SystemFW_sysconf_set_vip_func		\
-	  utc_SystemFW_sysman_get_apppath_func		\
-	  utc_SystemFW_sysman_get_cmdline_name_func	\
-	  utc_SystemFW_sysman_get_pid_func		\
-	  utc_SystemFW_sysman_set_datetime_func		\
+TARGETS = utc_SystemFW_system_conf_is_vip_func	\
+	  utc_SystemFW_system_conf_set_mempolicy_bypid_func	\
+	  utc_SystemFW_system_conf_set_mempolicy_func	\
+	  utc_SystemFW_system_conf_set_permanent_bypid_func	\
+	  utc_SystemFW_system_conf_set_permanent_func	\
+	  utc_SystemFW_system_conf_set_vip_func		\
+	  utc_SystemFW_system_get_apppath_func		\
+	  utc_SystemFW_system_get_cmdline_name_func	\
+	  utc_SystemFW_system_get_pid_func		\
+	  utc_SystemFW_system_set_datetime_func		\
 
-PKGS = sysman
+PKGS = deviced
 
 LDFLAGS = `pkg-config --libs $(PKGS)`
 LDFLAGS += $(TET_ROOT)/lib/tet3/tcm_s.o

@@ -52,21 +52,21 @@ SET(SRCS ${SRCS}
 # libdeviced
 SET(DEVICED_SRCS
 	src/shared/battery.c
+	src/shared/deviced-conf.c
+	src/shared/deviced-noti.c
+	src/shared/deviced-util.c
 	src/shared/display.c
 	src/shared/haptic.c
 	src/shared/led.c
-	src/shared/system-conf.c
-	src/shared/system-noti.c
-	src/shared/system-util.c
 )
 
 SET(DEVICED_HEADERS
 	src/deviced/dd-battery.h
+	src/deviced/dd-deviced.h
+	src/deviced/dd-deviced-managed.h
 	src/deviced/dd-display.h
 	src/deviced/dd-haptic.h
 	src/deviced/dd-led.h
-	src/deviced/dd-system.h
-	src/deviced/dd-system-managed.h
 	src/deviced/haptic-module.h
 	src/deviced/haptic-plugin-intf.h
 )

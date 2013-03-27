@@ -35,7 +35,7 @@ static void utc_@MODULE@_@API@_func_01(void)
 	int r = 0;
 
 /*
-   	r = @API@(...);
+	r = @API@(...);
 */
 	if (r) {
 		tet_infoline("@API@() failed in positive test case");
@@ -53,7 +53,7 @@ static void utc_@MODULE@_@API@_func_02(void)
 	int r = 0;
 
 /*
-   	r = @API@(...);
+	r = @API@(...);
 */
 	if (r) {
 		tet_infoline("@API@() failed in negative test case");
