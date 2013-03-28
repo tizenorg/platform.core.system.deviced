@@ -1163,6 +1163,18 @@ static int update_setting(int key_idx, int val)
 			backlight_ops.restore();
 		}
 		break;
+	case SETTING_POWEROFF:
+		switch (val) {
+		case VCONFKEY_SYSMAN_POWER_OFF_NONE:
+		case VCONFKEY_SYSMAN_POWER_OFF_POPUP:
+			pm_status_flag &= ~PWROFF_FLAG;
+			break;
+		case VCONFKEY_SYSMAN_POWER_OFF_DIRECT:
+		case VCONFKEY_SYSMAN_POWER_OFF_RESTART:
+			pm_status_flag |= PWROFF_FLAG;
+			break;
+		}
+		break;
 	default:
 		return -1;
 	}

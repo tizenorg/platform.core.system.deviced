@@ -78,7 +78,7 @@ static bool alc_handler(void* data)
 		}
 	}
 
-	if (fault_count > MAX_FAULT) {
+	if ((fault_count > MAX_FAULT) && !(pm_status_flag & PWROFF_FLAG)) {
 		if (alc_timeout_id > 0)
 			ecore_timer_del(alc_timeout_id);
 		alc_timeout_id = NULL;

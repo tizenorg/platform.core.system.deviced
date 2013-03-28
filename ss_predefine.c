@@ -42,6 +42,7 @@
 #include "include/ss_data.h"
 #include "ss_common.h"
 #include "poll.h"
+#include "setting.h"
 #include "led/led.h"
 
 #define PREDEFINE_SO_DIR		PREFIX"/lib/ss_predefine/"
@@ -862,6 +863,9 @@ static void poweroff_control_cb(keynode_t *in_key, struct ss_main_data *ad)
 		ss_action_entry_call_internal(PREDEF_REBOOT, 0);
 		break;
 	}
+
+	if (update_pm_setting)
+		update_pm_setting(SETTING_POWEROFF, val);
 }
 
 void ss_predefine_internal_init(void)
