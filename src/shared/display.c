@@ -193,6 +193,9 @@ API int display_release_brightness(void)
 
 	if (auto_brt_state == SETTING_BRIGHTNESS_AUTOMATIC_OFF) {
 		device_set_property(DEVICE_TYPE_DISPLAY, PROP_DISPLAY_BRIGHTNESS, setting_val);
+		if (vconf_set_int(VCONFKEY_PM_CURRENT_BRIGHTNESS, setting_val) != 0) {
+			PRT_ERR("Failed to set VCONFKEY_PM_CURRENT_BRIGHTNESS value");
+		}
 	} else if (auto_brt_state == SETTING_BRIGHTNESS_AUTOMATIC_PAUSE) {
 		PRT_DBG("Auto brightness will be enable");
 		vconf_set_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT, SETTING_BRIGHTNESS_AUTOMATIC_ON);
