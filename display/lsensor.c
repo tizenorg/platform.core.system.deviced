@@ -27,6 +27,7 @@
 #include <sensor.h>
 #include <Ecore.h>
 
+#include "util.h"
 #include "core.h"
 #include "device-node.h"
 

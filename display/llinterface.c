@@ -26,6 +26,7 @@
 #include <unistd.h>
 #include <limits.h>
 
+#include "util.h"
 #include "llinterface.h"
 #include "conf.h"
 #include "vconf.h"

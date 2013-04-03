@@ -23,7 +23,6 @@
 #ifndef __POWER_MANAGER_H__
 #define __POWER_MANAGER_H__
 
-#include "util.h"
 #include "poll.h"
 #include "llinterface.h"
 #include "setting.h"

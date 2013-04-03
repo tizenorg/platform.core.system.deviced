@@ -24,6 +24,7 @@
 #include <vconf.h>
 #include <Ecore.h>
 
+#include "util.h"
 #include "core.h"
 #include "poll.h"
 #include "core/queue.h"

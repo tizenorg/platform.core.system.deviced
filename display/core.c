@@ -39,6 +39,7 @@
 #include <vconf-keys.h>
 #include <Ecore.h>
 
+#include "util.h"
 #include "core.h"
 #include "battery.h"
 #include "device-node.h"

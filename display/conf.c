@@ -19,6 +19,7 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "util.h"
 #include "conf.h"
 
 enum {

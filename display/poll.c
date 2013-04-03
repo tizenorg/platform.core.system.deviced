@@ -40,6 +40,7 @@
 #include <sys/un.h>
 #include <Ecore.h>
 
+#include "util.h"
 #include "core.h"
 #include "poll.h"
 
