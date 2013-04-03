@@ -41,7 +41,8 @@
 
 #define PREDEF_USBCON			"usbcon"
 #define PREDEF_EARJACKCON		"earjack_predef_internal"
-#define PREDEF_DEVICE_CHANGED	"device_changed"
+#define PREDEF_DEVICE_CHANGED		"device_changed"
+#define PREDEF_BATTERY_CF_OPENED	"battery_cf_opened"
 
 #define TVOUT_X_BIN			"/usr/bin/xberc"
 #define TVOUT_FLAG			0x00000001
@@ -353,10 +354,26 @@ static void charge_cb(struct ss_main_data *ad)
 	int val = -1;
 	int charge_now = -1;
 	int capacity = -1;
+	int ret;
 	char params[BUFF_MAX];
 	static int bat_full_noti = 0;
+	static int present_status = 1;
 
 	ss_lowbat_monitor(NULL);
+
+	ret = device_get_property(DEVICE_TYPE_POWER, PROP_POWER_PRESENT, &val);
+	if (ret != 0)
+		PRT_TRACE_ERR("fail to get battery present value");
+	if (val == 0 && present_status == 1) {
+		present_status = 0;
+		PRT_TRACE_ERR("battery cf is opened");
+		ss_action_entry_call_internal(PREDEF_BATTERY_CF_OPENED, 0);
+	}
+
+	if (val == 1 && present_status == 0) {
+		present_status = 1;
+		PRT_TRACE_ERR("battery cf is closed again");
+	}
 
 	if (device_get_property(DEVICE_TYPE_POWER, PROP_POWER_CHARGE_NOW, &charge_now) != 0 ||
 	    device_get_property(DEVICE_TYPE_POWER, PROP_POWER_CAPACITY, &capacity) != 0)
@@ -639,6 +656,22 @@ int earjackcon_def_predefine_action(int argc, char **argv)
 	return -1;
 }
 
+static int battery_def_cf_opened_actioin(int argc, char **argv)
+{
+	int ret;
+	static int present_status = 1;
+	bundle *b;
+
+	bundle_add(b, "_SYSPOPUP_CONTENT_", "battdisconnect");
+
+	ret = syspopup_launch("lowbat-syspopup", b);
+
+	if (ret < 0) {
+	PRT_TRACE_ERR("popup launch failed");
+	}
+
+	bundle_free(b);
+}
 
 static void pci_keyboard_add_cb(struct ss_main_data *ad)
 {
@@ -664,6 +697,7 @@ void ss_predefine_device_change_init(void)
 {
 	ss_action_entry_add_internal(PREDEF_USBCON, usbcon_def_predefine_action, NULL, NULL);
 	ss_action_entry_add_internal(PREDEF_EARJACKCON, earjackcon_def_predefine_action, NULL, NULL);
+	ss_action_entry_add_internal(PREDEF_BATTERY_CF_OPENED, battery_def_cf_opened_actioin, NULL, NULL);
 }
 
 int ss_device_change_init(struct ss_main_data *ad)
