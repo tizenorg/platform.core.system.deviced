@@ -99,6 +99,15 @@ struct state {
 	int timeout;
 } states[S_END];
 
+enum pm_status {
+	PM_STATUS_LCD,
+	PM_STATUS_MAX
+};
+
+int pm_add_listener(enum pm_status status, int (*func)(void *data));
+int pm_del_listener(enum pm_status status, int (*func)(void *data));
+void pm_talker(enum pm_status status, void *value);
+
 /* If the bit in a condition variable is set,
  *  we cannot transit the state until clear this bit. */
 int trans_condition;
