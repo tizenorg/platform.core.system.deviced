@@ -44,6 +44,7 @@ SET(SRCS ${SRCS}
 	display/setting.c
 	display/poll.c
 	display/core.c
+	display/display-dbus.c
 	display/lsensor.c
 	display/key-filter.c
 	display/battery.c)

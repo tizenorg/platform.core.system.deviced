@@ -1360,6 +1360,7 @@ enum {
 	INIT_INTERFACE,
 	INIT_POLL,
 	INIT_FIFO,
+	INIT_DBUS,
 	INIT_END
 };
 
@@ -1368,6 +1369,7 @@ static char *errMSG[INIT_END] = {
 	[INIT_INTERFACE] = "lowlevel interface(sysfs or others) init error",
 	[INIT_POLL] = "input devices poll init error",
 	[INIT_FIFO] = "FIFO poll init error",
+	[INIT_DBUS] = "d-bus init error",
 };
 
 /* logging indev_list for debug */
@@ -1579,6 +1581,10 @@ void start_pm_main(void)
 		case INIT_POLL:
 			LOGINFO("poll init");
 			ret = init_pm_poll(poll_callback);
+			break;
+		case INIT_DBUS:
+			LOGINFO("dbus init");
+			ret = init_pm_dbus();
 			break;
 		}
 		if (ret != 0) {

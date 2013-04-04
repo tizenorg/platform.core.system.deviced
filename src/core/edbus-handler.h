@@ -27,8 +27,26 @@
 #define OBJECT_PATH		"/Org/Tizen/System/DeviceD"
 #define INTERFACE_NAME		BUS_NAME
 
+/*
+ * Core service
+ *   get/set device status
+ *   operations about device
+ */
+#define DEVICED_PATH_CORE		OBJECT_PATH"/Core"
+#define DEVICED_INTERFACE_CORE		INTERFACE_NAME".core"
+
+/*
+ * Display service
+ *   start/stop display(pm)
+ *   get/set brightness
+ *   operations about display
+ */
+#define DEVICED_PATH_DISPLAY		OBJECT_PATH"/Display"
+#define DEVICED_INTERFACE_DISPLAY	INTERFACE_NAME".display"
+
 void edbus_init(void);
 void edbus_fini(void);
 int register_edbus_signal_handler(char *signal_name, E_DBus_Signal_Cb cb);
+E_DBus_Interface *get_edbus_interface(const char *path);
 
 #endif /* __SS_EDBUS_HANDLE_H__ */

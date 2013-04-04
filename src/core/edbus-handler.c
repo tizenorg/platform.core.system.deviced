@@ -21,6 +21,7 @@
 #include "core/log.h"
 #include "core/data.h"
 #include "core/edbus-handler.h"
+#include "core/common.h"
 
 #define EDBUS_INIT_RETRY_COUNT 5
 
@@ -29,10 +30,59 @@ struct edbus_list{
 	E_DBus_Signal_Handler *handler;
 };
 
+static struct edbus_object {
+	const char *path;
+	const char *interface;
+	E_DBus_Object *obj;
+	E_DBus_Interface *iface;
+} edbus_objects[] = {
+	{ DEVICED_PATH_CORE   , DEVICED_INTERFACE_CORE   , NULL, NULL },
+	{ DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY, NULL, NULL },
+	/* Add new object & interface here*/
+};
+
 static Eina_List *edbus_handler_list;
 static int edbus_init_val;
 static E_DBus_Connection *edbus_conn;
 static DBusPendingCall *edbus_request_name;
+
+static int register_edbus_interface(struct edbus_object *object)
+{
+	int ret;
+
+	if (!object) {
+		PRT_TRACE_ERR("object is invalid value!");
+		return -1;
+	}
+
+	object->obj = e_dbus_object_add(edbus_conn, object->path, NULL);
+	if (!object->obj) {
+		PRT_TRACE_ERR("fail to add edbus obj");
+		return -1;
+	}
+
+	object->iface = e_dbus_interface_new(object->interface);
+	if (!object->iface) {
+		PRT_TRACE_ERR("fail to add edbus interface");
+		return -1;
+	}
+
+	e_dbus_object_interface_attach(object->obj, object->iface);
+
+	return 0;
+}
+
+E_DBus_Interface *get_edbus_interface(const char *path)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(edbus_objects); i++)
+		if (!strcmp(path, edbus_objects[i].path))
+			return edbus_objects[i].iface;
+
+	return NULL;
+}
+
 static void unregister_edbus_signal_handle(void)
 {
 	Eina_List *tmp;
@@ -106,6 +156,7 @@ void edbus_fini(void)
 void edbus_init(void)
 {
 	int retry = EDBUS_INIT_RETRY_COUNT;
+	int i, r;
 
 	while (--retry) {
 		edbus_init_val = e_dbus_init();
@@ -138,6 +189,16 @@ void edbus_init(void)
 			goto err_dbus_close;
 		}
 	}
+
+	for (i = 0; i < ARRAY_SIZE(edbus_objects); i++) {
+		r = register_edbus_interface(&edbus_objects[i]);
+		if (r < 0)
+			PRT_TRACE_ERR("fail to add obj & interface for %s",
+				    edbus_objects[i].interface);
+
+		PRT_TRACE("add new obj for %s", edbus_objects[i].interface);
+	}
+
 	PRT_TRACE("start edbus service");
 	return;
 
