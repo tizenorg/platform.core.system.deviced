@@ -19,13 +19,33 @@
 #ifndef __DEVICES_H__
 #define __DEVICES_H__
 
+#include <errno.h>
+
 struct device_ops {
 	void (*init) (void *data);
 	void (*exit) (void *data);
+	int (*start) (void);
+	int (*stop) (void);
 };
 
 void devices_init(void *data);
 void devices_exit(void *data);
+
+static inline int device_start(struct device_ops *dev)
+{
+	if (dev && dev->start)
+		return dev->start();
+
+	return -EINVAL;
+}
+
+static inline int device_stop(struct device_ops *dev)
+{
+	if (dev && dev->stop)
+		return dev->stop();
+
+	return -EINVAL;
+}
 
 extern const struct device_ops edbus_device_ops;
 extern const struct device_ops display_device_ops;
