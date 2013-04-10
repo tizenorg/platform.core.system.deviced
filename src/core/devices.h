@@ -51,6 +51,7 @@ extern const struct device_ops edbus_device_ops;
 extern const struct device_ops display_device_ops;
 extern const struct device_ops sysnoti_device_ops;
 extern const struct device_ops noti_device_ops;
+extern const struct device_ops control_device_ops;
 extern const struct device_ops core_device_ops;
 extern const struct device_ops signal_device_ops;
 extern const struct device_ops predefine_device_ops;

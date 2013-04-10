@@ -53,9 +53,13 @@ SET(SRCS ${SRCS}
 SET(SRCS ${SRCS}
 	src/led/led.c)
 
+SET(SRCS ${SRCS}
+	src/control/control.c)
+
 # libdeviced
 SET(DEVICED_SRCS
 	src/shared/battery.c
+	src/shared/control.c
 	src/shared/deviced-conf.c
 	src/shared/deviced-noti.c
 	src/shared/deviced-util.c
@@ -66,6 +70,7 @@ SET(DEVICED_SRCS
 
 SET(DEVICED_HEADERS
 	src/deviced/dd-battery.h
+	src/deviced/dd-control.h
 	src/deviced/dd-deviced.h
 	src/deviced/dd-deviced-managed.h
 	src/deviced/dd-display.h

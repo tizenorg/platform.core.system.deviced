@@ -29,6 +29,7 @@ static const struct device_ops *devices[] = {
 	/* The below devices don't have any init dependency */
 	&sysnoti_device_ops,
 	&noti_device_ops,
+	&control_device_ops,
 	&core_device_ops,
 	&signal_device_ops,
 	&predefine_device_ops,
