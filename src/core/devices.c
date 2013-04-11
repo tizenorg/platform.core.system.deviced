@@ -47,6 +47,7 @@ static const struct device_ops *devices[] = {
 	&mmc_device_ops,
 	&led_device_ops,
 	&vibrator_device_ops,
+	&notifier_device_ops,
 };
 
 void devices_init(void *data)

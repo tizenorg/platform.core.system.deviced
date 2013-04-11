@@ -13,6 +13,7 @@ SET(VERSION 0.1.0)
 SET(SRCS
 	src/battery/lowbat-handler.c
 	src/bs/bs.c
+	src/core/device-notifier.c
 	src/core/main.c
 	src/core/sysnoti.c
 	src/core/launch.c

@@ -46,6 +46,7 @@
 #include "core/queue.h"
 #include "core/data.h"
 #include "core/devices.h"
+#include "core/device-notifier.h"
 
 #define USB_CON_PIDFILE			"/var/run/.system_server.pid"
 #define PM_STATE_LOG_FILE		"/var/log/pm_state.log"
@@ -261,99 +262,6 @@ static Eina_Bool del_sleep_cond(void *data)
 
 	set_process_active(EINA_FALSE, (pid_t)data);
 	return EINA_FALSE;
-}
-
-struct pm_listener {
-	enum pm_status status;
-	int (*func)(void *data);
-};
-
-Eina_List *pm_listener_list;
-
-int pm_add_listener(enum pm_status status, int (*func)(void *data))
-{
-	Eina_List *n;
-	struct pm_listener *data, *listener;
-
-	LOGINFO("%d, %x", status, func);
-
-	if (!func) {
-		LOGERR("invalid func address!");
-		return -1;
-	}
-
-	EINA_LIST_FOREACH(pm_listener_list, n, data)
-		if (status == data->status && func == (data->func)) {
-			LOGERR("function is already registered! [%d, %x]",
-			    status, func);
-			return -1;
-		}
-
-	listener = malloc(sizeof(struct pm_listener));
-	if (!listener) {
-		LOGERR("Fail to malloc for listener!");
-		return -1;
-	}
-
-	listener->status = status;
-	listener->func = func;
-
-	pm_listener_list = eina_list_append(pm_listener_list, listener);
-
-	return 0;
-}
-
-int pm_del_listener(enum pm_status status, int (*func)(void *data))
-{
-	Eina_List *n, *next;
-	struct pm_listener *listener;
-
-	if (!func) {
-		LOGERR("invalid func address!");
-		return -1;
-	}
-
-	EINA_LIST_FOREACH_SAFE(pm_listener_list, n, next, listener)
-		if (status == listener->status && func == (listener->func)) {
-			LOGINFO("[%d, %x]", status, func);
-			free(listener);
-			pm_listener_list = eina_list_remove_list(
-					    pm_listener_list, n);
-		}
-
-	return 0;
-}
-
-static void pm_del_listener_all(void)
-{
-	Eina_List *n, *next;
-	struct pm_listener *listener;
-
-	EINA_LIST_FOREACH_SAFE(pm_listener_list, n, next, listener)
-		if (listener) {
-			free(listener);
-			pm_listener_list = eina_list_remove_list(pm_listener_list, n);
-		}
-
-	LOGINFO("all deleted!");
-}
-
-void pm_talker(enum pm_status status, void *data)
-{
-	Eina_List *n;
-	struct pm_listener *listener;
-	int cnt = 0;
-
-	EINA_LIST_FOREACH(pm_listener_list, n, listener) {
-		if (status == listener->status) {
-			if (listener->func) {
-				listener->func(data);
-				cnt++;
-			}
-		}
-	}
-
-	LOGINFO("cb is called! status:%d, cnt:%d ", status, cnt);
 }
 
 /* update transition condition for application requrements */
@@ -871,7 +779,7 @@ static int default_action(int timeout)
 
 	if (pm_cur_state != pm_old_state && pm_cur_state != S_SLEEP) {
 		set_setting_pmstate(pm_cur_state);
-		pm_talker(PM_STATUS_LCD, pm_cur_state);
+		device_notify(DEVICE_NOTIFIER_LCD, pm_cur_state);
 	}
 	switch (pm_cur_state) {
 	case S_NORMAL:
@@ -1624,7 +1532,6 @@ static void end_pm_main(void *data)
 	int i;
 
 	end_battinfo_gathering();
-	pm_del_listener_all();
 
 	for (i = i - 1; i >= INIT_SETTING; i--) {
 		switch (i) {

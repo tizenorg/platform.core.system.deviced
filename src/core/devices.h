@@ -69,5 +69,6 @@ extern const struct device_ops pmon_device_ops;
 extern const struct device_ops mmc_device_ops;
 extern const struct device_ops led_device_ops;
 extern const struct device_ops vibrator_device_ops;
+extern const struct device_ops notifier_device_ops;
 
 #endif
