@@ -38,9 +38,7 @@
 #define PREDEF_MOUNT_MMC		"mountmmc"
 #define PREDEF_UNMOUNT_MMC		"unmountmmc"
 #define PREDEF_FORMAT_MMC		"formatmmc"
-#define PREDEF_CHECK_SMACK_MMC	"checksmackmmc"
-#define PREDEF_CHECK_MMC		"checkmmc"
-#define PREDEF_CHECK_MMC_PROC	"checkmmcproc"
+#define PREDEF_CHECK_SMACK_MMC		"checksmackmmc"
 
 #define MMC_MOUNT_POINT			"/opt/storage/sdcard"
 
@@ -504,33 +502,6 @@ static const char **get_check_argument(const char *path)
 	return NULL;
 }
 
-static int mmc_check_process_launch(int argc,  char **argv)
-{
-	const char **params;
-	char buf[NAME_MAX];
-	int pid;
-
-	params = get_check_argument((const char*)argv[1]);
-	if ((pid = exec_process(params)) < 0) {
-		PRT_TRACE_ERR("mmc checker failed");
-		goto run_mount;
-	}
-
-	snprintf(buf, sizeof(buf), "%s%d", "/proc/", pid);
-	PRT_TRACE_ERR("child process : %s", buf);
-
-	while (1) {
-		sleep(1);
-		PRT_TRACE_ERR("mmc checking ....");
-		if (access(buf, R_OK) != 0)
-			break;
-	}
-run_mount:
-	ss_action_entry_call_internal(PREDEF_CHECK_MMC,0);
-	return 0;
-
-}
-
 int ss_mmc_unmounted(int argc, char **argv)
 {
 	int option = -1;
@@ -558,17 +529,6 @@ int ss_mmc_unmounted(int argc, char **argv)
 		      VCONFKEY_SYSMAN_MMC_INSERTED_NOT_MOUNTED);
 	vconf_set_int(VCONFKEY_SYSMAN_MMC_UNMOUNT,
 		      VCONFKEY_SYSMAN_MMC_UNMOUNT_COMPLETED);
-	return 0;
-}
-
-
-static int __ss_rw_mount(const char* szPath)
-{
-	struct statvfs mount_stat;
-	if (!statvfs(szPath, &mount_stat)) {
-		if ((mount_stat.f_flag & ST_RDONLY) == ST_RDONLY)
-			return -1;
-	}
 	return 0;
 }
 
@@ -660,7 +620,17 @@ static int __mmc_mount_fs(void)
 	return 0;
 }
 
-static int mmc_check_mount(int argc,  char **argv)
+static int __ss_rw_mount(const char* szPath)
+{
+	struct statvfs mount_stat;
+	if (!statvfs(szPath, &mount_stat)) {
+		if ((mount_stat.f_flag & ST_RDONLY) == ST_RDONLY)
+			return -1;
+	}
+	return 0;
+}
+
+static int mmc_check_mount(void)
 {
 	int r;
 	r = __mmc_mount_fs();
@@ -687,17 +657,40 @@ mount_fail:
 	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_REMOVED);
 	vconf_set_int(VCONFKEY_SYSMAN_MMC_MOUNT, VCONFKEY_SYSMAN_MMC_MOUNT_FAILED);
 	vconf_set_int(VCONFKEY_SYSMAN_MMC_ERR_STATUS, VCONFKEY_SYSMAN_MMC_EINVAL);
-	return 0;
+	return -1;
 mount_wait:
 	PRT_TRACE_ERR("wait ext4 smack rule checking");
 	return 0;
 }
 
+static int mmc_check_process_launch(char *path)
+{
+	const char **params;
+	char buf[NAME_MAX];
+	int pid;
+
+	params = get_check_argument((const char*)path);
+	if ((pid = exec_process(params)) < 0) {
+		PRT_TRACE_ERR("mmc checker failed");
+		goto run_mount;
+	}
+
+	snprintf(buf, sizeof(buf), "%s%d", "/proc/", pid);
+	PRT_TRACE_ERR("child process : %s", buf);
+
+	while (1) {
+		PRT_TRACE_ERR("mmc checking ....");
+		if (access(buf, R_OK) != 0)
+			break;
+		sleep(1);
+	}
+run_mount:
+	return mmc_check_mount();
+}
+
 static int __check_mmc_fs(void)
 {
 	char buf[NAME_MAX];
-	char params[NAME_MAX];
-	char options[NAME_MAX];
 	int fd;
 	int blk_num;
 	int ret = 0;
@@ -727,11 +720,7 @@ static int __check_mmc_fs(void)
 		PRT_TRACE_ERR("fail to check mount point %s", buf);
 		return -1;
 	}
-	snprintf(params, sizeof(params), "%d", inserted_type);
-	if (ss_action_entry_call_internal(PREDEF_CHECK_MMC_PROC, 2, params, buf) < 0) {
-		PRT_TRACE_ERR("fail to launch mmc checker,direct mount mmc");
-		ret = mmc_check_mount(0, NULL);
-	}
+	ret = mmc_check_process_launch(buf);
 	return ret;
 }
 
@@ -799,8 +788,6 @@ static void mmc_init(void *data)
 	ss_action_entry_add_internal(PREDEF_UNMOUNT_MMC, ss_mmc_unmounted, NULL, NULL);
 	ss_action_entry_add_internal(PREDEF_FORMAT_MMC, ss_mmc_format, NULL, NULL);
 	ss_action_entry_add_internal(PREDEF_CHECK_SMACK_MMC, ss_mmc_check_smack, NULL, NULL);
-	ss_action_entry_add_internal(PREDEF_CHECK_MMC, mmc_check_mount, NULL, NULL);
-	ss_action_entry_add_internal(PREDEF_CHECK_MMC_PROC, mmc_check_process_launch, NULL, NULL);
 	/* mmc card mount */
 	if (__check_mmc_fs() != 0)
 		PRT_TRACE_ERR("fail to check mmc");
