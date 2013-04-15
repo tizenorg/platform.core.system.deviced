@@ -114,13 +114,13 @@ static int trans_table[S_END][EVENT_END] = {
 #define MASK_MARGIN_TIMEOUT	(0x1 << 8)
 #define SHIFT_CHANGE_STATE	7
 #define CHANGE_STATE_BIT	0xF00	/* 1111 0000 0000 */
-#define LOCK_SCREEN_TIMEOUT	10
+#define LOCK_SCREEN_TIMEOUT	5
 #define SHIFT_LOCK_FLAG	16
 #define HOLD_KEY_BLOCK_BIT	0x1
 
 #define DEFAULT_NORMAL_TIMEOUT	30
 #define DEFAULT_DIM_TIMEOUT		5
-#define DEFAULT_OFF_TIMEOUT		5
+#define DEFAULT_OFF_TIMEOUT		1
 #define GET_HOLDKEY_BLOCK_STATE(x) ((x >> SHIFT_LOCK_FLAG) & HOLD_KEY_BLOCK_BIT)
 #define LOCK_SCREEN_WATING_TIME		50000	/* 50 ms */
 #define LOCK_SCREEN_WATING_MAX_COUNT	14	/* 50 * 14 : 700 ms at worst */
@@ -376,13 +376,15 @@ static int proc_condition(PMMsg *data)
 	if (val != 0) {
 		if ((val & 0x1)) {
 			reset_timeout(states[pm_cur_state].timeout);
-			LOGINFO("reset timeout\n", "S_LCDOFF", pid, pname);
+			LOGINFO("reset timeout (%d seconds)",
+					states[pm_cur_state].timeout);
 		}
 	} else {
 		/* guard time for suspend */
 		if (pm_cur_state == S_LCDOFF) {
-			reset_timeout(5);
-			LOGINFO("margin timeout (5 seconds)\n");
+			reset_timeout(states[S_LCDOFF].timeout);
+			LOGINFO("margin timeout (%d seconds)",
+					states[S_LCDOFF].timeout);
 		}
 	}
 

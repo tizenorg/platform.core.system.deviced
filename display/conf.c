@@ -33,7 +33,7 @@ static const char *def_values[][IDX_END] = {
 	{"PM_TO_START", "0"},
 	{"PM_TO_NORMAL", "600"},
 	{"PM_TO_LCDDIM", "5"},
-	{"PM_TO_LCDOFF", "5"},
+	{"PM_TO_LCDOFF", "1"},
 	{"PM_TO_SLEEP", "0"},
 	{"PM_SYS_POWER", "/sys/power/state"},
 	{"PM_SYS_BRIGHT", "/sys/class/backlight/mobile-bl/brightness"},

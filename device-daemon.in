@@ -9,7 +9,7 @@ export PM_EXEC_PRG=@PREFIX@/bin/@IDLE_LOCK@
 
 export PM_TO_NORMAL=600 # normal state timeout seconds
 export PM_TO_LCDDIM=5 # dim state timeout seconds
-export PM_TO_LCDOFF=5 # off state timeout seconds
+export PM_TO_LCDOFF=1 # off state timeout seconds
 #export PM_TO_LCDOFF=0  # prevent suspend mode 
 
 export PM_SYS_DIMBRT=0
