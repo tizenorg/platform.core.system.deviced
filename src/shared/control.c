@@ -38,6 +38,11 @@ static int deviced_control_common(int device, bool enable)
 		    buf_dev, buf_enable);
 }
 
+API int deviced_mmc_control(bool enable)
+{
+	return deviced_control_common(DEVICE_CONTROL_MMC, enable);
+}
+
 /*
  * example of control api
  * API int deviced_display_control(bool enable)

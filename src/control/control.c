@@ -34,6 +34,7 @@ static const struct control_device {
 	 * { DEVICE_CONTROL_DISPLAY,       &display_device_ops },
 	 */
 	/* Add id & ops to provide start/stop control */
+	{ DEVICE_CONTROL_MMC,	&mmc_device_ops },
 };
 
 static int control_handler(int argc, char **argv)

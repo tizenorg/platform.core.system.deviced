@@ -36,17 +36,14 @@ extern "C" {
 enum control_device_type {
 	/* Add device define here  */
 	/* DEVICE_CONTROL_DISPLAY, */
+	DEVICE_CONTROL_MMC,
 	DEVICE_CONTROL_MAX,
 };
 
 /*
  * Add new function to control in library.
  */
-/*
- * exmaple code
- * int deviced_display_control(bool enable);
- */
-
+int deviced_mmc_control(bool enable);
 
 #ifdef __cplusplus
 }

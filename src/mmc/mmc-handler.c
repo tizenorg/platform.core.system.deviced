@@ -28,6 +28,7 @@
 #include <sys/statfs.h>
 #include <bundle.h>
 #include <signal.h>
+#include <stdbool.h>
 
 #include "core/log.h"
 #include "core/common.h"
@@ -136,11 +137,18 @@ static const char *ext4_check_arg[] = {
 static int smack;
 static int mmc_popup_pid;
 static mmc_fs_type inserted_type;
+static bool mmc_disabled = false;
 
 static void __attribute__ ((constructor)) smack_check(void)
 {
 	struct statfs sfs;
 	int ret;
+
+	if (mmc_disabled) {
+		PRT_TRACE("mmc is blocked!");
+		vconf_set_int(VCONFKEY_SYSMAN_MMC_UNMOUNT, VCONFKEY_SYSMAN_MMC_UNMOUNT_COMPLETED);
+		return -ENODEV;
+	}
 
 	do {
 		ret = statfs(SMACKFS_MNT, &sfs);
@@ -793,6 +801,22 @@ static void mmc_init(void *data)
 		PRT_TRACE_ERR("fail to check mmc");
 }
 
+static void mmc_start(void)
+{
+	mmc_disabled = false;
+	PRT_TRACE("start");
+}
+
+static void mmc_stop(void)
+{
+	mmc_disabled = true;
+	vconf_set_int(VCONFKEY_SYSMAN_MMC_UNMOUNT, VCONFKEY_SYSMAN_MMC_UNMOUNT_COMPLETED);
+
+	PRT_TRACE("stop");
+}
+
 const struct device_ops mmc_device_ops = {
 	.init = mmc_init,
+	.start = mmc_start,
+	.stop = mmc_stop,
 };
