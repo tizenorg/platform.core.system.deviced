@@ -31,7 +31,8 @@
 #include "dd-display.h"
 
 #define DISPLAY_MAX_BRIGHTNESS  100
-#define DISPLAY_MIN_BRIGHTNESS  0
+#define DISPLAY_MIN_BRIGHTNESS  1
+#define DISPLAY_DIM_BRIGHTNESS  0
 
 #define SOCK_PATH			"/tmp/pm_sock"
 #define SHIFT_UNLOCK			4
@@ -88,7 +89,13 @@ API int display_set_brightness_with_setting(int val)
 	if (vconf_get_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT, &auto_brt_state) != 0) {
 		PRT_ERR("Failed to get VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT value");
 		errno = EPERM;
-		return -1;
+		return -errno;
+	}
+
+	if (val == DISPLAY_DIM_BRIGHTNESS) {
+		PRT_DBG("application can not set this value(DIM VALUE:%d)", val);
+		errno = EPERM;
+		return -errno;
 	}
 
 	if (auto_brt_state == SETTING_BRIGHTNESS_AUTOMATIC_ON) {
@@ -119,7 +126,13 @@ API int display_set_brightness(int val)
 	if (vconf_get_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT, &auto_brt_state) != 0) {
 		PRT_ERR("Failed to get VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT value");
 		errno = EPERM;
-		return -1;
+		return -errno;
+	}
+
+	if (val == DISPLAY_DIM_BRIGHTNESS) {
+		PRT_DBG("application can not set this value(DIM VALUE:%d)", val);
+		errno = EPERM;
+		return -errno;
 	}
 
 	vconf_set_int(VCONFKEY_PM_CUSTOM_BRIGHTNESS_STATUS, VCONFKEY_PM_CUSTOM_BRIGHTNESS_ON);
