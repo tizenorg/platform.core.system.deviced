@@ -48,6 +48,7 @@
 #include "core/data.h"
 #include "core/devices.h"
 #include "core/device-notifier.h"
+#include "core/udev.h"
 
 #define USB_CON_PIDFILE			"/var/run/.system_server.pid"
 #define PM_STATE_LOG_FILE		"/var/log/pm_state.log"
@@ -1470,6 +1471,31 @@ static int unset_noti(int noti_fd)
 }
 
 static int noti_fd = -1;
+
+static int input_device_add(void *data)
+{
+	char *path = data;
+
+	if (!path)
+		return -EINVAL;
+
+	input_action(ADD, path);
+
+	return 0;
+}
+
+static int input_device_remove(void *data)
+{
+	char *path = data;
+
+	if (!path)
+		return -EINVAL;
+
+	input_action(REMOVE, path);
+
+	return 0;
+}
+
 /**
  * Power manager Main
  *
@@ -1488,6 +1514,9 @@ static void display_init(void *data)
 	/* noti init for new input device like bt mouse */
 	indev_list = NULL;
 	set_noti(&noti_fd);
+
+	register_notifier(DEVICE_NOTIFIER_INPUT_ADD, input_device_add);
+	register_notifier(DEVICE_NOTIFIER_INPUT_REMOVE, input_device_remove);
 
 	for (i = INIT_SETTING; i < INIT_END; i++) {
 		switch (i) {
@@ -1555,6 +1584,10 @@ static void display_exit(void *data)
 			exit_sysfs();
 			break;
 		case INIT_POLL:
+			unregister_notifier(DEVICE_NOTIFIER_INPUT_ADD,
+				input_device_add);
+			unregister_notifier(DEVICE_NOTIFIER_INPUT_REMOVE,
+				input_device_remove);
 			unset_noti(noti_fd);
 			exit_pm_poll();
 			break;
