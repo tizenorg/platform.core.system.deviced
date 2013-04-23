@@ -42,6 +42,7 @@
 #include "util.h"
 #include "core.h"
 #include "poll.h"
+#include "core/devices.h"
 
 #define SHIFT_UNLOCK                    4
 #define SHIFT_UNLOCK_PARAMETER          12
@@ -76,6 +77,11 @@ static Eina_Bool pm_handler(void *data, Ecore_Fd_Handler *fd_handler)
 	int *fd = (int *)data;
 	int ret;
 	int clilen = sizeof(clientaddr);
+
+	if (device_get_status(&display_device_ops) != DEVICE_OPS_STATUS_START) {
+		LOGERR("display is not started!");
+		return EINA_FALSE;
+	}
 
 	if (g_pm_callback == NULL) {
 		return EINA_FALSE;

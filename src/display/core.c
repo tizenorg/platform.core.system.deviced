@@ -76,6 +76,8 @@ static void (*power_saving_func) (int onoff);
 static void reset_timeout(int timeout);
 static int get_lcd_timeout_from_settings();
 
+static enum device_ops_status status = DEVICE_OPS_STATUS_UNINIT;
+
 int pm_cur_state;
 int pm_old_state;
 Ecore_Timer *timeout_src_id;
@@ -781,6 +783,11 @@ static int default_action(int timeout)
 	int lock_state = -1;
 	struct itimerval val;
 
+	if (status != DEVICE_OPS_STATUS_START) {
+		LOGERR("display is not started!");
+		return -EINVAL;
+	}
+
 	if (pm_cur_state != pm_old_state && pm_cur_state != S_SLEEP) {
 		set_setting_pmstate(pm_cur_state);
 		device_notify(DEVICE_NOTIFIER_LCD, pm_cur_state);
@@ -1467,7 +1474,7 @@ static int noti_fd = -1;
  * Power manager Main
  *
  */
-static void start_pm_main(void *data)
+static void display_init(void *data)
 {
 	int ret, i;
 	unsigned int flags = (WITHOUT_STARTNOTI | FLAG_X_DPMS);
@@ -1529,12 +1536,14 @@ static void start_pm_main(void *data)
 		}
 		start_battinfo_gathering(30);
 	}
+	status = DEVICE_OPS_STATUS_START;
 }
 
-static void end_pm_main(void *data)
+static void display_exit(void *data)
 {
 	int i;
 
+	status = DEVICE_OPS_STATUS_STOP;
 	end_battinfo_gathering();
 
 	for (i = i - 1; i >= INIT_SETTING; i--) {
@@ -1558,9 +1567,15 @@ static void end_pm_main(void *data)
 	LOGINFO("Stop power manager");
 }
 
+static int display_status(void)
+{
+	return status;
+}
+
 const struct device_ops display_device_ops = {
-	.init = start_pm_main,
-	.exit = end_pm_main,
+	.init = display_init,
+	.exit = display_exit,
+	.status = display_status,
 };
 
 /**

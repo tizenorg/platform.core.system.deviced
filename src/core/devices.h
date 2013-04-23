@@ -27,6 +27,14 @@ struct device_ops {
 	void (*exit) (void *data);
 	int (*start) (void);
 	int (*stop) (void);
+	int (*status) (void);
+};
+
+enum device_ops_status {
+	DEVICE_OPS_STATUS_UNINIT,
+	DEVICE_OPS_STATUS_START,
+	DEVICE_OPS_STATUS_STOP,
+	DEVICE_OPS_STATUS_MAX,
 };
 
 void devices_init(void *data);
@@ -44,6 +52,14 @@ static inline int device_stop(struct device_ops *dev)
 {
 	if (dev && dev->stop)
 		return dev->stop();
+
+	return -EINVAL;
+}
+
+static inline int device_get_status(struct device_ops *dev)
+{
+	if (dev && dev->status)
+		return dev->status();
 
 	return -EINVAL;
 }
