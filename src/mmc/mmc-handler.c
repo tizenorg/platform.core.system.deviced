@@ -569,7 +569,7 @@ static int ss_mmc_unmounted(int argc, char **argv)
 		return -1;
 	}
 
-	if (mmc_umount(option) != 0) {
+	if (mmc_umount(MNT_DETACH) != 0) {
 		PRT_TRACE_ERR("Failed to unmount mmc card\n");
 		vconf_set_int(VCONFKEY_SYSMAN_MMC_UNMOUNT,
 			VCONFKEY_SYSMAN_MMC_UNMOUNT_FAILED);
