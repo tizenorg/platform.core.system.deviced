@@ -29,6 +29,7 @@
 #include "core.h"
 #include "poll.h"
 #include "core/queue.h"
+#include "core/common.h"
 #include "core/data.h"
 
 #include <linux/input.h>
@@ -51,6 +52,10 @@
 #define KEY_COMBINATION_STOP		0
 #define KEY_COMBINATION_START		1
 #define KEY_COMBINATION_SCREENCAPTURE	2
+
+#define BRIGHTNESS_UP			1
+#define BRIGHTNESS_DOWN			2
+#define BRIGHTNESS_CHANGE		10
 
 static struct timeval pressed_time;
 static Ecore_Timer *longkey_timeout_id = NULL;
@@ -224,6 +229,114 @@ static int process_volumedown_key(struct input_event *pinput)
 	return ignore;
 }
 
+static inline int calculate_brightness(int val, int action)
+{
+	if (action == BRIGHTNESS_UP)
+		val += BRIGHTNESS_CHANGE;
+	else if (action == BRIGHTNESS_DOWN)
+		val -= BRIGHTNESS_CHANGE;
+
+	val = max(val, PM_MIN_BRIGHTNESS);
+	val = min(val, PM_MAX_BRIGHTNESS);
+
+	return val;
+}
+
+static void update_automatic_brightness(int action)
+{
+	int ret, val, new_val;
+
+	ret = vconf_get_int(VCONFKEY_SETAPPL_LCD_AUTOMATIC_BRIGHTNESS, &val);
+	if (ret < 0) {
+		_E("Fail to get automatic brightness!");
+		return;
+	}
+
+	new_val = calculate_brightness(val, action);
+
+	if (new_val == val)
+		return;
+
+	ret = vconf_set_int(VCONFKEY_SETAPPL_LCD_AUTOMATIC_BRIGHTNESS, new_val);
+	if (!ret)
+		_I("automatic brightness is changed! (%d)", new_val);
+	else
+		_E("Fail to set automatic brightness!");
+}
+
+static void update_brightness(int action)
+{
+	int ret, val, new_val;
+
+	ret = vconf_get_int(VCONFKEY_SETAPPL_LCD_BRIGHTNESS, &val);
+	if (ret < 0) {
+		_E("Fail to get brightness!");
+		return;
+	}
+
+	new_val = calculate_brightness(val, action);
+
+	if (new_val == val)
+		return;
+
+	ret = vconf_set_int(VCONFKEY_SETAPPL_LCD_BRIGHTNESS, new_val);
+	if (!ret) {
+		backlight_ops.restore();
+		_I("brightness is changed! (%d)", new_val);
+	} else {
+		_E("Fail to set brightness!");
+	}
+}
+
+static int process_brightness_key(struct input_event *pinput, int action)
+{
+	int ret, val;
+
+	if (pinput->value == KEY_RELEASED) {
+		stop_key_combination();
+		return true;
+	}
+
+	ret = vconf_get_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT, &val);
+	if (!ret && val == SETTING_BRIGHTNESS_AUTOMATIC_ON) {
+		update_automatic_brightness(action);
+		return false;
+	}
+
+	update_brightness(action);
+	return false;
+}
+
+static int process_screenlock_key(struct input_event *pinput)
+{
+	if (pinput->value != KEY_RELEASED) {
+		stop_key_combination();
+		return true;
+	}
+
+	if (!current_state_in_on()) {
+		return false;
+	}
+
+	check_processes(S_LCDOFF);
+	check_processes(S_LCDDIM);
+
+	if (!check_holdkey_block(S_LCDOFF) && !check_holdkey_block(S_LCDDIM)) {
+		delete_condition(S_LCDOFF);
+		delete_condition(S_LCDDIM);
+		vconf_set_int(VCONFKEY_PM_LCDOFF_SOURCE,
+		    VCONFKEY_PM_LCDOFF_BY_POWERKEY);
+		_I("LCD OFF by screenlock key");
+
+		/* LCD off forcly */
+		recv_data.pid = -1;
+		recv_data.cond = 0x400;
+		(*g_pm_callback)(PM_CONTROL_EVENT, &recv_data);
+	}
+
+	return true;
+}
+
 static int check_key(struct input_event *pinput)
 {
 	int ignore = true;
@@ -234,6 +347,15 @@ static int check_key(struct input_event *pinput)
 		break;
 	case KEY_VOLUMEDOWN:
 		ignore = process_volumedown_key(pinput);
+		break;
+	case KEY_BRIGHTNESSDOWN:
+		ignore = process_brightness_key(pinput, BRIGHTNESS_DOWN);
+		break;
+	case KEY_BRIGHTNESSUP:
+		ignore = process_brightness_key(pinput, BRIGHTNESS_UP);
+		break;
+	case KEY_SCREENLOCK:
+		ignore = process_screenlock_key(pinput);
 		break;
 	case KEY_VOLUMEUP:
 	case KEY_CAMERA:
@@ -246,7 +368,6 @@ static int check_key(struct input_event *pinput)
 		if (current_state_in_on())
 			ignore = false;
 		break;
-	case KEY_SCREENLOCK:
 	case 0x1DB:
 	case 0x1DC:
 	case 0x1DD:
