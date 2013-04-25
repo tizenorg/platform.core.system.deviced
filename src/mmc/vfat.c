@@ -66,7 +66,7 @@ static int vfat_init(void *data)
 
 static const char ** vfat_check(void)
 {
-	return vfat_check_arg;
+	return NULL;
 }
 
 static int vfat_mount(int smack, void *data)
