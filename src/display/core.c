@@ -1065,16 +1065,17 @@ static int update_setting(int key_idx, int val)
 	case SETTING_TO_NORMAL:
 		ret = get_dim_timeout(&dim_timeout);
 		if (ret < 0 || dim_timeout < 0) {
-			_E("Can not get dim timeout.set default 5 seconds");
+			_E("Can not get dim timeout.set default %d seconds",
+			    DEFAULT_DIM_TIMEOUT);
 			dim_timeout = DEFAULT_DIM_TIMEOUT;
 		}
-		if (val < 0) {
-			_E("LCD timeout is wrong, set default 15 seconds");
-			val = 15;
+		if (val <= 0) {
+			_E("LCD timeout is wrong(%d), set default %d seconds",
+			    val, DEFAULT_NORMAL_TIMEOUT);
+			val = DEFAULT_NORMAL_TIMEOUT;
 		}
-		if (val == 0) {
-			states[S_NORMAL].timeout = 0;
-		} else if (val > dim_timeout) {
+
+		if (val > dim_timeout) {
 			states[S_NORMAL].timeout = val - dim_timeout;
 		} else {
 			states[S_NORMAL].timeout = 1;
@@ -1141,8 +1142,10 @@ static int update_setting(int key_idx, int val)
 			get_run_timeout(&run_timeout);
 			if (run_timeout < 0) {
 				_E("Can not get run timeout."
-					"set default 15 seconds");
-				run_timeout = 10;
+				    "set default %d seconds",
+				    DEFAULT_NORMAL_TIMEOUT);
+				run_timeout = DEFAULT_NORMAL_TIMEOUT -
+				    DEFAULT_DIM_TIMEOUT;
 			}
 			states[S_NORMAL].timeout = run_timeout;
 			states[S_LCDDIM].timeout = DEFAULT_DIM_TIMEOUT;
