@@ -276,6 +276,31 @@ static DBusMessage *e_dbus_setbrightness_cb(E_DBus_Object *obj, DBusMessage *msg
 	return reply;
 }
 
+static DBusMessage *e_dbus_setframerate_cb(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int val, cmd, ret;
+
+	ret = dbus_message_get_args(msg, NULL, DBUS_TYPE_INT32, &val, DBUS_TYPE_INVALID);
+	if (!ret) {
+		_I("there is no message");
+		ret = -EINVAL;
+		goto error;
+	}
+
+	_I("set frame rate %d", val);
+
+	cmd = DISP_CMD(PROP_DISPLAY_FRAME_RATE, DEFAULT_DISPLAY);
+	ret = device_set_property(DEVICE_TYPE_DISPLAY, cmd, val);
+
+error:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+	return reply;
+}
+
 static struct edbus_method {
 	const char *member;
 	const char *signature;
@@ -289,6 +314,7 @@ static struct edbus_method {
 	{ "changestate",      "s",   "i", e_dbus_changestate_cb },
 	{ "getbrightness",   NULL,   "i", e_dbus_getbrightness_cb },
 	{ "setbrightness",    "i",   "i", e_dbus_setbrightness_cb },
+	{ "setframerate",     "i",   "i", e_dbus_setframerate_cb },
 	/* Add methods here */
 };
 

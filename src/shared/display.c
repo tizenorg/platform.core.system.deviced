@@ -28,6 +28,7 @@
 #include <linux/limits.h>
 
 #include "log.h"
+#include "dbus.h"
 #include "dd-display.h"
 
 #define DISPLAY_MAX_BRIGHTNESS  100
@@ -39,6 +40,8 @@
 #define SHIFT_UNLOCK_PARAMETER		12
 #define SHIFT_CHANGE_STATE		8
 #define TIMEOUT_RESET_BIT		0x80
+
+#define METHOD_SET_FRAME_RATE		"setframerate"
 
 struct disp_lock_msg {
 	pid_t pid;
@@ -235,6 +238,37 @@ API int display_set_acl_status(int val)
 		return r;
 
 	return 0;
+}
+
+API int display_set_frame_rate(int val)
+{
+	DBusError err;
+	DBusMessage *msg;
+	char str_val[32];
+	char *arr[1];
+	int ret, ret_val;
+
+	snprintf(str_val, sizeof(str_val), "%d", val);
+	arr[0] = str_val;
+
+	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
+			METHOD_SET_FRAME_RATE, "i", arr);
+	if (!msg)
+		return -EBADMSG;
+
+	dbus_error_init(&err);
+
+	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
+	if (!ret) {
+		_E("no message : [%s:%s]", err.name, err.message);
+		ret_val = -EBADMSG;
+	}
+
+	dbus_message_unref(msg);
+	dbus_error_free(&err);
+
+	_D("%s-%s : %d", DEVICED_INTERFACE_DISPLAY, METHOD_SET_FRAME_RATE, ret_val);
+	return ret_val;
 }
 
 static int send_msg(unsigned int s_bits, unsigned int timeout, unsigned int timeout2)

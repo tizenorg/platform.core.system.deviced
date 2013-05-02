@@ -63,6 +63,7 @@ SET(SRCS ${SRCS}
 SET(DEVICED_SRCS
 	src/shared/battery.c
 	src/shared/control.c
+	src/shared/dbus.c
 	src/shared/deviced-conf.c
 	src/shared/deviced-noti.c
 	src/shared/deviced-util.c

@@ -56,6 +56,7 @@ int display_set_brightness(int val);
 int display_release_brightness(void);
 int display_get_acl_status(void);
 int display_set_acl_status(int val);
+int display_set_frame_rate(int val);
 int display_lock_state(unsigned int, unsigned int, unsigned int);
 int display_unlock_state(unsigned int, unsigned int);
 int display_change_state(unsigned int);
