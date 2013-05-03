@@ -255,7 +255,6 @@ systemctl daemon-reload
 %files -n system-server
 %manifest system-server.manifest
 %{_bindir}/system_server
-/opt/etc/smack/accesses.d/system-server.rule
 %if 0%{?simulator}
 %exclude %{_bindir}/restart
 %else
@@ -277,6 +276,7 @@ systemctl daemon-reload
 %{_datadir}/system-server/udev-rules/91-system-server.rules
 %{_datadir}/system-server/sys_pci_noti/res/locale/*/LC_MESSAGES/*.mo
 %config %{_sysconfdir}/dbus-1/system.d/system-server.conf
+%{_sysconfdir}/smack/accesses2.d/deviced.rule
 
 %files -n sysman
 %manifest sysman.manifest

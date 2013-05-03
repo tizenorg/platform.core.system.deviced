@@ -1,0 +1,6 @@
+# subject rule
+deviced sys-assert::core rwxat
+deviced system::vconf rwxat
+
+# object rule
+pulseaudio deviced rw
