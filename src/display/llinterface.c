@@ -365,6 +365,9 @@ static int backlight_restore(void)
 
 static int set_default_brt(int level)
 {
+	if (!pmsys)
+		return -EFAULT;
+
 	if (level < PM_MIN_BRIGHTNESS || level > PM_MAX_BRIGHTNESS)
 		level = PM_DEFAULT_BRIGHTNESS;
 	pmsys->def_brt = level;
