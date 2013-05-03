@@ -291,7 +291,10 @@ static int proc_condition(PMMsg *data)
 		snprintf(pname, PATH_MAX,
 			"does not exist now(may be dead without unlock)");
 	} else {
-		read(fd_cmdline, pname, PATH_MAX);
+		int r;
+		r = read(fd_cmdline, pname, PATH_MAX);
+		if ((r >= 0) && (r < PATH_MAX))
+			pname[r] = '\0';
 		close(fd_cmdline);
 	}
 
@@ -632,7 +635,10 @@ void print_info(int fd)
 					"does not exist now"
 					"(may be dead without unlock)");
 			} else {
-				read(fd_cmdline, pname, PATH_MAX);
+				int r;
+				r = read(fd_cmdline, pname, PATH_MAX);
+				if ((r >= 0) && (r < PATH_MAX))
+					pname[r] = '\0';
 				close(fd_cmdline);
 			}
 			snprintf(buf, sizeof(buf),
@@ -1573,7 +1579,7 @@ static void display_init(void *data)
 
 static void display_exit(void *data)
 {
-	int i;
+	int i = INIT_END;
 
 	status = DEVICE_OPS_STATUS_STOP;
 	end_battinfo_gathering();
