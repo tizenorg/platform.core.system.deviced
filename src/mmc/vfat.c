@@ -52,7 +52,11 @@ static int vfat_init(void *data)
 		return -EINVAL;
 	}
 	/* check fs type with magic code */
-	lseek(fd, fs_vfat_type.offset, SEEK_SET);
+	ret = lseek(fd, fs_vfat_type.offset, SEEK_SET);
+	if (ret != 0) {
+		_E("fail to check offset of vfat");
+		goto out;
+	}
 	ret = read(fd, buf, 2);
 	_D("mmc search magic : 0x%2x, 0x%2x", buf[0],buf[1]);
 	if (!memcmp(buf, fs_vfat_type.magic, fs_vfat_type.magic_sz)) {
@@ -60,6 +64,7 @@ static int vfat_init(void *data)
 		close(fd);
 		return fs_vfat_type.type;
 	}
+out:
 	close(fd);
 	return -EINVAL;
 }

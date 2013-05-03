@@ -513,17 +513,22 @@ static int uevent_control_start(void)
 	udev = udev_new();
 	if (!udev) {
 		_E("error create udev");
-		return -1;
+		return -EINVAL;
 	}
 
 	mon = udev_monitor_new_from_netlink(udev, "kernel");
 	if (mon == NULL) {
 		_E("error udev_monitor create");
 		uevent_control_stop(-1);
-		return -1;
+		return -EINVAL;
 	}
 
-	udev_monitor_set_receive_buffer_size(mon, 1024);
+	if (udev_monitor_set_receive_buffer_size(mon, 1024) != 0) {
+		_E("fail to set receive buffer size");
+		return -EINVAL;
+	}
+
+	_D("success to set receive buffer size");
 	if (udev_monitor_filter_add_match_subsystem_devtype(mon, "platform", NULL) < 0 ||
 		udev_monitor_filter_add_match_subsystem_devtype(mon, "input", NULL) < 0) {
 		_E("error apply subsystem filter");
@@ -535,20 +540,20 @@ static int uevent_control_start(void)
 	if (ufd == -1) {
 		_E("error udev_monitor_get_fd");
 		uevent_control_stop(ufd);
-		return -1;
+		return -EINVAL;
 	}
 
 	ufdh = ecore_main_fd_handler_add(ufd, ECORE_FD_READ, uevent_control_cb, NULL, NULL, NULL);
 	if (!ufdh) {
 		_E("error ecore_main_fd_handler_add");
 		uevent_control_stop(ufd);
-		return -1;
+		return -EINVAL;
 	}
 
 	if (udev_monitor_enable_receiving(mon) < 0) {
 		_E("error unable to subscribe to udev events");
 		uevent_control_stop(ufd);
-		return -1;
+		return -EINVAL;
 	}
 
 	return 0;
@@ -687,15 +692,25 @@ static int battery_def_cf_opened_actioin(int argc, char **argv)
 	static int present_status = 1;
 	bundle *b;
 
-	bundle_add(b, "_SYSPOPUP_CONTENT_", "battdisconnect");
-
-	ret = syspopup_launch("lowbat-syspopup", b);
-
-	if (ret < 0) {
-	_E("popup launch failed");
+	b = bundle_create();
+	if (!b) {
+		_E("fail to create bundle");
+		return -EINVAL;
 	}
 
+	ret = bundle_add(b, "_SYSPOPUP_CONTENT_", "battdisconnect");
+	if (ret != 0) {
+		_E("fail to add bundle");
+		goto out;
+	}
+
+	ret = syspopup_launch("lowbat-syspopup", b);
+	if (ret < 0)
+		_E("popup launch failed");
+
+out:
 	bundle_free(b);
+	return ret;
 }
 
 static void pci_keyboard_add_cb(struct ss_main_data *ad)
@@ -725,7 +740,7 @@ static void device_change_init(void *data)
 	ss_action_entry_add_internal(PREDEF_BATTERY_CF_OPENED, battery_def_cf_opened_actioin, NULL, NULL);
 	ss_action_entry_add_internal(PREDEF_DEVICE_CHANGED, changed_device_def_predefine_action, NULL, NULL);
 
-	if (uevent_control_start() == -1) {
+	if (uevent_control_start() != 0) {
 		_E("fail uevent control init");
 		return;
 	}

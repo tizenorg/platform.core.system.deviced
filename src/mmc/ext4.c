@@ -87,7 +87,11 @@ static int ext4_init(void *data)
 		return -EINVAL;
 	}
 	/* check fs type with magic code */
-	lseek(fd, fs_ext4_type.offset, SEEK_SET);
+	ret = lseek(fd, fs_ext4_type.offset, SEEK_SET);
+	if (ret != 0) {
+		_E("fail to check offset of ext4");
+		goto out;
+	}
 	ret = read(fd, buf, 2);
 	_D("mmc search magic : 0x%2x, 0x%2x", buf[0],buf[1]);
 	if (!memcmp(buf, fs_ext4_type.magic, fs_ext4_type.magic_sz)) {
@@ -96,6 +100,7 @@ static int ext4_init(void *data)
 
 		return fs_ext4_type.type;
 	}
+out:
 	close(fd);
 	return -EINVAL;
 }
