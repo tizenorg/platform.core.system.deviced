@@ -214,6 +214,10 @@ static int process_volumedown_key(struct input_event *pinput)
 				ecore_timer_del(combination_timeout_id);
 				combination_timeout_id = NULL;
 			}
+			if (longkey_timeout_id > 0) {
+				ecore_timer_del(longkey_timeout_id);
+				longkey_timeout_id = NULL;
+			}
 			_I("capture mode");
 			key_combination = KEY_COMBINATION_SCREENCAPTURE;
 			ignore = false;
