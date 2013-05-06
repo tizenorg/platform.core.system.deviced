@@ -41,7 +41,7 @@
 #define POWEROFF_ACT			"poweroff"
 #define PWROFF_POPUP_ACT		"pwroff-popup"
 #define USEC_PER_SEC			1000000
-#define LONG_PRESS_INTERVAL		1	/* 1 second */
+#define LONG_PRESS_INTERVAL		0.4	/* 0.4 second */
 #define COMBINATION_INTERVAL		0.3	/* 0.3 second */
 #define POWER_KEY_PRESS_IGNORE_TIME	0.7	/* 0.7 second */
 
