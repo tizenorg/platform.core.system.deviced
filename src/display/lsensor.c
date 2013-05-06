@@ -32,7 +32,7 @@
 #include "core.h"
 #include "device-node.h"
 
-#define SAMPLING_INTERVAL	1	/* 1 sec */
+#define SAMPLING_INTERVAL	2	/* 2 sec */
 #define MAX_FAULT		5
 
 static int (*prev_init_extention) (void *data);
