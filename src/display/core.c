@@ -138,6 +138,7 @@ static int received_sleep_cmd = 0;
 typedef struct _pm_lock_node {
 	pid_t pid;
 	Ecore_Timer *timeout_id;
+	time_t time;
 	bool holdkey_block;
 	struct _pm_lock_node *next;
 } PmLockNode;
@@ -183,6 +184,7 @@ static PmLockNode *add_node(enum state_t s_index, pid_t pid, Ecore_Timer *timeou
 		bool holdkey_block)
 {
 	PmLockNode *n;
+	time_t now;
 
 	n = (PmLockNode *) malloc(sizeof(PmLockNode));
 	if (n == NULL) {
@@ -190,8 +192,10 @@ static PmLockNode *add_node(enum state_t s_index, pid_t pid, Ecore_Timer *timeou
 		return NULL;
 	}
 
+	time(&now);
 	n->pid = pid;
 	n->timeout_id = timeout_id;
+	n->time = now;
 	n->holdkey_block = holdkey_block;
 	n->next = cond_head[s_index];
 	cond_head[s_index] = n;
@@ -224,6 +228,22 @@ static int del_node(enum state_t s_index, PmLockNode *n)
 	}
 	refresh_app_cond();
 	return 0;
+}
+
+static void print_node(int next)
+{
+	PmLockNode *n;
+	char buf[30];
+
+	if (next <= S_START || next >= S_END)
+		return;
+
+	n = cond_head[next];
+	while (n != NULL) {
+		ctime_r(&n->time, buf);
+		_I("pid: %5d, lock time: %s", n->pid, buf);
+		n = n->next;
+	}
 }
 
 static Eina_Bool del_dim_cond(void *data)
@@ -285,6 +305,8 @@ static int proc_condition(PMMsg *data)
 	char pname[PATH_MAX];
 	char buf[PATH_MAX];
 	int fd_cmdline;
+	time_t now;
+
 	snprintf(buf, PATH_MAX, "/proc/%d/cmdline", pid);
 	fd_cmdline = open(buf, O_RDONLY);
 	if (fd_cmdline < 0) {
@@ -309,9 +331,11 @@ static int proc_condition(PMMsg *data)
 		if (tmp == NULL)
 			add_node(S_LCDDIM, pid, cond_timeout_id, holdkey_block);
 		else if (tmp->timeout_id > 0) {
+			time(&now);
 			ecore_timer_del(tmp->timeout_id);
 			tmp->timeout_id = cond_timeout_id;
 			tmp->holdkey_block = holdkey_block;
+			tmp->time = now;
 		}
 		/* for debug */
 		_I("[%s] locked by pid %d - process %s", "S_NORMAL", pid,
@@ -328,9 +352,11 @@ static int proc_condition(PMMsg *data)
 		if (tmp == NULL)
 			add_node(S_LCDOFF, pid, cond_timeout_id, holdkey_block);
 		else if (tmp->timeout_id > 0) {
+			time(&now);
 			ecore_timer_del(tmp->timeout_id);
 			tmp->timeout_id = cond_timeout_id;
 			tmp->holdkey_block = holdkey_block;
+			tmp->time = now;
 		}
 		/* for debug */
 		_I("[%s] locked by pid %d - process %s", "S_LCDDIM", pid,
@@ -346,9 +372,11 @@ static int proc_condition(PMMsg *data)
 		if (tmp == NULL)
 			add_node(S_SLEEP, pid, cond_timeout_id, 0);
 		else if (tmp->timeout_id > 0) {
+			time(&now);
 			ecore_timer_del(tmp->timeout_id);
 			tmp->timeout_id = cond_timeout_id;
 			tmp->holdkey_block = 0;
+			tmp->time = now;
 		}
 		set_process_active(EINA_TRUE, pid);
 
@@ -624,6 +652,7 @@ void print_info(int fd)
 
 	for (s_index = S_NORMAL; s_index < S_END; s_index++) {
 		PmLockNode *t;
+		char time_buf[30];
 		t = cond_head[s_index];
 
 		while (t != NULL) {
@@ -641,9 +670,10 @@ void print_info(int fd)
 					pname[r] = '\0';
 				close(fd_cmdline);
 			}
+			ctime_r(&t->time, time_buf);
 			snprintf(buf, sizeof(buf),
-				 " %d: [%s] locked by pid %d - process %s\n",
-				 i++, state_string[s_index - 1], t->pid, pname);
+				 " %d: [%s] locked by pid %d %s %s",
+				 i++, state_string[s_index - 1], t->pid, pname, time_buf);
 			write(fd, buf, strlen(buf));
 			t = t->next;
 		}
@@ -959,8 +989,10 @@ static int default_check(int next)
 		break;
 	}
 
-	if (trans_cond != 0)
+	if (trans_cond != 0) {
+		print_node(next);
 		return 0;
+	}
 
 	return 1;		/* transitable */
 }
