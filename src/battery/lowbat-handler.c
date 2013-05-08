@@ -23,6 +23,7 @@
 #include <vconf.h>
 #include <fcntl.h>
 #include <bundle.h>
+#include <stdbool.h>
 
 #include "core/log.h"
 #include "core/launch.h"
@@ -148,14 +149,22 @@ static int battery_charge_act(void *data)
 	return 0;
 }
 
-int ss_lowbat_set_charge_on(int onoff)
+int ss_lowbat_set_charge_on(int on)
 {
-	if(vconf_set_int(VCONFKEY_SYSMAN_BATTERY_CHARGE_NOW, onoff) != 0) {
+	static bool state = -1;
+
+	if (state == on)
+		return 0;
+
+	if (vconf_set_int(VCONFKEY_SYSMAN_BATTERY_CHARGE_NOW, on) != 0) {
 		_E("fail to set charge vconf value");
-		return -1;
+		return -EPERM;
 	}
+
 	if (update_pm_setting)
-		update_pm_setting(SETTING_CHARGING, onoff);
+		update_pm_setting(SETTING_CHARGING, on);
+
+	state = on;
 	return 0;
 }
 
