@@ -32,6 +32,7 @@
 #include "core.h"
 #include "device-node.h"
 
+#define MAX_SAMPLING_INTERVAL	10	/* 10 sec */
 #define SAMPLING_INTERVAL	2	/* 2 sec */
 #define MAX_FAULT		5
 
@@ -41,6 +42,7 @@ static Ecore_Timer *alc_timeout_id = 0;
 static int sf_handle = -1;
 static int fault_count = 0;
 static int power_saving_display_stat = 0;
+static int sampling_interval = SAMPLING_INTERVAL;
 
 static bool alc_handler(void* data)
 {
@@ -99,7 +101,7 @@ static int alc_action(int timeout)
 	/* sampling timer add */
 	if (alc_timeout_id == 0 && !(pm_status_flag & PWRSV_FLAG))
 		alc_timeout_id =
-		    ecore_timer_add(SAMPLING_INTERVAL,
+		    ecore_timer_add(sampling_interval,
 			    (Ecore_Task_Cb)alc_handler, NULL);
 
 	if (_default_action != NULL)
@@ -188,7 +190,7 @@ static int set_alc_function(keynode_t *key_nodes, void *data)
 			_default_action = states[S_NORMAL].action;
 		states[S_NORMAL].action = alc_action;
 		alc_timeout_id =
-		    ecore_timer_add(SAMPLING_INTERVAL,
+		    ecore_timer_add(sampling_interval,
 			    (Ecore_Task_Cb)alc_handler, NULL);
 	} else if (onoff == SETTING_BRIGHTNESS_AUTOMATIC_PAUSE) {
 		_I("auto brightness paused!");
@@ -232,7 +234,7 @@ static bool check_sfsvc(void* data)
 			_default_action = states[S_NORMAL].action;
 		states[S_NORMAL].action = alc_action;
 		alc_timeout_id =
-		    ecore_timer_add(SAMPLING_INTERVAL,
+		    ecore_timer_add(sampling_interval,
 			    (Ecore_Task_Cb)alc_handler, NULL);
 		if (alc_timeout_id > 0)
 			return EINA_FALSE;
@@ -251,7 +253,7 @@ static int prepare_lsensor(void *data)
 	vconf_get_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT, &alc_conf);
 
 	if (alc_conf == SETTING_BRIGHTNESS_AUTOMATIC_ON)
-		ecore_timer_add(SAMPLING_INTERVAL, (Ecore_Task_Cb)check_sfsvc, NULL);
+		ecore_timer_add(sampling_interval, (Ecore_Task_Cb)check_sfsvc, NULL);
 
 	/* add auto_brt_setting change handler */
 	vconf_notify_key_changed(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT,
@@ -267,6 +269,24 @@ void set_power_saving_display_stat(int stat)
 {
 	_I("stat = %d", stat);
 	power_saving_display_stat = stat;
+}
+
+int get_autobrightness_interval(void)
+{
+	return sampling_interval;
+}
+
+int set_autobrightness_interval(int val)
+{
+	if (val <= 0 || val > MAX_SAMPLING_INTERVAL)
+		return -EINVAL;
+
+	sampling_interval = val;
+
+	if (alc_timeout_id > 0)
+		ecore_timer_interval_set(alc_timeout_id, val);
+
+	return 0;
 }
 
 static void __attribute__ ((constructor)) pm_lsensor_init(void)

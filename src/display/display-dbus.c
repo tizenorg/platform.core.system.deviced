@@ -301,6 +301,43 @@ error:
 	return reply;
 }
 
+static DBusMessage *e_dbus_getautobrightnessinterval_cb(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int val;
+
+	val = get_autobrightness_interval();
+	_I("get autobrightness interval %d", val);
+
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &val);
+	return reply;
+}
+
+static DBusMessage *e_dbus_setautobrightnessinterval_cb(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int rate, ret;
+
+	dbus_message_iter_init(msg, &iter);
+	dbus_message_iter_get_basic(&iter, &rate);
+
+	ret = set_autobrightness_interval(rate);
+	if (ret)
+		_E("fail to set autobrightness interval %d, %d", rate, ret);
+	else
+		_I("set autobrightness interval %d", rate);
+
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+
+	return reply;
+}
+
 static struct edbus_method {
 	const char *member;
 	const char *signature;
@@ -315,6 +352,8 @@ static struct edbus_method {
 	{ "getbrightness",   NULL,   "i", e_dbus_getbrightness_cb },
 	{ "setbrightness",    "i",   "i", e_dbus_setbrightness_cb },
 	{ "setframerate",     "i",   "i", e_dbus_setframerate_cb },
+	{ "getautobrightnessinterval",  NULL,   "i", e_dbus_getautobrightnessinterval_cb },
+	{ "setautobrightnessinterval",   "i",   "i", e_dbus_setautobrightnessinterval_cb },
 	/* Add methods here */
 };
 
