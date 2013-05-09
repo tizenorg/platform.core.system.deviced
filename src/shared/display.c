@@ -18,6 +18,7 @@
 
 
 #include <stdio.h>
+#include <string.h>
 #include <vconf.h>
 #include <errno.h>
 #include <device-node.h>
@@ -285,26 +286,25 @@ static int send_msg(unsigned int s_bits, unsigned int timeout, unsigned int time
 
 	sock = socket(AF_UNIX, SOCK_DGRAM, 0);
 	if (sock == -1) {
-		_E("pm socket() failed");
-		return -1;
+		_E("pm socket() failed: %s", strerror(errno));
+		return sock;
 	}
 
 	remote.sun_family = AF_UNIX;
 	if(strlen(SOCK_PATH) >= sizeof(remote.sun_path)) {
 		_E("socket path is vey long");
-		return -1;
+		close(sock);
+		return -ENAMETOOLONG;
 	}
 	strncpy(remote.sun_path, SOCK_PATH, sizeof(remote.sun_path));
 
 	rc = sendto(sock, (void *)&p, sizeof(p), 0, (struct sockaddr *)&remote,
 		    sizeof(struct sockaddr_un));
-	if (rc == -1) {
-		_E("pm socket sendto() failed");
-	} else
-		rc = 0;
+	if (rc == -1)
+		_E("pm socket sendto() failed: %s", strerror(errno));
 
 	close(sock);
-	return rc;
+	return (rc > 0 ? 0 : rc);
 }
 
 API int display_change_state(unsigned int s_bits)
