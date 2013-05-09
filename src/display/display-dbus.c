@@ -32,19 +32,19 @@
 #include "core/common.h"
 #include "core/devices.h"
 
-static DBusMessage *e_dbus_start_cb(E_DBus_Object *obj, DBusMessage *msg)
+static DBusMessage *e_dbus_start(E_DBus_Object *obj, DBusMessage *msg)
 {
 	display_device_ops.init(NULL);
 	return dbus_message_new_method_return(msg);
 }
 
-static DBusMessage *e_dbus_stop_cb(E_DBus_Object *obj, DBusMessage *msg)
+static DBusMessage *e_dbus_stop(E_DBus_Object *obj, DBusMessage *msg)
 {
 	display_device_ops.exit(NULL);
 	return dbus_message_new_method_return(msg);
 }
 
-static DBusMessage *e_dbus_lockstate_cb(E_DBus_Object *obj, DBusMessage *msg)
+static DBusMessage *e_dbus_lockstate(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusError err;
 	DBusMessageIter iter;
@@ -113,7 +113,7 @@ out:
 	return reply;
 }
 
-static DBusMessage *e_dbus_unlockstate_cb(E_DBus_Object *obj, DBusMessage *msg)
+static DBusMessage *e_dbus_unlockstate(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusError err;
 	DBusMessageIter iter;
@@ -180,7 +180,7 @@ out:
 	return reply;
 }
 
-static DBusMessage *e_dbus_changestate_cb(E_DBus_Object *obj, DBusMessage *msg)
+static DBusMessage *e_dbus_changestate(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusError err;
 	DBusMessageIter iter;
@@ -233,7 +233,7 @@ out:
 	return reply;
 }
 
-static DBusMessage *e_dbus_getbrightness_cb(E_DBus_Object *obj, DBusMessage *msg)
+static DBusMessage *e_dbus_getbrightness(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
@@ -253,7 +253,7 @@ static DBusMessage *e_dbus_getbrightness_cb(E_DBus_Object *obj, DBusMessage *msg
 	return reply;
 }
 
-static DBusMessage *e_dbus_setbrightness_cb(E_DBus_Object *obj, DBusMessage *msg)
+static DBusMessage *e_dbus_setbrightness(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
@@ -276,7 +276,7 @@ static DBusMessage *e_dbus_setbrightness_cb(E_DBus_Object *obj, DBusMessage *msg
 	return reply;
 }
 
-static DBusMessage *e_dbus_setframerate_cb(E_DBus_Object *obj, DBusMessage *msg)
+static DBusMessage *e_dbus_setframerate(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
@@ -301,7 +301,7 @@ error:
 	return reply;
 }
 
-static DBusMessage *e_dbus_getautobrightnessinterval_cb(E_DBus_Object *obj, DBusMessage *msg)
+static DBusMessage *e_dbus_getautobrightnessinterval(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
@@ -316,7 +316,7 @@ static DBusMessage *e_dbus_getautobrightnessinterval_cb(E_DBus_Object *obj, DBus
 	return reply;
 }
 
-static DBusMessage *e_dbus_setautobrightnessinterval_cb(E_DBus_Object *obj, DBusMessage *msg)
+static DBusMessage *e_dbus_setautobrightnessinterval(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
@@ -344,16 +344,16 @@ static struct edbus_method {
 	const char *reply_signature;
 	E_DBus_Method_Cb func;
 } edbus_methods[] = {
-	{ "start",           NULL,  NULL, e_dbus_start_cb },
-	{ "stop",            NULL,  NULL, e_dbus_stop_cb },
-	{ "lockstate",     "sssi",   "i", e_dbus_lockstate_cb },
-	{ "unlockstate",     "ss",   "i", e_dbus_unlockstate_cb },
-	{ "changestate",      "s",   "i", e_dbus_changestate_cb },
-	{ "getbrightness",   NULL,   "i", e_dbus_getbrightness_cb },
-	{ "setbrightness",    "i",   "i", e_dbus_setbrightness_cb },
-	{ "setframerate",     "i",   "i", e_dbus_setframerate_cb },
-	{ "getautobrightnessinterval",  NULL,   "i", e_dbus_getautobrightnessinterval_cb },
-	{ "setautobrightnessinterval",   "i",   "i", e_dbus_setautobrightnessinterval_cb },
+	{ "start",           NULL,  NULL, e_dbus_start },
+	{ "stop",            NULL,  NULL, e_dbus_stop },
+	{ "lockstate",     "sssi",   "i", e_dbus_lockstate },
+	{ "unlockstate",     "ss",   "i", e_dbus_unlockstate },
+	{ "changestate",      "s",   "i", e_dbus_changestate },
+	{ "getbrightness",   NULL,   "i", e_dbus_getbrightness },
+	{ "setbrightness",    "i",   "i", e_dbus_setbrightness },
+	{ "setframerate",     "i",   "i", e_dbus_setframerate },
+	{ "getautobrightnessinterval",  NULL,   "i", e_dbus_getautobrightnessinterval },
+	{ "setautobrightnessinterval",   "i",   "i", e_dbus_setautobrightnessinterval },
 	/* Add methods here */
 };
 
