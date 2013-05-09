@@ -367,20 +367,6 @@ static void charge_cb(struct ss_main_data *ad)
 
 	ss_lowbat_monitor(NULL);
 
-	ret = device_get_property(DEVICE_TYPE_POWER, PROP_POWER_PRESENT, &val);
-	if (ret != 0)
-		_E("fail to get battery present value");
-	if (val == 0 && present_status == 1) {
-		present_status = 0;
-		_E("battery cf is opened");
-		ss_action_entry_call_internal(PREDEF_BATTERY_CF_OPENED, 0);
-	}
-
-	if (val == 1 && present_status == 0) {
-		present_status = 1;
-		_E("battery cf is closed again");
-	}
-
 	if (device_get_property(DEVICE_TYPE_POWER, PROP_POWER_CHARGE_NOW, &charge_now) != 0 ||
 	    device_get_property(DEVICE_TYPE_POWER, PROP_POWER_CAPACITY, &capacity) != 0)
 		_E("fail to get battery node value");
@@ -388,6 +374,21 @@ static void charge_cb(struct ss_main_data *ad)
 		_E("target will be shut down");
 		battery_power_off_act(NULL);
 		return;
+	}
+
+	ret = device_get_property(DEVICE_TYPE_POWER, PROP_POWER_PRESENT, &val);
+	if (ret != 0)
+		_E("fail to get battery present value");
+	if (val == 0 && present_status == 1) {
+		present_status = 0;
+		_E("battery cf is opened");
+		if (charge_now)
+			ss_action_entry_call_internal(PREDEF_BATTERY_CF_OPENED, 0);
+	}
+
+	if (val == 1 && present_status == 0) {
+		present_status = 1;
+		_E("battery cf is closed again");
 	}
 
 	if (device_get_property(DEVICE_TYPE_POWER, PROP_POWER_HEALTH, &val) == 0) {
