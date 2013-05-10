@@ -66,7 +66,7 @@ int get_exec_pid(const char *execpath)
 
 	dp = opendir("/proc");
 	if (!dp) {
-		_E("open /proc");
+		_E("FAIL: open /proc");
 		return -1;
 	}
 

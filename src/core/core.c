@@ -84,13 +84,13 @@ static int core_pipe_cb(void *userdata, Ecore_Fd_Handler * fd_handler)
 		r = read(core_pipe[0], &p_msg, sizeof(struct _internal_msg));
 		if (r < 0) {
 			if (errno == EINTR) {
-				_E("Re-read for error(EINTR)");
+				_D("Re-read for error(EINTR)");
 				retry_count++;
 				continue;
 			} else {
 				__pipe_stop(core_pipe[0]);
 				__pipe_stop(core_pipe[1]);
-				_E("restart pipe fd");
+				_D("restart pipe fd");
 				__pipe_start(ad);
 			}
 		} else {
