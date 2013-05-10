@@ -421,7 +421,7 @@ void lcd_control_edbus_signal_handler(void *data, DBusMessage *msg)
 	int timeout = -1;
 
 	if (dbus_message_is_signal(msg, INTERFACE_NAME, SIGNAL_NAME_LCD_CONTROL) == 0) {
-		_E("there is lcd control signal");
+		_E("there is no lcd control signal");
 		return;
 	}
 

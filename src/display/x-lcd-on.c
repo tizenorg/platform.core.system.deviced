@@ -53,7 +53,7 @@ static int pm_x_set_lcd_backlight(struct _PMSys *p, int on)
 	}
 
 	if (pid == 0) {
-		_E("[1] Child proccess for LCD %d was created (%s)",
+		_I("[1] Child proccess for LCD %d was created (%s)",
 		    on, cmd_line);
 		execl("/usr/bin/xset", "/usr/bin/xset", "dpms", "force",
 		    cmd_line, NULL);

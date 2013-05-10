@@ -82,7 +82,7 @@ static int _bl_brt(PMSys *p, int brightness)
 	/* Update device brightness */
 	ret = device_set_property(DEVICE_TYPE_DISPLAY, cmd, brightness);
 
-	_E("set brightness %d, %d", brightness, ret);
+	_I("set brightness %d, %d", brightness, ret);
 
 	return ret;
 }
