@@ -71,7 +71,6 @@ static Ecore_Timer *poweroff_timer_id = NULL;
 static TapiHandle *tapi_handle = NULL;
 static int power_off = 0;
 
-
 static void poweroff_popup_edbus_signal_handler(void *data, DBusMessage *msg)
 {
 	DBusError err;
@@ -245,7 +244,7 @@ Eina_Bool powerdown_ap_by_force(void *data)
 		gettimeofday(&now, NULL);
 	}
 
-	_D("Power off by force\n");
+	_I("Power off by force");
 	/* give a chance to be terminated for each process */
 	power_off = 1;
 	sync();
@@ -269,7 +268,8 @@ static void powerdown_ap(TapiHandle *handle, const char *noti_id, void *data, vo
 		tel_deinit(tapi_handle);
 		tapi_handle = NULL;
 	}
-	_D("Power off \n");
+
+	_I("Power off");
 
 	/* Getting poweroff duration */
 	buf = getenv("PWROFF_DUR");
@@ -310,8 +310,7 @@ int internal_poweroff_def_predefine_action(int argc, char **argv)
 		ret = tel_register_noti_event(tapi_handle, TAPI_NOTI_MODEM_POWER, powerdown_ap, NULL);
 
 		if (ret != TAPI_API_SUCCESS) {
-			_E
-			    ("tel_register_event is not subscribed. error %d\n", ret);
+			_E("tel_register_event is not subscribed. error %d", ret);
 			powerdown_ap_by_force(NULL);
 			return 0;
 		}
@@ -356,7 +355,7 @@ static void restart_ap(TapiHandle *handle, const char *noti_id, void *data, void
 		tapi_handle = NULL;
 	}
 
-	_I("Restart\n");
+	_I("Restart");
 	vconf_ignore_key_changed(VCONFKEY_SYSMAN_POWER_OFF_STATUS, (void*)poweroff_control_cb);
 	power_off = 1;
 	sync();
@@ -387,14 +386,12 @@ static void restart_ap_by_force(void *data)
 		poweroff_timer_id = NULL;
 	}
 
-
-	if(tapi_handle != NULL)
-	{
+	if(tapi_handle != NULL) {
 		tel_deinit(tapi_handle);
 		tapi_handle = NULL;
 	}
 
-	_I("Restart\n");
+	_I("Restart");
 	power_off = 1;
 	sync();
 
@@ -421,7 +418,7 @@ int entersleep_def_predefine_action(int argc, char **argv)
 	sync();
 
 	ret = tel_set_flight_mode(tapi_handle, TAPI_POWER_FLIGHT_MODE_ENTER, enter_flight_mode_cb, NULL);
-	_E("request for changing into flight mode : %d\n", ret);
+	_I("request for changing into flight mode : %d", ret);
 
 	system("/etc/rc.d/rc.entersleep");
 	pm_change_internal(getpid(), POWER_OFF);
@@ -437,7 +434,7 @@ int poweroff_def_predefine_action(int argc, char **argv)
 
 	while (retry_count < MAX_RETRY) {
 		if (ss_action_entry_call_internal(PREDEF_INTERNAL_POWEROFF, 0) < 0) {
-			_E("failed to request poweroff to system_server \n");
+			_E("failed to request poweroff to system_server");
 			retry_count++;
 			continue;
 		}
@@ -470,7 +467,7 @@ int leavesleep_def_predefine_action(int argc, char **argv)
 	sync();
 
 	ret = tel_set_flight_mode(tapi_handle, TAPI_POWER_FLIGHT_MODE_LEAVE, leave_flight_mode_cb, NULL);
-	_E("request for changing into flight mode : %d\n", ret);
+	_I("request for changing into flight mode : %d", ret);
 
 	return 0;
 }
@@ -490,8 +487,7 @@ int restart_def_predefine_action(int argc, char **argv)
 	ret =
 	    tel_register_noti_event(tapi_handle, TAPI_NOTI_MODEM_POWER, restart_ap, NULL);
 	if (ret != TAPI_API_SUCCESS) {
-		_E
-		    ("tel_register_event is not subscribed. error %d\n", ret);
+		_E("tel_register_event is not subscribed. error %d", ret);
 		restart_ap_by_force((void *)-1);
 		return 0;
 	}
@@ -499,7 +495,7 @@ int restart_def_predefine_action(int argc, char **argv)
 
 	ret = tel_process_power_command(tapi_handle, TAPI_PHONE_POWER_OFF, powerdown_res_cb, NULL);
 	if (ret != TAPI_API_SUCCESS) {
-		_E("tel_process_power_command() error %d\n", ret);
+		_E("tel_process_power_command() error %d", ret);
 		restart_ap_by_force((void *)-1);
 		return 0;
 	}
