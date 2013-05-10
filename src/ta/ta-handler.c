@@ -29,24 +29,23 @@
 
 static void ta_init(void *data)
 {
-	int val = -1, i = 0, pid;
+	int val, i = 0;
 
-	_D("check ta connection");
-	if (device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_TA_ONLINE, &val) == 0) {
-		if ( val==1 ) {
-			vconf_set_int(VCONFKEY_SYSMAN_CHARGER_STATUS,
-					VCONFKEY_SYSMAN_CHARGER_CONNECTED);
-			while (i < RETRY
-			       && pm_lock_internal(getpid(), LCD_OFF, STAY_CUR_STATE,
+	if (device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_TA_ONLINE, &val) != 0)
+		return;
+
+	if (val == 1) {
+		vconf_set_int(VCONFKEY_SYSMAN_CHARGER_STATUS,
+				VCONFKEY_SYSMAN_CHARGER_CONNECTED);
+		while (i < RETRY
+			   &&  pm_lock_internal(getpid(), LCD_OFF, STAY_CUR_STATE,
 						0) == -1) {
-				i++;
-				sleep(1);
-			}
-			_D("ta is connected");
+			i++;
+			sleep(1);
 		}
-		else if ( val==0 )
-			vconf_set_int(VCONFKEY_SYSMAN_CHARGER_STATUS,
-					VCONFKEY_SYSMAN_CHARGER_DISCONNECTED);
+	} else if (val == 0) {
+		vconf_set_int(VCONFKEY_SYSMAN_CHARGER_STATUS,
+				VCONFKEY_SYSMAN_CHARGER_DISCONNECTED);
 	}
 }
 
