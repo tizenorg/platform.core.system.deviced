@@ -101,8 +101,7 @@ static int remove_shm()
 		if (shmid < 0)
 			continue;
 		if (shmseg.shm_nattch == 0) {
-			_D("shared memory killer ==> %d killed",
-				  shmid);
+			_D("shared memory killer ==> %d killed", shmid);
 			shmctl(shmid, IPC_RMID, NULL);
 		}
 	}
@@ -215,7 +214,7 @@ static int memory_low_act(void *data)
 {
 	char lowmem_noti_name[NAME_MAX];
 
-	_D("[LOW MEM STATE] memory low state");
+	_I("[LOW MEM STATE] memory low state");
 	make_LMM_log("/var/log/memps", 1, "LOWMEM_WARNING");
 	remove_shm();
 	heynoti_get_snoti_name(_SYS_RES_CLEANUP, lowmem_noti_name, NAME_MAX);
@@ -231,7 +230,7 @@ static int memory_oom_act(void *data)
 	unsigned int cur_time;
 	char lowmem_noti_name[NAME_MAX];
 
-	_D("[LOW MEM STATE] memory oom state");
+	_I("[LOW MEM STATE] memory oom state");
 	cur_time = time(NULL);
 	_D("cur=%d, old=%d, cur-old=%d", cur_time, oom_delete_sm_time,
 		  cur_time - oom_delete_sm_time);
@@ -248,13 +247,12 @@ static int memory_oom_act(void *data)
 	vconf_set_int(VCONFKEY_SYSMAN_LOW_MEMORY,
 		      VCONFKEY_SYSMAN_LOW_MEMORY_HARD_WARNING);
 
-
 	return 1;
 }
 
 static int memory_normal_act(void *data)
 {
-	_D("[LOW MEM STATE] memory normal state");
+	_I("[LOW MEM STATE] memory normal state");
 	vconf_set_int(VCONFKEY_SYSMAN_LOW_MEMORY,
 		      VCONFKEY_SYSMAN_LOW_MEMORY_NORMAL);
 	return 0;
@@ -272,7 +270,7 @@ static int lowmem_process(unsigned int mem_state, void *ad)
 				oom_timer = NULL;
 			}
 			lpe[i].action(ad);
-			if(mem_state == MEMNOTIFY_CRITICAL) 
+			if(mem_state == MEMNOTIFY_CRITICAL)
 				oom_timer = ecore_timer_add(OOM_TIMER_INTERVAL,lpe[i].action, ad);
 			return 0;
 		}
@@ -296,14 +294,13 @@ static int lowmem_cb(void *data, Ecore_Fd_Handler * fd_handler)
 	unsigned int mem_state;
 
 	if (!ecore_main_fd_handler_active_get(fd_handler, ECORE_FD_READ)) {
-		_E
-		    ("ecore_main_fd_handler_active_get error , return\n");
+		_E("ecore_main_fd_handler_active_get error, return");
 		return -1;
 	}
 
 	fd = ecore_main_fd_handler_fd_get(fd_handler);
 	if (fd < 0) {
-		_E("ecore_main_fd_handler_fd_get error , return");
+		_E("ecore_main_fd_handler_fd_get error, return");
 		return -1;
 	}
 	mem_state = lowmem_read(fd);
@@ -405,8 +402,7 @@ int lowmem_def_predefine_action(int argc, char **argv)
 		if (pid > 0 && pid != get_exec_pid(LOWMEM_EXEC_PATH) && pid != get_exec_pid(MEMPS_EXEC_PATH)) {
 			if ((get_cmdline_name(pid, appname, PATH_MAX)) ==
 			    0) {
-				_E("we will kill, lowmem lv2 = %d (%s)\n",
-				     pid, appname);
+				_E("we will kill, lowmem lv2 = %d (%s)", pid, appname);
 				make_memps_log(MEMPS_LOG_FILE, pid, appname);
 
 				if(get_app_oomadj(pid, &oom_adj) < 0) {
@@ -427,7 +423,7 @@ int lowmem_def_predefine_action(int argc, char **argv)
 				ret = syspopup_launch("lowmem-syspopup", b);
 				bundle_free(b);
 				if (ret < 0) {
-					_E("popup lauch failed\n");
+					_E("popup lauch failed");
 					return -1;
 				}
 

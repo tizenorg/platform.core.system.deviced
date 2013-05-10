@@ -84,14 +84,12 @@ int set_app_oomadj(pid_t pid, int new_oomadj)
 	}
 	old_oomadj = atoi(buf);
 	fclose(fp);
-	_E("Process %s, pid %d, old_oomadj %d", exe_name, pid,
-		     old_oomadj);
+	_I("Process %s, pid %d, old_oomadj %d", exe_name, pid, old_oomadj);
 
 	if (old_oomadj < OOMADJ_APP_LIMIT)
 		return 0;
 
-	_E("Process %s, pid %d, new_oomadj %d", exe_name, pid,
-		     new_oomadj);
+	_I("Process %s, pid %d, new_oomadj %d", exe_name, pid, new_oomadj);
 	snprintf(buf, sizeof(buf), "/proc/%d/oom_adj", pid);
 	fp = fopen(buf, "w");
 	if (fp == NULL)
@@ -127,8 +125,8 @@ int set_oomadj_action(int argc, char **argv)
 
 	char buf[255];
 	FILE *fp;
+	_I("OOMADJ_SET : pid %d, new_oomadj %d", pid, new_oomadj);
 
-	_E("OOMADJ_SET : pid %d, new_oomadj %d", pid, new_oomadj);
 	snprintf(buf, sizeof(buf), "/proc/%d/oom_adj", pid);
 	fp = fopen(buf, "w");
 	if (fp == NULL)
@@ -410,7 +408,7 @@ int set_process_group_action(int argc, char **argv)
 		ret = device_set_property(DEVICE_TYPE_PROCESS, PROP_PROCESS_MP_PNP, pid);
 
 	if (ret == 0)
-		_E("%s : pid %d", argv[1], pid);
+		_I("%s : pid %d", argv[1], pid);
 	else
 		_E("fail to set %s : pid %d",argv[1], pid);
 	return 0;

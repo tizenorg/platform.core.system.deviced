@@ -98,16 +98,16 @@ static int pmon_process(int pid, void *ad)
 	int r;
 
 	if (is_vip(pid)) {
-		_E("=======================================");
-		_E("[Process MON] VIP process dead.");
-		_E("=======================================");
+		_I("=======================================");
+		_I("[Process MON] VIP process dead.");
+		_I("=======================================");
 	}
 	/* If there is NOT a .hibernation_start file, run following codes 
 	 * On hibernation processing, just ignore relaunching */
 	else if (access("/tmp/.hibernation_start", R_OK) != 0) {
 		cmdline = pmon_get_permanent_pname(pid);
 		if (cmdline != NULL) {
-			_D("[Process MON] %s relaunch", cmdline);
+			_I("[Process MON] %s relaunch", cmdline);
 			new_pid = ss_launch_evenif_exist(cmdline, "");
 			free(cmdline);
 			if (new_pid > 0) {
@@ -117,10 +117,10 @@ static int pmon_process(int pid, void *ad)
 				int cnt;
 
 				if (access(PMON_PERMANENT_DIR, R_OK) < 0) {
-					_D("no predefined matrix dir = %s, so created", PMON_PERMANENT_DIR);
+					_I("no predefined matrix dir = %s, so created", PMON_PERMANENT_DIR);
 					r = mkdir(PMON_PERMANENT_DIR, 0777);
 					if(r < 0) {
-						_D("Make Directory is failed");
+						_E("Make Directory is failed");
 						return -1;
 					}
 				}
@@ -128,14 +128,14 @@ static int pmon_process(int pid, void *ad)
 				snprintf(filepath, sizeof(filepath), "%s/%d", PMON_PERMANENT_DIR, pid);
 				fd = open(filepath, O_RDONLY);
 				if (fd == -1) {
-					_D("Failed to open");
+					_E("Failed to open");
 					return -1;
 				}
 				cnt = read(fd, buf, PATH_MAX);
 				close(fd);
 
 				if (cnt <= 0) {
-					_D("Failed to read");
+					_E("Failed to read");
 					return -1;
 				}
 
@@ -143,11 +143,11 @@ static int pmon_process(int pid, void *ad)
 
 				fd = open(filepath, O_CREAT | O_WRONLY, 0644);
 				if (fd == -1) {
-					_D("Failed to open");
+					_E("Failed to open");
 					return -1;
 				}
 				if (write(fd, buf, cnt) == -1) {
-					_D("Failed to write");
+					_E("Failed to write");
 					close(fd);
 					return -1;
 				}
@@ -155,13 +155,13 @@ static int pmon_process(int pid, void *ad)
 				if ( device_set_property(DEVICE_TYPE_PROCESS, PROP_PROCESS_MP_PNP, new_pid) < 0) {
 					_E("Write new pid failed");
 				}
-				_D("[Process MON] %d ", new_pid);
+				_I("[Process MON] %d ", new_pid);
 
 				FILE *fp;
 
-				_D("[Process MON] OOMADJ_SET : pid %d, new_oomadj %d",
+				_I("[Process MON] OOMADJ_SET : pid %d, new_oomadj %d",
 				     new_pid, (-17));
-				
+
 				fp = open_proc_oom_adj_file(new_pid, "w");
 				if (fp == NULL)
 					return -1;
@@ -171,8 +171,8 @@ static int pmon_process(int pid, void *ad)
 				snprintf(old_file, sizeof(old_file), "%s/%d",
 					 PMON_PERMANENT_DIR, pid);
 				unlink(old_file);
-			} else { 
-				_E("[Process MON] failed relaunching");
+			} else {
+				_I("[Process MON] failed relaunching");
 			}
 		}
 	}
@@ -209,7 +209,7 @@ static int pmon_cb(void *data, Ecore_Fd_Handler * fd_handler)
 		__pmon_start(ad);
 		return -1;
 	}
-		
+
 	print_pmon_state(dead_pid);
 	pmon_process(dead_pid, ad);
 
