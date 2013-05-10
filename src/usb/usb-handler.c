@@ -31,7 +31,7 @@
 
 static void usb_init(void *data)
 {
-	int val = -1, i = 0, pid;
+	int val, i = 0, pid;
 
 	_D("check usb connection");
 	if (device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_USB_ONLINE, &val) == 0) {
