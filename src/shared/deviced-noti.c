@@ -82,7 +82,6 @@ static inline int send_str(int fd, char *str)
 
 static int deviced_noti_send(struct sysnoti *msg)
 {
-	_E("--- %s: start", __FUNCTION__);
 	int client_len;
 	int client_sockfd;
 	int result;
@@ -116,7 +115,6 @@ static int deviced_noti_send(struct sysnoti *msg)
 	for (i = 0; i < msg->argc; i++)
 		send_str(client_sockfd, msg->argv[i]);
 
-	_E("--- %s: read", __FUNCTION__);
 	while (retry_count < RETRY_READ_COUNT) {
 		r = read(client_sockfd, &result, sizeof(int));
 		if (r < 0) {
@@ -137,17 +135,14 @@ static int deviced_noti_send(struct sysnoti *msg)
 	}
 
 	close(client_sockfd);
-	_E("--- %s: end", __FUNCTION__);
 	return result;
 }
 
 API int deviced_call_predef_action(const char *type, int num, ...)
 {
-	_E("--- %s: start", __FUNCTION__);
 	struct sysnoti *msg;
 	int ret;
 	va_list argptr;
-
 	int i;
 	char *args = NULL;
 
@@ -176,11 +171,9 @@ API int deviced_call_predef_action(const char *type, int num, ...)
 	}
 	va_end(argptr);
 
-	_E("--- %s: send msg", __FUNCTION__);
 	ret = deviced_noti_send(msg);
 	free(msg);
 
-	_E("--- %s: end", __FUNCTION__);
 	return ret;
 }
 
