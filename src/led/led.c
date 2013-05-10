@@ -45,13 +45,7 @@ static int set_brightness(int val)
 
 static int predefine_action(int argc, char **argv)
 {
-	int i;
-	int pid;
 	int prop;
-
-	_D("argc : %d", argc);
-	for (i = 0; i < argc; ++i)
-		_D("[%2d] %s", i, argv[i]);
 
 	if (argc > 4) {
 		_E("Invalid argument");
@@ -59,10 +53,7 @@ static int predefine_action(int argc, char **argv)
 		return -1;
 	}
 
-	pid = atoi(argv[0]);
 	prop = atoi(argv[1]);
-	_D("pid : %d, prop : %d", pid, prop);
-
 	switch(prop) {
 	case SET_BRT:
 		return set_brightness(atoi(argv[2]));
