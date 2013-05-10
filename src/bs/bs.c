@@ -85,7 +85,6 @@ static int make_noti_file(const char *path, const char *file)
 	struct group *group_entry;
 	mode_t old_mask;
 
-	_D("Make Noti File");
 	snprintf(buf, sizeof(buf), "%s/%s", path, file);	/* buf - full path to file */
 	if (access(buf, F_OK) == 0)				/* if file exists then return -1 */
 		return -1;
@@ -116,7 +115,6 @@ static int make_coredump_dir(void)
 	gid_t group_id;
 	struct group *group_entry;
 
-	_D("Make core dump directory");
 	if (access(CRASH_COREDUMP_PATH, F_OK) == 0)				/* if file exists then return -1 */
 		return -1;
 
@@ -140,7 +138,6 @@ static int make_info_dir(void)
 	gid_t group_id;
 	struct group *group_entry;
 
-	_D("Make crash info directory");
 	if (access(CRASH_INFO_PATH, F_OK) == 0)				/* if file exists then return -1 */
 		return -1;
 
@@ -178,7 +175,7 @@ static int clean_coredump_dir(void)
 			if ((name[1] == '.') && (name[2] == 0)) continue;
 		}
 		if (unlinkat(dfd, name, 0) < 0) {
-			_E("clean_coredump_dir (%s)",name);
+			_E("FAIL: clean_coredump_dir (%s)",name);
 			continue;
 		}
 	}
@@ -206,7 +203,7 @@ static int clean_dump_dir(void)
 			}
 			snprintf(dirname, sizeof(dirname), "%s/%s", CRASH_DUMP_PATH, name);
 			if (ecore_file_recursive_rm(dirname) == EINA_FALSE) {
-				_E("clean_dump_dir (%s)",dirname);
+				_E("FAIL: clean_dump_dir (%s)",dirname);
 				continue;
 			}
 		}
@@ -234,7 +231,7 @@ static int clean_info_dir(void)
 			if ((name[1] == '.') && (name[2] == 0)) continue;
 		}
 		if (unlinkat(dfd, name, 0) < 0) {
-			_E("clean_info_dir (%s)",name);
+			_E("FAIL: clean_info_dir (%s)",name);
 			continue;
 		}
 	}
@@ -432,7 +429,6 @@ static void bs_init(void *data)
 		_E("ecore_file_init() failed");
 		launch_crash_worker(CRASH_NOTI_PATH, CRASH_POPUP_OFF);
 	}
-
 	crash_file_monitor = ecore_file_monitor_add(CRASH_NOTI_PATH,(void *) __crash_file_cb, NULL);
 	if (!crash_file_monitor) {
 		_E("ecore_file_monitor_add() failed");
