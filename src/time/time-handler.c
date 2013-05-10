@@ -90,7 +90,7 @@ int handle_timezone(char *str)
 		return -1;
 	const char *tzpath = str;
 
-	_E("TZPATH = %s\n", tzpath);
+	_D("TZPATH = %s", tzpath);
 
 	if (stat(tzpath, &sts) == -1 && errno == ENOENT) {
 		_E("invalid tzpath(%s)", tzpath);
@@ -100,7 +100,7 @@ int handle_timezone(char *str)
 	/* FIXME for debugging purpose */
 	time(&now);
 	ts = localtime(&now);
-	_E("cur local time is %s", asctime(ts));
+	_D("cur local time is %s", asctime(ts));
 
 	/* unlink current link
 	 * eg. rm /opt/etc/localtime */
@@ -109,28 +109,27 @@ int handle_timezone(char *str)
 	} else {
 		ret = unlink(sympath);
 		if (ret < 0) {
-			_E("unlink error : [%d]%s\n", ret,
+			_E("unlink error : [%d]%s", ret,
 				  strerror(errno));
 			return -1;
-		} else
-			_E("unlink success\n");
-
+		}
+		_D("unlink success");
 	}
 
 	/* symlink new link
 	 * eg. ln -s /usr/share/zoneinfo/Asia/Seoul /opt/etc/localtime */
 	ret = symlink(tzpath, sympath);
 	if (ret < 0) {
-		_E("symlink error : [%d]%s\n", ret, strerror(errno));
+		_E("symlink error : [%d]%s", ret, strerror(errno));
 		return -1;
-	} else
-		_E("symlink success\n");
+	}
+	_D("symlink success");
 
 	tzset();
 
 	/* FIXME for debugging purpose */
 	ts = localtime(&now);
-	_E("new local time is %s", asctime(ts));
+	_D("new local time is %s", asctime(ts));
 	return 0;
 }
 
@@ -149,7 +148,7 @@ int handle_date(char *str)
 	tmp = (long int)atoi(str);
 	timet = (time_t) tmp;
 
-	_E("ctime = %s", ctime(&timet));
+	_D("ctime = %s", ctime(&timet));
 	vconf_set_int(VCONFKEY_SYSTEM_TIMECHANGE, timet);
 
 	return 0;
@@ -253,11 +252,10 @@ static int tfd_cb(void *data, Ecore_Fd_Handler * fd_handler)
 	}
 
 	ret = read(tfd,&ticks,sizeof(ticks));
-
 	if (ret < 0 && errno == ECANCELED) {
 		vconf_set_int(VCONFKEY_SYSMAN_STIME, VCONFKEY_SYSMAN_STIME_CHANGED);
 		timerfd_check_stop(tfd);
-		_E("NOTIFICATION here");
+		_D("NOTIFICATION here");
 		timerfd_check_start();
 	} else {
 		_E("unexpected read (err:%d)", errno);
