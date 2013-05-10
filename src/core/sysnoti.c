@@ -48,7 +48,7 @@ static void print_sysnoti_msg(const char *title, struct sysnoti *msg)
 	if (get_cmdline_name(msg->pid, exe_name, PATH_MAX) < 0)
 		snprintf(exe_name, sizeof(exe_name), "Unknown (maybe dead)");
 
-	_E("pid : %d name: %s cmd : %d type : %s path : %s",
+	_D("pid : %d name: %s cmd : %d type : %s path : %s",
 			msg->pid, exe_name, msg->cmd, msg->type, msg->path);
 }
 
@@ -122,14 +122,13 @@ static inline char *recv_str(int fd)
 			if(errno == EINTR) {
 				_E("Re-read for error(EINTR)");
 				retry_count++;
-				continue;                       
-			}                                               
-			else {      
+				continue;
+			} else {
 				_E("Read fail for str");
 				free(str);
 				str = NULL;
 				return NULL;
-			}                                                           
+			}
 		} else
 			break;
 	}
@@ -189,15 +188,14 @@ static int sysnoti_cb(void *data, Ecore_Fd_Handler * fd_handler)
 	int client_len;
 
 	if (!ecore_main_fd_handler_active_get(fd_handler, ECORE_FD_READ)) {
-		_E
-		    ("ecore_main_fd_handler_active_get error , return\n");
+		_E("ecore_main_fd_handler_active_get error , return");
 		return 1;
 	}
 
 	fd = ecore_main_fd_handler_fd_get(fd_handler);
 	msg = malloc(sizeof(struct sysnoti));
 	if (msg == NULL) {
-		_E("%s : Not enough memory", __FUNCTION__);
+		_E("Not enough memory");
 		return 1;
 	}
 
@@ -210,7 +208,7 @@ static int sysnoti_cb(void *data, Ecore_Fd_Handler * fd_handler)
 		return -1;
 	}
 	if (read_message(client_sockfd, msg) < 0) {
-		_E("%s : recv error msg", __FUNCTION__);
+		_E("recv error msg");
 		print_sysnoti_msg(__FUNCTION__, msg);
 		free_message(msg);
 		write(client_sockfd, &ret, sizeof(int));
@@ -222,7 +220,7 @@ static int sysnoti_cb(void *data, Ecore_Fd_Handler * fd_handler)
 
 	print_sysnoti_msg(__FUNCTION__, msg);
 	if (msg->argc > SYSMAN_MAXARG) {
-		_E("%s : error argument", __FUNCTION__);
+		_E("error argument");
 		free_message(msg);
 		write(client_sockfd, &ret, sizeof(int));
 		close(client_sockfd);
@@ -256,11 +254,11 @@ static int ss_sysnoti_server_init(void)
 
 	fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (fd < 0) {
-		_E("%s: socket create failed\n", __FUNCTION__);
+		_E("socket create failed");
 		return -1;
 	}
 	if((fsetxattr(fd, "security.SMACK64IPOUT", "@", 2, 0)) < 0 ) {
-		_E("%s: Socket SMACK labeling failed\n", __FUNCTION__);
+		_E("Socket SMACK labeling failed");
 		if(errno != EOPNOTSUPP) {
 			close(fd);
 			return -1;
@@ -268,7 +266,7 @@ static int ss_sysnoti_server_init(void)
 	}
 
 	if((fsetxattr(fd, "security.SMACK64IPIN", "*", 2, 0)) < 0 ) {
-		_E("%s: Socket SMACK labeling failed\n", __FUNCTION__);
+		_E("Socket SMACK labeling failed");
 		if(errno != EOPNOTSUPP) {
 			close(fd);
 			return -1;
@@ -281,7 +279,7 @@ static int ss_sysnoti_server_init(void)
 		sizeof(serveraddr.sun_path));
 
 	if (bind(fd, (struct sockaddr *)&serveraddr, sizeof(struct sockaddr)) < 0) {
-		_E("%s: socket bind failed\n", __FUNCTION__);
+		_E("socket bind failed");
 		close(fd);
 		return -1;
 	}
@@ -294,7 +292,6 @@ static int ss_sysnoti_server_init(void)
 		close(fd);
 		return -1;
 	}
-	_I("socket create & listen ok\n");
 
 	return fd;
 }

@@ -75,7 +75,7 @@ int ss_action_entry_add_internal(char *type,
 
 	predef_act_list = eina_list_prepend(predef_act_list, data);
 
-	_E("[SYSMAN] add predefine action entry suceessfully - %s",
+	_I("[SYSMAN] add predefine action entry suceessfully - %s",
 		  data->type);
 	return 0;
  err:
@@ -121,7 +121,7 @@ int ss_action_entry_add(struct sysnoti *msg)
 
 	predef_act_list = eina_list_prepend(predef_act_list, data);
 
-	_E("[SYSMAN]add predefine action entry suceessfully - %s",
+	_I("[SYSMAN]add predefine action entry suceessfully - %s",
 		  data->type);
 	return 0;
  err:
@@ -157,9 +157,7 @@ int ss_action_entry_call_internal(char *type, int argc, ...)
 
 			int ret;
 			ret=ss_run_queue_add(data, argc, argv);
-			_E("ss_run_queue_add : %d", ret);
 			ret=ss_core_action_run();
-			_E("ss_core_action_run : %d", ret);
 			return 0;
 		}
 	}
@@ -177,16 +175,12 @@ int ss_action_entry_call(struct sysnoti *msg, int sockfd)
 		if ((data != NULL) && (!strcmp(data->type, msg->type))) {
 			if (data->is_accessible != NULL
 			    && data->is_accessible(sockfd) == 0) {
-				_E
-				    ("%d cannot call that predefine module",
-				     msg->pid);
+				_E("%d cannot call that predefine module", msg->pid);
 				return -1;
 			}
 			int ret;
 			ret=ss_run_queue_add(data, msg->argc, msg->argv);
-			_E("ss_run_queue_add : %d",ret);
 			ret=ss_core_action_run();
-			_E("ss_core_action_run : %d",ret);
 			return 0;
 		}
 	}
@@ -220,7 +214,7 @@ int ss_run_queue_add(struct ss_action_entry *act_entry, int argc, char **argv)
 
 	run_queue = eina_list_prepend(run_queue, rq_entry);
 
-	_E("[SYSMAN] new action called : %s", act_entry->type);
+	_I("[SYSMAN] new action called : %s", act_entry->type);
 	return 0;
 }
 
@@ -264,7 +258,7 @@ int ss_run_queue_del(struct ss_run_queue_entry *entry)
 	EINA_LIST_FOREACH_SAFE(run_queue, tmp, tmp_next, rq_entry) {
 		if ((rq_entry != NULL) && (rq_entry == entry)) {
 			run_queue = eina_list_remove(run_queue, rq_entry);
-			_E("[SYSMAN] action deleted : %s",
+			_I("[SYSMAN] action deleted : %s",
 				     rq_entry->action_entry->type);
 			for (i = 0; i < rq_entry->argc; i++) {
 				if (rq_entry->argv[i])
@@ -287,7 +281,7 @@ int ss_run_queue_del_bypid(int pid)
 	EINA_LIST_FOREACH_SAFE(run_queue, tmp, tmp_next, rq_entry) {
 		if ((rq_entry != NULL) && (rq_entry->forked_pid == pid)) {
 			run_queue = eina_list_remove(run_queue, rq_entry);
-			_E("[SYSMAN] action deleted : %s",
+			_I("[SYSMAN] action deleted : %s",
 				     rq_entry->action_entry->type);
 			for (i = 0; i < rq_entry->argc; i++) {
 				if (rq_entry->argv[i])
