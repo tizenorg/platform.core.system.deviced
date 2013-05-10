@@ -63,8 +63,7 @@ int util_process_group_set(const char* name, int pid)
 	}
 
 	snprintf(buf, sizeof(buf), "%d", pid);
-	_E("pid(%d) is inserted at vip", pid);
-
+	_D("pid(%d) is inserted at vip", pid);
 	return deviced_call_predef_action(PROCESS_GROUP_SET, 2, buf, name);
 }
 
@@ -128,7 +127,7 @@ static int copy_cmdline(int pid)
 
 	fd = open(filepath, O_RDONLY);
 	if (fd == -1) {
-		_D("Failed to open");
+		_E("Failed to open");
 		return -1;
 	}
 
@@ -137,7 +136,7 @@ static int copy_cmdline(int pid)
 
 	if (cnt <= 0) {
 		/* Read /proc/<pid>/cmdline error */
-		_D("Failed to read");
+		_E("Failed to read");
 		return -1;
 	}
 
@@ -145,17 +144,17 @@ static int copy_cmdline(int pid)
 
 	fd = open(filepath, O_CREAT | O_WRONLY, 0644);
 	if (fd == -1) {
-		_D("Failed to open");
+		_E("Failed to open");
 		return -1;
 	}
 
 	if (write(fd, buf, cnt) == -1) {
-		_D("Failed to write");
+		_E("Failed to write");
 		close(fd);
 		return -1;
 	}
-	close(fd);
 
+	close(fd);
 	return 0;
 }
 

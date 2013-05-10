@@ -92,7 +92,7 @@ static int deviced_noti_send(struct sysnoti *msg)
 
 	client_sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (client_sockfd == -1) {
-		_E("%s: socket create failed\n", __FUNCTION__);
+		_E("socket create failed");
 		return -1;
 	}
 	bzero(&clientaddr, sizeof(clientaddr));
@@ -102,7 +102,7 @@ static int deviced_noti_send(struct sysnoti *msg)
 
 	if (connect(client_sockfd, (struct sockaddr *)&clientaddr, client_len) <
 	    0) {
-		_E("%s: connect failed\n", __FUNCTION__);
+		_E("connect failed");
 		close(client_sockfd);
 		return -1;
 	}

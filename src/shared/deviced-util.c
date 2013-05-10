@@ -129,4 +129,3 @@ API int deviced_get_apppath(pid_t pid, char *app_path, size_t app_path_size)
 	app_path[ret] = '\0';
 	return 0;
 }
-

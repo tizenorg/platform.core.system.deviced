@@ -97,7 +97,7 @@ API int display_set_brightness_with_setting(int val)
 	}
 
 	if (val == DISPLAY_DIM_BRIGHTNESS) {
-		_D("application can not set this value(DIM VALUE:%d)", val);
+		_E("application can not set this value(DIM VALUE:%d)", val);
 		errno = EPERM;
 		return -errno;
 	}
@@ -134,7 +134,7 @@ API int display_set_brightness(int val)
 	}
 
 	if (val == DISPLAY_DIM_BRIGHTNESS) {
-		_D("application can not set this value(DIM VALUE:%d)", val);
+		_E("application can not set this value(DIM VALUE:%d)", val);
 		errno = EPERM;
 		return -errno;
 	}
