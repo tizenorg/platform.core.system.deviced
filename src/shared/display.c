@@ -198,7 +198,7 @@ API int display_release_brightness(void)
 	vconf_set_int(VCONFKEY_PM_CUSTOM_BRIGHTNESS_STATUS, VCONFKEY_PM_CUSTOM_BRIGHTNESS_OFF);
 
 	// check dim state
-	if (bat_state <= VCONFKEY_SYSMAN_BAT_WARNING_LOW &&
+	if (bat_state <= VCONFKEY_SYSMAN_BAT_CRITICAL_LOW &&
 		charger_state == VCONFKEY_SYSMAN_CHARGER_DISCONNECTED && !brt_changed_state) {
 		_D("batt warning low : brightness is not changed!");
 		device_set_property(DEVICE_TYPE_DISPLAY, PROP_DISPLAY_BRIGHTNESS, 0);

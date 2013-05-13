@@ -1121,7 +1121,7 @@ static int update_setting(int key_idx, int val)
 		states[pm_cur_state].trans(EVENT_INPUT);
 		break;
 	case SETTING_LOW_BATT:
-		if (val <= VCONFKEY_SYSMAN_BAT_WARNING_LOW &&
+		if (val <= VCONFKEY_SYSMAN_BAT_CRITICAL_LOW &&
 			val >= VCONFKEY_SYSMAN_BAT_POWER_OFF ) {
 			if (!(pm_status_flag & CHRGR_FLAG))
 				power_saving_func(true);
@@ -1146,7 +1146,7 @@ static int update_setting(int key_idx, int val)
 			int bat_state = VCONFKEY_SYSMAN_BAT_NORMAL;
 			vconf_get_int(VCONFKEY_SYSMAN_BATTERY_STATUS_LOW,
 				&bat_state);
-			if (bat_state <= VCONFKEY_SYSMAN_BAT_WARNING_LOW &&
+			if (bat_state <= VCONFKEY_SYSMAN_BAT_CRITICAL_LOW &&
 				bat_state >= VCONFKEY_SYSMAN_BAT_POWER_OFF ) {
 				power_saving_func(true);
 				pm_status_flag |= LOWBT_FLAG;
@@ -1269,7 +1269,7 @@ static void check_seed_status(void)
 	backlight_ops.set_default_brt(tmp);
 
 	vconf_get_int(VCONFKEY_SYSMAN_BATTERY_STATUS_LOW, &bat_state);
-	if (bat_state <= VCONFKEY_SYSMAN_BAT_WARNING_LOW &&
+	if (bat_state <= VCONFKEY_SYSMAN_BAT_CRITICAL_LOW &&
 		bat_state >= VCONFKEY_SYSMAN_BAT_POWER_OFF) {
 		if (!(pm_status_flag & CHRGR_FLAG)) {
 			power_saving_func(true);
