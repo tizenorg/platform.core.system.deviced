@@ -111,7 +111,18 @@ int deviced_request_mount_mmc(struct mmc_contents *mmc_data);
 int deviced_request_unmount_mmc(struct mmc_contents *mmc_data, int option);
 
 /**
- * @fn int deviced_request_format_mmc(struct deviced_mmc_contents *mmc_data, int option)
+ * @fn int deviced_request_format_mmc(struct deviced_mmc_contents *mmc_data)
+ * @brief This API is used to format mmc.\n
+ * 		Internally, this API call predefined action API. That is send a notify message. \n
+ * 		and when format opeation is finished, cb of deviced_mmc_content struct is called with cb's param1(result). \n
+ * 		means of param1 - 0(format success) , -1(format fail)
+ * @param[in] mmc_data for receive result of format operation
+ * @return  non-zero on success message sending, -1 if message sending is failed.
+ */
+int deviced_request_format_mmc(struct mmc_contents *mmc_data);
+
+/**
+ * @fn int deviced_format_mmc(struct deviced_mmc_contents *mmc_data, int option)
  * @brief This API is used to format mmc.\n
  * 		Internally, this API call predefined action API. That is send a notify message. \n
  * 		and when format opeation is finished, cb of deviced_mmc_content struct is called with cb's param1(result). \n
@@ -122,7 +133,7 @@ int deviced_request_unmount_mmc(struct mmc_contents *mmc_data, int option);
  * @param[in] FMT_NORMAL is 0, FMT_FORCE is 1
  * @return  non-zero on success message sending, -1 if message sending is failed.
  */
-int deviced_request_format_mmc(struct mmc_contents *mmc_data, int option);
+int deviced_format_mmc(struct mmc_contents *mmc_data, int option);
 
 #ifdef __cplusplus
 }
