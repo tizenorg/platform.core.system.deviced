@@ -41,7 +41,7 @@ static int append_variant(DBusMessageIter *iter, const char *sig, char *param[])
 			dbus_message_iter_append_basic(iter, DBUS_TYPE_INT32, &int_type);
 			break;
 		case 's':
-			dbus_message_iter_append_basic(iter, DBUS_TYPE_STRING, param[i]);
+			dbus_message_iter_append_basic(iter, DBUS_TYPE_STRING, &param[i]);
 			break;
 		default:
 			return -EINVAL;

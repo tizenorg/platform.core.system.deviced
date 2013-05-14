@@ -43,6 +43,26 @@
 #define TIMEOUT_RESET_BIT		0x80
 
 #define METHOD_SET_FRAME_RATE		"setframerate"
+#define METHOD_LOCK_STATE		"lockstate"
+#define METHOD_UNLOCK_STATE		"unlockstate"
+#define METHOD_CHANGE_STATE		"changestate"
+
+#define STR_LCD_OFF   "lcdoff"
+#define STR_LCD_DIM   "lcddim"
+#define STR_LCD_ON    "lcdon"
+#define STR_SUSPEND   "suspend"
+
+#define STR_STAYCURSTATE "staycurstate"
+#define STR_GOTOSTATENOW "gotostatenow"
+
+#define STR_HOLDKEYBLOCK "holdkeyblock"
+#define STR_STANDBYMODE  "standbymode"
+#define STR_NULL         "NULL"
+
+#define STR_SLEEP_MARGIN "sleepmargin"
+#define STR_RESET_TIMER  "resettimer"
+#define STR_KEEP_TIMER   "keeptimer"
+
 
 struct disp_lock_msg {
 	pid_t pid;
@@ -307,57 +327,148 @@ static int send_msg(unsigned int s_bits, unsigned int timeout, unsigned int time
 	return (rc > 0 ? 0 : rc);
 }
 
+static inline char *get_lcd_str(unsigned int val)
+{
+	switch (val) {
+	case LCD_NORMAL:
+		return STR_LCD_ON;
+	case LCD_DIM:
+		return STR_LCD_DIM;
+	case LCD_OFF:
+		return STR_LCD_OFF;
+	case SUSPEND:
+		return STR_SUSPEND;
+	default:
+		return NULL;
+	}
+}
+
 API int display_change_state(unsigned int s_bits)
 {
-	/* s_bits is LCD_NORMAL 0x1, LCD_DIM 0x2, LCD_OFF 0x4, SUSPEND 0x8
-	 * Stage change to NORMAL       0x100
-	 * Stage change to LCDDIM       0x200
-	 * Stage change to LCDOFF       0x400
-	 * Stage change to SLEEP        0x800
-	 * */
-	switch (s_bits) {
-	case LCD_NORMAL:
-	case LCD_DIM:
-	case LCD_OFF:
-	case SUSPEND:
-	case POWER_OFF:
-		break;
-	default:
-		return -1;
+	DBusError err;
+	DBusMessage *msg;
+	char *p, *pa[1];
+	int ret, val;
+
+	p = get_lcd_str(s_bits);
+	if (!p)
+		return -EINVAL;
+	pa[0] = p;
+
+	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
+			METHOD_CHANGE_STATE, "s", pa);
+	if (!msg)
+		return -EBADMSG;
+
+	dbus_error_init(&err);
+
+	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &val, DBUS_TYPE_INVALID);
+	if (!ret) {
+		_E("no message : [%s:%s]", err.name, err.message);
+		val = -EBADMSG;
 	}
-	return send_msg(s_bits << SHIFT_CHANGE_STATE, 0, 0);
+
+	dbus_message_unref(msg);
+	dbus_error_free(&err);
+
+	_D("%s-%s : %d", DEVICED_INTERFACE_DISPLAY, METHOD_CHANGE_STATE, val);
+	return val;
 }
 
 API int display_lock_state(unsigned int s_bits, unsigned int flag,
 		      unsigned int timeout)
 {
-	switch (s_bits) {
-	case LCD_NORMAL:
-	case LCD_DIM:
-	case LCD_OFF:
-		break;
-	default:
-		return -1;
-	}
+	DBusError err;
+	DBusMessage *msg;
+	char *p, *pa[4];
+	char str_timeout[32];
+	int ret, val;
+
+	p = get_lcd_str(s_bits);
+	if (!p)
+		return -EINVAL;
+	pa[0] = p;
+
 	if (flag & GOTO_STATE_NOW)
 		/* if the flag is true, go to the locking state directly */
-		s_bits = s_bits | (s_bits << SHIFT_CHANGE_STATE);
+		p = STR_GOTOSTATENOW;
+	else
+		p = STR_STAYCURSTATE;
+	pa[1] = p;
 
-	return send_msg(s_bits, timeout, 0);
+		p = STR_HOLDKEYBLOCK;
+	else if (flag & STANDBY_MODE)
+		p = STR_STANDBYMODE;
+	else
+		p = STR_NULL;
+	pa[2] = p;
+
+	snprintf(str_timeout, sizeof(str_timeout), "%d", timeout);
+	pa[3] = str_timeout;
+
+	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
+			METHOD_LOCK_STATE, "sssi", pa);
+	if (!msg)
+		return -EBADMSG;
+
+	dbus_error_init(&err);
+
+	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &val, DBUS_TYPE_INVALID);
+	if (!ret) {
+		_E("no message : [%s:%s]", err.name, err.message);
+		val = -EBADMSG;
+	}
+	dbus_message_unref(msg);
+	dbus_error_free(&err);
+
+	_D("%s-%s : %d", DEVICED_INTERFACE_DISPLAY, METHOD_LOCK_STATE, val);
+	return val;
 }
 
 API int display_unlock_state(unsigned int s_bits, unsigned int flag)
 {
-	switch (s_bits) {
-	case LCD_NORMAL:
-	case LCD_DIM:
-	case LCD_OFF:
+	DBusError err;
+	DBusMessage *msg;
+	char *p, *pa[2];
+	int ret, val;
+
+	p = get_lcd_str(s_bits);
+	if (!p)
+		return -EINVAL;
+	pa[0] = p;
+
+	switch (flag) {
+	case PM_SLEEP_MARGIN:
+		p = STR_SLEEP_MARGIN;
+		break;
+	case PM_RESET_TIMER:
+		p = STR_RESET_TIMER;
+		break;
+	case PM_KEEP_TIMER:
+		p = STR_KEEP_TIMER;
 		break;
 	default:
-		return -1;
+		return -EINVAL;
+	}
+	pa[1] = p;
+
+	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
+			METHOD_UNLOCK_STATE, "ss", pa);
+	if (!msg)
+		return -EBADMSG;
+
+	dbus_error_init(&err);
+
+	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &val, DBUS_TYPE_INVALID);
+	if (!ret) {
+		_E("no message : [%s:%s]", err.name, err.message);
+		val = -EBADMSG;
 	}
 
-	s_bits = (s_bits << SHIFT_UNLOCK);
-	s_bits = (s_bits | (flag << SHIFT_UNLOCK_PARAMETER));
-	return send_msg(s_bits, 0, 0);
+	dbus_message_unref(msg);
+	dbus_error_free(&err);
+
+	_D("%s-%s : %d", DEVICED_INTERFACE_DISPLAY, METHOD_UNLOCK_STATE, val);
+	return val;
+
 }
