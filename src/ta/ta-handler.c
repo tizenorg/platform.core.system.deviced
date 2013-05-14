@@ -30,6 +30,7 @@
 static void ta_init(void *data)
 {
 	int val, i = 0;
+	int ret;
 
 	if (device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_TA_ONLINE, &val) != 0)
 		return;
@@ -47,6 +48,10 @@ static void ta_init(void *data)
 		vconf_set_int(VCONFKEY_SYSMAN_CHARGER_STATUS,
 				VCONFKEY_SYSMAN_CHARGER_DISCONNECTED);
 	}
+	ret = device_get_property(DEVICE_TYPE_POWER,
+		PROP_POWER_CHARGE_NOW, &val);
+	if (ret == 0)
+		vconf_set_int(VCONFKEY_SYSMAN_BATTERY_CHARGE_NOW, val);
 }
 
 const struct device_ops ta_device_ops = {
