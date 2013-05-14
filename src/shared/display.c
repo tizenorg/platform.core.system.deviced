@@ -396,9 +396,8 @@ API int display_lock_state(unsigned int s_bits, unsigned int flag,
 		p = STR_STAYCURSTATE;
 	pa[1] = p;
 
+	if (flag & HOLD_KEY_BLOCK)
 		p = STR_HOLDKEYBLOCK;
-	else if (flag & STANDBY_MODE)
-		p = STR_STANDBYMODE;
 	else
 		p = STR_NULL;
 	pa[2] = p;
@@ -470,5 +469,4 @@ API int display_unlock_state(unsigned int s_bits, unsigned int flag)
 
 	_D("%s-%s : %d", DEVICED_INTERFACE_DISPLAY, METHOD_UNLOCK_STATE, val);
 	return val;
-
 }
