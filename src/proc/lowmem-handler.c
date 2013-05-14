@@ -52,8 +52,8 @@
 
 #define _SYS_RES_CLEANUP	"RES_CLEANUP"
 
-#define MEM_THRESHOLD_LV1	60
-#define MEM_THRESHOLD_LV2	40
+#define MEM_THRESHOLD_LV1	110
+#define MEM_THRESHOLD_LV2	70
 
 
 struct lowmem_process_entry {
