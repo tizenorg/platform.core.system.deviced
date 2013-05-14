@@ -128,7 +128,13 @@ int get_mmcblk_num(void)
 		_E("Can not open directory..");
 		return -1;
 	}
-	chdir("/sys/block");
+
+	r = chdir("/sys/block");
+	if (r < 0) {
+		_E("Fail to change the directory..");
+		closedir(dp);
+		return r;
+	}
 
 	while ((dir = readdir(dp)) != NULL) {
 		memset(&stat, 0, sizeof(struct stat));
