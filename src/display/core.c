@@ -129,6 +129,8 @@ static int trans_table[S_END][EVENT_END] = {
 #define LOCK_SCREEN_WATING_TIME		50000	/* 50 ms */
 #define LOCK_SCREEN_WATING_MAX_COUNT	14	/* 50 * 14 : 700 ms at worst */
 #define MASK32				0xffffffff
+#define LOCK_TIME_ERROR			600	/* 600 seconds */
+#define LOCK_TIME_WARNING		60	/* 60 seconds */
 
 #define ACTIVE_ACT "active"
 #define INACTIVE_ACT "inactive"
@@ -234,14 +236,25 @@ static void print_node(int next)
 {
 	PmLockNode *n;
 	char buf[30];
+	time_t now;
+	double diff;
 
 	if (next <= S_START || next >= S_END)
 		return;
 
+	time(&now);
 	n = cond_head[next];
 	while (n != NULL) {
+		diff = difftime(now, n->time);
 		ctime_r(&n->time, buf);
-		_I("pid: %5d, lock time: %s", n->pid, buf);
+
+		if (diff > LOCK_TIME_ERROR)
+			_E("over %.0f s, pid: %5d, lock time: %s", diff, n->pid, buf);
+		else if (diff > LOCK_TIME_WARNING)
+			_I("over %.0f s, pid: %5d, lock time: %s", diff, n->pid, buf);
+		else
+			_I("pid: %5d, lock time: %s", n->pid, buf);
+
 		n = n->next;
 	}
 }
