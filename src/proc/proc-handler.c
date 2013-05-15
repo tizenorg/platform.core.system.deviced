@@ -43,6 +43,9 @@
 #define PREDEF_INACTIVE			"inactive"
 #define PROCESS_GROUP_SET		"process_group_set"
 
+#define SIOP_LEVEL_MASK	0xFFFF
+#define SIOP_LEVEL(val)			((val & SIOP_LEVEL_MASK) << 16)
+static int siop = 0;
 int get_app_oomadj(int pid, int *oomadj)
 {
 	if (pid < 0)
@@ -74,16 +77,9 @@ int set_app_oomadj(pid_t pid, int new_oomadj)
 	if (get_cmdline_name(pid, exe_name, PATH_MAX) < 0)
 		snprintf(exe_name, sizeof(exe_name), "Unknown (maybe dead)");
 
-	snprintf(buf, sizeof(buf), "/proc/%d/oom_adj", pid);
-	fp = fopen(buf, "r");
-	if (fp == NULL)
+	if (get_app_oomadj(pid, &old_oomadj) < 0)
 		return -1;
-	if (fgets(buf, PATH_MAX, fp) == NULL) {
-		fclose(fp);
-		return -1;
-	}
-	old_oomadj = atoi(buf);
-	fclose(fp);
+
 	_I("Process %s, pid %d, old_oomadj %d", exe_name, pid, old_oomadj);
 
 	if (old_oomadj < OOMADJ_APP_LIMIT)
