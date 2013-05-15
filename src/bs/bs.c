@@ -344,7 +344,6 @@ static void launch_crash_worker(const char *filename, int popup_on)
 		}
 	}
 	fclose(fp);
-
 	if (ret != -1) {
 		fp = fopen(filename, "w");
 		if (fp == NULL) {
@@ -352,7 +351,6 @@ static void launch_crash_worker(const char *filename, int popup_on)
 		}
 		fclose(fp);
 	}
-
 	return;
 }
 
@@ -372,7 +370,6 @@ static Ecore_File_Monitor_Cb __crash_file_cb(void *data, Ecore_File_Monitor *em,
 		launch_crash_worker(path, CRASH_POPUP_ON);
 		break;
 	}
-
 	return NULL;
 }
 static int _get_file_count(char *path)

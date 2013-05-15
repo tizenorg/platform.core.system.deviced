@@ -30,7 +30,7 @@
 static Eina_List *predef_act_list;
 static Eina_List *run_queue;
 
-static struct ss_action_entry *ss_action_entry_find(char *type)
+static struct ss_action_entry *action_entry_find(char *type)
 {
 	Eina_List *tmp;
 	Eina_List *tmp_next;
@@ -44,7 +44,7 @@ static struct ss_action_entry *ss_action_entry_find(char *type)
 	return NULL;
 }
 
-int ss_action_entry_add_internal(char *type,
+int action_entry_add_internal(char *type,
 				 int (*predefine_action) (),
 				 int (*ui_viewable) (),
 				 int (*is_accessible) (int))
@@ -59,7 +59,7 @@ int ss_action_entry_add_internal(char *type,
 	}
 
 	data->type = NULL;
-	if (ss_action_entry_find(type) != NULL)
+	if (action_entry_find(type) != NULL)
 		goto err;
 
 	data->handle = NULL;
@@ -86,7 +86,7 @@ int ss_action_entry_add_internal(char *type,
 	return -1;
 }
 
-int ss_action_entry_add(struct sysnoti *msg)
+int action_entry_add(struct sysnoti *msg)
 {
 	struct ss_action_entry *data;
 
@@ -97,7 +97,7 @@ int ss_action_entry_add(struct sysnoti *msg)
 		return -1;
 	}
 
-	if (ss_action_entry_find(msg->type) != NULL)
+	if (action_entry_find(msg->type) != NULL)
 		goto err;
 
 	data->handle = dlopen(msg->path, RTLD_LAZY);
@@ -130,7 +130,7 @@ int ss_action_entry_add(struct sysnoti *msg)
 	return -1;
 }
 
-int ss_action_entry_call_internal(char *type, int argc, ...)
+int action_entry_call_internal(char *type, int argc, ...)
 {
 	Eina_List *tmp;
 	Eina_List *tmp_next;
@@ -165,7 +165,7 @@ int ss_action_entry_call_internal(char *type, int argc, ...)
 	return 0;
 }
 
-int ss_action_entry_call(struct sysnoti *msg, int sockfd)
+int action_entry_call(struct sysnoti *msg, int sockfd)
 {
 	Eina_List *tmp;
 	Eina_List *tmp_next;

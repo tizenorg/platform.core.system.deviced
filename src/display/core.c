@@ -152,7 +152,7 @@ void set_process_active(bool flag, pid_t pid)
 	char str[6];
 
 	sprintf(str, "%d", (int)pid);
-	ss_action_entry_call_internal(
+	action_entry_call_internal(
 	    (flag ? ACTIVE_ACT : INACTIVE_ACT), 1, str);
 }
 

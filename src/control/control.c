@@ -75,7 +75,7 @@ static int control_handler(int argc, char **argv)
 
 static void control_init(void *data)
 {
-	ss_action_entry_add_internal(CONTROL_HANDLER_NAME, control_handler, NULL, NULL);
+	action_entry_add_internal(CONTROL_HANDLER_NAME, control_handler, NULL, NULL);
 }
 
 const struct device_ops control_device_ops = {

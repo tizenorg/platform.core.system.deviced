@@ -318,7 +318,7 @@ int haptic_def_predefine_action(int argc, char **argv)
 
 static void vibrator_init(void *data)
 {
-	ss_action_entry_add_internal(PREDEF_HAPTIC, haptic_def_predefine_action,
+	action_entry_add_internal(PREDEF_HAPTIC, haptic_def_predefine_action,
 					NULL, NULL);
 }
 

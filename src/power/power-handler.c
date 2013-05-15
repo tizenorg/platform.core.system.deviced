@@ -109,13 +109,13 @@ static void poweroff_control_cb(keynode_t *in_key, struct ss_main_data *ad)
 		return;
 	switch (val) {
 	case VCONFKEY_SYSMAN_POWER_OFF_DIRECT:
-		ss_action_entry_call_internal(PREDEF_POWEROFF, 0);
+		action_entry_call_internal(PREDEF_POWEROFF, 0);
 		break;
 	case VCONFKEY_SYSMAN_POWER_OFF_POPUP:
-		ss_action_entry_call_internal(PREDEF_PWROFF_POPUP, 0);
+		action_entry_call_internal(PREDEF_PWROFF_POPUP, 0);
 		break;
 	case VCONFKEY_SYSMAN_POWER_OFF_RESTART:
-		ss_action_entry_call_internal(PREDEF_REBOOT, 0);
+		action_entry_call_internal(PREDEF_REBOOT, 0);
 		break;
 	}
 
@@ -433,7 +433,7 @@ int poweroff_def_predefine_action(int argc, char **argv)
 	heynoti_publish(POWEROFF_NOTI_NAME);
 
 	while (retry_count < MAX_RETRY) {
-		if (ss_action_entry_call_internal(PREDEF_INTERNAL_POWEROFF, 0) < 0) {
+		if (action_entry_call_internal(PREDEF_INTERNAL_POWEROFF, 0) < 0) {
 			_E("failed to request poweroff to system_server");
 			retry_count++;
 			continue;
@@ -521,23 +521,23 @@ static void power_init(void *data)
 		_E("failed to get tapi vconf key");
 	}
 
-	ss_action_entry_add_internal(PREDEF_ENTERSLEEP,
+	action_entry_add_internal(PREDEF_ENTERSLEEP,
 				     entersleep_def_predefine_action, NULL,
 				     NULL);
-	ss_action_entry_add_internal(PREDEF_POWEROFF,
+	action_entry_add_internal(PREDEF_POWEROFF,
 				     poweroff_def_predefine_action, NULL, NULL);
-	ss_action_entry_add_internal(PREDEF_PWROFF_POPUP,
+	action_entry_add_internal(PREDEF_PWROFF_POPUP,
 				     launching_predefine_action, NULL, NULL);
-	ss_action_entry_add_internal(PREDEF_LEAVESLEEP,
+	action_entry_add_internal(PREDEF_LEAVESLEEP,
 				     leavesleep_def_predefine_action, NULL,
 				     NULL);
-	ss_action_entry_add_internal(PREDEF_REBOOT,
+	action_entry_add_internal(PREDEF_REBOOT,
 				     restart_def_predefine_action, NULL, NULL);
 
-	ss_action_entry_add_internal(PREDEF_INTERNAL_POWEROFF,
+	action_entry_add_internal(PREDEF_INTERNAL_POWEROFF,
 				     internal_poweroff_def_predefine_action, NULL, NULL);
 
-	ss_action_entry_add_internal(PREDEF_FLIGHT_MODE,
+	action_entry_add_internal(PREDEF_FLIGHT_MODE,
 				     flight_mode_def_predefine_action, NULL, NULL);
 
 	if (vconf_notify_key_changed(VCONFKEY_SYSMAN_POWER_OFF_STATUS, (void *)poweroff_control_cb, NULL) < 0) {

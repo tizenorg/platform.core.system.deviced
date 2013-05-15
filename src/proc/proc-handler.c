@@ -412,16 +412,16 @@ int set_process_group_action(int argc, char **argv)
 
 static void process_init(void *data)
 {
-	ss_action_entry_add_internal(PREDEF_FOREGRD, set_foregrd_action, NULL,
+	action_entry_add_internal(PREDEF_FOREGRD, set_foregrd_action, NULL,
 				     NULL);
-	ss_action_entry_add_internal(PREDEF_BACKGRD, set_backgrd_action, NULL,
+	action_entry_add_internal(PREDEF_BACKGRD, set_backgrd_action, NULL,
 				     NULL);
-	ss_action_entry_add_internal(PREDEF_ACTIVE, set_active_action, NULL,
+	action_entry_add_internal(PREDEF_ACTIVE, set_active_action, NULL,
 				     NULL);
-	ss_action_entry_add_internal(PREDEF_INACTIVE, set_inactive_action, NULL,
+	action_entry_add_internal(PREDEF_INACTIVE, set_inactive_action, NULL,
 				     NULL);
-	ss_action_entry_add_internal(OOMADJ_SET, set_oomadj_action, NULL, NULL);
-	ss_action_entry_add_internal(PROCESS_GROUP_SET, set_process_group_action, NULL, NULL);
+	action_entry_add_internal(OOMADJ_SET, set_oomadj_action, NULL, NULL);
+	action_entry_add_internal(PROCESS_GROUP_SET, set_process_group_action, NULL, NULL);
 }
 
 const struct device_ops process_device_ops = {

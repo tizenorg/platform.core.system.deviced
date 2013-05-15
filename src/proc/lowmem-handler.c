@@ -242,7 +242,7 @@ static int memory_oom_act(void *data)
 				       NAME_MAX);
 		ss_noti_send(lowmem_noti_name);
 	}
-	ss_action_entry_call_internal(PREDEF_LOWMEM, 1, OOM_MEM_ACT);
+	action_entry_call_internal(PREDEF_LOWMEM, 1, OOM_MEM_ACT);
 
 	vconf_set_int(VCONFKEY_SYSMAN_LOW_MEMORY,
 		      VCONFKEY_SYSMAN_LOW_MEMORY_HARD_WARNING);
@@ -441,7 +441,7 @@ static void lowmem_init(void *data)
 	struct ss_main_data *ad = (struct ss_main_data*)data;
 	char lowmem_dev_node[PATH_MAX];
 
-	ss_action_entry_add_internal(PREDEF_LOWMEM, lowmem_def_predefine_action,
+	action_entry_add_internal(PREDEF_LOWMEM, lowmem_def_predefine_action,
 				     NULL, NULL);
 
 	if (device_get_property(DEVICE_TYPE_MEMORY, PROP_MEMORY_NODE, lowmem_dev_node) < 0) {

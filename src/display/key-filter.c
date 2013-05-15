@@ -88,7 +88,7 @@ static void longkey_pressed()
 	else
 		opt = PWROFF_POPUP_ACT;
 
-	ss_action_entry_call_internal(opt, 0);
+	action_entry_call_internal(opt, 0);
 }
 
 static Eina_Bool longkey_pressed_cb(void *data)

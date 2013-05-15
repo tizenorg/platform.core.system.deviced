@@ -172,7 +172,7 @@ static void usb_chgdet_cb(struct ss_main_data *ad)
 	ss_lowbat_is_charge_in_now();
 	/* check current battery level */
 	ss_lowbat_monitor(NULL);
-	ss_action_entry_call_internal(PREDEF_USBCON, 0);
+	action_entry_call_internal(PREDEF_USBCON, 0);
 	if (device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_USB_ONLINE, &val) == 0) {
 		_I("jack - usb changed %d",val);
 		check_lowbat_charge_device(val);
@@ -195,7 +195,7 @@ static void __sync_usb_status(void)
 		return;
 	if ((val == 1 && status == VCONFKEY_SYSMAN_USB_DISCONNECTED) ||
 	    (val == 0 && status == VCONFKEY_SYSMAN_USB_AVAILABLE))
-		ss_action_entry_call_internal(PREDEF_USBCON, 0);
+		action_entry_call_internal(PREDEF_USBCON, 0);
 }
 
 static void ta_chgdet_cb(struct ss_main_data *ad)
@@ -233,7 +233,7 @@ static void ta_chgdet_cb(struct ss_main_data *ad)
 static void earjack_chgdet_cb(struct ss_main_data *ad)
 {
 	_I("jack - earjack changed");
-	ss_action_entry_call_internal(PREDEF_EARJACKCON, 0);
+	action_entry_call_internal(PREDEF_EARJACKCON, 0);
 }
 
 static void earkey_chgdet_cb(struct ss_main_data *ad)
@@ -383,7 +383,7 @@ static void charge_cb(struct ss_main_data *ad)
 		present_status = 0;
 		_I("battery cf is opened");
 		if (charge_now)
-			ss_action_entry_call_internal(PREDEF_BATTERY_CF_OPENED, 0);
+			action_entry_call_internal(PREDEF_BATTERY_CF_OPENED, 0);
 	}
 
 	if (val == 1 && present_status == 0) {
@@ -604,7 +604,7 @@ static int uevent_control_cb(void *data, Ecore_Fd_Handler *fd_handler)
 	}
 
 	_I("UEVENT DETECTED (%s)", env_value);
-	ss_action_entry_call_internal(PREDEF_DEVICE_CHANGED,1,env_value);
+	action_entry_call_internal(PREDEF_DEVICE_CHANGED,1,env_value);
 
 	udev_device_unref(dev);
 	uevent_control_stop(ufd);
@@ -731,10 +731,10 @@ static void pci_keyboard_remove_cb(struct ss_main_data *ad)
 
 static void device_change_init(void *data)
 {
-	ss_action_entry_add_internal(PREDEF_USBCON, usbcon_def_predefine_action, NULL, NULL);
-	ss_action_entry_add_internal(PREDEF_EARJACKCON, earjackcon_def_predefine_action, NULL, NULL);
-	ss_action_entry_add_internal(PREDEF_BATTERY_CF_OPENED, battery_def_cf_opened_actioin, NULL, NULL);
-	ss_action_entry_add_internal(PREDEF_DEVICE_CHANGED, changed_device_def_predefine_action, NULL, NULL);
+	action_entry_add_internal(PREDEF_USBCON, usbcon_def_predefine_action, NULL, NULL);
+	action_entry_add_internal(PREDEF_EARJACKCON, earjackcon_def_predefine_action, NULL, NULL);
+	action_entry_add_internal(PREDEF_BATTERY_CF_OPENED, battery_def_cf_opened_actioin, NULL, NULL);
+	action_entry_add_internal(PREDEF_DEVICE_CHANGED, changed_device_def_predefine_action, NULL, NULL);
 
 	if (uevent_control_start() != 0) {
 		_E("fail uevent control init");

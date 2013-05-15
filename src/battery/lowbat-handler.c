@@ -121,25 +121,25 @@ int battery_warning_low_act(void *data)
 	heynoti_get_snoti_name(_SYS_LOW_POWER, lowbat_noti_name, NAME_MAX);
 	ss_noti_send(lowbat_noti_name);
 
-	ss_action_entry_call_internal(PREDEF_LOWBAT, 1, WARNING_LOW_BAT_ACT);
+	action_entry_call_internal(PREDEF_LOWBAT, 1, WARNING_LOW_BAT_ACT);
 	return 0;
 }
 
 int battery_critical_low_act(void *data)
 {
-	ss_action_entry_call_internal(PREDEF_LOWBAT, 1, CRITICAL_LOW_BAT_ACT);
+	action_entry_call_internal(PREDEF_LOWBAT, 1, CRITICAL_LOW_BAT_ACT);
 	return 0;
 }
 
 int battery_power_off_act(void *data)
 {
-	ss_action_entry_call_internal(PREDEF_LOWBAT, 1,	POWER_OFF_BAT_ACT);
+	action_entry_call_internal(PREDEF_LOWBAT, 1,	POWER_OFF_BAT_ACT);
 	return 0;
 }
 
 int battery_charge_err_act(void *data)
 {
-	ss_action_entry_call_internal(PREDEF_LOWBAT, 1, CHARGE_ERROR_ACT);
+	action_entry_call_internal(PREDEF_LOWBAT, 1, CHARGE_ERROR_ACT);
 	return 0;
 }
 
@@ -479,7 +479,7 @@ static void lowbat_init(void *data)
 {
 	struct ss_main_data *ad = (struct ss_main_data*)data;
 
-	ss_action_entry_add_internal(PREDEF_LOWBAT, lowbat_def_predefine_action,
+	action_entry_add_internal(PREDEF_LOWBAT, lowbat_def_predefine_action,
 				     NULL, NULL);
 
 	/* need check battery */

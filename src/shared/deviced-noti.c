@@ -80,7 +80,7 @@ static inline int send_str(int fd, char *str)
 	return ret;
 }
 
-static int deviced_noti_send(struct sysnoti *msg)
+static int noti_send(struct sysnoti *msg)
 {
 	int client_len;
 	int client_sockfd;
@@ -171,7 +171,7 @@ API int deviced_call_predef_action(const char *type, int num, ...)
 	}
 	va_end(argptr);
 
-	ret = deviced_noti_send(msg);
+	ret = noti_send(msg);
 	free(msg);
 
 	return ret;

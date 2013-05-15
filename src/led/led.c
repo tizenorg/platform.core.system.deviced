@@ -66,7 +66,7 @@ static int predefine_action(int argc, char **argv)
 
 static void led_init(void *data)
 {
-	ss_action_entry_add_internal(PREDEF_LED, predefine_action, NULL, NULL);
+	action_entry_add_internal(PREDEF_LED, predefine_action, NULL, NULL);
 }
 
 const struct device_ops led_device_ops = {

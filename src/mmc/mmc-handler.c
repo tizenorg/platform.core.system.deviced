@@ -673,9 +673,9 @@ error:
 
 static void mmc_init(void *data)
 {
-	ss_action_entry_add_internal(PREDEF_MOUNT_MMC, ss_mmc_inserted, NULL, NULL);
-	ss_action_entry_add_internal(PREDEF_UNMOUNT_MMC, ss_mmc_unmounted, NULL, NULL);
-	ss_action_entry_add_internal(PREDEF_FORMAT_MMC, ss_mmc_format, NULL, NULL);
+	action_entry_add_internal(PREDEF_MOUNT_MMC, ss_mmc_inserted, NULL, NULL);
+	action_entry_add_internal(PREDEF_UNMOUNT_MMC, ss_mmc_unmounted, NULL, NULL);
+	action_entry_add_internal(PREDEF_FORMAT_MMC, ss_mmc_format, NULL, NULL);
 	/* mmc card mount */
 	mmc_mount();
 }
