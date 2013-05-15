@@ -13,6 +13,7 @@ Source4:    libslp-pm.manifest
 Source5:    haptic.manifest
 Source6:    devman.manifest
 Source8:    regpmon.service
+Source9:    zbooting-done.service
 BuildRequires:  cmake
 BuildRequires:  libattr-devel
 BuildRequires:  pkgconfig(ecore)
@@ -182,6 +183,8 @@ ln -s ../system-server.service %{buildroot}%{_libdir}/systemd/system/sockets.tar
 install -m 0644 %{SOURCE8} %{buildroot}%{_libdir}/systemd/system/regpmon.service
 ln -s ../regpmon.service %{buildroot}%{_libdir}/systemd/system/multi-user.target.wants/regpmon.service
 mkdir -p %{buildroot}%{_libdir}/systemd/system/graphical.target.wants
+install -m 0644 %{SOURCE9} %{buildroot}%{_libdir}/systemd/system/zbooting-done.service
+ln -s ../zbooting-done.service %{buildroot}%{_libdir}/systemd/system/graphical.target.wants/zbooting-done.service
 
 %post
 #memory type vconf key init
@@ -246,12 +249,14 @@ systemctl daemon-reload
 if [ $1 == 1 ]; then
     systemctl restart system-server.service
     systemctl restart regpmon.service
+	systemctl restart zbooting-done.service
 fi
 
 %preun
 if [ $1 == 0 ]; then
     systemctl stop system-server.service
     systemctl stop regpmon.service
+	systemctl stop zbooting-done.service
 fi
 
 %postun
@@ -281,6 +286,8 @@ systemctl daemon-reload
 %{_libdir}/systemd/system/system-server.socket
 %{_libdir}/systemd/system/multi-user.target.wants/regpmon.service
 %{_libdir}/systemd/system/regpmon.service
+%{_libdir}/systemd/system/graphical.target.wants/zbooting-done.service
+%{_libdir}/systemd/system/zbooting-done.service
 %{_datadir}/system-server/udev-rules/91-system-server.rules
 %{_datadir}/system-server/sys_pci_noti/res/locale/*/LC_MESSAGES/*.mo
 %config %{_sysconfdir}/dbus-1/system.d/system-server.conf
