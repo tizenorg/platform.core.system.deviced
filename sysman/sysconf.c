@@ -62,8 +62,7 @@ int util_process_group_set(const char* name, int pid)
 	}
 
 	snprintf(buf, sizeof(buf), "%d", pid);
-	ERR("pid(%d) is inserted at vip", pid);
-
+	INFO("pid(%d) is inserted at vip", pid);
 	return sysman_call_predef_action(PROCESS_GROUP_SET, 2, buf, name);
 }
 
