@@ -43,6 +43,14 @@
 #define DEVICED_PATH_DISPLAY		OBJECT_PATH"/Display"
 #define DEVICED_INTERFACE_DISPLAY	INTERFACE_NAME".display"
 
+/*
+ * Storage service
+ *   get storage size
+ *   operatioins about storage
+ */
+#define DEVICED_PATH_STORAGE		OBJECT_PATH"/Storage"
+#define DEVICED_INTERFACE_STORAGE	INTERFACE_NAME".storage"
+
 int register_edbus_signal_handler(const char *path, const char *interface,
 		const char *name, E_DBus_Signal_Cb cb);
 E_DBus_Interface *get_edbus_interface(const char *path);

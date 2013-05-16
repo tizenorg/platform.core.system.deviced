@@ -45,6 +45,7 @@ static struct edbus_object {
 } edbus_objects[] = {
 	{ DEVICED_PATH_CORE   , DEVICED_INTERFACE_CORE   , NULL, NULL },
 	{ DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY, NULL, NULL },
+	{ DEVICED_PATH_STORAGE, DEVICED_INTERFACE_STORAGE, NULL, NULL },
 	/* Add new object & interface here*/
 };
 

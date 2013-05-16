@@ -35,6 +35,8 @@
 #include "core/predefine.h"
 #include "core/data.h"
 #include "core/devices.h"
+#include "core/common.h"
+#include "core/edbus-handler.h"
 
 #define PREDEF_LOWMEM			"lowmem"
 #define OOM_MEM_ACT			"oom_mem_act"
@@ -55,6 +57,9 @@
 #define MEM_THRESHOLD_LV1	110
 #define MEM_THRESHOLD_LV2	70
 
+#define MEMORY_STATUS_USR_PATH			"/opt/usr"
+#define MEMORY_MEGABYTE_VALUE			1048576
+#define MEMORY_RESERVE_VALUE			(100*MEMORY_MEGABYTE_VALUE)
 
 struct lowmem_process_entry {
 	unsigned cur_mem_state;
@@ -376,6 +381,26 @@ static void make_memps_log(char *file, pid_t pid, char *victim_name)
 	free(cur_tm);
 }
 
+static int __fs_stat(double* pdTotal, double* pdAvail, const char* szPath)
+{
+        struct statvfs s;
+
+        if (NULL == pdAvail) {
+                _E("input param error");
+                return 0;
+        }
+
+        if (!statvfs(szPath, &s)) {
+                *pdTotal = (double)s.f_frsize * s.f_blocks;
+                *pdAvail = (double)s.f_bsize * s.f_bavail;
+        } else {
+                _E("fail to get memory size");
+                return 0;
+        }
+
+        return 1;
+}
+
 static int lowmem_get_victim_pid()
 {
 	pid_t pid;
@@ -435,12 +460,69 @@ int lowmem_def_predefine_action(int argc, char **argv)
 	}
 	return 0;
 }
+static DBusMessage *e_dbus_getstatus(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int ret;
+	double dAvail = 0.0;
+	double dTotal = 0.0;
+
+	ret = __fs_stat(&dTotal, &dAvail, MEMORY_STATUS_USR_PATH);
+
+	dAvail -= MEMORY_RESERVE_VALUE;
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT64, &dTotal);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT64, &dAvail);
+	return reply;
+}
+
+static struct edbus_method {
+	const char *member;
+	const char *signature;
+	const char *reply_signature;
+	E_DBus_Method_Cb func;
+} edbus_methods[] = {
+	{ "getstorage",       NULL,   "i", e_dbus_getstatus },
+	/* Add methods here */
+};
+
+static int lowmem_dbus_init(void)
+{
+	E_DBus_Interface *iface;
+	int ret, i;
+
+	iface = get_edbus_interface(DEVICED_PATH_STORAGE);
+
+	_D("%s, %x", DEVICED_PATH_STORAGE, iface);
+
+	if (!iface) {
+		_E("fail to get edbus interface!");
+		return -EPERM;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(edbus_methods); i++) {
+		ret = e_dbus_interface_method_add(iface,
+				    edbus_methods[i].member,
+				    edbus_methods[i].signature,
+				    edbus_methods[i].reply_signature,
+				    edbus_methods[i].func);
+		if (!ret) {
+			_E("fail to add method %s!", edbus_methods[i].member);
+			return -EPERM;
+		}
+	}
+
+	return 0;
+}
 
 static void lowmem_init(void *data)
 {
 	struct ss_main_data *ad = (struct ss_main_data*)data;
 	char lowmem_dev_node[PATH_MAX];
 
+	lowmem_dbus_init();
 	action_entry_add_internal(PREDEF_LOWMEM, lowmem_def_predefine_action,
 				     NULL, NULL);
 
