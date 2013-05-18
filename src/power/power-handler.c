@@ -123,35 +123,14 @@ static void poweroff_control_cb(keynode_t *in_key, struct ss_main_data *ad)
 		update_pm_setting(SETTING_POWEROFF, val);
 }
 
-static void remount_ro()
+/* umount usr data partition */
+static void unmount_rw_partition()
 {
-	struct mntent* mnt;
-	const char* table = "/etc/mtab";
-	const char mmtpoint[10][64];
-	FILE* fp;
-	int r = -1, foundmount=0;
 	char buf[256];
-	fp = setmntent(table, "r");
-
-	if (!fp)
-		return;
-
-	while (mnt=getmntent(fp)) {
-		if (foundmount >= 10)
-			continue;
-		if (!strcmp(mnt->mnt_type, "ext4") && strstr(mnt->mnt_opts, "rw")) {
-			memset(mmtpoint[foundmount], 0, 64);
-			strncpy(mmtpoint[foundmount], mnt->mnt_dir, 63);
-			foundmount++;
-		}
-	}
-	endmntent(fp);
-	while (foundmount) {
-		foundmount--;
-		snprintf(buf, sizeof(buf), "fuser -c %s -k -15", mmtpoint[foundmount]);
-		sleep(1);
-		umount2(mmtpoint[foundmount], MNT_DETACH);
-	}
+	int ret;
+	ret =  umount2("/opt/usr", MNT_DETACH);
+	_D("/opt/usr unmount : %d", ret);
+	sleep(1);
 }
 
 static void enter_flight_mode_cb(TapiHandle *handle, int result, void *data, void *user_data)
@@ -248,7 +227,7 @@ Eina_Bool powerdown_ap_by_force(void *data)
 	/* give a chance to be terminated for each process */
 	power_off = 1;
 	sync();
-	remount_ro();
+	unmount_rw_partition();
 	reboot(RB_POWER_OFF);
 	return EINA_TRUE;
 }
@@ -288,7 +267,7 @@ static void powerdown_ap(TapiHandle *handle, const char *noti_id, void *data, vo
 	/* give a chance to be terminated for each process */
 	power_off = 1;
 	sync();
-	remount_ro();
+	unmount_rw_partition();
 	reboot(RB_POWER_OFF);
 }
 static void powerdown_res_cb(TapiHandle *handle, int result, void *data, void *user_data)
@@ -370,7 +349,7 @@ static void restart_ap(TapiHandle *handle, const char *noti_id, void *data, void
 		usleep(100000);
 		gettimeofday(&now, NULL);
 	}
-	remount_ro();
+	unmount_rw_partition();
 
 	reboot(RB_AUTOBOOT);
 }
@@ -405,7 +384,7 @@ static void restart_ap_by_force(void *data)
 		usleep(100000);
 		gettimeofday(&now, NULL);
 	}
-	remount_ro();
+	unmount_rw_partition();
 
 	reboot(RB_AUTOBOOT);
 }
