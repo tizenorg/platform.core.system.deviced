@@ -31,6 +31,7 @@
 #include "core/queue.h"
 #include "core/data.h"
 #include "core/devices.h"
+#include "core/device-handler.h"
 #include "device-node.h"
 #include "display/setting.h"
 
@@ -155,7 +156,8 @@ int ss_lowbat_set_charge_on(int on)
 
 	if (state == on)
 		return 0;
-
+	if (CONNECTED(on))
+		extcon_set_count(EXTCON_TA);
 	if (vconf_set_int(VCONFKEY_SYSMAN_BATTERY_CHARGE_NOW, on) != 0) {
 		_E("fail to set charge vconf value");
 		return -EPERM;

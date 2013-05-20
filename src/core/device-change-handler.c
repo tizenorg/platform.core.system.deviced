@@ -44,6 +44,7 @@
 #include "devices.h"
 #include "sys_pci_noti/sys_pci_noti.h"
 #include "udev.h"
+#include "common.h"
 
 #define PREDEF_USBCON			"usbcon"
 #define PREDEF_EARJACKCON		"earjack_predef_internal"
@@ -115,6 +116,16 @@ static struct udev_monitor *mon = NULL;
 static struct udev *udev = NULL;
 static Ecore_Fd_Handler *ufdh = NULL;
 
+static struct extcon_device {
+	const enum extcon_type type;
+	const char *str;
+	int fd;
+	int count;
+} extcon_devices[] = {
+	{ EXTCON_TA, "/csa/factory/batt_cable_count", 0, 0},
+	{ EXTCON_EARJACK, "/csa/factory/earjack_count", 0, 0},
+};
+
 static int uevent_control_cb(void *data, Ecore_Fd_Handler *fd_handler);
 extern int battery_power_off_act(void *data);
 extern int battery_charge_err_act(void *data);
@@ -159,6 +170,98 @@ static int check_lowbat_charge_device(int bInserted)
 		}
 	}
 	return -1;
+}
+
+int extcon_set_count(int index)
+{
+	int r;
+	int ret = 0;
+	char buf[BUFF_MAX];
+
+	extcon_devices[index].count++;
+
+	if (extcon_devices[index].fd < 0) {
+		_E("cannot open file(%s)", extcon_devices[index].str);
+		return -ENOENT;
+	}
+	lseek(extcon_devices[index].fd, 0, SEEK_SET);
+	_I("ext(%d) count %d", index, extcon_devices[index].count);
+	snprintf(buf, sizeof(buf), "%d", extcon_devices[index].count);
+
+	r = write(extcon_devices[index].fd, buf, strlen(buf));
+	if (r < 0)
+		ret = -EIO;
+	return ret;
+}
+
+static int extcon_get_count(int index)
+{
+	int fd;
+	int r;
+	int ret = 0;
+	char buf[BUFF_MAX];
+
+	fd = open(extcon_devices[index].str, O_RDWR);
+	if (fd < 0)
+		return -ENOENT;
+
+	r = read(fd, buf, BUFF_MAX);
+	if ((r >= 0) && (r < BUFF_MAX))
+		buf[r] = '\0';
+	else
+		ret = -EIO;
+
+	if (ret != 0) {
+		close(fd);
+		return ret;
+	}
+	extcon_devices[index].fd = fd;
+	extcon_devices[index].count = atoi(buf);
+	_I("get extcon(%d:%x) count %d",
+		index, extcon_devices[index].fd, extcon_devices[index].count);
+
+	return ret;
+}
+
+static int extcon_create_count(int index)
+{
+	int fd;
+	int r;
+	int ret = 0;
+	char buf[BUFF_MAX];
+	fd = open(extcon_devices[index].str, O_RDWR | O_CREAT, 0644);
+	if (fd < 0) {
+		_E("cannot open file(%s)", extcon_devices[index].str);
+		return -ENOENT;
+	}
+	snprintf(buf, sizeof(buf), "%d", extcon_devices[index].count);
+	r = write(fd, buf, strlen(buf));
+	if (r < 0)
+		ret = -EIO;
+
+	if (ret != 0) {
+		close(fd);
+		_E("cannot write file(%s)", extcon_devices[index].str);
+		return ret;
+	}
+	extcon_devices[index].fd = fd;
+	_I("create extcon(%d:%x) %s",
+		index, extcon_devices[index].fd, extcon_devices[index].str);
+	return ret;
+}
+
+static int extcon_count_init(void)
+{
+	int i;
+	int ret = 0;
+	for (i = 0; i < ARRAY_SIZE(extcon_devices); i++) {
+		if (extcon_get_count(i) >= 0)
+			continue;
+		ret = extcon_create_count(i);
+		if (ret < 0)
+			break;
+	}
+	return ret;
 }
 
 static void usb_chgdet_cb(struct ss_main_data *ad)
@@ -676,6 +779,8 @@ int earjackcon_def_predefine_action(int argc, char **argv)
 
 	_E("earjack_normal predefine action");
 	if (device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_EARJACK_ONLINE, &val) == 0) {
+		if (CONNECTED(val))
+			extcon_set_count(EXTCON_EARJACK);
 		return vconf_set_int(VCONFKEY_SYSMAN_EARJACK, val);
 	}
 
@@ -731,6 +836,8 @@ static void pci_keyboard_remove_cb(struct ss_main_data *ad)
 
 static void device_change_init(void *data)
 {
+	if (extcon_count_init() != 0)
+		_E("fail to init extcon files");
 	action_entry_add_internal(PREDEF_USBCON, usbcon_def_predefine_action, NULL, NULL);
 	action_entry_add_internal(PREDEF_EARJACKCON, earjackcon_def_predefine_action, NULL, NULL);
 	action_entry_add_internal(PREDEF_BATTERY_CF_OPENED, battery_def_cf_opened_actioin, NULL, NULL);
@@ -781,6 +888,18 @@ static void device_change_init(void *data)
 	system(STORE_DEFAULT_USB_INFO);
 }
 
+static void device_change_exit(void *data)
+{
+	int i;
+	for (i = 0; i < ARRAY_SIZE(extcon_devices); i++) {
+		if (extcon_devices[i].fd <= 0)
+			continue;
+		close(extcon_devices[i].fd);
+	}
+
+}
+
 const struct device_ops change_device_ops = {
 	.init = device_change_init,
+	.exit = device_change_exit,
 };

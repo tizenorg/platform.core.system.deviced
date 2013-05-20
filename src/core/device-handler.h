@@ -20,6 +20,13 @@
 #ifndef __SS_DEVICE_HANDLER_H__
 #define __SS_DEVICE_HANDLER_H__
 
+enum extcon_type {
+	EXTCON_TA = 0,
+	EXTCON_EARJACK,
+};
+
+#define CONNECTED(val) ((val) == 1)
+
 /* MMC functions */
 int ss_mmc_inserted();
 int ss_mmc_removed();
@@ -31,5 +38,7 @@ int _ss_usb_storage_init(void);
 int ss_lowbat_is_charge_in_now();
 int ss_lowbat_set_charge_on(int onoff);
 int ss_lowbat_monitor(void *data);
+
+int extcon_set_count(int index);
 
 #endif /* __SS_DEVICE_HANDLER_H__ */
