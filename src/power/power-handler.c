@@ -163,18 +163,34 @@ static void leave_flight_mode_cb(TapiHandle *handle, int result, void *data, voi
 	}
 }
 
+static void tapi_handle_init(void)
+{
+	int ready = 0;
+	if (vconf_get_bool(VCONFKEY_TELEPHONY_READY,&ready) != 0 || ready != 1) {
+		_E("fail to get %s(%d)", VCONFKEY_TELEPHONY_READY, ready);
+		return;
+	}
+	tapi_handle = tel_init(NULL);
+	if (tapi_handle == NULL)
+		_E("tapi init error");
+}
+
 int flight_mode_def_predefine_action(int argc, char **argv)
 {
-	int bCurFlightMode;
+	int mode;
 	int err = TAPI_API_SUCCESS;
 	if (argc != 1 || argv[0] == NULL) {
 		_E("FlightMode Set predefine action failed");
 		return -1;
 	}
-	bCurFlightMode = atoi(argv[0]);
-	if (bCurFlightMode == 1) {
+	mode = atoi(argv[0]);
+
+	if (tapi_handle == NULL)
+		tapi_handle_init();
+
+	if (mode == 1) {
 		err = tel_set_flight_mode(tapi_handle, TAPI_POWER_FLIGHT_MODE_LEAVE, leave_flight_mode_cb, NULL);
-	} else if (bCurFlightMode == 0) {
+	} else if (mode == 0) {
 		err = tel_set_flight_mode(tapi_handle, TAPI_POWER_FLIGHT_MODE_ENTER, enter_flight_mode_cb, NULL);
 	}
 	if (err != TAPI_API_SUCCESS)
