@@ -34,6 +34,7 @@
 #include "core/launch.h"
 #include "core/devices.h"
 
+#define CRASH_WORKER_MAX	3
 #define CRASH_PID_MAX 7
 #define CRASH_MODE_MAX 2
 #define CRASH_TIME_MAX 65
@@ -297,7 +298,7 @@ static void launch_crash_worker(const char *filename, int popup_on)
 	static int popup_pid = 0;
 	FILE *fp;
 	int ret = -1;
-	int len = 0;
+	int len, count;
 	char linebuffer[CRASH_ARG_MAX] = {0,};
 	char crash_worker_args[CRASH_ARG_MAX] = {0,};
 	struct crash_arg parsing_arg;
@@ -305,6 +306,7 @@ static void launch_crash_worker(const char *filename, int popup_on)
 	if (fp == NULL) {
 		return;
 	}
+	count = 0;
 	/* launch crash process */
 	while (fgets(linebuffer, CRASH_ARG_MAX, fp) != NULL) {
 		len = strlen(linebuffer);
@@ -332,6 +334,9 @@ static void launch_crash_worker(const char *filename, int popup_on)
 				fprintf(fpAdj, "%d", (-17));
 				fclose(fpAdj);
 			}
+			count++;
+			if (CRASH_WORKER_MAX <= count)
+				break;
 		}
 		if (popup_on) {
 			if (!is_running_process(popup_pid))
