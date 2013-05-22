@@ -126,12 +126,22 @@ static void stop_key_combination(void)
 	}
 }
 
+static inline void check_key_pair(int code, int new, int *old)
+{
+	if (new == *old)
+		_E("key pair is not matched! (%d, %d)", code, new);
+	else
+		*old = new;
+}
+
 static int process_power_key(struct input_event *pinput)
 {
 	int ignore = true;
+	static int value = KEY_RELEASED;
 
 	switch (pinput->value) {
 	case KEY_RELEASED:
+		check_key_pair(pinput->code, pinput->value, &value);
 		if (current_state_in_on() && !cancel_lcdoff &&
 		    !(key_combination == KEY_COMBINATION_SCREENCAPTURE)) {
 			check_processes(S_LCDOFF);
@@ -159,6 +169,7 @@ static int process_power_key(struct input_event *pinput)
 		}
 		break;
 	case KEY_PRESSED:
+		check_key_pair(pinput->code, pinput->value, &value);
 		if (timediff_usec(pressed_time, pinput->time) <
 		    (POWER_KEY_PRESS_IGNORE_TIME * USEC_PER_SEC)) {
 			_I("power key double pressed ignored");
