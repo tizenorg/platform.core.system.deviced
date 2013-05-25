@@ -167,6 +167,7 @@ INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/utils/pmon DESTINATION bin)
 
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/systemd/system-server.service DESTINATION lib/systemd/system)
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/systemd/system-server.socket  DESTINATION lib/systemd/system)
+INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/fsck-msdos/LICENSE DESTINATION share/license RENAME fsck_msdosfs)
 
 ADD_SUBDIRECTORY(restarter)
 ADD_SUBDIRECTORY(sys_event)
@@ -176,3 +177,4 @@ ADD_SUBDIRECTORY(sysman)
 ADD_SUBDIRECTORY(libslp-pm)
 ADD_SUBDIRECTORY(haptic)
 ADD_SUBDIRECTORY(devman)
+ADD_SUBDIRECTORY(fsck-msdos)
