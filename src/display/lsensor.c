@@ -73,7 +73,7 @@ static bool alc_handler(void* data)
 				ret = device_get_property(DEVICE_TYPE_DISPLAY, cmd, &tmp_value);
 				if (!ret && (tmp_value != value)) {
 					backlight_ops.set_default_brt(value);
-					backlight_ops.restore();
+					backlight_ops.update();
 				}
 				_I("load light data : %d, brightness : %d", (int)light_data.values[0], value);
 			}
@@ -212,7 +212,7 @@ static int set_alc_function(keynode_t *key_nodes, void *data)
 		}
 
 		backlight_ops.set_default_brt(default_brt);
-		backlight_ops.restore();
+		backlight_ops.update();
 	}
 
 	return 0;

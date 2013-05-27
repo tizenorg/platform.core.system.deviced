@@ -61,7 +61,7 @@ struct _backlight_ops {
 	int (*off)(void);
 	int (*dim)(void);
 	int (*on)(void);
-	int (*restore)(void);
+	int (*update)(void);
 	int (*set_default_brt)(int level);
 	int (*get_lcd_power)(void);
 };

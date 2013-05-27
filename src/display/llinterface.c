@@ -345,14 +345,14 @@ static int backlight_dim(void)
 	return ret;
 }
 
-static int backlight_restore(void)
+static int backlight_update(void)
 {
 	int ret = 0;
 	int val = -1;
 
 	ret = vconf_get_int(VCONFKEY_PM_CUSTOM_BRIGHTNESS_STATUS, &val);
 	if (ret == 0 && val == VCONFKEY_PM_CUSTOM_BRIGHTNESS_ON) {
-		_I("custom brightness mode! brt no restored");
+		_I("custom brightness mode! brt no updated");
 		return 0;
 	}
 	if ((pm_status_flag & PWRSV_FLAG) && !(pm_status_flag & BRTCH_FLAG)) {
@@ -388,7 +388,7 @@ void _init_ops(void)
 	backlight_ops.off = backlight_off;
 	backlight_ops.dim = backlight_dim;
 	backlight_ops.on = backlight_on;
-	backlight_ops.restore = backlight_restore;
+	backlight_ops.update = backlight_update;
 	backlight_ops.set_default_brt = set_default_brt;
 	backlight_ops.get_lcd_power = get_lcd_power;
 
@@ -438,7 +438,7 @@ int exit_sysfs(void)
 		backlight_on();
 	}
 
-	backlight_restore();
+	backlight_update();
 	free(pmsys);
 	pmsys = NULL;
 	if(fd != -1)

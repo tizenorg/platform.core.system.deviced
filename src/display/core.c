@@ -865,14 +865,14 @@ static int default_action(int timeout)
 			}
 
 #ifndef X86 /* Different with ARM FB driver, IA gfx driver is sensitive to the order. */
-			backlight_ops.restore();
+			backlight_ops.update();
 			backlight_ops.on();
 #else
 			backlight_ops.on();
-			backlight_ops.restore();
+			backlight_ops.update();
 #endif
 		} else if (pm_old_state == S_LCDDIM)
-			backlight_ops.restore();
+			backlight_ops.update();
 
 		if (backlight_ops.get_lcd_power() != PM_LCD_POWER_ON)
 			backlight_ops.on();
@@ -1071,7 +1071,7 @@ static void default_saving_mode(int onoff)
 		pm_status_flag &= ~PWRSV_FLAG;
 	}
 	if (pm_cur_state == S_NORMAL)
-		backlight_ops.restore();
+		backlight_ops.update();
 }
 
 static int poll_callback(int condition, PMMsg *data)
@@ -1218,7 +1218,7 @@ static int update_setting(int key_idx, int val)
 		    power_saving_display_stat) < 0) {
 			_E("Fail to set display frame rate!");
 		}
-		backlight_ops.restore();
+		backlight_ops.update();
 		break;
 	case SETTING_POWER_SAVING_DISPLAY:
 		vconf_get_bool(VCONFKEY_SETAPPL_PWRSV_SYSMODE_STATUS,
@@ -1233,7 +1233,7 @@ static int update_setting(int key_idx, int val)
 			    PROP_DISPLAY_FRAME_RATE, power_saving_display_stat) < 0) {
 				_E("Fail to set display frame rate!");
 			}
-			backlight_ops.restore();
+			backlight_ops.update();
 		}
 		break;
 	case SETTING_POWEROFF:
@@ -1289,7 +1289,7 @@ static void check_seed_status(void)
 			pm_status_flag |= LOWBT_FLAG;
 		}
 	}
-	backlight_ops.restore();
+	backlight_ops.update();
 
 	/* USB connection check
 	 * If connected, add sleep prohibit condition */

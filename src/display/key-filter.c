@@ -296,7 +296,7 @@ static void update_brightness(int action)
 
 	ret = vconf_set_int(VCONFKEY_SETAPPL_LCD_BRIGHTNESS, new_val);
 	if (!ret) {
-		backlight_ops.restore();
+		backlight_ops.update();
 		_I("brightness is changed! (%d)", new_val);
 	} else {
 		_E("Fail to set brightness!");
