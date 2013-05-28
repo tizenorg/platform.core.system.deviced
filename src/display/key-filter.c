@@ -63,6 +63,7 @@ static Ecore_Timer *combination_timeout_id = NULL;
 static int cancel_lcdoff;
 static int key_combination = KEY_COMBINATION_STOP;
 static int powerkey_ignored = false;
+static int volumedown_pressed = false;
 
 static inline int current_state_in_on(void)
 {
@@ -142,7 +143,7 @@ static int process_power_key(struct input_event *pinput)
 	switch (pinput->value) {
 	case KEY_RELEASED:
 		check_key_pair(pinput->code, pinput->value, &value);
-		if (current_state_in_on() && !cancel_lcdoff &&
+		if (current_state_in_on() && !cancel_lcdoff && !volumedown_pressed &&
 		    !(key_combination == KEY_COMBINATION_SCREENCAPTURE)) {
 			check_processes(S_LCDOFF);
 			check_processes(S_LCDDIM);
@@ -233,12 +234,14 @@ static int process_volumedown_key(struct input_event *pinput)
 			key_combination = KEY_COMBINATION_SCREENCAPTURE;
 			ignore = false;
 		}
+		volumedown_pressed = true;
 	} else if (pinput->value == KEY_RELEASED) {
 		if (key_combination != KEY_COMBINATION_SCREENCAPTURE) {
 			stop_key_combination();
 			if (current_state_in_on())
 				ignore = false;
 		}
+		volumedown_pressed = false;
 	}
 
 	return ignore;
