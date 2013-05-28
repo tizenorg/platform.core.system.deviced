@@ -19,6 +19,7 @@
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <math.h>
 #include <limits.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -36,10 +37,16 @@
 #define SAMPLING_INTERVAL	2	/* 2 sec */
 #define MAX_FAULT		5
 
+#define RADIAN_VALUE 		(57.2957)
+#define ROTATION_90		90
+#define WORKING_ANGLE_MIN	0
+#define WORKING_ANGLE_MAX	20
+
 static int (*prev_init_extention) (void *data);
 static int (*_default_action) (int);
 static Ecore_Timer *alc_timeout_id = 0;
-static int sf_handle = -1;
+static int light_handle = -1;
+static int accel_handle = -1;
 static int fault_count = 0;
 static int power_saving_display_stat = 0;
 static int sampling_interval = SAMPLING_INTERVAL;
@@ -58,7 +65,7 @@ static bool alc_handler(void* data)
 			ecore_timer_del(alc_timeout_id);
 		alc_timeout_id = NULL;
 	} else {
-		if (sf_get_data(sf_handle, LIGHT_BASE_DATA_SET, &light_data) < 0) {
+		if (sf_get_data(light_handle, LIGHT_BASE_DATA_SET, &light_data) < 0) {
 			fault_count++;
 		} else {
 			if (light_data.values[0] < 0.0 || light_data.values[0] > 10.0) {
@@ -116,32 +123,66 @@ static int alc_action(int timeout)
 static int connect_sfsvc(void)
 {
 	int sf_state = -1;
-	/* connect with sensor fw */
+
 	_I("connect with sensor fw");
-	sf_handle = sf_connect(LIGHT_SENSOR);
-	if (sf_handle < 0) {
-		_E("sensor attach fail");
-		return -1;
+	/* light sensor */
+	light_handle = sf_connect(LIGHT_SENSOR);
+	if (light_handle < 0) {
+		_E("light sensor attach fail");
+		goto error;
 	}
-	sf_state = sf_start(sf_handle, 0);
+	sf_state = sf_start(light_handle, 0);
 	if (sf_state < 0) {
-		_E("sensor attach fail");
-		sf_disconnect(sf_handle);
-		sf_handle = -1;
-		return -2;
+		_E("light sensor attach fail");
+		sf_disconnect(light_handle);
+		light_handle = -1;
+		goto error;
 	}
+	/* accelerometer sensor */
+	accel_handle = sf_connect(ACCELEROMETER_SENSOR);
+	if (accel_handle < 0) {
+		_E("accelerometer sensor attach fail");
+		goto error;
+	}
+	sf_state = sf_start(accel_handle, 0);
+	if (sf_state < 0) {
+		_E("accelerometer sensor attach fail");
+		sf_disconnect(accel_handle);
+		light_handle = -1;
+		goto error;
+	}
+
 	fault_count = 0;
 	return 0;
+
+error:
+	if (light_handle >= 0) {
+		sf_stop(light_handle);
+		sf_disconnect(light_handle);
+		light_handle = -1;
+	}
+	if (accel_handle >= 0) {
+		sf_stop(accel_handle);
+		sf_disconnect(accel_handle);
+		accel_handle = -1;
+	}
+	return -EIO;
 }
 
 static int disconnect_sfsvc(void)
 {
 	_I("disconnect with sensor fw");
-	if(sf_handle >= 0)
-	{
-		sf_stop(sf_handle);
-		sf_disconnect(sf_handle);
-		sf_handle = -1;
+	/* light sensor*/
+	if(light_handle >= 0) {
+		sf_stop(light_handle);
+		sf_disconnect(light_handle);
+		light_handle = -1;
+	}
+	/* accelerometer sensor*/
+	if(accel_handle >= 0) {
+		sf_stop(accel_handle);
+		sf_disconnect(accel_handle);
+		accel_handle = -1;
 	}
 
 	if (_default_action != NULL) {
