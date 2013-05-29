@@ -407,14 +407,27 @@ static int mmc_format(int blknum)
 
 	snprintf(dev_mmcblk, sizeof(dev_mmcblk), "%s%d", MMC_DEV, blknum);
 	snprintf(dev_mmcblkp, sizeof(dev_mmcblkp), "%sp1", dev_mmcblk);
+
+	/* in case of no partition */
 	if (access(dev_mmcblkp, R_OK) < 0) {
 		_I("%s is not valid, create the primary partition", dev_mmcblkp);
+
+		/* format default dev partition */
+		r = mmc_format_exec(dev_mmcblk);
+		if (r != 0) {
+			_E("format_mmc(%s) fail", dev_mmcblk);
+			return r;
+		}
+
+		/* create partition */
 		r = create_partition(dev_mmcblk);
 		if (r != 0) {
 			_E("create_partition failed");
 			return r;
 		}
 	}
+
+	/* format first partition */
 	r = mmc_format_exec(dev_mmcblkp);
 	if (r != 0) {
 		_E("format_mmc fail");
@@ -577,7 +590,6 @@ int ss_mmc_removed(void)
 int ss_mmc_inserted(void)
 {
 	int mmc_status;
-	int ret;
 
 	if (mmc_disabled) {
 		_I("mmc is blocked!");
@@ -593,9 +605,7 @@ int ss_mmc_inserted(void)
 		return 0;
 	}
 
-	ret = mmc_mount();
-
-	return ret;
+	return mmc_mount();
 }
 
 static int ss_mmc_unmounted(int argc, char **argv)
