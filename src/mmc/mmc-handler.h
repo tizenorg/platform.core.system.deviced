@@ -43,6 +43,10 @@
 #define SMACKFS_MOUNT_OPT		"smackfsroot=*,smackfsdef=*"
 #define MMC_MOUNT_POINT		"/opt/storage/sdcard"
 
+struct mmc_list {
+struct mmc_list *prev, *next;
+};
+
 enum mmc_fs_type {
 	FS_TYPE_NONE,
 	FS_TYPE_FAT,
@@ -65,10 +69,13 @@ struct mmc_filesystem_ops {
 	const char ** (*format) (void *data);
 };
 
-extern const struct mmc_filesystem_ops exfat_ops;
-extern const struct mmc_filesystem_ops vfat_ops;
-extern const struct mmc_filesystem_ops ext4_ops;
+struct mmc_filesystem_info {
+	char *name;
+	struct mmc_filesystem_ops *fs_ops;
+	struct mmc_list list;
+};
 
 int mount_fs(char *path, const char *fs_name, const char *mount_data);
+int register_mmc_handler(const char *name, struct mmc_filesystem_ops filesystem_type);
 
 #endif /* __MMC_HANDLER_H__ */

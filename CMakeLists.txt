@@ -3,8 +3,8 @@ PROJECT(system_server C)
 
 SET(PREFIX ${CMAKE_INSTALL_PREFIX})
 SET(EXEC_PREFIX "${PREFIX}/bin")
-SET(INCLUDEDIR "${PREFIX}/include/${PROJECT_NAME}")
 SET(LIBDIR "\${prefix}/lib")
+SET(INCLUDEDIR "${PREFIX}/include/${PROJECT_NAME}")
 
 # deviced
 SET(DEVICED_NAME deviced)
@@ -29,7 +29,6 @@ SET(SRCS
 	src/core/edbus-handler.c
 	src/cpu/cpu-handler.c
 	src/mmc/mmc-handler.c
-	src/mmc/ext4.c
 	src/mmc/vfat.c
 	src/power/power-handler.c
 	src/proc/lowmem-handler.c
@@ -40,6 +39,13 @@ SET(SRCS
 	src/usb/usb-handler.c
 	src/vibrator/vibrator.c
 )
+FIND_PROGRAM(UNAME NAMES uname)
+EXEC_PROGRAM("${UNAME}" ARGS "-m" OUTPUT_VARIABLE "ARCH")
+IF("${ARCH}" STREQUAL "emulated")
+SET(SRCS ${SRCS}
+	src/mmc/ext4.c
+	)
+ENDIF("${ARCH}" STREQUAL "emulated")
 
 SET(SRCS ${SRCS}
 	src/display/util.c

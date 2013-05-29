@@ -17,6 +17,7 @@
  */
 
 #include "mmc-handler.h"
+#include "core/common.h"
 
 #define FS_VFAT_MOUNT_OPT  "uid=0,gid=0,dmask=0000,fmask=0111,iocharset=iso8859-1,utf8,shortname=mixed"
 
@@ -53,7 +54,7 @@ static int vfat_init(void *data)
 	}
 	/* check fs type with magic code */
 	ret = lseek(fd, fs_vfat_type.offset, SEEK_SET);
-	if (ret != 0) {
+	if (ret < 0) {
 		_E("fail to check offset of vfat");
 		goto out;
 	}
@@ -97,10 +98,15 @@ static const char **vfat_format(void *data)
 	return vfat_arg;
 }
 
-const struct mmc_filesystem_ops vfat_ops = {
-	.init = vfat_init,
-	.check = vfat_check,
-	.mount = vfat_mount,
-	.format = vfat_format,
+static const struct mmc_filesystem_ops vfat_ops = {
+	vfat_init,
+	vfat_check,
+	vfat_mount,
+	vfat_format,
 };
+
+static void __CONSTRUCTOR__ vfat_register(void)
+{
+	register_mmc_handler("vfat", vfat_ops);
+}
 

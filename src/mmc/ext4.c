@@ -17,6 +17,7 @@
  */
 
 #include "mmc-handler.h"
+#include "core/common.h"
 
 #define FS_EXT4_SMACK_LABEL "mmc-smack-label "MMC_MOUNT_POINT
 
@@ -88,7 +89,7 @@ static int ext4_init(void *data)
 	}
 	/* check fs type with magic code */
 	ret = lseek(fd, fs_ext4_type.offset, SEEK_SET);
-	if (ret != 0) {
+	if (ret < 0) {
 		_E("fail to check offset of ext4");
 		goto out;
 	}
@@ -131,9 +132,14 @@ static const char **ext4_format(void *data)
 	return ext4_arg;
 }
 
-const struct mmc_filesystem_ops ext4_ops = {
-	.init = ext4_init,
-	.check = ext4_check,
-	.mount = ext4_mount,
-	.format = ext4_format,
+static const struct mmc_filesystem_ops ext4_ops = {
+	ext4_init,
+	ext4_check,
+	ext4_mount,
+	ext4_format,
 };
+
+static void __CONSTRUCTOR__ ext4_register(void)
+{
+	register_mmc_handler("ext4", ext4_ops);
+}

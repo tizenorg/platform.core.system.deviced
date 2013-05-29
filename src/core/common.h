@@ -24,7 +24,13 @@
 #include <unistd.h>
 
 #define ARRAY_SIZE(name) (sizeof(name)/sizeof(name[0]))
+#ifndef __CONSTRUCTOR__
+#define __CONSTRUCTOR__ __attribute__ ((constructor))
+#endif
 
+#ifndef __DESTRUCTOR__
+#define __DESTRUCTOR__ __attribute__ ((destructor))
+#endif
 #ifndef max
 #define max(a,b) ((a) > (b) ? (a) : (b))
 #endif

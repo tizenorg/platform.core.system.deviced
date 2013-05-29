@@ -55,6 +55,13 @@
 
 #define MMC_32GB_SIZE           61315072
 
+#define get_mmc_fs(ptr, type, member) \
+((type *)((char *)(ptr)-(unsigned long)(&((type *)0)->member)))
+
+#define mmc_fs_search(pos, head) \
+for (pos = (head)->next; pos != (head); \
+pos = pos->next)
+
 typedef enum {
 	FS_MOUNT_ERR = -1,
 	FS_MOUNT_FAIL = 0,
@@ -71,14 +78,12 @@ static int mmc_popup_pid = 0;
 static enum mmc_fs_type inserted_type;
 static bool mmc_disabled = false;
 static char mmc_node[PATH_MAX];
-static const struct mmc_filesystem_ops *filesystem_type[] = {
-	&vfat_ops,
-	&ext4_ops,
-};
 
 static struct mmc_filesystem_ops *mmc_filesystem;
 
-static void __attribute__ ((constructor)) smack_check(void)
+static struct mmc_list mmc_handler_list = { &(mmc_handler_list), &(mmc_handler_list)};
+
+static void __CONSTRUCTOR__ smack_check(void)
 {
 	struct statfs sfs;
 	int ret;
@@ -90,6 +95,19 @@ static void __attribute__ ((constructor)) smack_check(void)
 	if (ret == 0 && sfs.f_type == SMACKFS_MAGIC)
 		smack = 1;
 	_I("smackfs check %d", smack);
+}
+
+static void mmc_list_add(struct mmc_list *new, struct mmc_list *prev, struct mmc_list *next)
+{
+	next->prev = new;
+	new->next = next;
+	new->prev = prev;
+	prev->next = new;
+}
+
+static void mmc_fs_add(struct mmc_list *new, struct mmc_list *head)
+{
+	mmc_list_add(new, head->prev, head);
 }
 
 static int exec_process(const char **argv)
@@ -223,38 +241,39 @@ int get_mmcblk_num(void)
 
 static int mmc_check_fs_type(void)
 {
-	int ret, i;
-	struct mmc_filesystem_ops *filesystem;
+	int ret;
+	struct mmc_filesystem_info *filesystem = NULL;
+	struct mmc_list *tmp;
 	inserted_type = FS_TYPE_NONE;
 
-	for (i = 0; i < ARRAY_SIZE(filesystem_type); i++) {
-		filesystem = filesystem_type[i];
-		if (!filesystem)
-			continue;
-		ret = filesystem->init((void *)mmc_node);
+	mmc_fs_search(tmp, &mmc_handler_list) {
+		filesystem = get_mmc_fs(tmp, struct mmc_filesystem_info, list);
+		ret = filesystem->fs_ops->init((void *)mmc_node);
 		if (ret == -EINVAL)
 			continue;
 		inserted_type = ret;
-		mmc_filesystem = filesystem;
+		mmc_filesystem = filesystem->fs_ops;
 		return 0;
 	}
-
-	if (inserted_type == FS_TYPE_NONE) {
-		_D("set default file system");
+	_D("set default file system");
+	mmc_fs_search(tmp, &mmc_handler_list) {
+		filesystem = get_mmc_fs(tmp, struct mmc_filesystem_info, list);
+		if (strcmp(filesystem->name, "vfat"))
+			continue;
 		inserted_type = FS_TYPE_FAT;
-		mmc_filesystem = &vfat_ops;
-		if (!mmc_filesystem) {
-			_E("fail to init mmc file system");
-			return -EINVAL;
-		}
+		mmc_filesystem =  filesystem->fs_ops;
 		mmc_filesystem->init((void *)mmc_node);
+		return 0;
 	}
-	return 0;
+	_E("fail to init mmc file system");
+	return -EINVAL;
 }
 
 static int get_format_type(void)
 {
 	unsigned int size;
+	struct mmc_list *tmp;
+	struct mmc_filesystem_info *filesystem = NULL;
 
 	if (mmc_check_fs_type())
 		return -EINVAL;
@@ -262,7 +281,8 @@ static int get_format_type(void)
 	if (inserted_type == FS_TYPE_EXT4)
 		return 0;
 
-	return 0;
+	_E("fail to init mmc file system");
+	return -EINVAL;
 }
 
 static int check_mount_state(void)
@@ -679,6 +699,45 @@ error:
 	_E("Format Failed");
 	vconf_set_int(VCONFKEY_SYSMAN_MMC_FORMAT, VCONFKEY_SYSMAN_MMC_FORMAT_FAILED);
 	return r;
+}
+
+int register_mmc_handler(const char *name, const struct mmc_filesystem_ops filesystem_type)
+{
+	struct mmc_list *tmp;
+	struct mmc_filesystem_info *entry;
+
+	entry = malloc(sizeof(struct mmc_filesystem_info));
+
+	if (!entry) {
+		_E("Malloc failed");
+		return -1;
+	}
+
+	entry->name = strndup(name, strlen(name));
+
+	if (!entry->name) {
+		_E("Malloc failed");
+		free(entry);
+		return -1;
+	}
+
+	entry->fs_ops = malloc(sizeof(struct mmc_filesystem_ops));
+	if (!entry->fs_ops) {
+		_E("Malloc failed");
+		return -1;
+	}
+
+	entry->fs_ops->init = filesystem_type.init;
+	entry->fs_ops->check = filesystem_type.check;
+	entry->fs_ops->mount = filesystem_type.mount;
+	entry->fs_ops->format = filesystem_type.format;
+
+	mmc_fs_add(&entry->list, &mmc_handler_list);
+
+	mmc_fs_search(tmp, &mmc_handler_list) {
+		entry = get_mmc_fs(tmp, struct mmc_filesystem_info, list);
+	}
+	return 0;
 }
 
 static void mmc_init(void *data)
