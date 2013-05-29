@@ -29,6 +29,14 @@
 #define DEVICED_PATH_DISPLAY		OBJECT_PATH"/Display"
 #define DEVICED_INTERFACE_DISPLAY	INTERFACE_NAME".display"
 
+#define DEVICED_PATH_HAPTIC		OBJECT_PATH"/Haptic"
+#define DEVICED_INTERFACE_HAPTIC	INTERFACE_NAME".haptic"
+
+struct dbus_byte {
+	char *data;
+	int size;
+};
+
 DBusMessage *deviced_dbus_method_sync(const char *dest, const char *path,
 		const char *interface, const char *method,
 		const char *sig, char *param[]);

@@ -51,6 +51,13 @@
 #define DEVICED_PATH_STORAGE		OBJECT_PATH"/Storage"
 #define DEVICED_INTERFACE_STORAGE	INTERFACE_NAME".storage"
 
+/*
+ * Haptic service
+ *   operatioins about haptic
+ */
+#define DEVICED_PATH_HAPTIC		OBJECT_PATH"/Haptic"
+#define DEVICED_INTERFACE_HAPTIC	INTERFACE_NAME".haptic"
+
 int register_edbus_signal_handler(const char *path, const char *interface,
 		const char *name, E_DBus_Signal_Cb cb);
 E_DBus_Interface *get_edbus_interface(const char *path);

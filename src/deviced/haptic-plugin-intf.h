@@ -27,16 +27,10 @@ struct haptic_ops {
 	int (*open_device) (int, int*);
 	int (*close_device) (int);
 	int (*vibrate_monotone) (int, int, int, int, int*);
-	int (*vibrate_file) (int, const char*, int, int, int, int*);
 	int (*vibrate_buffer) (int, const unsigned char*, int, int, int, int*);
-	int (*stop_effect) (int, int);
-	int (*stop_all_effects) (int);
-	int (*pause_effect) (int, int);
-	int (*resume_effect) (int, int);
-	int (*get_effect_state) (int, int, int*);
+	int (*stop_device) (int);
+	int (*get_device_state) (int, int*);
 	int (*create_effect) (unsigned char*, int, haptic_module_effect_element*, int);
-	int (*save_effect) (const unsigned char*, int, const char*);
-	int (*get_file_duration) (int, const char*, int*);
 	int (*get_buffer_duration) (int, const unsigned char*, int*);
 	int (*convert_binary) (const unsigned char*, int, const char*);
 };

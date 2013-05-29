@@ -46,6 +46,7 @@ static const struct device_ops *devices[] = {
 	&ta_device_ops,
 	&pmon_device_ops,
 	&mmc_device_ops,
+	&haptic_device_ops,
 	&led_device_ops,
 	&vibrator_device_ops,
 	&notifier_device_ops,

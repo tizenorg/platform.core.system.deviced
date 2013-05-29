@@ -59,6 +59,9 @@ SET(SRCS ${SRCS}
 SET(SRCS ${SRCS}
 	src/control/control.c)
 
+SET(SRCS ${SRCS}
+	src/haptic/haptic.c)
+
 # libdeviced
 SET(DEVICED_SRCS
 	src/shared/battery.c

@@ -30,6 +30,8 @@ static int append_variant(DBusMessageIter *iter, const char *sig, char *param[])
 	char *ch;
 	int i;
 	int int_type;
+	DBusMessageIter arr;
+	struct dbus_byte *byte;
 
 	if (!sig || !param)
 		return 0;
@@ -41,7 +43,21 @@ static int append_variant(DBusMessageIter *iter, const char *sig, char *param[])
 			dbus_message_iter_append_basic(iter, DBUS_TYPE_INT32, &int_type);
 			break;
 		case 's':
+			_D("data : %s", param[i]);
 			dbus_message_iter_append_basic(iter, DBUS_TYPE_STRING, &param[i]);
+			break;
+		case 'a':
+			++i, ++ch;
+			switch (*ch) {
+			case 'y':
+				dbus_message_iter_open_container(iter, DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE_AS_STRING, &arr);
+				byte = (struct dbus_byte*)param[i];
+				dbus_message_iter_append_fixed_array(&arr, DBUS_TYPE_BYTE, &(byte->data), byte->size);
+				dbus_message_iter_close_container(iter, &arr);
+				break;
+			default:
+				break;
+			}
 			break;
 		default:
 			return -EINVAL;
