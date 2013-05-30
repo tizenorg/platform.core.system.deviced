@@ -147,7 +147,7 @@ static DBusMessage *edbus_stop_device(E_DBus_Object *obj, DBusMessage *msg)
 	if (ret < 0)
 		_E("fail to stop device : %d", ret);
 
-	_D("haptic close %d", ret);
+	_D("haptic stop %d", ret);
 
 exit:
 	reply = dbus_message_new_method_return(msg);
@@ -178,13 +178,14 @@ static DBusMessage *edbus_vibrate_monotone(E_DBus_Object *obj, DBusMessage *msg)
 		goto exit;
 	}
 
+	_D("haptic vibrate monotone (h:%d, d:%d, f:%d, p:%d)", handle, duration, feedback, priority);
 	ret = plugin_intf->vibrate_monotone(handle, duration, feedback, priority, &e_handle);
 	if (ret < 0)
 		_E("fail to vibrate monotone : %d", ret);
 	else
 		ret = e_handle;
 
-	_D("haptic vibrate monotone %d(h:%d, d:%d, f:%d, p:%d)", ret, handle, duration, feedback, priority);
+	_D("haptic vibrate monotone %d", ret);
 
 exit:
 	reply = dbus_message_new_method_return(msg);
@@ -218,14 +219,14 @@ static DBusMessage *edbus_vibrate_buffer(E_DBus_Object *obj, DBusMessage *msg)
 		goto exit;
 	}
 
+	_D("haptic vibrate buffer (h:%d, s:%d, i:%d, f:%d, p:%d)", handle, size, iteration, feedback, priority);
 	ret = plugin_intf->vibrate_buffer(handle, data, iteration, feedback, priority, &e_handle);
 	if (ret < 0)
 		_E("fail to vibrate buffer : %d", ret);
 	else
 		ret = e_handle;
 
-	_D("haptic vibrate buffer %d(h:%d, s:%d, i:%d, f:%d, p:%d)",
-			ret, handle, size, iteration, feedback, priority);
+	_D("haptic vibrate buffer %d", ret);
 
 exit:
 	reply = dbus_message_new_method_return(msg);
@@ -319,7 +320,7 @@ static DBusMessage *edbus_get_duration(E_DBus_Object *obj, DBusMessage *msg)
 	DBusError err;
 	unsigned int handle;
 	unsigned char *data;
-	int duration, ret;
+	int size, duration, ret;
 
 	if (!plugin_intf || !plugin_intf->get_buffer_duration) {
 		ret = -EFAULT;
@@ -328,7 +329,8 @@ static DBusMessage *edbus_get_duration(E_DBus_Object *obj, DBusMessage *msg)
 
 	dbus_error_init(&err);
 	if (!dbus_message_get_args(msg, &err, DBUS_TYPE_UINT32, &handle,
-				DBUS_TYPE_STRING, &data, DBUS_TYPE_INVALID)) {
+				DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE, &data, &size,
+				DBUS_TYPE_INVALID)) {
 		ret = -EINVAL;
 		goto exit;
 	}
@@ -448,7 +450,7 @@ static struct edbus_method {
 	{ "VibrateMonotone", "uiii",   "i", edbus_vibrate_monotone },
 	{ "VibrateBuffer", "uayiii",   "i", edbus_vibrate_buffer },
 	{ "GetState",           "u",   "i", edbus_get_state },
-	{ "GetDuration",       "us",   "i", edbus_get_duration },
+	{ "GetDuration",      "uay",   "i", edbus_get_duration },
 	{ "CreateEffect",    "sisi",   "i", edbus_create_effect },
 	{ "SaveBinary",       "sis",   "i", edbus_save_binary },
 	/* Add methods here */

@@ -412,6 +412,62 @@ int haptic_vibrate_buffers_with_detail(haptic_device_h device_handle,
                                       haptic_effect_h *effect_handle);
 
 /**
+ * @param[out] effect_handle	Pointer to the variable that will receive a handle to the playing effect
+ *
+ * @return 0 on success, otherwise a negative error value.
+ * @retval #HAPTIC_ERROR_NONE                	Successful
+ * @retval #HAPTIC_ERROR_INVALID_PARAMETER   	Invalid parameter
+ * @retval #HAPTIC_ERROR_NOT_INITIALIZED     	Not initialized
+ * @retval #HAPTIC_ERROR_OPERATION_FAILED    	Operation failed
+ * @retval #HAPTIC_ERROR_NOT_SUPPORTED_DEVICE	Not supported device
+ *
+ * @see haptic_vibrate_buffer_with_detail()
+ * @see haptic_vibrate_monotone()
+ * @see haptic_vibrate_file()
+ * @see haptic_get_count()
+ */
+int haptic_vibrate_buffers(haptic_device_h device_handle,
+							const unsigned char *vibe_buffer,
+							int size,
+							haptic_effect_h *effect_handle);
+
+/**
+ * @brief Vibrates a predefined rhythmic haptic-vibration pattern buffer.
+ * @details
+ * This function can be used to play a haptic-vibration pattern buffer.
+ *
+ * @remark
+ * If you don't use th api regarding effect_handle, you can pass in a NULL value to last parameter.
+ *
+ * @param[in] device_handle 	The device handle from haptic_open()
+ * @param[in] vibe_buffer     	Pointer to the vibration pattern
+ * @param[in] size              Size to the vibration pattern
+ * @param[in] iteration     	The number of times to repeat the effect
+ * @param[in] feedback      	The amount of the intensity variation
+ * @param[in] priority      	The priority from HAPTIC_PRIORITY_MIN to HAPTIC_PRIORITY_HIGH
+ * @param[out] effect_handle	Pointer to the variable that will receive a handle to the playing effect
+ *
+ * @return 0 on success, otherwise a negative error value.
+ * @retval #HAPTIC_ERROR_NONE                	Successful
+ * @retval #HAPTIC_ERROR_INVALID_PARAMETER   	Invalid parameter
+ * @retval #HAPTIC_ERROR_NOT_INITIALIZED     	Not initialized
+ * @retval #HAPTIC_ERROR_OPERATION_FAILED    	Operation failed
+ * @retval #HAPTIC_ERROR_NOT_SUPPORTED_DEVICE	Not supported device
+ *
+ * @see haptic_vibrate_buffer()
+ * @see haptic_vibrate_monotone_with_detail()
+ * @see haptic_vibrate_file_with_detail()
+ * @see haptic_get_count()
+ */
+int haptic_vibrate_buffers_with_detail(haptic_device_h device_handle,
+                                      const unsigned char *vibe_buffer,
+									  int size,
+                                      haptic_iteration_e iteration,
+                                      haptic_feedback_e feedback,
+                                      haptic_priority_e priority,
+                                      haptic_effect_h *effect_handle);
+
+/**
  * @brief Stops the current vibration effect which is being played.
  * @details This function can be used to stop each effect started by haptic_vibrate_xxx().
  *
