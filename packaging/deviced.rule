@@ -3,6 +3,6 @@ deviced sys-assert::core rwxat
 deviced system::vconf rwxat
 deviced telephony_framework::api_manager r
 deviced telephony_framework::api_modem wx
-
+deviced testmode::vconf r
 # object rule
 pulseaudio deviced rw
