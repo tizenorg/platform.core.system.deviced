@@ -343,6 +343,22 @@ static int kill_app_accessing_mmc(void)
 	return 0;
 }
 
+static void launch_syspopup(const char *str)
+{
+	bundle *b;
+	int ret;
+	b = bundle_create();
+	if (!b) {
+		_E("error bundle_create()");
+		return;
+	}
+	bundle_add(b, "_SYSPOPUP_CONTENT_", str);
+	ret = syspopup_launch("mmc-syspopup", b);
+	if (ret < 0)
+		_E("popup launch failed");
+	bundle_free(b);
+}
+
 static int mmc_umount(int option)
 {
 	int r, retry = 5;
@@ -363,11 +379,8 @@ static int mmc_umount(int option)
 	/* it takes some seconds til other app completely clean up */
 	usleep(500000);
 
-	/* kill application accessing sd card */
-	kill_app_accessing_mmc();
-
 	while (--retry) {
-		r = umount(MMC_MOUNT_POINT);
+		r = umount2(MMC_MOUNT_POINT, MNT_DETACH);
 		if (!r)
 			break;
 		usleep(500000);
@@ -596,17 +609,6 @@ mount_wait:
 	return 0;
 }
 
-int ss_mmc_removed(void)
-{
-	int mmc_err = 0;
-
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_REMOVED);
-	mmc_err = mmc_umount(UNMOUNT_NORMAL);
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_ERR_STATUS, mmc_err);
-	mmc_filesystem = NULL;
-	return 0;
-}
-
 int ss_mmc_inserted(void)
 {
 	int mmc_status;
@@ -618,7 +620,6 @@ int ss_mmc_inserted(void)
 	}
 
 	vconf_get_int(VCONFKEY_SYSMAN_MMC_STATUS, &mmc_status);
-
 	if (mmc_status == VCONFKEY_SYSMAN_MMC_MOUNTED) {
 		_I("Mmc is already mounted");
 		vconf_set_int(VCONFKEY_SYSMAN_MMC_MOUNT, VCONFKEY_SYSMAN_MMC_MOUNT_ALREADY);
@@ -626,6 +627,17 @@ int ss_mmc_inserted(void)
 	}
 
 	return mmc_mount();
+}
+
+int ss_mmc_removed(void)
+{
+	int mmc_err = 0;
+
+	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_REMOVED);
+	mmc_err = mmc_umount(UNMOUNT_NORMAL);
+	vconf_set_int(VCONFKEY_SYSMAN_MMC_ERR_STATUS, mmc_err);
+	mmc_filesystem = NULL;
+	return 0;
 }
 
 static int ss_mmc_unmounted(int argc, char **argv)
