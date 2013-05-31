@@ -72,6 +72,7 @@ static bool alc_handler(void* data)
 				_I("fail to load light data : %d",	(int)light_data.values[0]);
 				fault_count++;
 			} else {
+				fault_count = 0;
 				int tmp_value;
 				int cmd;
 				int ret;
