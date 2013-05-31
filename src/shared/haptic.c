@@ -48,8 +48,6 @@
 #define METHOD_CREATE_EFFECT		"CreateEffect"
 #define METHOD_SAVE_BINARY			"SaveBinary"
 
-#define DURATION_CHAR	6
-#define LEVEL_CHAR		3
 
 /* START of Static Function Section */
 static unsigned char* convert_file_to_buffer(const char *file_name, int *size)
@@ -639,10 +637,11 @@ API int haptic_create_effect(unsigned char *vibe_buffer,
 	DBusError err;
 	DBusMessage *msg;
 	char str_bufsize[32];
-	char *str_elem;
 	char str_elemcnt[32];
 	char *arr[4];
+	char *data;
 	int i, temp, size, ret, ret_val;
+	struct dbus_byte bytes;
 
 	/* check if passed arguments are valid */
 	if (vibe_buffer == NULL) {
@@ -665,39 +664,45 @@ API int haptic_create_effect(unsigned char *vibe_buffer,
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
-	arr[0] = vibe_buffer;
-	snprintf(str_bufsize, sizeof(str_bufsize), "%d", max_bufsize);
-	arr[1] = str_bufsize;
-	size = (DURATION_CHAR+LEVEL_CHAR)*max_elemcnt;
-	str_elem = (unsigned char *)malloc(size+1);
-	memset(str_elem, 0, size);
+	/* convert to proper feedback level in case of auto */
 	for (i = 0; i < max_elemcnt; i++) {
 		if (elem_arr[i].haptic_level == HAPTIC_FEEDBACK_AUTO) {
 			vconf_get_int(VCONFKEY_SETAPPL_TOUCH_FEEDBACK_VIBRATION_LEVEL_INT, &temp);
 			elem_arr[i].haptic_level = temp*20;
 		}
-		snprintf(str_elem, size, "%s%6d%3d", str_elem,
-				elem_arr[i].haptic_duration, elem_arr[i].haptic_level);
 	}
-	str_elem[size] = '\0';
-	arr[2] = str_elem;
+
+	snprintf(str_bufsize, sizeof(str_bufsize), "%d", max_bufsize);
+	arr[0] = str_bufsize;
+	bytes.size = sizeof(haptic_effect_element_s)*max_elemcnt;
+	bytes.data = (unsigned char*)elem_arr;
+	arr[2] = &bytes;
 	snprintf(str_elemcnt, sizeof(str_elemcnt), "%d", max_elemcnt);
 	arr[3] = str_elemcnt;
 
 	/* request to deviced to open haptic device */
 	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
-			METHOD_CREATE_EFFECT, "sisi", arr);
-	free(str_elem);
+			METHOD_CREATE_EFFECT, "iayi", arr);
 	if (!msg)
 		return HAPTIC_ERROR_OPERATION_FAILED;
 
 	dbus_error_init(&err);
 
-	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
-	if (!ret) {
+	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE, &data, &size,
+			DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
+	if (!ret || ret_val < 0) {
 		_E("no message : [%s:%s]", err.name, err.message);
-		ret = HAPTIC_ERROR_OPERATION_FAILED;
+		dbus_message_unref(msg);
+		dbus_error_free(&err);
+		return HAPTIC_ERROR_OPERATION_FAILED;
 	}
+
+	if (max_bufsize < size) {
+		_E("max_bufsize(%d) is smaller than effect buffer size(%d)", max_bufsize, size);
+		return HAPTIC_ERROR_INVALID_PARAMETER;
+	}
+
+	memcpy(vibe_buffer, data, max_bufsize);
 
 	dbus_message_unref(msg);
 	dbus_error_free(&err);
@@ -736,14 +741,8 @@ API int haptic_save_effect(const unsigned char *vibe_buffer,
 		return HAPTIC_ERROR_FILE_EXISTS;
 	}
 
-	size = strlen(vibe_buffer);
-	if (size <= 0) {
-		_E("fail to get buffer size");
-		return HAPTIC_MODULE_OPERATION_FAILED;
-	}
-
 	_D("file path : %s", file_path);
-	ret = save_data(vibe_buffer, size, file_path);
+	ret = save_data(vibe_buffer, max_bufsize, file_path);
 	if (ret < 0) {
 		_E("fail to save data");
 		return HAPTIC_MODULE_OPERATION_FAILED;

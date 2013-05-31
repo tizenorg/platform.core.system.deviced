@@ -28,6 +28,7 @@
 #include "haptic-plugin-intf.h"
 
 #define HAPTIC_MODULE_PATH			"/usr/lib/libhaptic-module.so"
+#define MAX_EFFECT_BUFFER			16000
 
 /* Haptic Plugin Interface */
 static void *dlopen_handle;
@@ -271,14 +272,13 @@ exit:
 
 static DBusMessage *edbus_create_effect(E_DBus_Object *obj, DBusMessage *msg)
 {
-	DBusMessageIter iter;
+	static unsigned char data[MAX_EFFECT_BUFFER];
+	static unsigned char *p = data;
+	DBusMessageIter iter, arr;
 	DBusMessage *reply;
 	DBusError err;
 	haptic_module_effect_element *elem_arr;
-	unsigned char *data;
-	unsigned char *elem;
-	unsigned char *p;
-	int i, size, cnt, ret;
+	int i, size, bufsize, cnt, ret;
 
 	if (!plugin_intf || !plugin_intf->create_effect) {
 		ret = -EFAULT;
@@ -286,21 +286,23 @@ static DBusMessage *edbus_create_effect(E_DBus_Object *obj, DBusMessage *msg)
 	}
 
 	dbus_error_init(&err);
-	if (!dbus_message_get_args(msg, &err, DBUS_TYPE_STRING, &data,
-				DBUS_TYPE_INT32, &size,
-				DBUS_TYPE_STRING, &elem,
+	if (!dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &bufsize,
+				DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE, &elem_arr, &size,
 				DBUS_TYPE_INT32, &cnt, DBUS_TYPE_INVALID)) {
 		ret = -EINVAL;
 		goto exit;
 	}
 
-	elem_arr = (haptic_module_effect_element*)malloc(sizeof(haptic_module_effect_element)*cnt);
-	for (p = elem_arr, i = 0; i < cnt; i++, p+=9) {
-		sscanf(p, "%6d%3d", &elem_arr[i].haptic_duration, &elem_arr[i].haptic_level);
-		_D("[%2d] duration : %d, level : %d", i, elem_arr[i].haptic_duration, elem_arr[i].haptic_level);
+	if (bufsize >= MAX_EFFECT_BUFFER) {
+		ret = -ENOMEM;
+		goto exit;
 	}
 
-	ret = plugin_intf->create_effect(data, size, elem_arr, cnt);
+	for (i = 0; i < cnt; ++i)
+		_D("[%2d] %d %d", i, elem_arr[i].haptic_duration, elem_arr[i].haptic_level);
+
+	memset(data, 0, MAX_EFFECT_BUFFER);
+	ret = plugin_intf->create_effect(data, bufsize, elem_arr, cnt);
 	if (ret < 0)
 		_E("fail to create haptic effect : %d", ret);
 
@@ -309,6 +311,9 @@ static DBusMessage *edbus_create_effect(E_DBus_Object *obj, DBusMessage *msg)
 exit:
 	reply = dbus_message_new_method_return(msg);
 	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE_AS_STRING, &arr);
+	dbus_message_iter_append_fixed_array(&arr, DBUS_TYPE_BYTE, &p, bufsize);
+	dbus_message_iter_close_container(&iter, &arr);
 	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
 	return reply;
 }
@@ -451,7 +456,7 @@ static struct edbus_method {
 	{ "VibrateBuffer", "uayiii",   "i", edbus_vibrate_buffer },
 	{ "GetState",           "u",   "i", edbus_get_state },
 	{ "GetDuration",      "uay",   "i", edbus_get_duration },
-	{ "CreateEffect",    "sisi",   "i", edbus_create_effect },
+	{ "CreateEffect",    "iayi", "ayi", edbus_create_effect },
 	{ "SaveBinary",       "sis",   "i", edbus_save_binary },
 	/* Add methods here */
 };
