@@ -31,6 +31,7 @@
 #include <bundle.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <mntent.h>
 
 #include "core/log.h"
 #include "core/common.h"
@@ -54,6 +55,8 @@
 #endif
 
 #define MMC_32GB_SIZE           61315072
+
+#define UNMOUNT_RETRY	5
 
 #define get_mmc_fs(ptr, type, member) \
 ((type *)((char *)(ptr)-(unsigned long)(&((type *)0)->member)))
@@ -359,17 +362,47 @@ static void launch_syspopup(const char *str)
 	bundle_free(b);
 }
 
+static int mmc_check(char* path)
+{
+	int ret = false;
+	struct mntent* mnt;
+	const char* table = "/etc/mtab";
+	FILE* fp;
+
+	fp = setmntent(table, "r");
+	if (!fp)
+		return ret;
+	while (mnt=getmntent(fp)) {
+		if (!strcmp(mnt->mnt_dir, path)) {
+			ret = true;
+			break;
+		}
+	}
+	endmntent(fp);
+	return ret;
+}
+
+static int mmc_check_and_unmount(char *path)
+{
+	int ret = 0;
+	if (mmc_check(path))
+		ret = umount(path);
+	return ret;
+}
+
 static int mmc_umount(int option)
 {
-	int r, retry = 5;
+	int r, retry = UNMOUNT_RETRY;
 
 	if (!check_mount_state())
 		return 0;
 
 	_I("Mounted, will be unmounted");
-	r = umount(MMC_MOUNT_POINT);
-	if (!r || option == UNMOUNT_NORMAL)
+	r = mmc_check_and_unmount(MMC_MOUNT_POINT);
+	if (!r || option == UNMOUNT_NORMAL) {
+		_I("unmount mmc card, ret = %d, option = %d", r, option);
 		return r;
+	}
 
 	_I("Execute force unmount!");
 
@@ -380,11 +413,13 @@ static int mmc_umount(int option)
 	usleep(500000);
 
 	while (--retry) {
-		r = umount2(MMC_MOUNT_POINT, MNT_DETACH);
+		r = mmc_check_and_unmount(MMC_MOUNT_POINT);
 		if (!r)
 			break;
 		usleep(500000);
 		_I("umount retry : %d", retry);
+		if (retry == UNMOUNT_RETRY -2)
+			kill_app_accessing_mmc();
 	}
 
 	return r;
