@@ -100,8 +100,6 @@ void device_notify(enum device_notifier_type status, void *data)
 			}
 		}
 	}
-
-	_I("cb is called! status:%d, cnt:%d ", status, cnt);
 }
 
 static void device_notifier_exit(void)
