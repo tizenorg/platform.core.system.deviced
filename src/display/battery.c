@@ -412,7 +412,7 @@ void end_battinfo_gathering(void)
 {
 	_I("End battery gathering!");
 
-	if (!timeout_id) {
+	if (timeout_id) {
 		ecore_timer_del(timeout_id);
 		timeout_id = NULL;
 	}

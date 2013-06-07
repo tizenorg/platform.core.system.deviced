@@ -551,6 +551,7 @@ int delete_condition(enum state_t state)
 	while (t != NULL) {
 		if (t->timeout_id > 0) {
 			ecore_timer_del(t->timeout_id);
+			t->timeout_id = NULL;
 		}
 		tmp = t;
 		t = t->next;
