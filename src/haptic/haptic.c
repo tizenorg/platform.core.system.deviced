@@ -241,8 +241,7 @@ static DBusMessage *edbus_get_state(E_DBus_Object *obj, DBusMessage *msg)
 	DBusMessageIter iter;
 	DBusMessage *reply;
 	DBusError err;
-	unsigned int handle;
-	int state, ret;
+	int index, state, ret;
 
 	if (!plugin_intf || !plugin_intf->get_device_state) {
 		ret = -EFAULT;
@@ -250,12 +249,12 @@ static DBusMessage *edbus_get_state(E_DBus_Object *obj, DBusMessage *msg)
 	}
 
 	dbus_error_init(&err);
-	if (!dbus_message_get_args(msg, &err, DBUS_TYPE_UINT32, &handle, DBUS_TYPE_INVALID)) {
+	if (!dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &index, DBUS_TYPE_INVALID)) {
 		ret = -EINVAL;
 		goto exit;
 	}
 
-	ret = plugin_intf->get_device_state(handle, &state);
+	ret = plugin_intf->get_device_state(index, &state);
 	if (ret < 0)
 		_E("fail to get device state : %d", ret);
 	else
@@ -454,7 +453,7 @@ static struct edbus_method {
 	{ "StopDevice",         "u",   "i", edbus_stop_device },
 	{ "VibrateMonotone", "uiii",   "i", edbus_vibrate_monotone },
 	{ "VibrateBuffer", "uayiii",   "i", edbus_vibrate_buffer },
-	{ "GetState",           "u",   "i", edbus_get_state },
+	{ "GetState",           "i",   "i", edbus_get_state },
 	{ "GetDuration",      "uay",   "i", edbus_get_duration },
 	{ "CreateEffect",    "iayi", "ayi", edbus_create_effect },
 	{ "SaveBinary",       "sis",   "i", edbus_save_binary },

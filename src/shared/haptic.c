@@ -583,7 +583,7 @@ API int haptic_get_effect_state(haptic_device_h device_handle, haptic_effect_h e
 {
 	DBusError err;
 	DBusMessage *msg;
-	char str_handle[32];
+	char str_index[32];
 	char *arr[1];
 	int ret, ret_val;
 
@@ -603,12 +603,12 @@ API int haptic_get_effect_state(haptic_device_h device_handle, haptic_effect_h e
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
-	snprintf(str_handle, sizeof(str_handle), "%u", device_handle);
-	arr[0] = str_handle;
+	snprintf(str_index, sizeof(str_index), "%d", HAPTIC_DEVICE_0);
+	arr[0] = str_index;
 
 	/* request to deviced to open haptic device */
 	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
-			METHOD_GET_STATE, "u", arr);
+			METHOD_GET_STATE, "i", arr);
 	if (!msg)
 		return HAPTIC_ERROR_OPERATION_FAILED;
 

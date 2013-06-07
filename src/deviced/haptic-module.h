@@ -64,8 +64,8 @@ typedef enum
  */
 typedef enum
 {
-    HAPTIC_MODULE_STATE_PLAYING = 0,
-    HAPTIC_MODULE_STATE_STOP,
+    HAPTIC_MODULE_STATE_STOP = 0,
+    HAPTIC_MODULE_STATE_PLAYING,
 } haptic_module_state;
 
 /* Error and Return value codes */
