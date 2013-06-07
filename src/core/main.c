@@ -48,6 +48,13 @@ static void sig_quit(int signo)
 	_E("received SIGTERM signal %d", signo);
 }
 
+static void sig_usr1(int signo)
+{
+	_D("received SIGUSR1 signal %d, deviced'll be finished!", signo);
+
+	ecore_main_loop_quit();
+}
+
 static int system_main(int argc, char **argv)
 {
 	struct ss_main_data ad;
@@ -55,6 +62,8 @@ static int system_main(int argc, char **argv)
 	init_ad(&ad);
 	devices_init(&ad);
 	signal(SIGTERM, sig_quit);
+	signal(SIGUSR1, sig_usr1);
+
 	ecore_main_loop_begin();
 
 	devices_exit(&ad);

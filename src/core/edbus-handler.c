@@ -354,6 +354,9 @@ static unregister_edbus_watch_all(void)
 	Eina_List *n, *next;
 	struct edbus_list *watch;
 
+	if (eina_list_count(edbus_watch_list) > 0)
+		dbus_connection_remove_filter(conn, message_filter, NULL);
+
 	EINA_LIST_FOREACH_SAFE(edbus_watch_list, n, next, watch) {
 		snprintf(match, sizeof(match), NAME_OWNER_MATCH, watch);
 		dbus_bus_remove_match(conn, match, NULL);
@@ -419,7 +422,6 @@ err_dbus_shutdown:
 static void edbus_exit(void *data)
 {
 	unregister_edbus_signal_handle();
-	dbus_connection_remove_filter(conn, message_filter, NULL);
 	unregister_edbus_watch_all();
 	e_dbus_connection_close(edbus_conn);
 	e_dbus_shutdown();
