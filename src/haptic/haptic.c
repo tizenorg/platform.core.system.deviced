@@ -28,7 +28,7 @@
 #include "haptic-plugin-intf.h"
 
 #define HAPTIC_MODULE_PATH			"/usr/lib/libhaptic-module.so"
-#define MAX_EFFECT_BUFFER			16000
+#define MAX_EFFECT_BUFFER			(64*1024)
 
 /* Haptic Plugin Interface */
 static void *dlopen_handle;
@@ -292,7 +292,7 @@ static DBusMessage *edbus_create_effect(E_DBus_Object *obj, DBusMessage *msg)
 		goto exit;
 	}
 
-	if (bufsize >= MAX_EFFECT_BUFFER) {
+	if (bufsize > MAX_EFFECT_BUFFER) {
 		ret = -ENOMEM;
 		goto exit;
 	}
