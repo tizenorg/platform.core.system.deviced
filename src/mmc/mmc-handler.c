@@ -21,7 +21,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <sys/mount.h>
-#include <sys/smack.h>
 #include <sys/statvfs.h>
 #include <errno.h>
 #include <vconf.h>
@@ -787,11 +786,27 @@ int register_mmc_handler(const char *name, const struct mmc_filesystem_ops files
 	return 0;
 }
 
+static void mmc_poweron_changed_cb(keynode_t *key, void* data)
+{
+	int val;
+	if (vconf_get_int(VCONFKEY_DEVICED_BOOT_POWER_ON_STATUS, &val) < 0)
+		return;
+
+	/* unregister poweron callback */
+	vconf_ignore_key_changed(VCONFKEY_DEVICED_BOOT_POWER_ON_STATUS,
+		    mmc_poweron_changed_cb);
+}
+
 static void mmc_init(void *data)
 {
 	action_entry_add_internal(PREDEF_MOUNT_MMC, ss_mmc_inserted, NULL, NULL);
 	action_entry_add_internal(PREDEF_UNMOUNT_MMC, ss_mmc_unmounted, NULL, NULL);
 	action_entry_add_internal(PREDEF_FORMAT_MMC, ss_mmc_format, NULL, NULL);
+
+	/* register vconf callback */
+	vconf_notify_key_changed(VCONFKEY_DEVICED_BOOT_POWER_ON_STATUS,
+			mmc_poweron_changed_cb, NULL);	/* mmc card mount */
+
 	/* mmc card mount */
 	mmc_mount();
 }
