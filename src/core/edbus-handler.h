@@ -58,6 +58,14 @@
 #define DEVICED_PATH_HAPTIC		OBJECT_PATH"/Haptic"
 #define DEVICED_INTERFACE_HAPTIC	INTERFACE_NAME".haptic"
 
+/*
+ * Lowmem service
+ *   get critical low status
+ *   operations about Lowmem
+ */
+#define DEVICED_PATH_LOWMEM		OBJECT_PATH"/Lowmem"
+#define DEVICED_INTERFACE_LOWMEM	INTERFACE_NAME".lowmem"
+
 int register_edbus_signal_handler(const char *path, const char *interface,
 		const char *name, E_DBus_Signal_Cb cb);
 E_DBus_Interface *get_edbus_interface(const char *path);
