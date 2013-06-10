@@ -48,6 +48,7 @@
 #define METHOD_CREATE_EFFECT		"CreateEffect"
 #define METHOD_SAVE_BINARY			"SaveBinary"
 
+#define TEMP_BUFFER_SIZE			(64*1024)
 
 /* START of Static Function Section */
 static unsigned char* convert_file_to_buffer(const char *file_name, int *size)
@@ -414,7 +415,7 @@ API int haptic_vibrate_buffer(haptic_device_h device_handle, const unsigned char
 {
 	return haptic_vibrate_buffers_with_detail(device_handle,
 											 vibe_buffer,
-											 0,
+											 TEMP_BUFFER_SIZE,
 											 HAPTIC_ITERATION_ONCE,
 											 HAPTIC_FEEDBACK_AUTO,
 											 HAPTIC_PRIORITY_MIN,
@@ -430,7 +431,7 @@ API int haptic_vibrate_buffer_with_detail(haptic_device_h device_handle,
 {
 	return haptic_vibrate_buffers_with_detail(device_handle,
 											 vibe_buffer,
-											 0,
+											 TEMP_BUFFER_SIZE,
 											 iteration,
 											 feedback,
 											 priority,
@@ -774,7 +775,7 @@ API int haptic_get_buffer_duration(haptic_device_h device_handle, const unsigned
 {
 	return haptic_get_buffers_duration(device_handle,
 									vibe_buffer,
-									0,
+									TEMP_BUFFER_SIZE,
 									buffer_duration);
 }
 
