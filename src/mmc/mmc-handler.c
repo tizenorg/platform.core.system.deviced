@@ -33,11 +33,13 @@
 #include <mntent.h>
 
 #include "core/log.h"
+#include "core/device-notifier.h"
 #include "core/common.h"
 #include "core/devices.h"
 #include "mmc-handler.h"
 
 #define VCONFKEY_INTERNAL_PRIVATE_MMC_ID	"db/private/sysman/mmc_device_id"
+#define VCONFKEY_SYSMAN_MMC_INIT	-1
 
 #define PREDEF_MOUNT_MMC		"mountmmc"
 #define PREDEF_UNMOUNT_MMC		"unmountmmc"
@@ -786,26 +788,22 @@ int register_mmc_handler(const char *name, const struct mmc_filesystem_ops files
 	return 0;
 }
 
-static void mmc_poweron_changed_cb(keynode_t *key, void* data)
+static void ss_mmc_booting_done(void* data)
 {
-	int val;
-	if (vconf_get_int(VCONFKEY_DEVICED_BOOT_POWER_ON_STATUS, &val) < 0)
-		return;
-
-	/* unregister poweron callback */
-	vconf_ignore_key_changed(VCONFKEY_DEVICED_BOOT_POWER_ON_STATUS,
-		    mmc_poweron_changed_cb);
+	ss_mmc_inserted();
 }
 
 static void mmc_init(void *data)
 {
+	int ret, op;
+
+	/* IPC between libdeviced and deviced, used by setting application */
 	action_entry_add_internal(PREDEF_MOUNT_MMC, ss_mmc_inserted, NULL, NULL);
 	action_entry_add_internal(PREDEF_UNMOUNT_MMC, ss_mmc_unmounted, NULL, NULL);
 	action_entry_add_internal(PREDEF_FORMAT_MMC, ss_mmc_format, NULL, NULL);
 
-	/* register vconf callback */
-	vconf_notify_key_changed(VCONFKEY_DEVICED_BOOT_POWER_ON_STATUS,
-			mmc_poweron_changed_cb, NULL);	/* mmc card mount */
+	/* register notifier if mmc exist or not */
+	register_notifier(DEVICE_NOTIFIER_BOOTING_DONE, ss_mmc_booting_done);
 
 	/* mmc card mount */
 	mmc_mount();
