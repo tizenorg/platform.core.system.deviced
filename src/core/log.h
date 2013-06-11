@@ -31,12 +31,27 @@
 	do { SLOGD(fmt, ##arg); } while(0)
 #define _I(fmt, arg...) \
 	do { SLOGI(fmt, ##arg); } while(0)
+#define _W(fmt, arg...) \
+	do { SLOGW(fmt, ##arg); } while(0)
 #define _E(fmt, arg...) \
 	do { SLOGE(fmt, ##arg); } while(0)
+#define _SD(fmt, arg...) \
+	do { SECURE_SLOGD(fmt, ##arg); } while(0)
+#define _SI(fmt, arg...) \
+	do { SECURE_SLOGI(fmt, ##arg); } while(0)
+#define _SW(fmt, arg...) \
+	do { SECURE_SLOGW(fmt, ##arg); } while(0)
+#define _SE(fmt, arg...) \
+	do { SECURE_SLOGE(fmt, ##arg); } while(0)
 #else
-#define _D(fmt, arg...)	do{} while(0)
-#define _I(fmt, arg...)	do{} while(0)
-#define _E(fmt, arg...)	do{} while(0)
+#define _D(x, ...)	do { } while (0)
+#define _I(x, ...)	do { } while (0)
+#define _W(x, ...)	do { } while (0)
+#define _E(x, ...)	do { } while (0)
+#define _SD(fmt, args...)	do { } while (0)
+#define _SI(fmt, args...)	do { } while (0)
+#define _SW(fmt, args...)	do { } while (0)
+#define _SE(fmt, args...)	do { } while (0)
 #endif
 
 #endif
