@@ -176,7 +176,7 @@ static int clean_coredump_dir(void)
 			if ((name[1] == '.') && (name[2] == 0)) continue;
 		}
 		if (unlinkat(dfd, name, 0) < 0) {
-			_E("FAIL: clean_coredump_dir (%s)",name);
+			_SE("FAIL: clean_coredump_dir (%s)", name);
 			continue;
 		}
 	}
@@ -204,7 +204,7 @@ static int clean_dump_dir(void)
 			}
 			snprintf(dirname, sizeof(dirname), "%s/%s", CRASH_DUMP_PATH, name);
 			if (ecore_file_recursive_rm(dirname) == EINA_FALSE) {
-				_E("FAIL: clean_dump_dir (%s)",dirname);
+				_SE("FAIL: clean_dump_dir (%s)", dirname);
 				continue;
 			}
 		}
@@ -251,43 +251,43 @@ static int crash_arg_parser(char *linebuffer, struct crash_arg *arg)
 	}
 	ptr = strtok(linebuffer, CRASH_DELIMITER);
 	if (ptr == NULL) {
-		_E("can't strtok linebuffer ptr(%s)", ptr);
+		_SE("can't strtok linebuffer ptr(%s)", ptr);
 		return -1;
 	}
 	snprintf(arg->crash_mode, CRASH_MODE_MAX, "%s",  ptr);
 	ptr = strtok(NULL, CRASH_DELIMITER);
 	if (ptr == NULL) {
-		_E("can't strtok linebuffer ptr(%s)", ptr);
+		_SE("can't strtok linebuffer ptr(%s)", ptr);
 		return -1;
 	}
 	snprintf(arg->crash_processname, CRASH_PROCESSNAME_MAX, "%s",  ptr);
 	ptr = strtok(NULL, CRASH_DELIMITER);
 	if (ptr == NULL) {
-		_E("can't strtok linebuffer ptr(%s)", ptr);
+		_SE("can't strtok linebuffer ptr(%s)", ptr);
 		return -1;
 	}
 	snprintf(arg->crash_timestr, CRASH_TIME_MAX, "%s", ptr);
 	ptr = strtok(NULL, CRASH_DELIMITER);
 	if (ptr == NULL) {
-		_E("can't strtok linebuffer ptr(%s)", ptr);
+		_SE("can't strtok linebuffer ptr(%s)", ptr);
 		return -1;
 	}
 	snprintf(arg->crash_pid, CRASH_PID_MAX, "%s", ptr);
 	ptr = strtok(NULL, CRASH_DELIMITER);
 	if (ptr == NULL) {
-		_E("can't strtok linebuffer ptr(%s)", ptr);
+		_SE("can't strtok linebuffer ptr(%s)", ptr);
 		return -1;
 	}
 	snprintf(arg->crash_exepath, CRASH_EXEPATH_MAX, "%s", ptr);
 	ptr = strtok(NULL, CRASH_DELIMITER);
 	if (ptr == NULL) {
-		_E("can't strtok linebuffer ptr(%s)", ptr);
+		_SE("can't strtok linebuffer ptr(%s)", ptr);
 		return -1;
 	}
 	snprintf(arg->crash_verify, CRASH_VERIFY_MAX, "%s", ptr);
 	verify_num = strlen(arg->crash_processname) + strlen(arg->crash_exepath);
 	verify_arg_num = atoi(arg->crash_verify);
-	_D("vnum %d vanum %d", verify_num, verify_arg_num);
+	_SD("vnum %d vanum %d", verify_num, verify_arg_num);
 	if (verify_num == verify_arg_num)
 		return 1;
 	else
@@ -322,8 +322,8 @@ static void launch_crash_worker(const char *filename, int popup_on)
 		snprintf(crash_worker_args, sizeof(crash_worker_args), "%s %s %s %s %s",
 				parsing_arg.crash_mode, parsing_arg.crash_processname,
 				parsing_arg.crash_timestr, parsing_arg.crash_pid, parsing_arg.crash_exepath);
-		_D("crash_worker args(%s)", crash_worker_args);
-		_D("(%s%s%s)", parsing_arg.crash_mode,
+		_SD("crash_worker args(%s)", crash_worker_args);
+		_SD("(%s%s%s)", parsing_arg.crash_mode,
 				parsing_arg.crash_processname, parsing_arg.crash_timestr);
 		ret = ss_launch_evenif_exist (CRASH_WORKER_PATH, crash_worker_args);
 		if (ret > 0) {
