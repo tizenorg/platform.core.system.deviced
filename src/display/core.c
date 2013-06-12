@@ -49,6 +49,7 @@
 #include "core/devices.h"
 #include "core/device-notifier.h"
 #include "core/udev.h"
+#include "core/log.h"
 
 #define USB_CON_PIDFILE			"/var/run/.system_server.pid"
 #define PM_STATE_LOG_FILE		"/var/log/pm_state.log"
