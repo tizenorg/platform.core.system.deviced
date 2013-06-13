@@ -65,11 +65,6 @@ make %{?jobs:-j%jobs}
 rm -rf %{buildroot}
 %make_install
 
-mkdir -p %{buildroot}%{_sysconfdir}/rc.d/rc3.d/
-ln -s %{_sysconfdir}/init.d/system_server.sh %{buildroot}%{_sysconfdir}/rc.d/rc3.d/S35system-server
-mkdir -p %{buildroot}%{_sysconfdir}/rc.d/rc5.d/
-ln -s %{_sysconfdir}/init.d/system_server.sh %{buildroot}%{_sysconfdir}/rc.d/rc5.d/S00system-server
-
 mkdir -p %{buildroot}%{_libdir}/systemd/system/multi-user.target.wants
 mkdir -p %{buildroot}%{_libdir}/systemd/system/sockets.target.wants
 ln -s ../system-server.service %{buildroot}%{_libdir}/systemd/system/multi-user.target.wants/system-server.service
@@ -140,9 +135,6 @@ systemctl daemon-reload
 %files
 %manifest system-server.manifest
 %config %{_sysconfdir}/dbus-1/system.d/system-server.conf
-%{_sysconfdir}/rc.d/init.d/system_server.sh
-%{_sysconfdir}/rc.d/rc3.d/S35system-server
-%{_sysconfdir}/rc.d/rc5.d/S00system-server
 %{_bindir}/system_server
 /opt/etc/smack/accesses.d/system-server.rule
 %if 0%{?simulator}

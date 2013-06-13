@@ -3,10 +3,6 @@
 		<domain name="deviced" policy="shared"/>
 	</define>
 	<assign>
-		<filesystem path="/etc/init.d/system_server.sh" label="_" exec_label="none" />
-		<filesystem path="/etc/rc.d/init.d/system_server.sh" label="_" exec_label="none" />
-		<filesystem path="/etc/rc.d/rc3.d/S35system-server" label="_" exec_label="none" />
-		<filesystem path="/etc/rc.d/rc5.d/S00system-server" label="_" exec_label="none" />
 		<filesystem path="/usr/lib/systemd/system/system-server.service" label="_" exec_label="none" />
 		<filesystem path="/usr/lib/systemd/system/multi-user.target.wants/system-server.service" label="_" exec_label="none" />
 		<filesystem path="/usr/lib/systemd/system/system-server.socket" label="_" exec_label="none" />
