@@ -331,11 +331,12 @@ static int sysnoti_format_mmc_cb(keynode_t *key_nodes, void *data)
 
 API int sysman_request_format_mmc(struct mmc_contents *mmc_data)
 {
+	char *buf = "1";
 	if (mmc_data != NULL && mmc_data->mmc_cb != NULL)
 		vconf_notify_key_changed(VCONFKEY_SYSMAN_MMC_FORMAT,
 					 (void *)sysnoti_format_mmc_cb,
 					 (void *)mmc_data);
-	return sysman_call_predef_action(PREDEF_FORMAT_MMC, 0);
+	return sysman_call_predef_action(PREDEF_FORMAT_MMC, 1, buf);
 }
 
 API int sysman_request_set_cpu_max_frequency(int val)
