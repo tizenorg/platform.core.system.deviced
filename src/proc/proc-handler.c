@@ -46,6 +46,7 @@
 #define SIOP_LEVEL_MASK	0xFFFF
 #define SIOP_LEVEL(val)			((val & SIOP_LEVEL_MASK) << 16)
 static int siop = 0;
+
 int get_app_oomadj(int pid, int *oomadj)
 {
 	if (pid < 0)
@@ -62,6 +63,7 @@ int get_app_oomadj(int pid, int *oomadj)
 		fclose(fp);
 		return -1;
 	}
+
 	(*oomadj) = atoi(buf);
 	fclose(fp);
 	return 0;
@@ -149,75 +151,6 @@ static int update_backgrd_app_oomadj(pid_t pid, int new_oomadj)
 	return 0;
 }
 
-int check_and_set_old_backgrd()
-{
-	int pid = -1;
-	DIR *dp;
-	struct dirent *dentry;
-	FILE *fp;
-	char buf[PATH_MAX];
-	int token =0;
-	int oom_adj, new_oomadj, i;
-	pid_t buckets[MAX_BACKGRD_OOMADJ][LIMITED_BACKGRD_NUM];
-
-	dp = opendir("/proc");
-	if (!dp) {
-		_E("BACKGRD MANAGE : fail to open /proc : %s", strerror(errno));
-		return -1;
-	}
-
-	memset(buckets, 0, sizeof(buckets));
-	while ((dentry = readdir(dp)) != NULL) {
-		if (!isdigit(dentry->d_name[0]))
-			continue;
-
-		pid = atoi(dentry->d_name);
-
-		snprintf(buf, sizeof(buf), "/proc/%d/oom_adj", pid);
-		fp = fopen(buf, "r");
-		if (fp == NULL)
-			continue;
-		if (fgets(buf, sizeof(buf), fp) == NULL) {
-			fclose(fp);
-			continue;
-		}
-		oom_adj = atoi(buf);
-		if (oom_adj < MAX_BACKGRD_OOMADJ && oom_adj >= OOMADJ_BACKGRD_UNLOCKED) {
-			pid_t *bucket = buckets[oom_adj];
-			for (i = 0; i < LIMITED_BACKGRD_NUM; i++) {
-				if (!bucket[i])
-					break;
-			}
-			if (i >= LIMITED_BACKGRD_NUM)
-				_E("BACKGRB MANAGE : background applications(oom_adj %d) exceeds limitation", i);
-			else
-				bucket[i] = pid;
-		}
-		fclose(fp);
-	}
-	closedir(dp);
-
-	new_oomadj = OOMADJ_BACKGRD_UNLOCKED + 1;
-	for (oom_adj = OOMADJ_BACKGRD_UNLOCKED; oom_adj < MAX_BACKGRD_OOMADJ; oom_adj++) {
-		for (i = 0; i < LIMITED_BACKGRD_NUM; i++) {
-			pid = buckets[oom_adj][i];
-			if (!pid)
-				break;
-			if (new_oomadj >= MAX_BACKGRD_OOMADJ) {
-				_D("BACKGRD MANAGE : kill the process %d (oom_adj %d)", pid, MAX_BACKGRD_OOMADJ);
-				kill(pid, SIGTERM);
-			}
-			else {
-				if (new_oomadj != oom_adj)
-					update_backgrd_app_oomadj(pid, new_oomadj);
-				new_oomadj++;
-			}
-		}
-	}
-
-	return 0;
-}
-
 int set_active_action(int argc, char **argv)
 {
 	int pid = -1;
@@ -283,11 +216,9 @@ int set_inactive_action(int argc, char **argv)
 		ret = set_app_oomadj((pid_t) pid, OOMADJ_FOREGRD_UNLOCKED);
 		break;
 	case OOMADJ_BACKGRD_LOCKED:
-		check_and_set_old_backgrd();
 		ret = set_app_oomadj((pid_t) pid, OOMADJ_BACKGRD_UNLOCKED);
 		break;
 	case OOMADJ_INIT:
-		check_and_set_old_backgrd();
 		ret = set_app_oomadj((pid_t) pid, OOMADJ_BACKGRD_UNLOCKED);
 		break;
 	default:
@@ -303,7 +234,7 @@ int set_inactive_action(int argc, char **argv)
 	return ret;
 }
 
-int set_foregrd_action(int argc, char **argv)
+int set_process_action(int argc, char **argv)
 {
 	int pid = -1;
 	int ret = 0;
@@ -314,77 +245,6 @@ int set_foregrd_action(int argc, char **argv)
 	if ((pid = atoi(argv[0])) < 0)
 		return -1;
 
-	if (get_app_oomadj(pid, &oomadj) < 0)
-		return -1;
-
-	switch (oomadj) {
-	case OOMADJ_FOREGRD_LOCKED:
-	case OOMADJ_FOREGRD_UNLOCKED:
-	case OOMADJ_SU:
-		ret = 0;
-		break;
-	case OOMADJ_BACKGRD_LOCKED:
-		ret = set_app_oomadj((pid_t) pid, OOMADJ_FOREGRD_LOCKED);
-		break;
-	case OOMADJ_BACKGRD_UNLOCKED:
-		ret = set_app_oomadj((pid_t) pid, OOMADJ_FOREGRD_UNLOCKED);
-		break;
-	case OOMADJ_INIT:
-		ret = set_app_oomadj((pid_t) pid, OOMADJ_FOREGRD_UNLOCKED);
-		break;
-	default:
-		if(oomadj > OOMADJ_BACKGRD_UNLOCKED) {
-			ret = set_app_oomadj((pid_t) pid, OOMADJ_FOREGRD_UNLOCKED);
-		} else {
-			_E("Unknown oomadj value (%d) !", oomadj);
-			ret = -1;
-		}
-		break;
-
-	}
-	return ret;
-}
-
-int set_backgrd_action(int argc, char **argv)
-{
-	int pid = -1;
-	int ret = 0;
-	int oomadj = 0;
-
-	if (argc < 1)
-		return -1;
-	if ((pid = atoi(argv[0])) < 0)
-		return -1;
-
-	if (get_app_oomadj(pid, &oomadj) < 0)
-		return -1;
-
-	switch (oomadj) {
-	case OOMADJ_BACKGRD_LOCKED:
-	case OOMADJ_BACKGRD_UNLOCKED:
-	case OOMADJ_SU:
-		ret = 0;
-		break;
-	case OOMADJ_FOREGRD_LOCKED:
-		ret = set_app_oomadj((pid_t) pid, OOMADJ_BACKGRD_LOCKED);
-		break;
-	case OOMADJ_FOREGRD_UNLOCKED:
-		check_and_set_old_backgrd();
-		ret = set_app_oomadj((pid_t) pid, OOMADJ_BACKGRD_UNLOCKED);
-		break;
-	case OOMADJ_INIT:
-		check_and_set_old_backgrd();
-		ret = set_app_oomadj((pid_t) pid, OOMADJ_BACKGRD_UNLOCKED);
-		break;
-	default:
-		if(oomadj > OOMADJ_BACKGRD_UNLOCKED) {
-			ret = 0;
-		} else {
-			_E("Unknown oomadj value (%d) !", oomadj);
-			ret = -1;
-		}
-		break;
-	}
 	return ret;
 }
 
@@ -412,9 +272,9 @@ int set_process_group_action(int argc, char **argv)
 
 static void process_init(void *data)
 {
-	action_entry_add_internal(PREDEF_FOREGRD, set_foregrd_action, NULL,
+	action_entry_add_internal(PREDEF_FOREGRD, set_process_action, NULL,
 				     NULL);
-	action_entry_add_internal(PREDEF_BACKGRD, set_backgrd_action, NULL,
+	action_entry_add_internal(PREDEF_BACKGRD, set_process_action, NULL,
 				     NULL);
 	action_entry_add_internal(PREDEF_ACTIVE, set_active_action, NULL,
 				     NULL);
