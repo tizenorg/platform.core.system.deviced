@@ -24,6 +24,7 @@
  */
 
 #include <error.h>
+#include <stdbool.h>
 #include <Ecore.h>
 #include <device-node.h>
 
@@ -371,7 +372,38 @@ error:
 	return reply;
 }
 
-static struct edbus_method {
+static DBusMessage *e_dbus_lockscreenbgon(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int ret = 0;
+	char *on;
+
+	ret = dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &on,
+		    DBUS_TYPE_INVALID);
+
+	if (!ret) {
+		_E("fail to update lcdscreen bg on state %d", ret);
+		ret = -EINVAL;
+		goto error;
+	}
+
+	if (!strcmp(on, "true"))
+		update_pm_setting(SETTING_LOCK_SCREEN_BG, true);
+	else if (!strcmp(on, "false"))
+		update_pm_setting(SETTING_LOCK_SCREEN_BG, false);
+	else
+		ret = -EINVAL;
+
+error:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+
+	return reply;
+}
+
+static const struct edbus_method {
 	const char *member;
 	const char *signature;
 	const char *reply_signature;
@@ -388,6 +420,7 @@ static struct edbus_method {
 	{ "getautobrightnessinterval",  NULL,   "i", e_dbus_getautobrightnessinterval },
 	{ "setautobrightnessinterval",   "i",   "i", e_dbus_setautobrightnessinterval },
 	{ "setautobrightnessmin", "i", "i", e_dbus_setautobrightnessmin },
+	{ "LockScreenBgOn", "s", "i", e_dbus_lockscreenbgon },
 	/* Add methods here */
 };
 

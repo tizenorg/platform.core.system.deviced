@@ -1209,6 +1209,12 @@ static int update_setting(int key_idx, int val)
 			states[pm_cur_state].trans(EVENT_INPUT);
 		}
 		break;
+	case SETTING_LOCK_SCREEN_BG:
+		set_lock_screen_bg_state(val);
+		if (pm_cur_state == S_NORMAL) {
+			states[pm_cur_state].trans(EVENT_INPUT);
+		}
+		break;
 	case SETTING_POWER_SAVING:
 		if (val == 1)
 			vconf_get_bool(VCONFKEY_SETAPPL_PWRSV_CUSTMODE_DISPLAY,

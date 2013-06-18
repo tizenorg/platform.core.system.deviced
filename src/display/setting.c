@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <stdbool.h>
 
 #include "util.h"
 #include "setting.h"
@@ -34,6 +35,7 @@ static const char *setting_keys[SETTING_GET_END] = {
 };
 
 static int lock_screen_state = VCONFKEY_IDLE_UNLOCK;
+static bool lock_screen_bg_state = false;
 
 int (*update_pm_setting) (int key_idx, int val);
 
@@ -52,6 +54,17 @@ void set_lock_screen_state(int state)
 	default:
 		lock_screen_state = VCONFKEY_IDLE_UNLOCK;
 	}
+}
+
+int get_lock_screen_bg_state(void)
+{
+	return lock_screen_bg_state;
+}
+
+void set_lock_screen_bg_state(bool state)
+{
+	_I("state is %d", state);
+	lock_screen_bg_state = state;
 }
 
 int get_charging_status(int *val)
