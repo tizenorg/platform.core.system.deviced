@@ -66,6 +66,14 @@
 #define DEVICED_PATH_LOWMEM		OBJECT_PATH"/Lowmem"
 #define DEVICED_INTERFACE_LOWMEM	INTERFACE_NAME".lowmem"
 
+/*
+ * Poweroff service
+ *   get power off status
+ *   operations about Poweroff
+ */
+#define DEVICED_PATH_POWEROFF		OBJECT_PATH"/PowerOff"
+#define DEVICED_INTERFACE_POWEROFF	INTERFACE_NAME".PowerOff"
+
 int register_edbus_signal_handler(const char *path, const char *interface,
 		const char *name, E_DBus_Signal_Cb cb);
 E_DBus_Interface *get_edbus_interface(const char *path);

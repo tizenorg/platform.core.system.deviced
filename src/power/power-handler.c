@@ -65,6 +65,8 @@
 #define POWEROFF_DURATION		2
 #define MAX_RETRY			2
 
+#define SIGNAL_POWEROFF_STATE	"ChangeState"
+
 static struct timeval tv_start_poweroff;
 
 static Ecore_Timer *poweroff_timer_id = NULL;
@@ -102,11 +104,34 @@ static void poweroff_popup_edbus_signal_handler(void *data, DBusMessage *msg)
 	vconf_set_int(VCONFKEY_SYSMAN_POWER_OFF_STATUS, val);
 }
 
+static void poweroff_send_broadcast(int status)
+{
+	static int old = 0;
+	char *arr[1];
+	char str_status[32];
+
+	if (old == status)
+		return;
+
+	_D("broadcast poweroff %d", status);
+
+	old = status;
+	snprintf(str_status, sizeof(str_status), "%d", status);
+	arr[0] = str_status;
+
+	broadcast_edbus_signal(DEVICED_PATH_POWEROFF, DEVICED_INTERFACE_POWEROFF,
+			SIGNAL_POWEROFF_STATE, "i", arr);
+}
+
 static void poweroff_control_cb(keynode_t *in_key, struct ss_main_data *ad)
 {
 	int val;
 	if (vconf_get_int(VCONFKEY_SYSMAN_POWER_OFF_STATUS, &val) != 0)
 		return;
+
+	if (val == VCONFKEY_SYSMAN_POWER_OFF_DIRECT || val == VCONFKEY_SYSMAN_POWER_OFF_RESTART)
+		poweroff_send_broadcast(val);
+
 	switch (val) {
 	case VCONFKEY_SYSMAN_POWER_OFF_DIRECT:
 		action_entry_call_internal(PREDEF_POWEROFF, 0);
