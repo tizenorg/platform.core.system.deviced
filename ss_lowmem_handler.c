@@ -18,7 +18,6 @@
 #include <fcntl.h>
 #include <assert.h>
 #include <limits.h>
-#include <sysman.h>
 #include <heynoti.h>
 #include <vconf.h>
 #include <sys/types.h>

@@ -27,6 +27,7 @@
 #include "vconf-keys.h"
 #include "ss_log.h"
 #include "ss_launch.h"
+#include "ss_common.h"
 
 #define MAX_ARGS 255
 
@@ -211,7 +212,7 @@ int ss_launch_if_noexist(const char *execpath, const char *arg, ...)
 		errno = EINVAL;
 		return -1;
 	}
-	if (pid = sysman_get_pid(execpath) > 0)
+	if (pid = get_exec_pid(execpath) > 0)
 		return pid;
 
 	va_start(argptr, arg);
@@ -303,7 +304,7 @@ int ss_launch_after_kill_if_exist(const char *execpath, const char *arg, ...)
 		return -1;
 	}
 
-	if ((exist_pid = sysman_get_pid(execpath)) > 0)
+	if ((exist_pid = get_exec_pid(execpath)) > 0)
 		kill(exist_pid, SIGTERM);
 
 	va_start(argptr, arg);

@@ -24,7 +24,6 @@
 #include <pmapi.h>
 #include <vconf.h>
 
-#include <sysman.h>
 #include "include/ss_data.h"
 #include "ss_queue.h"
 #include "ss_log.h"

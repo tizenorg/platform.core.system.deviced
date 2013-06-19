@@ -20,7 +20,6 @@
 #include <dirent.h>
 #include <errno.h>
 #include <vconf.h>
-#include <sysman.h>
 #include <pmapi.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -29,6 +28,7 @@
 #include <aul.h>
 #include <bundle.h>
 #include <dirent.h>
+#include "sysman.h"
 #include <libudev.h>
 #include "ss_queue.h"
 #include "ss_log.h"

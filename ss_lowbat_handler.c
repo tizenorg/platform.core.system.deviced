@@ -19,7 +19,6 @@
 #include <limits.h>
 #include <heynoti.h>
 #include <vconf.h>
-#include <sysman.h>
 #include <fcntl.h>
 
 #include "ss_log.h"

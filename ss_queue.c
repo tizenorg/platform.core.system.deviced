@@ -15,7 +15,6 @@
  */
 
 
-#include <sysman.h>
 #include <dlfcn.h>
 #include "include/ss_data.h"
 #include "ss_core.h"

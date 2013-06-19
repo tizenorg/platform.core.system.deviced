@@ -15,7 +15,6 @@
  */
 
 
-#include <sysman.h>
 #include <limits.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -24,6 +23,7 @@
 #include "include/ss_data.h"
 #include "ss_log.h"
 #include "ss_queue.h"
+#include "ss_common.h"
 
 #define SYSNOTI_SOCKET_PATH "/tmp/sn"
 #define RETRY_READ_COUNT	5
@@ -42,7 +42,7 @@ static void print_sysnoti_msg(const char *title, struct sysnoti *msg)
 	int i;
 	char exe_name[PATH_MAX];
 
-	if (sysman_get_cmdline_name(msg->pid, exe_name, PATH_MAX) < 0)
+	if (get_cmdline_name(msg->pid, exe_name, PATH_MAX) < 0)
 		snprintf(exe_name, sizeof(exe_name), "Unknown (maybe dead)");
 
 	PRT_TRACE_ERR("pid : %d name: %s cmd : %d type : %s path : %s",

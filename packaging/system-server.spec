@@ -6,14 +6,14 @@ Release:    7
 Group:      Framework/system
 License:    Apache License, Version 2.0
 Source0:    system-server-%{version}.tar.gz
-Source2:    system-server.manifest
-Source3:    deviced.manifest
+Source1:    system-server.manifest
+Source2:    deviced.manifest
+Source3:    sysman.manifest
 BuildRequires:  cmake
 BuildRequires:  libattr-devel
 BuildRequires:  pkgconfig(ecore)
 BuildRequires:  pkgconfig(heynoti)
 BuildRequires:  pkgconfig(vconf)
-BuildRequires:  pkgconfig(sysman)
 BuildRequires:  pkgconfig(tapi)
 BuildRequires:  pkgconfig(pmapi)
 BuildRequires:  pkgconfig(edbus)
@@ -36,7 +36,45 @@ Requires(post): /usr/bin/vconftool
 Requires(postun): /usr/bin/systemctl
 
 %description
-Description: System server
+system server
+
+%package system-server
+Summary:    system-server daemon
+Group:      main
+Requires:   %{name} = %{version}-%{release}
+
+%description system-server
+system server daemon.
+
+%package -n sysman
+Summary:    sysman library
+License:    LGPL
+Group:      main
+Requires:   %{name} = %{version}-%{release}
+#Provides:   sysman
+
+%description -n sysman
+sysman library.
+
+%package -n sysman-devel
+Summary:    sysman devel library
+License:    LGPL
+Group:      main
+Requires:   %{name} = %{version}-%{release}
+#Provides:   sysman-devel
+
+%description -n sysman-devel
+sysman devel library.
+
+%package -n sysman-internal-devel
+Summary:    sysman internal devel library
+License:    LGPL
+Group:      main
+Requires:   %{name} = %{version}-%{release}
+#Provides:   sysman-internal-devel
+
+%description -n sysman-internal-devel
+sysman internal devel library.
 
 %package -n libdeviced
 Summary:    Deviced library
@@ -58,6 +96,7 @@ Deviced library for device control (devel)
 cmake . -DCMAKE_INSTALL_PREFIX=%{_prefix}
 
 %build
+cp %{SOURCE1} .
 cp %{SOURCE2} .
 cp %{SOURCE3} .
 make %{?jobs:-j%jobs}
@@ -144,7 +183,7 @@ fi
 systemctl daemon-reload
 
 
-%files
+%files -n system-server
 %manifest system-server.manifest
 %{_bindir}/system_server
 /opt/etc/smack/accesses.d/system-server.rule
@@ -169,6 +208,26 @@ systemctl daemon-reload
 %{_datadir}/system-server/sys_device_noti/res/locale/*/LC_MESSAGES/*.mo
 %{_datadir}/system-server/sys_pci_noti/res/locale/*/LC_MESSAGES/*.mo
 %config %{_sysconfdir}/dbus-1/system.d/system-server.conf
+
+%files -n sysman
+%manifest sysman.manifest
+%defattr(-,root,root,-)
+%{_libdir}/libsysman.so.*
+%{_bindir}/regpmon
+%{_bindir}/set_pmon
+
+%files -n sysman-devel
+%defattr(-,root,root,-)
+%{_includedir}/sysman/sysman.h
+
+%{_includedir}/sysman/sysman_managed.h
+%{_includedir}/sysman/SLP_sysman_PG.h
+%{_libdir}/pkgconfig/sysman.pc
+%{_libdir}/libsysman.so
+
+%files -n sysman-internal-devel
+%defattr(-,root,root,-)
+%{_includedir}/sysman/sysman-internal.h
 
 %files -n libdeviced
 %defattr(-,root,root,-)

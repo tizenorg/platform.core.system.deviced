@@ -22,7 +22,6 @@
 #include <sys/types.h>
 #include <device-node.h>
 
-#include <sysman.h>
 #include "include/ss_data.h"
 #include "ss_queue.h"
 #include "ss_log.h"
@@ -60,7 +59,7 @@ int set_app_oomadj(pid_t pid, int new_oomadj)
 	int old_oomadj;
 	char exe_name[PATH_MAX];
 
-	if (sysman_get_cmdline_name(pid, exe_name, PATH_MAX) < 0)
+	if (get_cmdline_name(pid, exe_name, PATH_MAX) < 0)
 		snprintf(exe_name, sizeof(exe_name), "Unknown (maybe dead)");
 
 	snprintf(buf, sizeof(buf), "/proc/%d/oom_adj", pid);
