@@ -160,7 +160,7 @@ static void __sync_usb_status(void)
 {
 	int val = -1;
 	int status = -1;
-	if (device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_USB_ONLINE, &val) != 0 ||
+	if ((device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_USB_ONLINE, &val) != 0) ||
 	    vconf_get_int(VCONFKEY_SYSMAN_USB_STATUS,&status) != 0)
 		return;
 	if ((val == 1 && status == VCONFKEY_SYSMAN_USB_DISCONNECTED) ||

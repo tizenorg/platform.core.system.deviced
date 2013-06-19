@@ -1,0 +1,53 @@
+#!/bin/sh
+
+KERNVER=`uname -r`
+
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib
+export PATH=$PATH:/usr/bin
+export ELM_FONT_PATH=@PREFIX@/share/SLP/fonts:@PREFIX@/share/SLP/licensed_fonts:@PREFIX@/share/fonts/truetype/ttf-bitstream-vera
+export PM_EXEC_PRG=@PREFIX@/bin/@IDLE_LOCK@
+
+export PM_TO_NORMAL=600 # normal state timeout seconds
+export PM_TO_LCDDIM=5 # dim state timeout seconds
+export PM_TO_LCDOFF=5 # off state timeout seconds
+#export PM_TO_LCDOFF=0  # prevent suspend mode 
+
+export PM_SYS_DIMBRT=0
+
+DEV_INPUT=
+ABS_POSITION_X=0x15
+ABS_POSITION_Y=0x16
+for file in /sys/class/input/event*; do
+	if [ -e $file ]; then
+		dev_keytype=`cat ${file}/device/capabilities/key`
+		if [ "$dev_keytype" != 0 ]; then
+			DEV_INPUT=$DEV_INPUT:/dev/input/${file#/sys/class/input/}
+			continue
+		fi
+		abs_num=`cat ${file}/device/capabilities/abs | wc -w | cut -d ' ' -f 1`
+		if [ $abs_num != 2 ]; then
+			continue
+		fi
+		abs_val=`cat ${file}/device/capabilities/abs | cut -d ' ' -f 1`
+		if [ $(((0x$abs_val >> $ABS_POSITION_X) & 0x1)) != 1 ]; then
+			continue
+		fi
+		if [ $(((0x$abs_val >> $ABS_POSITION_Y) & 0x1)) != 1 ]; then
+			continue
+		fi
+		DEV_INPUT=$DEV_INPUT:/dev/input/${file#/sys/class/input/}
+	fi
+done
+
+export PM_INPUT=$DEV_INPUT
+
+PMD=@PREFIX@/bin/@EXEC@
+
+echo "Input Event: $PM_INPUT"
+OPT_X_DPMS="-x"
+echo "LCD Power: X-DPMS enabled"
+
+/usr/bin/system_server &
+
+exit 0
+

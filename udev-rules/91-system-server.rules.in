@@ -35,3 +35,10 @@ ACTION=="remove"	SUBSYSTEM=="input"	DEVPATH=="*/virtio[1-9]*/input/input[1-9]*/e
 
 #Smart debug bridge
 ACTION=="add", KERNEL="samsung_sdb", SYMLINK+="tizen_sdb"
+
+#input(like bt)
+ACTION=="add" SUBSYSTEM=="input"  DEVPATH=="*/input[0-9]*/event[0-9]*" RUN+="@PREFIX@/bin/pm_event add $DEVNAME"
+ACTION=="remove" SUBSYSTEM=="input"  DEVPATH=="*/input[0-9]*/event[0-9]*" RUN+="@PREFIX@/bin/pm_event remove $DEVNAME"
+
+# Since power_manager is running as app user, make sure this user can read the input device nodes
+SUBSYSTEM=="input" DEVPATH=="*/input[0-9]*/event[0-9]*" GROUP="video"

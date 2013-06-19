@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <systemd/sd-daemon.h>
+
 #include <sysman.h>
 #include <limits.h>
 #include <sys/types.h>
@@ -243,45 +243,10 @@ static int sysnoti_cb(void *data, Ecore_Fd_Handler * fd_handler)
 	return 1;
 }
 
-static int ss_sysnoti_systemd_socket_test(const char *path)
-{
-	int type = SOCK_STREAM;
-	int listening = 1;
-	size_t length = 0;
-	int fd = -1;
-	int rc;
-	int n;
-	int i;
-
-	// Gets number of created by systemd file descriptors that represent open sockets.
-	n = sd_listen_fds(0);
-	for (i = 0; i < n; i ++) {
-
-		// File descriptor calculation
-		fd = SD_LISTEN_FDS_START  + i;
-
-		// File descriptor veryfication.
-		if ((rc = sd_is_socket_unix(fd, type, listening, path, length)) > 0)
-			return fd;
-
-		// Check error
-		if (rc < 0)
-			return -1;
-	}
-
-	// No proper socket
-	return -1;
-}
-
 static int ss_sysnoti_server_init(void)
 {
 	int fd;
 	struct sockaddr_un serveraddr;
-
-	// Getting systemd socket
-	fd = ss_sysnoti_systemd_socket_test(SYSNOTI_SOCKET_PATH);
-	if (fd >= 0)
-		return fd;
 
 	if (access(SYSNOTI_SOCKET_PATH, F_OK) == 0)
 		unlink(SYSNOTI_SOCKET_PATH);

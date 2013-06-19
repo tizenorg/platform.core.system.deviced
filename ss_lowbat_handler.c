@@ -28,6 +28,7 @@
 #include "ss_queue.h"
 #include "device-node.h"
 #include "include/ss_data.h"
+#include "display/setting.h"
 
 #define BAT_MON_INTERVAL		30
 #define BAT_MON_INTERVAL_MIN		2
@@ -128,6 +129,8 @@ int ss_lowbat_set_charge_on(int onoff)
 		PRT_TRACE_ERR("fail to set charge vconf value");
 		return -1;
 	}
+	if (update_pm_setting)
+		update_pm_setting(SETTING_CHARGING, onoff);
 	return 0;
 }
 
@@ -157,6 +160,7 @@ static int lowbat_process(int bat_percent, void *ad)
 	int bat_full = -1;
 	int i, ret = 0;
 	int val = 0;
+	int status = -1;
 	new_bat_capacity = bat_percent;
 	if (new_bat_capacity < 0)
 		return -1;
@@ -179,42 +183,48 @@ static int lowbat_process(int bat_percent, void *ad)
 		if (val == 1) {
 			new_bat_state = BATTERY_POWER_OFF;
 			if (vconf_state != VCONFKEY_SYSMAN_BAT_POWER_OFF)
-				ret=vconf_set_int(VCONFKEY_SYSMAN_BATTERY_STATUS_LOW, VCONFKEY_SYSMAN_BAT_POWER_OFF);
+				status = VCONFKEY_SYSMAN_BAT_POWER_OFF;
 		} else {
 			new_bat_state = BATTERY_REAL_POWER_OFF;
 			if (vconf_state != VCONFKEY_SYSMAN_BAT_REAL_POWER_OFF)
-				ret=vconf_set_int(VCONFKEY_SYSMAN_BATTERY_STATUS_LOW, VCONFKEY_SYSMAN_BAT_REAL_POWER_OFF);
+				status = VCONFKEY_SYSMAN_BAT_REAL_POWER_OFF;
 		}
 	} else if (new_bat_capacity <= BATTERY_POWER_OFF) {
 		new_bat_state = BATTERY_POWER_OFF;
 		if (vconf_state != VCONFKEY_SYSMAN_BAT_POWER_OFF)
-			ret=vconf_set_int(VCONFKEY_SYSMAN_BATTERY_STATUS_LOW, VCONFKEY_SYSMAN_BAT_POWER_OFF);
+			status = VCONFKEY_SYSMAN_BAT_POWER_OFF;
 	} else if (new_bat_capacity <= BATTERY_CRITICAL_LOW) {
 		new_bat_state = BATTERY_CRITICAL_LOW;
 		if (vconf_state != VCONFKEY_SYSMAN_BAT_CRITICAL_LOW)
-			ret=vconf_set_int(VCONFKEY_SYSMAN_BATTERY_STATUS_LOW, VCONFKEY_SYSMAN_BAT_CRITICAL_LOW);
+			status = VCONFKEY_SYSMAN_BAT_CRITICAL_LOW;
 	} else if (new_bat_capacity <= BATTERY_WARNING_LOW) {
 		new_bat_state = BATTERY_WARNING_LOW;
 		if (vconf_state != VCONFKEY_SYSMAN_BAT_WARNING_LOW)
-			ret=vconf_set_int(VCONFKEY_SYSMAN_BATTERY_STATUS_LOW, VCONFKEY_SYSMAN_BAT_WARNING_LOW);
+			status = VCONFKEY_SYSMAN_BAT_WARNING_LOW;
 	} else {
 		new_bat_state = BATTERY_NORMAL;
 		if (new_bat_capacity == BATTERY_FULL) {
 			device_get_property(DEVICE_TYPE_POWER, PROP_POWER_CHARGE_FULL, &bat_full);
 			if (bat_full == 1) {
 				if (vconf_state != VCONFKEY_SYSMAN_BAT_FULL)
-				ret=vconf_set_int(VCONFKEY_SYSMAN_BATTERY_STATUS_LOW, VCONFKEY_SYSMAN_BAT_FULL);
+					status = VCONFKEY_SYSMAN_BAT_FULL;
 			} else {
 				if (vconf_state != VCONFKEY_SYSMAN_BAT_NORMAL)
-					ret=vconf_set_int(VCONFKEY_SYSMAN_BATTERY_STATUS_LOW, VCONFKEY_SYSMAN_BAT_NORMAL);
+					status = VCONFKEY_SYSMAN_BAT_NORMAL;
 			}
 		} else {
 			if (vconf_state != VCONFKEY_SYSMAN_BAT_NORMAL)
-				ret=vconf_set_int(VCONFKEY_SYSMAN_BATTERY_STATUS_LOW, VCONFKEY_SYSMAN_BAT_NORMAL);
+				status = VCONFKEY_SYSMAN_BAT_NORMAL;
 		}
 	}
 
-	if(ret < 0)
+	if (status != -1) {
+		ret = vconf_set_int(VCONFKEY_SYSMAN_BATTERY_STATUS_LOW, status);
+		if (update_pm_setting)
+			update_pm_setting(SETTING_LOW_BATT, status);
+	}
+
+	if (ret < 0)
 		return -1;
 
 	ss_lowbat_is_charge_in_now();

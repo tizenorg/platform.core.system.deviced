@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <systemd/sd-daemon.h>
+
 #include <stdio.h>
 #include <fcntl.h>
 #include <heynoti.h>
@@ -104,14 +104,11 @@ static int system_main(int argc, char **argv)
 	}
 	edbus_init();
 	system_server_init(&ad);
+	start_pm_main();
 	signal(SIGTERM, sig_quit);
-
-	// Notyfication to systemd
-	if (sd_booted())
-		sd_notify(0, "READY=1");
-
 	ecore_main_loop_begin();
 
+	end_pm_main();
 	fini(&ad);
 	edbus_fini();
 	ecore_shutdown();
