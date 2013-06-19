@@ -34,6 +34,7 @@
 #include "ss_timemgr.h"
 #include "ss_cpu_handler.h"
 #include "include/ss_data.h"
+#include "edbus-handler.h"
 
 static void fini(struct ss_main_data *ad)
 {
@@ -101,7 +102,7 @@ static int system_main(int argc, char **argv)
 		fini(&ad);
 		return 0;
 	}
-
+	edbus_init();
 	system_server_init(&ad);
 	signal(SIGTERM, sig_quit);
 
@@ -112,6 +113,7 @@ static int system_main(int argc, char **argv)
 	ecore_main_loop_begin();
 
 	fini(&ad);
+	edbus_fini();
 	ecore_shutdown();
 
 	return 0;

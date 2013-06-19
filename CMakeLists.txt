@@ -27,7 +27,8 @@ SET(SRCS
 	ss_timemgr.c
 	ss_cpu_handler.c
 	ss_common.c
-	ss_vibrator.c)
+	ss_vibrator.c
+	edbus-handler.c)
 
 # libdeviced
 SET(DEVICED_SRCS
@@ -48,6 +49,7 @@ pkg_check_modules(pkgs REQUIRED
 	ecore
 	ecore-file
 	ecore-x
+	edbus
 	eina
 	sysman
 	vconf
