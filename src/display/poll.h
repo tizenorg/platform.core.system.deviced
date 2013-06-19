@@ -44,7 +44,6 @@ enum {
 	PM_CONTROL_EVENT,
 };
 
-#define SOCK_PATH "/tmp/pm_sock"
 #define SIGNAL_NAME_LCD_CONTROL		"lcdcontol"
 
 #define LCD_NORMAL	0x1		/**< NORMAL state */

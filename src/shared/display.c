@@ -36,11 +36,8 @@
 #define DISPLAY_MIN_BRIGHTNESS  1
 #define DISPLAY_DIM_BRIGHTNESS  0
 
-#define SOCK_PATH			"/tmp/pm_sock"
-#define SHIFT_UNLOCK			4
-#define SHIFT_UNLOCK_PARAMETER		12
-#define SHIFT_CHANGE_STATE		8
-#define TIMEOUT_RESET_BIT		0x80
+#define HOLDKEY_BLOCK_BIT		0x1
+#define STANDBY_MODE_BIT		0x2
 
 #define METHOD_SET_FRAME_RATE		"setframerate"
 #define METHOD_LOCK_STATE		"lockstate"
@@ -62,14 +59,6 @@
 #define STR_SLEEP_MARGIN "sleepmargin"
 #define STR_RESET_TIMER  "resettimer"
 #define STR_KEEP_TIMER   "keeptimer"
-
-
-struct disp_lock_msg {
-	pid_t pid;
-	unsigned int cond;
-	unsigned int timeout;
-	unsigned int timeout2;
-};
 
 API int display_get_count(void)
 {
@@ -290,41 +279,6 @@ API int display_set_frame_rate(int val)
 
 	_D("%s-%s : %d", DEVICED_INTERFACE_DISPLAY, METHOD_SET_FRAME_RATE, ret_val);
 	return ret_val;
-}
-
-static int send_msg(unsigned int s_bits, unsigned int timeout, unsigned int timeout2)
-{
-	int rc = 0;
-	int sock;
-	struct disp_lock_msg p;
-	struct sockaddr_un remote;
-
-	p.pid = getpid();
-	p.cond = s_bits;
-	p.timeout = timeout;
-	p.timeout2 = timeout2;
-
-	sock = socket(AF_UNIX, SOCK_DGRAM, 0);
-	if (sock == -1) {
-		_E("pm socket() failed: %s", strerror(errno));
-		return sock;
-	}
-
-	remote.sun_family = AF_UNIX;
-	if(strlen(SOCK_PATH) >= sizeof(remote.sun_path)) {
-		_E("socket path is vey long");
-		close(sock);
-		return -ENAMETOOLONG;
-	}
-	strncpy(remote.sun_path, SOCK_PATH, sizeof(remote.sun_path));
-
-	rc = sendto(sock, (void *)&p, sizeof(p), 0, (struct sockaddr *)&remote,
-		    sizeof(struct sockaddr_un));
-	if (rc == -1)
-		_E("pm socket sendto() failed: %s", strerror(errno));
-
-	close(sock);
-	return (rc > 0 ? 0 : rc);
 }
 
 static inline char *get_lcd_str(unsigned int val)

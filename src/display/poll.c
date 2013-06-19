@@ -76,7 +76,6 @@ static Eina_Bool pm_handler(void *data, Ecore_Fd_Handler *fd_handler)
 
 	int *fd = (int *)data;
 	int ret;
-	int clilen = sizeof(clientaddr);
 
 	if (device_get_status(&display_device_ops) != DEVICE_OPS_STATUS_START) {
 		_E("display is not started!");
@@ -86,59 +85,12 @@ static Eina_Bool pm_handler(void *data, Ecore_Fd_Handler *fd_handler)
 	if (g_pm_callback == NULL) {
 		return EINA_FALSE;
 	}
-	if (fd == sockfd) {
-		ret =
-		    recvfrom(fd, &recv_data, sizeof(recv_data), 0,
-			     (struct sockaddr *)&clientaddr,
-			     (socklen_t *)&clilen);
-		(*g_pm_callback) (PM_CONTROL_EVENT, &recv_data);
-	} else {
-		ret = read(fd, buf, sizeof(buf));
-		CHECK_KEY_FILTER(ret, buf);
-		(*g_pm_callback) (INPUT_POLL_EVENT, NULL);
-	}
+
+	ret = read(fd, buf, sizeof(buf));
+	CHECK_KEY_FILTER(ret, buf);
+	(*g_pm_callback) (INPUT_POLL_EVENT, NULL);
 
 	return EINA_TRUE;
-}
-
-static int init_sock(char *sock_path)
-{
-	struct sockaddr_un serveraddr;
-	int fd;
-
-	_I("initialize pm_socket for pm_control library");
-
-	if (sock_path == NULL || strcmp(sock_path, SOCK_PATH)) {
-		_E("invalid sock_path= %s");
-		return -1;
-	}
-
-	fd = socket(AF_UNIX, SOCK_DGRAM, 0);
-	if (fd < 0) {
-		_E("socket error");
-		return -1;
-	}
-
-	unlink(sock_path);
-
-	bzero(&serveraddr, sizeof(serveraddr));
-	serveraddr.sun_family = AF_UNIX;
-	strncpy(serveraddr.sun_path, sock_path, sizeof(serveraddr.sun_path) - 1);
-
-	if (bind(fd, (struct sockaddr *)&serveraddr, sizeof(serveraddr)) < 0) {
-		_E("bind error");
-		close(fd);
-		return -1;
-	}
-
-	if (chmod(sock_path, (S_IRWXU | S_IRWXG | S_IRWXO)) < 0)	/* 0777 */
-		_E("failed to change the socket permission");
-
-	if (!strcmp(sock_path, SOCK_PATH))
-		sockfd = fd;
-
-	_I("init sock() sueccess!");
-	return fd;
 }
 
 int init_pm_poll(int (*pm_callback) (int, PMMsg *))
@@ -152,22 +104,21 @@ int init_pm_poll(int (*pm_callback) (int, PMMsg *))
 
 	g_pm_callback = pm_callback;
 
-	_I
-	    ("initialize pm poll - input devices and domain socket(deviced)");
+	_I("initialize pm poll - input devices(deviced)");
 
 	pm_input_env = getenv("PM_INPUT");
 	if ((pm_input_env != NULL) && (strlen(pm_input_env) < 1024)) {
 		_I("Getting input device path from environment: %s",
 		       pm_input_env);
 		/* Add 2 bytes for following strncat() */
-		dev_paths_size =  strlen(pm_input_env) + strlen(SOCK_PATH) + strlen(DEV_PATH_DLM) + 1;
+		dev_paths_size =  strlen(pm_input_env) + 1;
 		dev_paths = (char *)malloc(dev_paths_size);
 		if (!dev_paths)
 			return -1;
 		snprintf(dev_paths, dev_paths_size, "%s", pm_input_env);
 	} else {
 		/* Add 2 bytes for following strncat() */
-		dev_paths_size = strlen(DEFAULT_DEV_PATH) + strlen(SOCK_PATH) + strlen(DEV_PATH_DLM) + 1;
+		dev_paths_size = strlen(DEFAULT_DEV_PATH) + 1;
 		dev_paths = (char *)malloc(dev_paths_size);
 		if (!dev_paths)
 			return -1;
@@ -176,7 +127,6 @@ int init_pm_poll(int (*pm_callback) (int, PMMsg *))
 
 	/* add the UNIX domain socket file path */
 	strncat(dev_paths, DEV_PATH_DLM, strlen(DEV_PATH_DLM));
-	strncat(dev_paths, SOCK_PATH, strlen(SOCK_PATH));
 	dev_paths[dev_paths_size - 1] = '\0';
 
 	path_tok = strtok_r(dev_paths, DEV_PATH_DLM, &save_ptr);
@@ -189,17 +139,9 @@ int init_pm_poll(int (*pm_callback) (int, PMMsg *))
 		char *path, *new_path;
 		int len;
 
-		if (strcmp(path_tok, SOCK_PATH) == 0) {
-			fd = init_sock(SOCK_PATH);
-			path = SOCK_PATH;
-			_I("pm_poll domain socket file: %s, fd: %d",
-			       path_tok, fd);
-		} else {
-			fd = open(path_tok, O_RDONLY);
-			path = path_tok;
-			_I("pm_poll input device file: %s, fd: %d",
-			       path_tok, fd);
-		}
+		fd = open(path_tok, O_RDONLY);
+		path = path_tok;
+		_I("pm_poll input device file: %s, fd: %d", path_tok, fd);
 
 		if (fd == -1) {
 			_E("Cannot open the file: %s", path_tok);
@@ -264,8 +206,6 @@ int exit_pm_poll(void)
 		indev_list = eina_list_remove_list(indev_list, l);
 	}
 
-	close(sockfd);
-	unlink(SOCK_PATH);
 	_I("pm_poll is finished");
 	return 0;
 }
