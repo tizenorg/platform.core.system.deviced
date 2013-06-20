@@ -26,4 +26,6 @@
 #define ADD			"add"
 #define REMOVE			"remove"
 
+/* switch device */
+#define SWITCH_SUBSYSTEM	"switch"
 #endif /* __UDEV_H__ */

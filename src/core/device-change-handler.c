@@ -105,6 +105,8 @@ enum snd_jack_types {
 #define ENV_VALUE_HDMI 		"hdmi"
 #define ENV_VALUE_KEYBOARD 	"keyboard"
 
+#define SWITCH_DEVICE_USB 	"usb_cable"
+
 
 #define ABNORMAL_POPUP_COUNTER	5
 
@@ -264,9 +266,10 @@ static int extcon_count_init(void)
 	return ret;
 }
 
-static void usb_chgdet_cb(struct ss_main_data *ad)
+static void usb_chgdet_cb(void *data)
 {
 	int val = -1;
+	int ret = 0;
 	char params[BUFF_MAX];
 
 	predefine_pm_change_state(LCD_NORMAL);
@@ -276,7 +279,12 @@ static void usb_chgdet_cb(struct ss_main_data *ad)
 	/* check current battery level */
 	ss_lowbat_monitor(NULL);
 	action_entry_call_internal(PREDEF_USBCON, 0);
-	if (device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_USB_ONLINE, &val) == 0) {
+
+	if (data == NULL)
+		ret = device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_USB_ONLINE, &val);
+	else
+		val = (int)data;
+	if (ret == 0) {
 		_I("jack - usb changed %d",val);
 		check_lowbat_charge_device(val);
 		if (val==1) {
@@ -723,6 +731,13 @@ out:
 
 int changed_device_def_predefine_action(int argc, char **argv)
 {
+	int state;
+
+	if (argc ==2 && argv[0] != NULL && argv[1] != NULL) {
+		state = atoi(argv[1]);
+		goto switch_device;
+	}
+
 	if (argc != 1 || argv[0] == NULL) {
 		_E("param is failed");
 		return -1;
@@ -744,6 +759,11 @@ int changed_device_def_predefine_action(int argc, char **argv)
 		keyboard_chgdet_cb(NULL);
 
 	return 0;
+
+	switch_device:
+		if (strncmp(argv[0], SWITCH_DEVICE_USB, strlen(SWITCH_DEVICE_USB)) == 0)
+			usb_chgdet_cb((void *)state);
+		return 0;
 }
 
 int usbcon_def_predefine_action(int argc, char **argv)
@@ -854,7 +874,7 @@ static void device_change_init(void *data)
 	}
 
 	/* for simple noti change cb */
-	ss_noti_add("device_usb_chgdet", (void *)usb_chgdet_cb, data);
+	ss_noti_add("device_usb_chgdet", (void *)usb_chgdet_cb, NULL);
 	ss_noti_add("device_ta_chgdet", (void *)ta_chgdet_cb, data);
 	ss_noti_add("device_earjack_chgdet", (void *)earjack_chgdet_cb, data);
 	ss_noti_add("device_earkey_chgdet", (void *)earkey_chgdet_cb, data);
