@@ -21,12 +21,12 @@
 #include <sys/types.h>
 #include <errno.h>
 #include <sys/stat.h>
-#include <pmapi.h>
 #include <vconf.h>
 
 #include "include/ss_data.h"
 #include "ss_queue.h"
 #include "ss_log.h"
+#include "poll.h"
 
 #include <time.h>
 #include <sys/ioctl.h>
@@ -148,9 +148,9 @@ int set_datetime_action(int argc, char **argv)
 	else
 		pm_state = 0x4;
 
-	pm_lock_state(pm_state, STAY_CUR_STATE, 0);
+	pm_lock_internal(pm_state, STAY_CUR_STATE, 0);
 	ret = handle_date(argv[0]);
-	pm_unlock_state(pm_state, STAY_CUR_STATE);
+	pm_unlock_internal(pm_state, STAY_CUR_STATE);
 	return ret;
 }
 
@@ -169,9 +169,9 @@ int set_timezone_action(int argc, char **argv)
 	else
 		pm_state = 0x4;
 
-	pm_lock_state(pm_state, STAY_CUR_STATE, 0);
+	pm_lock_internal(pm_state, STAY_CUR_STATE, 0);
 	ret = handle_timezone(argv[0]);
-	pm_unlock_state(pm_state, STAY_CUR_STATE);
+	pm_unlock_internal(pm_state, STAY_CUR_STATE);
 	return ret;
 }
 

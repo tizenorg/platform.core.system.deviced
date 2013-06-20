@@ -20,7 +20,6 @@
 #include <dirent.h>
 #include <errno.h>
 #include <vconf.h>
-#include <pmapi.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mount.h>
@@ -39,6 +38,8 @@
 #include "sys_device_noti/sys_device_noti.h"
 #include "sys_pci_noti/sys_pci_noti.h"
 #include "ss_predefine.h"
+#include "poll.h"
+
 #define BUFF_MAX		255
 #define SYS_CLASS_INPUT		"/sys/class/input"
 #define USBCON_EXEC_PATH	PREFIX"/bin/usb-server"
@@ -187,9 +188,9 @@ static void ta_chgdet_cb(struct ss_main_data *ad)
 		check_lowbat_charge_device(val);
 		vconf_set_int(VCONFKEY_SYSMAN_CHARGER_STATUS, val);
 		if (val == 0) {
-			pm_unlock_state(LCD_OFF, STAY_CUR_STATE);
+			pm_unlock_internal(LCD_OFF, STAY_CUR_STATE);
 		} else {
-			pm_lock_state(LCD_OFF, STAY_CUR_STATE, 0);
+			pm_lock_internal(LCD_OFF, STAY_CUR_STATE, 0);
 			snprintf(params, sizeof(params), "%d", CB_NOTI_BATT_CHARGE);
 			ss_launch_if_noexist("/usr/bin/sys_device_noti", params);
 			PRT_TRACE("ta device notification");
@@ -217,7 +218,7 @@ static void earkey_chgdet_cb(struct ss_main_data *ad)
 static void tvout_chgdet_cb(struct ss_main_data *ad)
 {
 	PRT_TRACE("jack - tvout changed\n");
-	pm_change_state(LCD_NORMAL);
+	pm_change_internal(LCD_NORMAL);
 }
 
 static void hdmi_chgdet_cb(struct ss_main_data *ad)
@@ -225,7 +226,7 @@ static void hdmi_chgdet_cb(struct ss_main_data *ad)
 	int val;
 	int ret = -1;
 
-	pm_change_state(LCD_NORMAL);
+	pm_change_internal(LCD_NORMAL);
 	if (device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_HDMI_SUPPORT, &val) == 0) {
 		if (val!=1) {
 			PRT_TRACE_ERR("target is not support HDMI");
@@ -237,9 +238,9 @@ static void hdmi_chgdet_cb(struct ss_main_data *ad)
 		PRT_TRACE("jack - hdmi changed %d",val);
 		vconf_set_int(VCONFKEY_SYSMAN_HDMI,val);
 		if(val == 1)
-			pm_lock_state(LCD_NORMAL, GOTO_STATE_NOW, 0);
+			pm_lock_internal(LCD_NORMAL, GOTO_STATE_NOW, 0);
 		else
-			pm_unlock_state(LCD_NORMAL, PM_SLEEP_MARGIN);
+			pm_unlock_internal(LCD_NORMAL, PM_SLEEP_MARGIN);
 	} else {
 		PRT_TRACE_ERR("failed to get hdmi_online status");
 	}
@@ -576,7 +577,7 @@ static void pci_keyboard_add_cb(struct ss_main_data *ad)
 {
 	char params[BUFF_MAX];
 	PRT_TRACE("pci- keyboard inserted\n");
-	pm_change_state(LCD_NORMAL);
+	pm_change_internal(LCD_NORMAL);
 
 	snprintf(params, sizeof(params), "%d", CB_NOTI_PCI_INSERTED);
 	ss_launch_if_noexist("/usr/bin/sys_pci_noti", params);
@@ -586,7 +587,7 @@ static void pci_keyboard_remove_cb(struct ss_main_data *ad)
 {
 	char params[BUFF_MAX];
 	PRT_TRACE("pci- keyboard removed\n");
-	pm_change_state(LCD_NORMAL);
+	pm_change_internal(LCD_NORMAL);
 
 	snprintf(params, sizeof(params), "%d", CB_NOTI_PCI_REMOVED);
 	ss_launch_if_noexist("/usr/bin/sys_pci_noti", params);

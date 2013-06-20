@@ -15,13 +15,13 @@
  */
 
 
-#include <pmapi.h>
 #include <vconf.h>
 
 #include "ss_log.h"
 #include "device-node.h"
 #include "ss_launch.h"
 #include "include/ss_data.h"
+#include "poll.h"
 
 #define USBCON_EXEC_PATH	PREFIX"/bin/usb-server"
 #define RETRY			3
@@ -36,7 +36,7 @@ int ss_usb_init()
 			vconf_set_int(VCONFKEY_SYSMAN_USB_STATUS,
 					VCONFKEY_SYSMAN_USB_AVAILABLE);
 			while (i < RETRY
-					&& pm_lock_state(LCD_OFF, STAY_CUR_STATE, 0) == -1) {
+					&& pm_lock_internal(LCD_OFF, STAY_CUR_STATE, 0) == -1) {
 				i++;
 				sleep(1);
 			}

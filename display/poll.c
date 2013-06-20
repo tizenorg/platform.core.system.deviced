@@ -41,6 +41,11 @@
 #include "core.h"
 #include "poll.h"
 
+#define SHIFT_UNLOCK                    4
+#define SHIFT_UNLOCK_PARAMETER          12
+#define SHIFT_CHANGE_STATE              8
+#define SHIFT_CHANGE_TIMEOUT            20
+
 #define DEV_PATH_DLM	":"
 
 PMMsg recv_data;
@@ -272,6 +277,79 @@ int init_pm_poll_input(int (*pm_callback)(int , PMMsg * ), const char *path)
 	LOGINFO("pm_poll for BT input device file(path: %s, fd: %d",
 		    new_dev->dev_path, new_dev->fd);
 	indev_list = eina_list_append(indev_list, new_dev);
+
+	return 0;
+}
+
+int pm_lock_internal(int s_bits, int flag, int timeout)
+{
+	if (!g_pm_callback)
+		return -1;
+
+	switch (s_bits) {
+	case LCD_NORMAL:
+	case LCD_DIM:
+	case LCD_OFF:
+		break;
+	default:
+		return -1;
+	}
+	if (flag & GOTO_STATE_NOW)
+		/* if the flag is true, go to the locking state directly */
+		s_bits = s_bits | (s_bits << SHIFT_CHANGE_STATE);
+
+	recv_data.pid = getpid();
+	recv_data.cond = s_bits;
+	recv_data.timeout = timeout;
+
+	(*g_pm_callback)(PM_CONTROL_EVENT, &recv_data);
+
+	return 0;
+}
+
+int pm_unlock_internal(int s_bits, int flag)
+{
+	if (!g_pm_callback)
+		return -1;
+
+	switch (s_bits) {
+	case LCD_NORMAL:
+	case LCD_DIM:
+	case LCD_OFF:
+		break;
+	default:
+		return -1;
+	}
+
+	s_bits = (s_bits << SHIFT_UNLOCK);
+	s_bits = (s_bits | (flag << SHIFT_UNLOCK_PARAMETER));
+
+	recv_data.pid = getpid();
+	recv_data.cond = s_bits;
+
+	(*g_pm_callback)(PM_CONTROL_EVENT, &recv_data);
+
+	return 0;
+}
+
+int pm_change_internal(int s_bits)
+{
+	if (!g_pm_callback)
+		return -1;
+
+	switch (s_bits) {
+	case LCD_NORMAL:
+	case LCD_DIM:
+	case LCD_OFF:
+		break;
+	default:
+		return -1;
+	}
+
+	recv_data.pid = getpid();
+	recv_data.cond = s_bits << SHIFT_CHANGE_STATE;
+
+	(*g_pm_callback)(PM_CONTROL_EVENT, &recv_data);
 
 	return 0;
 }

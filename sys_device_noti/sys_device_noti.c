@@ -18,7 +18,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <svi.h>
-#include <pmapi.h>
 #include <notification.h>
 #include <libintl.h>
 #include <locale.h>
@@ -141,7 +140,6 @@ static int battery_full_noti(int bNoti)
 			PRT_TRACE("[BAT_FULL_NOTI] Error notification_free : %d\n", noti_err);
 			return -1;
 		}
-		pm_change_state(LCD_NORMAL);
 	} else {
 		noti_err = notification_delete_all_by_type(NULL, NOTIFICATION_TYPE_NOTI);
 		PRT_TRACE("[BAT_FULL_NOTI] Leave battery full status\n");

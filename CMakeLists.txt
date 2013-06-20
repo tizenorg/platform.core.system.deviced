@@ -64,7 +64,6 @@ pkg_check_modules(pkgs REQUIRED
 	eina
 	vconf
 	heynoti
-	pmapi
 	tapi
 	dlog
 	syspopup-caller
@@ -139,3 +138,4 @@ ADD_SUBDIRECTORY(pm_event)
 ADD_SUBDIRECTORY(sys_device_noti)
 ADD_SUBDIRECTORY(sys_pci_noti)
 ADD_SUBDIRECTORY(sysman)
+ADD_SUBDIRECTORY(libslp-pm)

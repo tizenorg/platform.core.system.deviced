@@ -9,13 +9,13 @@ Source0:    system-server-%{version}.tar.gz
 Source1:    system-server.manifest
 Source2:    deviced.manifest
 Source3:    sysman.manifest
+Source4:    libslp-pm.manifest
 BuildRequires:  cmake
 BuildRequires:  libattr-devel
 BuildRequires:  pkgconfig(ecore)
 BuildRequires:  pkgconfig(heynoti)
 BuildRequires:  pkgconfig(vconf)
 BuildRequires:  pkgconfig(tapi)
-BuildRequires:  pkgconfig(pmapi)
 BuildRequires:  pkgconfig(edbus)
 BuildRequires:  pkgconfig(dlog)
 BuildRequires:  pkgconfig(syspopup-caller)
@@ -76,6 +76,23 @@ Requires:   %{name} = %{version}-%{release}
 %description -n sysman-internal-devel
 sysman internal devel library.
 
+%package -n libslp-pm
+Summary:    SLP power manager client
+Group:      main
+Requires:   %{name} = %{version}-%{release}
+
+%description -n libslp-pm
+power-manager library.
+
+%package -n libslp-pm-devel
+Summary:    SLP power manager client (devel)
+Group:      main
+Requires:   %{name} = %{version}-%{release}
+#Requires:   libslp-pm
+
+%description -n libslp-pm-devel
+power-manager devel library.
+
 %package -n libdeviced
 Summary:    Deviced library
 Group:      Development/Libraries
@@ -99,6 +116,7 @@ cmake . -DCMAKE_INSTALL_PREFIX=%{_prefix}
 cp %{SOURCE1} .
 cp %{SOURCE2} .
 cp %{SOURCE3} .
+cp %{SOURCE4} .
 make %{?jobs:-j%jobs}
 
 %install
@@ -219,7 +237,6 @@ systemctl daemon-reload
 %files -n sysman-devel
 %defattr(-,root,root,-)
 %{_includedir}/sysman/sysman.h
-
 %{_includedir}/sysman/sysman_managed.h
 %{_includedir}/sysman/SLP_sysman_PG.h
 %{_libdir}/pkgconfig/sysman.pc
@@ -228,6 +245,19 @@ systemctl daemon-reload
 %files -n sysman-internal-devel
 %defattr(-,root,root,-)
 %{_includedir}/sysman/sysman-internal.h
+
+%files -n libslp-pm
+%defattr(-,root,root,-)
+%manifest libslp-pm.manifest
+%{_libdir}/libpmapi.so.*
+
+%files -n libslp-pm-devel
+%defattr(-,root,root,-)
+%{_includedir}/pmapi/pmapi.h
+%{_includedir}/pmapi/pmapi_managed.h
+%{_includedir}/pmapi/SLP_pm_PG.h
+%{_libdir}/pkgconfig/pmapi.pc
+%{_libdir}/libpmapi.so
 
 %files -n libdeviced
 %defattr(-,root,root,-)
