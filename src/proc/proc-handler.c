@@ -55,8 +55,7 @@ int get_app_oomadj(int pid, int *oomadj)
 	char buf[PATH_MAX];
 	FILE *fp = NULL;
 
-	snprintf(buf, sizeof(buf), "/proc/%d/oom_adj", pid);
-	fp = fopen(buf, "r");
+	fp = open_proc_oom_adj_file(pid, "r");
 	if (fp == NULL)
 		return -1;
 	if (fgets(buf, PATH_MAX, fp) == NULL) {
@@ -82,14 +81,13 @@ int set_app_oomadj(pid_t pid, int new_oomadj)
 	if (get_app_oomadj(pid, &old_oomadj) < 0)
 		return -1;
 
-	_I("Process %s, pid %d, old_oomadj %d", exe_name, pid, old_oomadj);
+	_SI("Process %s, pid %d, old_oomadj %d new_oomadj %d",
+		exe_name, pid, old_oomadj, new_oomadj);
 
 	if (old_oomadj < OOMADJ_APP_LIMIT)
 		return 0;
 
-	_I("Process %s, pid %d, new_oomadj %d", exe_name, pid, new_oomadj);
-	snprintf(buf, sizeof(buf), "/proc/%d/oom_adj", pid);
-	fp = fopen(buf, "w");
+	fp = open_proc_oom_adj_file(pid, "w");
 	if (fp == NULL)
 		return -1;
 
@@ -121,12 +119,10 @@ int set_oomadj_action(int argc, char **argv)
 	if ((pid = atoi(argv[0])) < 0 || (new_oomadj = atoi(argv[1])) <= -20)
 		return -1;
 
-	char buf[255];
 	FILE *fp;
 	_I("OOMADJ_SET : pid %d, new_oomadj %d", pid, new_oomadj);
 
-	snprintf(buf, sizeof(buf), "/proc/%d/oom_adj", pid);
-	fp = fopen(buf, "w");
+	fp = open_proc_oom_adj_file(pid, "w");
 	if (fp == NULL)
 		return -1;
 	fprintf(fp, "%d", new_oomadj);
@@ -137,11 +133,9 @@ int set_oomadj_action(int argc, char **argv)
 
 static int update_backgrd_app_oomadj(pid_t pid, int new_oomadj)
 {
-	char buf[PATH_MAX];
 	FILE* fp;
 
-	snprintf(buf, sizeof(buf), "/proc/%d/oom_adj", pid);
-	fp = fopen(buf, "w");
+	fp = open_proc_oom_adj_file(pid, "w");
 	if (fp == NULL)
 		return -1;
 

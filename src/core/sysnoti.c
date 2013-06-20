@@ -48,7 +48,7 @@ static void print_sysnoti_msg(const char *title, struct sysnoti *msg)
 	if (get_cmdline_name(msg->pid, exe_name, PATH_MAX) < 0)
 		snprintf(exe_name, sizeof(exe_name), "Unknown (maybe dead)");
 
-	_D("pid : %d name: %s cmd : %d type : %s path : %s",
+	_SD("pid : %d name: %s cmd : %d type : %s path : %s",
 			msg->pid, exe_name, msg->cmd, msg->type, msg->path);
 }
 
