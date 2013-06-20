@@ -47,6 +47,9 @@ extern "C" {
 #define PM_RESET_TIMER	0x1	/**< reset timer for unlock */
 #define PM_KEEP_TIMER	0x2	/**< keep timer for unlock */
 
+/* parameter for display_set_timeout */
+#define CUSTOM_TIMEOUT  0x1
+
 int display_get_count(void);
 int display_get_max_brightness(void);
 int display_get_min_brightness(void);
