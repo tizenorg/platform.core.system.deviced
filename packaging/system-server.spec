@@ -110,14 +110,13 @@ Deviced library for device control (devel)
 
 %prep
 %setup -q
-cmake . -DCMAKE_INSTALL_PREFIX=%{_prefix}
 
 %build
 cp %{SOURCE1} .
 cp %{SOURCE2} .
 cp %{SOURCE3} .
 cp %{SOURCE4} .
-make %{?jobs:-j%jobs}
+%cmake .
 
 %install
 rm -rf %{buildroot}

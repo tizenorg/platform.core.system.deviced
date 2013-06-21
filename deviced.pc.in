@@ -2,8 +2,8 @@
 
 prefix=@PREFIX@
 exec_prefix=@EXEC_PREFIX@
-libdir=/usr/lib
-includedir=/usr/include/deviced
+libdir=@LIB_INSTALL_DIR@
+includedir=@INCLUDEDIR@/deviced
 
 Name: deviced library
 Description: Tizen platform device control library
