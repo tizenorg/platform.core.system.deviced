@@ -10,6 +10,7 @@ Source1:    system-server.manifest
 Source2:    deviced.manifest
 Source3:    sysman.manifest
 Source4:    libslp-pm.manifest
+Source5:    haptic.manifest
 BuildRequires:  cmake
 BuildRequires:  libattr-devel
 BuildRequires:  pkgconfig(ecore)
@@ -28,6 +29,7 @@ BuildRequires:  pkgconfig(libsmack)
 BuildRequires:  pkgconfig(sensor)
 BuildRequires:	gettext
 BuildRequires:  pkgconfig(libsystemd-daemon)
+BuildRequires:  pkgconfig(capi-base-common)
 %{?systemd_requires}
 Requires(preun): /usr/bin/systemctl
 Requires(post): /usr/bin/systemctl
@@ -92,6 +94,28 @@ Requires:   %{name} = %{version}-%{release}
 %description -n libslp-pm-devel
 power-manager devel library.
 
+%package -n libhaptic
+Summary:    Haptic library
+Group:      Development/Libraries
+
+%description -n libhaptic
+Haptic library for device control
+
+%package -n libhaptic-devel
+Summary:    Haptic library for (devel)
+Group:      Development/Libraries
+Requires:   libhaptic = %{version}-%{release}
+
+%description -n libhaptic-devel
+Haptic library for device control (devel)
+
+%package -n libhaptic-plugin-devel
+Summary:    Haptic plugin library for (devel)
+Group:      Development/Libraries
+
+%description -n libhaptic-plugin-devel
+Haptic plugin library for device control (devel)
+
 %package -n libdeviced
 Summary:    Deviced library
 Group:      Development/Libraries
@@ -115,6 +139,7 @@ cp %{SOURCE1} .
 cp %{SOURCE2} .
 cp %{SOURCE3} .
 cp %{SOURCE4} .
+cp %{SOURCE5} .
 %cmake .
 
 %install
@@ -253,6 +278,24 @@ systemctl daemon-reload
 %{_includedir}/pmapi/SLP_pm_PG.h
 %{_libdir}/pkgconfig/pmapi.pc
 %{_libdir}/libpmapi.so
+
+%files -n libhaptic
+%defattr(-,root,root,-)
+%{_libdir}/libhaptic.so.*
+%manifest haptic.manifest
+
+%files -n libhaptic-devel
+%defattr(-,root,root,-)
+%{_includedir}/haptic/haptic.h
+%{_libdir}/libhaptic.so
+%{_libdir}/pkgconfig/haptic.pc
+
+%files -n libhaptic-plugin-devel
+%defattr(-,root,root,-)
+%{_includedir}/haptic/haptic_module.h
+%{_includedir}/haptic/haptic_plugin_intf.h
+%{_includedir}/haptic/SLP_haptic_PG.h
+%{_libdir}/pkgconfig/haptic-plugin.pc
 
 %files -n libdeviced
 %defattr(-,root,root,-)
