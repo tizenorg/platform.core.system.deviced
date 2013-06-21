@@ -1,0 +1,13 @@
+# Package Information for pkg-config
+
+prefix=@PREFIX@
+exec_prefix=@EXEC_PREFIX@
+libdir=@LIB_INSTALL_DIR@
+includedir=@INCLUDEDIR@
+
+Name: devman_haptic
+Description: SAMSUNG Linux platform motor devman_haptic library
+Version: @VERSION@
+Requires: 
+Libs: -L${libdir} -ldevman
+Cflags: -I${includedir}

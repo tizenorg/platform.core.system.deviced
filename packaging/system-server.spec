@@ -11,6 +11,7 @@ Source2:    deviced.manifest
 Source3:    sysman.manifest
 Source4:    libslp-pm.manifest
 Source5:    haptic.manifest
+Source6:    devman.manifest
 BuildRequires:  cmake
 BuildRequires:  libattr-devel
 BuildRequires:  pkgconfig(ecore)
@@ -116,6 +117,29 @@ Group:      Development/Libraries
 %description -n libhaptic-plugin-devel
 Haptic plugin library for device control (devel)
 
+%package -n libdevman
+Summary:    Device manager library
+Group:      Development/Libraries
+
+%description -n libdevman
+Device manager library for device control
+
+%package -n libdevman-devel
+Summary:    Device manager library for (devel)
+Group:      Development/Libraries
+Requires:   libdevman = %{version}-%{release}
+
+%description -n libdevman-devel
+Device manager library for device control (devel)
+
+%package -n libdevman-haptic-devel
+Summary:    Haptic Device manager library for (devel)
+Group:      Development/Libraries
+Requires:   libdevman-devel = %{version}-%{release}
+
+%description -n libdevman-haptic-devel
+Haptic Device manager library for device control (devel)
+
 %package -n libdeviced
 Summary:    Deviced library
 Group:      Development/Libraries
@@ -140,6 +164,7 @@ cp %{SOURCE2} .
 cp %{SOURCE3} .
 cp %{SOURCE4} .
 cp %{SOURCE5} .
+cp %{SOURCE6} .
 %cmake .
 
 %install
@@ -296,6 +321,25 @@ systemctl daemon-reload
 %{_includedir}/haptic/haptic_plugin_intf.h
 %{_includedir}/haptic/SLP_haptic_PG.h
 %{_libdir}/pkgconfig/haptic-plugin.pc
+
+%files -n libdevman
+%{_bindir}/display_wd
+%{_libdir}/libdevman.so.*
+%manifest devman.manifest
+
+%files -n libdevman-devel
+%{_includedir}/devman/devman.h
+%{_includedir}/devman/devman_image.h
+%{_includedir}/devman/devman_managed.h
+%{_includedir}/devman/devman_haptic.h
+%{_includedir}/devman/SLP_devman_PG.h
+%{_libdir}/pkgconfig/devman.pc
+%{_libdir}/libdevman.so
+
+%files -n libdevman-haptic-devel
+%{_includedir}/devman/devman_haptic_ext.h
+%{_includedir}/devman/devman_haptic_ext_core.h
+%{_libdir}/pkgconfig/devman_haptic.pc
 
 %files -n libdeviced
 %defattr(-,root,root,-)
