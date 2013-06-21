@@ -246,9 +246,7 @@ static float update_factor(enum state_b b_index)
 			break;
 		}
 	}
-	_I(" sum = %lf", total_factor);
 	total_factor /= (float)cnt;
-	_I(" avg_factor = %lf", total_factor);
 
 	return total_factor;
 }
@@ -267,12 +265,10 @@ static void update_time(enum state_a a_index, int seconds)
 		case A_TIMETOFULL:
 			vconf_set_int(VCONFKEY_PM_BATTERY_TIMETOFULL,
 				seconds);
-			_I("update time[%d,%d]", a_index, seconds);
 			break;
 		case A_TIMETOEMPTY:
 			vconf_set_int(VCONFKEY_PM_BATTERY_TIMETOEMPTY,
 				seconds);
-			_I("update time[%d,%d]", a_index, seconds);
 			break;
 	}
 }
