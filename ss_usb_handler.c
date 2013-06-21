@@ -36,7 +36,7 @@ int ss_usb_init()
 			vconf_set_int(VCONFKEY_SYSMAN_USB_STATUS,
 					VCONFKEY_SYSMAN_USB_AVAILABLE);
 			while (i < RETRY
-					&& pm_lock_internal(LCD_OFF, STAY_CUR_STATE, 0) == -1) {
+					&& pm_lock_internal(getpid(), LCD_OFF, STAY_CUR_STATE, 0) == -1) {
 				i++;
 				sleep(1);
 			}

@@ -281,7 +281,7 @@ int init_pm_poll_input(int (*pm_callback)(int , PMMsg * ), const char *path)
 	return 0;
 }
 
-int pm_lock_internal(int s_bits, int flag, int timeout)
+int pm_lock_internal(pid_t pid, int s_bits, int flag, int timeout)
 {
 	if (!g_pm_callback)
 		return -1;
@@ -298,7 +298,7 @@ int pm_lock_internal(int s_bits, int flag, int timeout)
 		/* if the flag is true, go to the locking state directly */
 		s_bits = s_bits | (s_bits << SHIFT_CHANGE_STATE);
 
-	recv_data.pid = getpid();
+	recv_data.pid = pid;
 	recv_data.cond = s_bits;
 	recv_data.timeout = timeout;
 
@@ -307,7 +307,7 @@ int pm_lock_internal(int s_bits, int flag, int timeout)
 	return 0;
 }
 
-int pm_unlock_internal(int s_bits, int flag)
+int pm_unlock_internal(pid_t pid, int s_bits, int flag)
 {
 	if (!g_pm_callback)
 		return -1;
@@ -324,7 +324,7 @@ int pm_unlock_internal(int s_bits, int flag)
 	s_bits = (s_bits << SHIFT_UNLOCK);
 	s_bits = (s_bits | (flag << SHIFT_UNLOCK_PARAMETER));
 
-	recv_data.pid = getpid();
+	recv_data.pid = pid;
 	recv_data.cond = s_bits;
 
 	(*g_pm_callback)(PM_CONTROL_EVENT, &recv_data);
@@ -332,7 +332,7 @@ int pm_unlock_internal(int s_bits, int flag)
 	return 0;
 }
 
-int pm_change_internal(int s_bits)
+int pm_change_internal(pid_t pid, int s_bits)
 {
 	if (!g_pm_callback)
 		return -1;
@@ -346,10 +346,73 @@ int pm_change_internal(int s_bits)
 		return -1;
 	}
 
-	recv_data.pid = getpid();
+	recv_data.pid = pid;
 	recv_data.cond = s_bits << SHIFT_CHANGE_STATE;
 
 	(*g_pm_callback)(PM_CONTROL_EVENT, &recv_data);
 
 	return 0;
+}
+
+void lcd_control_edbus_signal_handler(void *data, DBusMessage *msg)
+{
+	DBusError err;
+	int pid = -1;
+	char *lock_str = NULL;
+	char *state_str = NULL;
+	int state = -1;
+	int timeout = -1;
+
+	if (dbus_message_is_signal(msg, INTERFACE_NAME, SIGNAL_NAME_LCD_CONTROL) == 0) {
+		LOGERR("there is lcd control signal");
+		return;
+	}
+
+	dbus_error_init(&err);
+
+	if (dbus_message_get_args(msg, &err,
+		    DBUS_TYPE_INT32, &pid,
+		    DBUS_TYPE_STRING, &lock_str,
+		    DBUS_TYPE_STRING, &state_str,
+		    DBUS_TYPE_INT32, &timeout, DBUS_TYPE_INVALID) == 0) {
+		LOGERR("there is no message");
+		return;
+	}
+
+	if (pid == -1 || !lock_str || !state_str) {
+		LOGERR("message is invalid!!");
+		return;
+	}
+
+	if (kill(pid, 0) == -1) {
+		LOGERR("%d process does not exist, dbus ignored!", pid);
+		return;
+	}
+
+	if (!strcmp(state_str, PM_LCDON_STR))
+		state = LCD_NORMAL;
+	else if (!strcmp(state_str, PM_LCDDIM_STR))
+		state = LCD_DIM;
+	else if (!strcmp(state_str, PM_LCDOFF_STR))
+		state = LCD_OFF;
+	else {
+		LOGERR("%d process does not exist, dbus ignored!", pid);
+		return;
+	}
+
+	if (!strcmp(lock_str, PM_LOCK_STR)) {
+		if (timeout < 0) {
+			LOGERR("pm_lock timeout is invalid! %d", timeout);
+			return;
+		}
+		pm_lock_internal(pid, state, STAY_CUR_STATE, timeout);
+	} else if (!strcmp(lock_str, PM_UNLOCK_STR)) {
+		pm_unlock_internal(pid, state, PM_SLEEP_MARGIN);
+	} else if (!strcmp(lock_str, PM_CHANGE_STR)) {
+		pm_change_internal(pid, state);
+	} else {
+		LOGERR("%s process does not exist, dbus ignored!", pid);
+		return;
+	}
+	LOGINFO("dbus call success from %d\n", pid);
 }

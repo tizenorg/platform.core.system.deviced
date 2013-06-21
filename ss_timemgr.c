@@ -148,9 +148,9 @@ int set_datetime_action(int argc, char **argv)
 	else
 		pm_state = 0x4;
 
-	pm_lock_internal(pm_state, STAY_CUR_STATE, 0);
+	pm_lock_internal(getpid(), pm_state, STAY_CUR_STATE, 0);
 	ret = handle_date(argv[0]);
-	pm_unlock_internal(pm_state, STAY_CUR_STATE);
+	pm_unlock_internal(getpid(), pm_state, STAY_CUR_STATE);
 	return ret;
 }
 
@@ -169,9 +169,9 @@ int set_timezone_action(int argc, char **argv)
 	else
 		pm_state = 0x4;
 
-	pm_lock_internal(pm_state, STAY_CUR_STATE, 0);
+	pm_lock_internal(getpid(), pm_state, STAY_CUR_STATE, 0);
 	ret = handle_timezone(argv[0]);
-	pm_unlock_internal(pm_state, STAY_CUR_STATE);
+	pm_unlock_internal(getpid(), pm_state, STAY_CUR_STATE);
 	return ret;
 }
 

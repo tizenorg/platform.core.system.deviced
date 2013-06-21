@@ -30,6 +30,7 @@
 #define __PM_POLL_H__
 
 #include <Ecore.h>
+#include "edbus-handler.h"
 /**
  * @addtogroup POWER_MANAGER
  * @{
@@ -43,6 +44,7 @@ enum {
 };
 
 #define SOCK_PATH "/tmp/pm_sock"
+#define SIGNAL_NAME_LCD_CONTROL		"lcdcontol"
 
 #define LCD_NORMAL	0x1		/**< NORMAL state */
 #define LCD_DIM		0x2		/**< LCD dimming state */
@@ -55,6 +57,14 @@ enum {
 #define PM_SLEEP_MARGIN	0x0	/**< keep guard time for unlock */
 #define PM_RESET_TIMER	0x1	/**< reset timer for unlock */
 #define PM_KEEP_TIMER		0x2	/**< keep timer for unlock */
+
+#define PM_LOCK_STR	"lock"
+#define PM_UNLOCK_STR	"unlock"
+#define PM_CHANGE_STR	"change"
+
+#define PM_LCDOFF_STR	"lcdoff"
+#define PM_LCDDIM_STR	"lcddim"
+#define PM_LCDON_STR	"lcdon"
 
 typedef struct {
 	pid_t pid;
@@ -78,9 +88,11 @@ extern int init_pm_poll(int (*pm_callback) (int, PMMsg *));
 extern int exit_pm_poll();
 extern int init_pm_poll_input(int (*pm_callback)(int , PMMsg * ), const char *path);
 
-extern int pm_lock_internal(int s_bits, int flag, int timeout);
-extern int pm_unlock_internal(int s_bits, int flag);
-extern int pm_change_internal(int s_bits);
+extern int pm_lock_internal(pid_t pid, int s_bits, int flag, int timeout);
+extern int pm_unlock_internal(pid_t pid, int s_bits, int flag);
+extern int pm_change_internal(pid_t pid, int s_bits);
+
+extern void lcd_control_edbus_signal_handler(void *data, DBusMessage *msg);
 
 /**
  * @}

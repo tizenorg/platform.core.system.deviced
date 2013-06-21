@@ -34,7 +34,7 @@ int ss_ta_init()
 			vconf_set_int(VCONFKEY_SYSMAN_CHARGER_STATUS,
 					VCONFKEY_SYSMAN_CHARGER_CONNECTED);
 			while (i < RETRY
-			       && pm_lock_internal(LCD_OFF, STAY_CUR_STATE,
+			       && pm_lock_internal(getpid(), LCD_OFF, STAY_CUR_STATE,
 						0) == -1) {
 				i++;
 				sleep(1);
