@@ -71,6 +71,7 @@ static bool alc_handler(void* data)
 				if (!ret && (tmp_value != value)) {
 					backlight_ops.set_default_brt(value);
 					backlight_ops.restore();
+					vconf_set_int(VCONFKEY_PM_CURRENT_BRIGHTNESS, value);
 				}
 				LOGINFO("load light data : %d, brightness : %d", (int)light_data.values[0], value);
 			}
@@ -157,6 +158,7 @@ static inline void set_brtch_state(void)
 {
 	if (pm_status_flag & PWRSV_FLAG) {
 		pm_status_flag |= BRTCH_FLAG;
+		vconf_set_bool(VCONFKEY_PM_BRIGHTNESS_CHANGED_IN_LPM, true);
 		LOGINFO("brightness changed in low battery,"
 		    "escape dim state (light)");
 	}

@@ -348,7 +348,7 @@ static int proc_condition(PMMsg *data)
 	if (val & MASK_DIM) {
 		tmp = find_node(S_LCDDIM, pid);
 		del_node(S_LCDDIM, tmp);
-		LOGINFO("[%s] unlocked by pid %d - process %s\n", "S_LORMAL",
+		LOGINFO("[%s] unlocked by pid %d - process %s\n", "S_NORMAL",
 			pid, pname);
 	}
 	if (val & MASK_OFF) {
@@ -578,6 +578,8 @@ void print_info(int fd)
 	int s_index = 0;
 	char buf[255];
 	int i = 1, ret;
+	char pname[PATH_MAX];
+	int fd_cmdline;
 
 	if (fd < 0)
 		return;
@@ -606,11 +608,10 @@ void print_info(int fd)
 
 	for (s_index = S_NORMAL; s_index < S_END; s_index++) {
 		PmLockNode *t;
-		char pname[PATH_MAX];
-		int fd_cmdline;
 		t = cond_head[s_index];
 
 		while (t != NULL) {
+			pname[0] = NULL;
 			snprintf(buf, sizeof(buf), "/proc/%d/cmdline", t->pid);
 			fd_cmdline = open(buf, O_RDONLY);
 			if (fd_cmdline < 0) {
@@ -1069,6 +1070,8 @@ static int update_setting(int key_idx, int val)
 				power_saving_func(false);
 			pm_status_flag &= ~LOWBT_FLAG;
 			pm_status_flag &= ~BRTCH_FLAG;
+			vconf_set_bool(VCONFKEY_PM_BRIGHTNESS_CHANGED_IN_LPM,
+			    false);
 		}
 		break;
 	case SETTING_CHARGING:
@@ -1093,6 +1096,8 @@ static int update_setting(int key_idx, int val)
 	case SETTING_BRT_LEVEL:
 		if (pm_status_flag & PWRSV_FLAG) {
 			pm_status_flag |= BRTCH_FLAG;
+			vconf_set_bool(VCONFKEY_PM_BRIGHTNESS_CHANGED_IN_LPM,
+			    true);
 			LOGINFO("brightness changed in low battery,"
 				"escape dim state");
 		}

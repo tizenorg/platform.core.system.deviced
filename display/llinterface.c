@@ -349,7 +349,13 @@ static int backlight_dim(void)
 static int backlight_restore(void)
 {
 	int ret = 0;
+	int val = -1;
 
+	ret = vconf_get_int(VCONFKEY_PM_CUSTOM_BRIGHTNESS_STATUS, &val);
+	if (ret == 0 && val == VCONFKEY_PM_CUSTOM_BRIGHTNESS_ON) {
+		LOGINFO("custom brightness mode! brt no restored");
+		return 0;
+	}
 	if ((pm_status_flag & PWRSV_FLAG) && !(pm_status_flag & BRTCH_FLAG)) {
 		ret = backlight_dim();
 	} else if (pmsys && pmsys->bl_brt) {
