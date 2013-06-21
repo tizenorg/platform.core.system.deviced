@@ -20,6 +20,9 @@
 #ifndef __UDEV_H__
 #define __UDEV_H__
 
+/* battery device */
+#define POWER_SUBSYSTEM         "power_supply"
+
 /* input device */
 #define INPUT_SUBSYSTEM		"input"
 #define INPUT_PATH		"*/input[0-9]*/event[0-9]*"

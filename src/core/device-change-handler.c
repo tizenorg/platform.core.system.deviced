@@ -128,6 +128,16 @@ static struct extcon_device {
 	{ EXTCON_EARJACK, "/csa/factory/earjack_count", 0, 0},
 };
 
+struct battery_status {
+	int capacity;
+	int charge_full;
+	int charge_now;
+	int health;
+	int present;
+};
+
+static struct battery_status battery;
+
 static Eina_Bool uevent_control_cb(void *data, Ecore_Fd_Handler *fd_handler);
 extern int battery_power_off_act(void *data);
 extern int battery_charge_err_act(void *data);
@@ -138,38 +148,34 @@ static int check_lowbat_charge_device(int bInserted)
 	int bat_state = -1;
 	int ret = -1;
 	if (bInserted == 1) {
-		if (device_get_property(DEVICE_TYPE_POWER, PROP_POWER_CHARGE_NOW, &val) == 0) {
-			if (val == 1)
-				bChargeDeviceInserted = 1;
-			return 0;
-		}
+		if (battery.charge_now == 1)
+			bChargeDeviceInserted = 1;
+		return 0;
 	} else if (bInserted == 0) {
-		if (device_get_property(DEVICE_TYPE_POWER, PROP_POWER_CHARGE_NOW, &val) == 0) {
-			if (val == 0 && bChargeDeviceInserted == 1) {
-				bChargeDeviceInserted = 0;
-				//low bat popup during charging device removing
-				if (vconf_get_int(VCONFKEY_SYSMAN_BATTERY_STATUS_LOW, &bat_state) == 0) {
-					if(bat_state < VCONFKEY_SYSMAN_BAT_NORMAL
-					|| bat_state == VCONFKEY_SYSMAN_BAT_REAL_POWER_OFF) {
-						bundle *b = NULL;
-						b = bundle_create();
-						if(bat_state == VCONFKEY_SYSMAN_BAT_REAL_POWER_OFF)
-							bundle_add(b,"_SYSPOPUP_CONTENT_", "poweroff");
-						else
-							bundle_add(b, "_SYSPOPUP_CONTENT_", "warning");
-						ret = syspopup_launch("lowbat-syspopup", b);
-						if (ret < 0) {
-							_E("popup lauch failed");
-						}
-						bundle_free(b);
+		if (battery.charge_now == 0 && bChargeDeviceInserted == 1) {
+			bChargeDeviceInserted = 0;
+			//low bat popup during charging device removing
+			if (vconf_get_int(VCONFKEY_SYSMAN_BATTERY_STATUS_LOW, &bat_state) == 0) {
+				if(bat_state < VCONFKEY_SYSMAN_BAT_NORMAL
+				|| bat_state == VCONFKEY_SYSMAN_BAT_REAL_POWER_OFF) {
+					bundle *b = NULL;
+					b = bundle_create();
+					if(bat_state == VCONFKEY_SYSMAN_BAT_REAL_POWER_OFF)
+						bundle_add(b,"_SYSPOPUP_CONTENT_", "poweroff");
+					else
+						bundle_add(b, "_SYSPOPUP_CONTENT_", "warning");
+					ret = syspopup_launch("lowbat-syspopup", b);
+					if (ret < 0) {
+						_E("popup lauch failed");
 					}
-				} else {
-					_E("failed to get vconf key");
-					return -1;
+					bundle_free(b);
 				}
+			} else {
+				_E("failed to get vconf key");
+				return -1;
 			}
-			return 0;
 		}
+		return 0;
 	}
 	return -1;
 }
@@ -667,6 +673,71 @@ static int uevent_control_start(void)
 	return 0;
 }
 
+static void power_supply(void *data)
+{
+	static int old;
+	int ret;
+	char params[BUFF_MAX];
+	static int bat_full_noti = 0;
+	static int present_status = 1;
+
+	ss_lowbat_monitor(NULL);
+
+	if ((battery.charge_now == 1 || battery.charge_full == 1) &&
+	    old == VCONFKEY_SYSMAN_CHARGER_DISCONNECTED) {
+		old = VCONFKEY_SYSMAN_CHARGER_CONNECTED;
+		vconf_set_int(VCONFKEY_SYSMAN_CHARGER_STATUS, old);
+	} else if (battery.charge_now == 0 && battery.charge_full == 0 &&
+	    old == VCONFKEY_SYSMAN_CHARGER_CONNECTED) {
+		old = VCONFKEY_SYSMAN_CHARGER_DISCONNECTED;
+		vconf_set_int(VCONFKEY_SYSMAN_CHARGER_STATUS, old);
+	}
+
+	if (battery.charge_now == 0 && battery.capacity == 0) {
+		_I("target will be shut down");
+		battery_power_off_act(NULL);
+		return;
+	}
+
+	if (battery.present == 0 && present_status == 1) {
+		present_status = 0;
+		_I("battery cf is opened");
+		if (battery.charge_now)
+			action_entry_call_internal(PREDEF_BATTERY_CF_OPENED, 0);
+	}
+
+	if (battery.present == 1 && present_status == 0) {
+		present_status = 1;
+		_I("battery cf is closed again");
+	}
+	if (battery.health == 0) {
+		_I("Battery health status is not good");
+		if (__check_abnormal_popup_launch() != 0)
+			return;
+		if (battery.capacity <= 0)
+			battery_power_off_act(NULL);
+		else
+			battery_charge_err_act(NULL);
+		return;
+	}
+
+	if (battery.charge_full == 0) {
+		if (bat_full_noti==1) {
+			snprintf(params, sizeof(params), "%d %d", DEVICE_NOTI_BATT_FULL, DEVICE_NOTI_OFF);
+			ss_launch_if_noexist("/usr/bin/sys_device_noti", params);
+		}
+		bat_full_noti = 0;
+	} else {
+		if (battery.charge_full==1 && bat_full_noti==0) {
+			bat_full_noti = 1;
+			_D("battery full noti");
+			snprintf(params, sizeof(params), "%d %d", DEVICE_NOTI_BATT_FULL, DEVICE_NOTI_ON);
+			ss_launch_if_noexist("/usr/bin/sys_device_noti", params);
+		}
+	}
+
+}
+
 static Eina_Bool uevent_control_cb(void *data, Ecore_Fd_Handler *fd_handler)
 {
 	struct udev_device *dev = NULL;
@@ -745,8 +816,6 @@ int changed_device_def_predefine_action(int argc, char **argv)
 
 	if (strncmp(argv[0], ENV_VALUE_USB, strlen(ENV_VALUE_USB)) == 0)
 		usb_chgdet_cb(NULL);
-	if (strncmp(argv[0], ENV_VALUE_CHARGER, strlen(ENV_VALUE_CHARGER)) == 0)
-		ta_chgdet_cb(NULL);
 	if (strncmp(argv[0], ENV_VALUE_EARJACK, strlen(ENV_VALUE_EARJACK)) == 0)
 		earjack_chgdet_cb(NULL);
 	if (strncmp(argv[0], ENV_VALUE_EARKEY, strlen(ENV_VALUE_EARKEY)) == 0)
@@ -757,6 +826,8 @@ int changed_device_def_predefine_action(int argc, char **argv)
 		hdmi_chgdet_cb(NULL);
 	if (strncmp(argv[0], ENV_VALUE_KEYBOARD, strlen(ENV_VALUE_KEYBOARD)) == 0)
 		keyboard_chgdet_cb(NULL);
+	if (strncmp(argv[0], POWER_SUBSYSTEM, strlen(POWER_SUBSYSTEM)) == 0)
+		power_supply(NULL);
 
 	return 0;
 
