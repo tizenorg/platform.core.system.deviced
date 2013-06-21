@@ -1,8 +1,8 @@
 #sbs-git:slp/pkgs/s/system-server system-server 0.1.51 56e16bca39f96d6c8aed9ed3df2fea9b393801be
 Name:       system-server
 Summary:    System server
-Version:    0.1.65
-Release:    7
+Version:    2.0.0
+Release:    1
 Group:      Framework/system
 License:    Apache License, Version 2.0
 Source0:    system-server-%{version}.tar.gz
