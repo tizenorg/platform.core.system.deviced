@@ -43,10 +43,14 @@ SET(SRCS ${SRCS}
 
 # libdeviced
 SET(DEVICED_SRCS
-	src/shared/battery.c)
+	src/shared/battery.c
+	src/shared/display.c
+	src/shared/led.c)
 
 SET(DEVICED_HEADERS
-	src/deviced/dd-battery.h)
+	src/deviced/dd-battery.h
+	src/deviced/dd-display.h
+	src/deviced/dd-led.h)
 
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/display ${CMAKE_CURRENT_SOURCE_DIR}/sysman)
 
@@ -116,7 +120,7 @@ CONFIGURE_FILE(${DEVICED_NAME}.pc.in ${DEVICED_NAME}.pc @ONLY)
 INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/${DEVICED_NAME}.pc DESTINATION ${LIB_INSTALL_DIR}/pkgconfig)
 
 ADD_EXECUTABLE(${PROJECT_NAME} ${SRCS})
-TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${pkgs_LDFLAGS} "-ldl" "-ludev" "-lsmack")
+TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${pkgs_LDFLAGS} "-ldl" "-ludev")
 INSTALL(TARGETS ${PROJECT_NAME} DESTINATION bin)
 
 INSTALL(FILES ${MOVINAND_FORMAT} DESTINATION bin)

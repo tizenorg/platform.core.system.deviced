@@ -245,6 +245,7 @@ typedef enum {
  */
 	int device_is_battery_full(void);
 
+#ifndef __DD_BATTERY_H__
 /**
  * @par Description:
  *  Battery health status
@@ -259,6 +260,7 @@ typedef enum {
 		BAT_COLD,			/**< */
 		BAT_HEALTH_MAX,		/**< */
 	};
+#endif
 
 /**
  * @par Description:

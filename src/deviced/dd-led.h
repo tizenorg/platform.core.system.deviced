@@ -16,34 +16,22 @@
  */
 
 
-#ifndef __DD_BATTERY_H__
-#define __DD_BATTERY_H__
+#ifndef __DD_LED_H__
+#define __DD_LED_H__
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /**
- * @file        dd-battery.h
+ * @file        dd-led.h
  * @ingroup     DEVICED_LIBRARY
- * @brief       This file provides for control of battery
+ * @brief       This file provides for control of led
  */
 
-enum {
-	BAT_UNKNOWN = 0,
-	BAT_GOOD,
-	BAT_OVERHEAT,
-	BAT_DEAD,
-	BAT_OVERVOLTAGE,
-	BAT_UNSPECIFIED,
-	BAT_COLD,
-	BAT_HEALTH_MAX,
-};
-
-int battery_get_percent(void);
-int battery_get_percent_raw(void);
-int battery_is_full(void);
-int battery_get_health(void);
+int led_get_brightness(void);
+int led_get_max_brightness(void);
+int led_set_brightness(int val);
 
 #ifdef __cplusplus
 }
