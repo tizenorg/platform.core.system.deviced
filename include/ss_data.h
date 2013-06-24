@@ -75,6 +75,8 @@ enum {
 #define PREDEF_CHECK_MMC		"checkmmc"
 #define PREDEF_CHECK_MMC_PROC	"checkmmcproc"
 
+#define PREDEF_LED		"led"
+
 #define PREDEF_SET_MAX_FREQUENCY	"set_max_frequency"     
 #define PREDEF_SET_MIN_FREQUENCY	"set_min_frequency"     
 #define PREDEF_RELEASE_MAX_FREQUENCY	"release_max_frequency" 

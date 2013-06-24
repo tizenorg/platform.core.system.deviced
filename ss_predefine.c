@@ -42,6 +42,7 @@
 #include "include/ss_data.h"
 #include "ss_common.h"
 #include "poll.h"
+#include "led/led.h"
 
 #define PREDEFINE_SO_DIR		PREFIX"/lib/ss_predefine/"
 
@@ -906,6 +907,9 @@ void ss_predefine_internal_init(void)
 				     internal_poweroff_def_predefine_action, NULL, NULL);
 	ss_action_entry_add_internal(PREDEF_HAPTIC, haptic_def_predefine_action,
 					NULL, NULL);
+
+	ss_action_entry_add_internal(PREDEF_LED,
+					led_def_predefine_action, NULL, NULL);
 
 	if (vconf_notify_key_changed(VCONFKEY_SYSMAN_POWER_OFF_STATUS, (void *)poweroff_control_cb, NULL) < 0) {
 		PRT_TRACE_ERR("Vconf notify key chaneged failed: KEY(%s)", VCONFKEY_SYSMAN_POWER_OFF_STATUS);

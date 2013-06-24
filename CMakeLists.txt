@@ -1,6 +1,11 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 PROJECT(system_server C)
 
+SET(PREFIX ${CMAKE_INSTALL_PREFIX})
+SET(EXEC_PREFIX "${PREFIX}/bin")
+SET(INCLUDEDIR "${PREFIX}/include/${PROJECT_NAME}")
+SET(LIBDIR "\${prefix}/lib")
+
 # deviced
 SET(DEVICED_NAME deviced)
 SET(VERSION 0.1.0)
@@ -41,6 +46,9 @@ SET(SRCS ${SRCS}
 	display/key-filter.c
 	display/battery.c)
 
+SET(SRCS ${SRCS}
+	src/led/led.c)
+
 # libdeviced
 SET(DEVICED_SRCS
 	src/shared/battery.c
@@ -63,7 +71,7 @@ SET(DEVICED_HEADERS
 	src/deviced/haptic-plugin-intf.h
 )
 
-INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/display ${CMAKE_CURRENT_SOURCE_DIR}/sysman)
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/display ${CMAKE_CURRENT_SOURCE_DIR}/sysman ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 # libdeviced
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/src/deviced)
