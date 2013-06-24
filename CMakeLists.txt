@@ -45,12 +45,16 @@ SET(SRCS ${SRCS}
 SET(DEVICED_SRCS
 	src/shared/battery.c
 	src/shared/display.c
+	src/shared/haptic.c
 	src/shared/led.c)
 
 SET(DEVICED_HEADERS
 	src/deviced/dd-battery.h
 	src/deviced/dd-display.h
-	src/deviced/dd-led.h)
+	src/deviced/dd-haptic.h
+	src/deviced/dd-led.h
+	src/deviced/haptic-module.h
+	src/deviced/haptic-plugin-intf.h)
 
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/display ${CMAKE_CURRENT_SOURCE_DIR}/sysman)
 

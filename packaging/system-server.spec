@@ -98,6 +98,7 @@ power-manager devel library.
 %package -n libhaptic
 Summary:    Haptic library
 Group:      Development/Libraries
+Requires:   %{name} = %{version}-%{release}
 
 %description -n libhaptic
 Haptic library for device control
@@ -120,6 +121,7 @@ Haptic plugin library for device control (devel)
 %package -n libdevman
 Summary:    Device manager library
 Group:      Development/Libraries
+Requires:   %{name} = %{version}-%{release}
 
 %description -n libdevman
 Device manager library for device control
@@ -351,6 +353,9 @@ systemctl daemon-reload
 %defattr(-,root,root,-)
 %{_includedir}/deviced/dd-battery.h
 %{_includedir}/deviced/dd-display.h
+%{_includedir}/deviced/dd-haptic.h
 %{_includedir}/deviced/dd-led.h
+%{_includedir}/deviced/haptic-module.h
+%{_includedir}/deviced/haptic-plugin-intf.h
 %{_libdir}/libdeviced.so
 %{_libdir}/pkgconfig/deviced.pc
