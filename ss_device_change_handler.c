@@ -27,7 +27,7 @@
 #include <aul.h>
 #include <bundle.h>
 #include <dirent.h>
-#include "sysman.h"
+#include "dd-system.h"
 #include <libudev.h>
 #include "ss_queue.h"
 #include "ss_log.h"

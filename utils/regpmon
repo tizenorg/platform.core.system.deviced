@@ -1,0 +1,12 @@
+#!/bin/sh
+
+# Don't regist processes on hibernation capturing sequence
+if [ -e /opt/etc/.hib_capturing ] ; then
+	exit 0
+elif [ -e /opt/etc/.hib_capturing_firstboot ]; then
+	exit 0
+fi
+
+set_pmon -v Xorg enlightenment dbus-daemon libsqlfs_mount telephony-server pulseaudio
+set_pmon -p wifid phonebook-engine voice-calld menu-daemon input_router indicator dlog-daemon ss-server media-server sf_server security-server dnet quickpanel sound_server audio-session-mgr-server launchpad_preloading_preinitializing_daemon voip-daemon drm_server calendar-serviced wrt_launchpad_daemon
+

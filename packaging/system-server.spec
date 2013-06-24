@@ -264,6 +264,9 @@ systemctl daemon-reload
 %{_bindir}/movi_format.sh
 %{_bindir}/sys_event
 %{_bindir}/pm_event
+%{_bindir}/regpmon
+%{_bindir}/set_pmon
+%{_bindir}/pmon
 %{_bindir}/sys_pci_noti
 %{_bindir}/mmc-smack-label
 %{_bindir}/device-daemon
@@ -355,6 +358,8 @@ systemctl daemon-reload
 %{_includedir}/deviced/dd-display.h
 %{_includedir}/deviced/dd-haptic.h
 %{_includedir}/deviced/dd-led.h
+%{_includedir}/deviced/dd-system.h
+%{_includedir}/deviced/dd-system-managed.h
 %{_includedir}/deviced/haptic-module.h
 %{_includedir}/deviced/haptic-plugin-intf.h
 %{_libdir}/libdeviced.so

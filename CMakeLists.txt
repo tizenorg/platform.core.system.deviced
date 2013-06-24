@@ -46,15 +46,22 @@ SET(DEVICED_SRCS
 	src/shared/battery.c
 	src/shared/display.c
 	src/shared/haptic.c
-	src/shared/led.c)
+	src/shared/led.c
+	src/shared/system-conf.c
+	src/shared/system-noti.c
+	src/shared/system-util.c
+)
 
 SET(DEVICED_HEADERS
 	src/deviced/dd-battery.h
 	src/deviced/dd-display.h
 	src/deviced/dd-haptic.h
 	src/deviced/dd-led.h
+	src/deviced/dd-system.h
+	src/deviced/dd-system-managed.h
 	src/deviced/haptic-module.h
-	src/deviced/haptic-plugin-intf.h)
+	src/deviced/haptic-plugin-intf.h
+)
 
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/display ${CMAKE_CURRENT_SOURCE_DIR}/sysman)
 
@@ -133,6 +140,9 @@ INSTALL(PROGRAMS ${CMAKE_BINARY_DIR}/device-daemon DESTINATION bin)
 INSTALL(FILES system-server.conf DESTINATION /etc/dbus-1/system.d)
 INSTALL(FILES ${CMAKE_SOURCE_DIR}/packaging/system-server.rule DESTINATION /opt/etc/smack/accesses.d)
 INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/mmc-smack-label DESTINATION bin)
+INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/utils/set_pmon DESTINATION bin)
+INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/utils/regpmon DESTINATION bin)
+INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/utils/pmon DESTINATION bin)
 
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/systemd/system-server.service DESTINATION lib/systemd/system)
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/systemd/system-server.socket  DESTINATION lib/systemd/system)
