@@ -71,6 +71,8 @@
 
 #define _SYS_LOW_POWER "LOW_POWER"
 
+#define WAITING_INTERVAL	10
+
 struct lowbat_process_entry {
 	unsigned cur_bat_state;
 	unsigned new_bat_state;
@@ -410,9 +412,8 @@ static Eina_Bool lowbat_popup(void *data)
 			bundle_add(b, "_SYSPOPUP_CONTENT_", "poweroff");
 		} else if(lowbat_popup_option == LOWBAT_OPT_CHARGEERR) {
 			bundle_add(b, "_SYSPOPUP_CONTENT_", "chargeerr");
-		} else {
-			bundle_add(b, "_SYSPOPUP_CONTENT_", "check");
-		}
+		} else
+			goto out;
 
 		ret = syspopup_launch("lowbat-syspopup", b);
 		if (ret < 0) {
@@ -420,10 +421,14 @@ static Eina_Bool lowbat_popup(void *data)
 			bundle_free(b);
 			return EINA_TRUE;
 		}
-		lowbat_popup_id = NULL;
+out:
+		if (lowbat_popup_id != NULL) {
+			ecore_timer_del(lowbat_popup_id);
+			lowbat_popup_id = NULL;
+		}
 		lowbat_popup_option = 0;
 		bundle_free(b);
-		return EINA_TRUE;
+		return EINA_FALSE;
 	}
 	_D("boot-animation running yet");
 	return EINA_FALSE;
@@ -469,7 +474,7 @@ int lowbat_def_predefine_action(int argc, char **argv)
 		}
 	} else {
 		_D("boot-animation running yet");
-		lowbat_popup_id = ecore_timer_add(1, lowbat_popup, NULL);
+		lowbat_popup_id = ecore_timer_add(WAITING_INTERVAL, lowbat_popup, NULL);
 	}
 	bundle_free(b);
 	return 0;
