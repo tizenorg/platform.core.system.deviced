@@ -5,5 +5,8 @@ deviced telephony_framework::api_manager r
 deviced telephony_framework::api_modem wx
 deviced testmode::vconf r
 deviced starter::vconf r
+# for notification (will be removed)
+deviced data-provider-master::notification rw
+deviced data-provider-master::notification.client w
 # object rule
 pulseaudio deviced rw
