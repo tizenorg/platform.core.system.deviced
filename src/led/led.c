@@ -22,7 +22,9 @@
 #include <device-node.h>
 
 #include "deviced/dd-led.h"
-#include "ss_log.h"
+#include "core/log.h"
+
+#define PREDEF_LED			"led"
 
 enum {
 	SET_BRT = 0,
@@ -67,4 +69,10 @@ int led_def_predefine_action(int argc, char **argv)
 	}
 
 	return -1;
+}
+
+int led_init(void)
+{
+	ss_action_entry_add_internal(PREDEF_LED, led_def_predefine_action, NULL, NULL);
+	return 0;
 }

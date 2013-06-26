@@ -1,12 +1,11 @@
 /*
- * deviced
- * Copyright (c) 2012 - 2013 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2012 Samsung Electronics Co., Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the License);
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,9 +15,11 @@
  */
 
 
-#ifndef __LED_H__
-#define __LED_H__
+#ifndef __SS_PMON_HANDLER_H__
+#define __SS_PMON_HANDLER_H__
 
-int led_def_predefine_action(int argc, char **argv);
-int led_init(void);
-#endif
+#include "core/data.h"
+
+int ss_pmon_init(struct ss_main_data *ad);
+
+#endif /* __SS_PMON_HANDLER_H__ */

@@ -21,7 +21,7 @@
 #include <vconf.h>
 #include <syspopup_caller.h>
 #include <notification.h>
-#include "ss_log.h"
+#include "core/log.h"
 #include "sys_pci_noti.h"
 
 static void show_tickernoti(char *msg)

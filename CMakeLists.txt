@@ -11,29 +11,31 @@ SET(DEVICED_NAME deviced)
 SET(VERSION 0.1.0)
 
 SET(SRCS
-	ss_main.c
-	ss_sysnoti.c
-	ss_launch.c
-	ss_queue.c
-	ss_core.c
-	ss_sig_handler.c
-	ss_log.c
-	ss_device_change_handler.c
-	ss_predefine.c
-	ss_noti.c
-	ss_lowbat_handler.c
-	ss_lowmem_handler.c
-	ss_pmon_handler.c
-	ss_mmc_handler.c
-	ss_usb_handler.c
-	ss_ta_handler.c
-	ss_bs.c
-	ss_procmgr.c
-	ss_timemgr.c
-	ss_cpu_handler.c
-	ss_common.c
-	ss_vibrator.c
-	edbus-handler.c)
+	src/battery/lowbat-handler.c
+	src/bs/bs.c
+	src/core/main.c
+	src/core/sysnoti.c
+	src/core/launch.c
+	src/core/queue.c
+	src/core/core.c
+	src/core/sig-handler.c
+	src/core/log.c
+	src/core/device-change-handler.c
+	src/core/predefine.c
+	src/core/noti.c
+	src/core/common.c
+	src/core/edbus-handler.c
+	src/cpu/cpu-handler.c
+	src/mmc/mmc-handler.c
+	src/power/power-handler.c
+	src/proc/lowmem-handler.c
+	src/proc/pmon-handler.c
+	src/proc/proc-handler.c
+	src/ta/ta-handler.c
+	src/time/time-handler.c
+	src/usb/usb-handler.c
+	src/vibrator/vibrator.c
+)
 
 SET(SRCS ${SRCS}
 	display/util.c
@@ -76,7 +78,7 @@ INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/disp
 # libdeviced
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/src/deviced)
 
-SET(MOVINAND_FORMAT movi_format.sh)
+SET(MOVINAND_FORMAT scripts/movi_format.sh)
 
 INCLUDE(FindPkgConfig)
 pkg_check_modules(pkgs REQUIRED
@@ -147,7 +149,7 @@ INSTALL(FILES ${UDEV_RULES} DESTINATION ${UDEV_RULES_PATH})
 INSTALL(PROGRAMS ${CMAKE_BINARY_DIR}/device-daemon DESTINATION bin)
 INSTALL(FILES system-server.conf DESTINATION /etc/dbus-1/system.d)
 INSTALL(FILES ${CMAKE_SOURCE_DIR}/packaging/system-server.rule DESTINATION /opt/etc/smack/accesses.d)
-INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/mmc-smack-label DESTINATION bin)
+INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/utils/mmc-smack-label DESTINATION bin)
 INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/utils/set_pmon DESTINATION bin)
 INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/utils/regpmon DESTINATION bin)
 INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/utils/pmon DESTINATION bin)

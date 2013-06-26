@@ -1,3 +1,0 @@
-@PREFIX@/bin/*
-@PREFIX@/share/system-server/*
-/etc/*

@@ -30,7 +30,7 @@
 #define __PM_POLL_H__
 
 #include <Ecore.h>
-#include "edbus-handler.h"
+#include "core/edbus-handler.h"
 /**
  * @addtogroup POWER_MANAGER
  * @{

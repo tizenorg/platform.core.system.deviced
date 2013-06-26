@@ -29,14 +29,19 @@
 static int pm_x_set_lcd_backlight(struct _PMSys *p, int on)
 {
 	pid_t pid;
-	char cmd_line[4];
+	char cmd_line[8];
 	int ret;
 
 	LOGINFO("Backlight on=%d", on);
-	if (on == STATUS_ON)
+
+	switch (on) {
+	case STATUS_ON:
 		snprintf(cmd_line, sizeof(cmd_line), "%s", CMD_ON);
-	else
+		break;
+	case STATUS_OFF:
 		snprintf(cmd_line, sizeof(cmd_line), "%s", CMD_OFF);
+		break;
+	}
 
 	signal(SIGCHLD, SIG_DFL);
 	pid = vfork();
@@ -47,10 +52,10 @@ static int pm_x_set_lcd_backlight(struct _PMSys *p, int on)
 	}
 
 	if (pid == 0) {
-		LOGERR("[1] Child proccess for LCD %s was created (%s)",
-			((on == STATUS_ON) ? "ON" : "OFF"), cmd_line);
+		LOGERR("[1] Child proccess for LCD %d was created (%s)",
+		    on, cmd_line);
 		execl("/usr/bin/xset", "/usr/bin/xset", "dpms", "force",
-		      cmd_line, NULL);
+		    cmd_line, NULL);
 		_exit(0);
 	} else if (pid != (ret = waitpid(pid, NULL, 0))) {
 		LOGERR

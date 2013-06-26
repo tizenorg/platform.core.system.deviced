@@ -18,7 +18,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "util.h"
+#include <util.h>
 #include "setting.h"
 #include "conf.h"
 

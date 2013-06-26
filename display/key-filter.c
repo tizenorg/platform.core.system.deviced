@@ -26,8 +26,8 @@
 
 #include "core.h"
 #include "poll.h"
-#include "ss_queue.h"
-#include "include/ss_data.h"
+#include "core/queue.h"
+#include "core/data.h"
 
 #include <linux/input.h>
 #ifndef KEY_SCREENLOCK
@@ -35,7 +35,8 @@
 #endif
 
 #define PREDEF_LEAVESLEEP	"leavesleep"
-
+#define POWEROFF_ACT			"poweroff"
+#define PWROFF_POPUP_ACT		"pwroff-popup"
 #define USEC_PER_SEC			1000000
 #define LONG_PRESS_INTERVAL		1	/* 1 second */
 #define COMBINATION_INTERVAL		0.3	/* 0.3 second */
@@ -76,9 +77,9 @@ static void longkey_pressed()
 	(*g_pm_callback) (INPUT_POLL_EVENT, NULL);
 
 	if (vconf_get_int(VCONFKEY_TESTMODE_POWER_OFF_POPUP, &val) == 0 && val == 1)
-		opt = PREDEF_POWEROFF;
+		opt = POWEROFF_ACT;
 	else
-		opt = PREDEF_PWROFF_POPUP;
+		opt = PWROFF_POPUP_ACT;
 
 	ss_action_entry_call_internal(opt, 0);
 }
