@@ -378,30 +378,37 @@ static Ecore_File_Monitor_Cb __crash_file_cb(void *data, Ecore_File_Monitor *em,
 	}
 	return NULL;
 }
+
 static int _get_file_count(char *path)
 {
 	DIR *dir;
 	struct dirent *dp;
 	int count = 0;
+
 	dir = opendir(path);
-	if (!dir) return 0;
+	if (!dir)
+		return 0;
 	while ((dp = readdir(dir)) != NULL) {
 		const char *name = dp->d_name;
 		/* always skip "." and ".." */
 		if (name[0] == '.') {
-			if (name[1] == 0) continue;
-			if ((name[1] == '.') && (name[2] == 0)) continue;
+			if (name[1] == 0)
+				continue;
+			if ((name[1] == '.') && (name[2] == 0))
+				continue;
 		}
 		count++;
 	}
 	closedir(dir);
 	return count;
 }
+
 /* check disk available size */
 static int _check_disk_available(void)
 {
 	struct statfs lstatfs;
 	int avail_size = 0;
+
 	if (statfs(CRASH_CHECK_DISK_PATH, &lstatfs) < 0)
 		return -1;
 	avail_size = (int)(lstatfs.f_bavail * (lstatfs.f_bsize/1024));
