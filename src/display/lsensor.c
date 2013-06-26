@@ -149,7 +149,7 @@ static int connect_sfsvc(void)
 	if (sf_state < 0) {
 		_E("accelerometer sensor attach fail");
 		sf_disconnect(accel_handle);
-		light_handle = -1;
+		accel_handle = -1;
 		goto error;
 	}
 

@@ -346,9 +346,11 @@ int register_edbus_watch(DBusMessage *msg)
 	dbus_bus_add_match(conn, match, NULL);
 
 	_I("%s is watched by dbus!", watch);
+
+	return 0;
 }
 
-static unregister_edbus_watch_all(void)
+static void unregister_edbus_watch_all(void)
 {
 	char match[256];
 	Eina_List *n, *next;
