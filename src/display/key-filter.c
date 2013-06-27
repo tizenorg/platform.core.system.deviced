@@ -28,6 +28,7 @@
 #include "util.h"
 #include "core.h"
 #include "poll.h"
+#include "device-node.h"
 #include "core/queue.h"
 #include "core/common.h"
 #include "core/data.h"
@@ -44,6 +45,8 @@
 #define LONG_PRESS_INTERVAL		0.4	/* 0.4 second */
 #define COMBINATION_INTERVAL		0.3	/* 0.3 second */
 #define POWER_KEY_PRESS_IGNORE_TIME	0.7	/* 0.7 second */
+#define KEYBACKLIGHT_TIME		1.5	/* 1.5 second */
+#define KEYBACKLIGHT_PRESSED_TIME	15	/*  15 second */
 
 #define KEY_RELEASED		0
 #define KEY_PRESSED		1
@@ -60,6 +63,7 @@
 static struct timeval pressed_time;
 static Ecore_Timer *longkey_timeout_id = NULL;
 static Ecore_Timer *combination_timeout_id = NULL;
+static Ecore_Timer *hardkey_timeout_id = NULL;
 static int cancel_lcdoff;
 static int key_combination = KEY_COMBINATION_STOP;
 static int powerkey_ignored = false;
@@ -355,6 +359,71 @@ static int process_screenlock_key(struct input_event *pinput)
 	return true;
 }
 
+static Eina_Bool key_backlight_expired(void *data)
+{
+	int ret, val;
+	hardkey_timeout_id = NULL;
+
+	ret = device_get_property(DEVICE_TYPE_LED, PROP_LED_HARDKEY, &val);
+	/* check key backlight is already off */
+	if (!ret && !val)
+		return ECORE_CALLBACK_CANCEL;
+
+	/* key backlight off */
+	ret = device_set_property(DEVICE_TYPE_LED, PROP_LED_HARDKEY, STATUS_OFF);
+	if (ret < 0)
+		_E("Fail to turn off key backlight!");
+
+	return ECORE_CALLBACK_CANCEL;
+}
+
+static void process_hardkey_backlight(struct input_event *pinput)
+{
+	int val, ret;
+
+	if (pinput->value == KEY_PRESSED) {
+		_I("hard key pressed : code(%d)", pinput->code);
+
+		if (hardkey_timeout_id > 0) {
+			ecore_timer_del(hardkey_timeout_id);
+			hardkey_timeout_id = NULL;
+		}
+
+		/* key backlight on */
+		ret = device_set_property(DEVICE_TYPE_LED, PROP_LED_HARDKEY, STATUS_ON);
+		if (ret < 0)
+			_E("Fail to turn off key backlight!");
+		/* device notify(vibrator) */
+		/* sound(dbus) */
+		/* start timer */
+		hardkey_timeout_id = ecore_timer_add(
+			    KEYBACKLIGHT_PRESSED_TIME,
+			    key_backlight_expired, NULL);
+
+	} else if (pinput->value == KEY_RELEASED) {
+		_I("hard key released : code(%d)", pinput->code);
+
+		if (hardkey_timeout_id > 0) {
+			ecore_timer_del(hardkey_timeout_id);
+			hardkey_timeout_id = NULL;
+		}
+
+		ret = device_get_property(DEVICE_TYPE_LED, PROP_LED_HARDKEY, &val);
+		/* check key backlight is already off */
+		if (!ret && !val)
+			return;
+
+		if (get_lock_screen_state() == VCONFKEY_IDLE_LOCK) {
+			_I("Lock state, key backlight is off when phone is unlocked!");
+			return;
+		}
+		/* timer start if backlight is on */
+		hardkey_timeout_id = ecore_timer_add(
+			    KEYBACKLIGHT_TIME,
+			    key_backlight_expired, NULL);
+	}
+}
+
 static int check_key(struct input_event *pinput)
 {
 	int ignore = true;
@@ -375,10 +444,17 @@ static int check_key(struct input_event *pinput)
 	case KEY_SCREENLOCK:
 		ignore = process_screenlock_key(pinput);
 		break;
+	case KEY_BACK:
+	case KEY_PHONE:
+		stop_key_combination();
+		if (current_state_in_on()) {
+			process_hardkey_backlight(pinput);
+			ignore = false;
+		}
+		break;
 	case KEY_VOLUMEUP:
 	case KEY_CAMERA:
 	case KEY_EXIT:
-	case KEY_PHONE:
 	case KEY_CONFIG:
 	case KEY_SEARCH:
 	case KEY_MEDIA:
@@ -431,5 +507,32 @@ int check_key_filter(int length, char buf[])
 	} while (length > idx);
 
 	return 0;
+}
+
+void key_backlight_enable(bool enable)
+{
+	int ret;
+
+	if (hardkey_timeout_id > 0) {
+		ecore_timer_del(hardkey_timeout_id);
+		hardkey_timeout_id = NULL;
+	}
+
+	/* backlight enable or disable */
+	ret = device_set_property(DEVICE_TYPE_LED, PROP_LED_HARDKEY, enable);
+
+	if (ret < 0)
+		_E("Fail to turn %s key backlight!", (enable ? "on" : "off"));
+
+	/* start timer in case of backlight enabled */
+	if (enable) {
+		if (get_lock_screen_state() == VCONFKEY_IDLE_LOCK) {
+			_I("[Lock] key backlight's off when phone is unlocked!");
+			return;
+		}
+
+		hardkey_timeout_id = ecore_timer_add(KEYBACKLIGHT_TIME,
+			    key_backlight_expired, NULL);
+	}
 }
 

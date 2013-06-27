@@ -872,6 +872,7 @@ static int default_action(int timeout)
 			backlight_ops.on();
 			backlight_ops.update();
 #endif
+			key_backlight_enable(true);
 		} else if (pm_old_state == S_LCDDIM)
 			backlight_ops.update();
 
@@ -894,6 +895,7 @@ static int default_action(int timeout)
 		if (pm_old_state != S_SLEEP && pm_old_state != S_LCDOFF) {
 			/* lcd off state : turn off the backlight */
 			backlight_ops.off();
+			key_backlight_enable(false);
 
 			if (pre_suspend_flag == false) {
 				pre_suspend_flag = true;
@@ -1187,6 +1189,7 @@ static int update_setting(int key_idx, int val)
 			states[S_LCDDIM].timeout = 0;
 			_E("LOCKED: NORMAL timeout is set by %d seconds",
 				LOCK_SCREEN_TIMEOUT);
+			key_backlight_enable(false);
 		} else {
 			set_lock_screen_state(val);
 			get_run_timeout(&run_timeout);
