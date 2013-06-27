@@ -55,7 +55,7 @@ static unsigned char* convert_file_to_buffer(const char *file_name, int *size)
 {
 	FILE *pf;
 	long file_size;
-	unsigned char *pdata;
+	unsigned char *pdata = NULL;
 
 	if (!file_name)
 		return NULL;
@@ -67,35 +67,35 @@ static unsigned char* convert_file_to_buffer(const char *file_name, int *size)
 		return NULL;
 	}
 
-	if (fseek(pf, 0, SEEK_END)) {
-		_E("fseek failed : %s", strerror(errno));
-		fclose(pf);
-		return NULL;
-	}
+	if (fseek(pf, 0, SEEK_END))
+		goto error;
 
 	file_size = ftell(pf);
-	if (fseek(pf, 0, SEEK_SET)) {
-		_E("fseek failed : %s", strerror(errno));
-		fclose(pf);
-		return NULL;
-	}
+	if (fseek(pf, 0, SEEK_SET))
+		goto error;
+
+	if (file_size < 0)
+		goto error;
 
 	pdata = (unsigned char*)malloc(file_size);
-	if (!pdata) {
-		fclose(pf);
-		return NULL;
-	}
+	if (!pdata)
+		goto error;
 
-	if (fread(pdata, 1, file_size, pf) != file_size) {
-		_E("fread failed : %s", strerror(errno));
-		free(pdata);
-		fclose(pf);
-		return NULL;
-	}
+	if (fread(pdata, 1, file_size, pf) != file_size)
+		goto err_free;
 
 	fclose(pf);
 	*size = file_size;
 	return pdata;
+
+err_free:
+	free(pdata);
+
+error:
+	fclose(pf);
+
+	_E("failed to convert file to buffer (%s)", strerror(errno));
+	return NULL;
 }
 
 static int save_data(const unsigned char *data, int size, const char *file_path)

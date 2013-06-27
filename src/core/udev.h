@@ -25,10 +25,18 @@
 
 /* input device */
 #define INPUT_SUBSYSTEM		"input"
-#define INPUT_PATH		"*/input[0-9]*/event[0-9]*"
+#define INPUT_PATH			"*/input[0-9]*/event[0-9]*"
 #define ADD			"add"
 #define REMOVE			"remove"
 
 /* switch device */
 #define SWITCH_SUBSYSTEM	"switch"
+
+/* block device */
+#define BLOCK_SUBSYSTEM		"block"
+#define MMC_PATH			"*/mmcblk[0-9]"
+
+/* host device */
+#define HOST_SUBSYSTEM		"host_notify"
+
 #endif /* __UDEV_H__ */
