@@ -108,6 +108,8 @@ checkfilesys(const char *fname)
 	mod |= readfat(dosfs, &boot, boot.ValidFat >= 0 ? boot.ValidFat : 0, &fat);
 	if (mod & FSFATAL) {
 		printf("Fatal error during readfat()\n");
+		if (fat)
+			free(fat);
 		close(dosfs);
 		return 8;
 	}

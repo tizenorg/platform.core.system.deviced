@@ -765,14 +765,13 @@ int register_mmc_handler(const char *name, const struct mmc_filesystem_ops files
 
 	if (!entry->name) {
 		_E("Malloc failed");
-		free(entry);
-		return -1;
+		goto free_entry;
 	}
 
 	entry->fs_ops = malloc(sizeof(struct mmc_filesystem_ops));
 	if (!entry->fs_ops) {
 		_E("Malloc failed");
-		return -1;
+		goto free_entry_with_name;
 	}
 
 	entry->fs_ops->init = filesystem_type.init;
@@ -786,6 +785,14 @@ int register_mmc_handler(const char *name, const struct mmc_filesystem_ops files
 		entry = get_mmc_fs(tmp, struct mmc_filesystem_info, list);
 	}
 	return 0;
+
+	free_entry_with_name:
+	free(entry->name);
+
+	free_entry:
+	free(entry);
+
+	return -1;
 }
 
 static void ss_mmc_booting_done(void* data)
