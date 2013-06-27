@@ -107,7 +107,6 @@ static bool alc_handler(void* data)
 
 static int alc_action(int timeout)
 {
-	_I("alc action");
 	/* sampling timer add */
 	if (alc_timeout_id == 0 && !(pm_status_flag & PWRSV_FLAG))
 		alc_timeout_id =

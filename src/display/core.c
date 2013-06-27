@@ -49,7 +49,6 @@
 #include "core/devices.h"
 #include "core/device-notifier.h"
 #include "core/udev.h"
-#include "core/log.h"
 
 #define USB_CON_PIDFILE			"/var/run/.system_server.pid"
 #define PM_STATE_LOG_FILE		"/var/log/pm_state.log"
@@ -980,8 +979,6 @@ static int default_check(int next)
 {
 	int trans_cond = trans_condition & MASK_BIT;
 	int lock_state = -1;
-
-	_I("trans_cond : %x", trans_cond);
 
 	vconf_get_int(VCONFKEY_IDLE_LOCK_STATE, &lock_state);
 	if (lock_state==VCONFKEY_IDLE_LOCK && next != S_SLEEP) {
