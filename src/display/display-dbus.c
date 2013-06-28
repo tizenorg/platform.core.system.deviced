@@ -338,6 +338,8 @@ static DBusMessage *e_dbus_holdbrightness(E_DBus_Object *obj, DBusMessage *msg)
 		autobrt = SETTING_BRIGHTNESS_AUTOMATIC_OFF;
 	}
 
+	vconf_set_int(VCONFKEY_PM_CUSTOM_BRIGHTNESS_STATUS, VCONFKEY_PM_CUSTOM_BRIGHTNESS_ON);
+
 	cmd = DISP_CMD(PROP_DISPLAY_BRIGHTNESS, DEFAULT_DISPLAY);
 	ret = device_set_property(DEVICE_TYPE_DISPLAY, cmd, brt);
 	if (ret < 0)
