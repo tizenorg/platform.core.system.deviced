@@ -35,7 +35,7 @@ int set_oomadj(int pid, int oomadj_val)
 	char buf[BUFF_MAX];
 	FILE *fp;
 
-	snprintf(buf, BUFF_MAX, "/proc/%d/oom_adj", pid);
+	snprintf(buf, BUFF_MAX, "/proc/%d/oom_score_adj", pid);
 	fp = fopen(buf, "w");
 	if (fp == NULL)
 		return -1;
@@ -73,7 +73,10 @@ int check_and_setpmon(int pid, int idx, char **argv, char type)
 			case 'v':
 				printf("====> found, %s - set vip\n",
 				       argv[idx]);
-				set_oomadj(pid, -17);
+				if (!strcmp(argv[idx], "Xorg") || !strcmp(argv[idx], "enlightenment"))
+					set_oomadj(pid, -1000);
+				else
+					set_oomadj(pid, 0);
 				sysconf_set_vip(pid);
 				return 0;
 			case 'p':

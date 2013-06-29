@@ -162,10 +162,10 @@ static int pmon_process(int pid, void *ad)
 				_I("[Process MON] OOMADJ_SET : pid %d, new_oomadj %d",
 				     new_pid, (-17));
 
-				fp = open_proc_oom_adj_file(new_pid, "w");
+				fp = open_proc_oom_score_adj_file(new_pid, "w");
 				if (fp == NULL)
 					return -1;
-				fprintf(fp, "%d", (-17));
+				fprintf(fp, "%d",0);
 				fclose(fp);
 
 				snprintf(old_file, sizeof(old_file), "%s/%d",

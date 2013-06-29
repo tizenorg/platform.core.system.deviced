@@ -68,28 +68,16 @@ int util_process_group_set(const char* name, int pid)
 
 API int sysconf_set_mempolicy_bypid(int pid, enum mem_policy mempol)
 {
-	if (pid < 1)
-		return -1;
+	ERR("Don't support this api anymore. Please use deviced api");
 
-	int oomadj_val = 0;
-
-	switch (mempol) {
-	case OOM_LIKELY:
-		oomadj_val = 1;
-		break;
-	case OOM_IGNORE:
-		oomadj_val = -17;
-		break;
-	default:
-		return -1;
-	}
-
-	return util_oomadj_set(pid, oomadj_val);
+	return -1;
 }
 
 API int sysconf_set_mempolicy(enum mem_policy mempol)
 {
-	return sysconf_set_mempolicy_bypid(getpid(), mempol);
+	ERR("Don't support this api anymore. Please use deviced api");
+
+	return -1;
 }
 
 static int already_permanent(int pid)
@@ -220,7 +208,7 @@ API int sysconf_set_permanent_bypid(int pid)
 	}
 
  MEMPOL_SET:
-	util_oomadj_set(pid, -17);
+	util_oomadj_set(pid, 0);
 
 	return 0;
 }
