@@ -47,7 +47,7 @@
 #define SIOP_LEVEL(val)			((val & SIOP_LEVEL_MASK) << 16)
 static int siop = 0;
 
-int get_app_oomadj(int pid, int *oomadj)
+int get_oom_score_adj(int pid, int *oom_score_adj)
 {
 	if (pid < 0)
 		return -1;
@@ -55,7 +55,7 @@ int get_app_oomadj(int pid, int *oomadj)
 	char buf[PATH_MAX];
 	FILE *fp = NULL;
 
-	fp = open_proc_oom_adj_file(pid, "r");
+	fp = open_proc_oom_score_adj_file(pid, "r");
 	if (fp == NULL)
 		return -1;
 	if (fgets(buf, PATH_MAX, fp) == NULL) {
@@ -63,69 +63,71 @@ int get_app_oomadj(int pid, int *oomadj)
 		return -1;
 	}
 
-	(*oomadj) = atoi(buf);
+	*oom_score_adj = atoi(buf);
 	fclose(fp);
 	return 0;
 }
 
-int set_app_oomadj(pid_t pid, int new_oomadj)
+int set_oom_score_adj(pid_t pid, int new_oom_score_adj)
 {
 	char buf[PATH_MAX];
 	FILE *fp;
-	int old_oomadj;
+	int old_oom_score_adj;
 	char exe_name[PATH_MAX];
 
 	if (get_cmdline_name(pid, exe_name, PATH_MAX) < 0)
 		snprintf(exe_name, sizeof(exe_name), "Unknown (maybe dead)");
 
-	if (get_app_oomadj(pid, &old_oomadj) < 0)
+	if (get_oom_score_adj(pid, &old_oom_score_adj) < 0)
 		return -1;
 
-	_SI("Process %s, pid %d, old_oomadj %d new_oomadj %d",
-		exe_name, pid, old_oomadj, new_oomadj);
+	_SI("Process %s, pid %d, old_oom_score_adj %d new_oom_score_adj %d",
+		exe_name, pid, old_oom_score_adj, new_oom_score_adj);
 
-	if (old_oomadj < OOMADJ_APP_LIMIT)
+	if (old_oom_score_adj < OOMADJ_APP_LIMIT)
 		return 0;
 
-	fp = open_proc_oom_adj_file(pid, "w");
+	fp = open_proc_oom_score_adj_file(pid, "w");
 	if (fp == NULL)
 		return -1;
 
-	fprintf(fp, "%d", new_oomadj);
+	fprintf(fp, "%d", new_oom_score_adj);
 	fclose(fp);
 
 	return 0;
 }
 
-int set_su_oomadj(pid_t pid)
+int set_su_oom_score_adj(pid_t pid)
 {
-	return set_app_oomadj(pid, OOMADJ_SU);
+	return set_oom_score_adj(pid, OOMADJ_SU);
 }
 
-int check_oomadj(int oom_adj)
+int check_oom_score_adj(int oom_score_adj)
 {
-	if (oom_adj != OOMADJ_FOREGRD_LOCKED && oom_adj != OOMADJ_FOREGRD_UNLOCKED)
+	if (oom_score_adj != OOMADJ_FOREGRD_LOCKED && oom_score_adj != OOMADJ_FOREGRD_UNLOCKED)
 		return 0;
 	return -1;
 }
 
-int set_oomadj_action(int argc, char **argv)
+int set_oom_score_adj_action(int argc, char **argv)
 {
+	FILE *fp;
 	int pid = -1;
-	int new_oomadj = -20;
+	int new_oom_score_adj = 0;
 
 	if (argc < 2)
 		return -1;
-	if ((pid = atoi(argv[0])) < 0 || (new_oomadj = atoi(argv[1])) <= -20)
+	if ((pid = atoi(argv[0])) < 0 || (new_oom_score_adj = atoi(argv[1])) <= -20)
 		return -1;
 
-	FILE *fp;
-	_I("OOMADJ_SET : pid %d, new_oomadj %d", pid, new_oomadj);
+	_I("OOMADJ_SET : pid %d, new_oom_score_adj %d", pid, new_oom_score_adj);
 
-	fp = open_proc_oom_adj_file(pid, "w");
+	fp = open_proc_oom_score_adj_file(pid, "w");
 	if (fp == NULL)
 		return -1;
-	fprintf(fp, "%d", new_oomadj);
+	if (new_oom_score_adj < OOMADJ_SU)
+		new_oom_score_adj = OOMADJ_SU;
+	fprintf(fp, "%d", new_oom_score_adj);
 	fclose(fp);
 
 	return 0;
@@ -135,36 +137,36 @@ int set_active_action(int argc, char **argv)
 {
 	int pid = -1;
 	int ret = 0;
-	int oomadj = 0;
+	int oom_score_adj = 0;
 
 	if (argc < 1)
 		return -1;
 	if ((pid = atoi(argv[0])) < 0)
 		return -1;
 
-	if (get_app_oomadj(pid, &oomadj) < 0)
+	if (get_oom_score_adj(pid, &oom_score_adj) < 0)
 		return -1;
 
-	switch (oomadj) {
+	switch (oom_score_adj) {
 	case OOMADJ_FOREGRD_LOCKED:
 	case OOMADJ_BACKGRD_LOCKED:
 	case OOMADJ_SU:
 		ret = 0;
 		break;
 	case OOMADJ_FOREGRD_UNLOCKED:
-		ret = set_app_oomadj((pid_t) pid, OOMADJ_FOREGRD_LOCKED);
+		ret = set_oom_score_adj((pid_t) pid, OOMADJ_FOREGRD_LOCKED);
 		break;
 	case OOMADJ_BACKGRD_UNLOCKED:
-		ret = set_app_oomadj((pid_t) pid, OOMADJ_BACKGRD_LOCKED);
+		ret = set_oom_score_adj((pid_t) pid, OOMADJ_BACKGRD_LOCKED);
 		break;
 	case OOMADJ_INIT:
-		ret = set_app_oomadj((pid_t) pid, OOMADJ_BACKGRD_LOCKED);
+		ret = set_oom_score_adj((pid_t) pid, OOMADJ_BACKGRD_LOCKED);
 		break;
 	default:
-		if(oomadj > OOMADJ_BACKGRD_UNLOCKED) {
-			ret = set_app_oomadj((pid_t) pid, OOMADJ_BACKGRD_LOCKED);
+		if(oom_score_adj > OOMADJ_BACKGRD_UNLOCKED) {
+			ret = set_oom_score_adj((pid_t) pid, OOMADJ_BACKGRD_LOCKED);
 		} else {
-			_E("Unknown oomadj value (%d) !", oomadj);
+			_E("Unknown oom_score_adj value (%d) !", oom_score_adj);
 			ret = -1;
 		}
 		break;
@@ -176,36 +178,36 @@ int set_inactive_action(int argc, char **argv)
 {
 	int pid = -1;
 	int ret = 0;
-	int oomadj = 0;
+	int oom_score_adj = 0;
 
 	if (argc < 1)
 		return -1;
 	if ((pid = atoi(argv[0])) < 0)
 		return -1;
 
-	if (get_app_oomadj(pid, &oomadj) < 0)
+	if (get_oom_score_adj(pid, &oom_score_adj) < 0)
 		return -1;
 
-	switch (oomadj) {
+	switch (oom_score_adj) {
 	case OOMADJ_FOREGRD_UNLOCKED:
 	case OOMADJ_BACKGRD_UNLOCKED:
 	case OOMADJ_SU:
 		ret = 0;
 		break;
 	case OOMADJ_FOREGRD_LOCKED:
-		ret = set_app_oomadj((pid_t) pid, OOMADJ_FOREGRD_UNLOCKED);
+		ret = set_oom_score_adj((pid_t) pid, OOMADJ_FOREGRD_UNLOCKED);
 		break;
 	case OOMADJ_BACKGRD_LOCKED:
-		ret = set_app_oomadj((pid_t) pid, OOMADJ_BACKGRD_UNLOCKED);
+		ret = set_oom_score_adj((pid_t) pid, OOMADJ_BACKGRD_UNLOCKED);
 		break;
 	case OOMADJ_INIT:
-		ret = set_app_oomadj((pid_t) pid, OOMADJ_BACKGRD_UNLOCKED);
+		ret = set_oom_score_adj((pid_t) pid, OOMADJ_BACKGRD_UNLOCKED);
 		break;
 	default:
-		if(oomadj > OOMADJ_BACKGRD_UNLOCKED) {
+		if(oom_score_adj > OOMADJ_BACKGRD_UNLOCKED) {
 			ret = 0;
 		} else {
-			_E("Unknown oomadj value (%d) !", oomadj);
+			_E("Unknown oom_score_adj value (%d) !", oom_score_adj);
 			ret = -1;
 		}
 		break;
@@ -218,7 +220,6 @@ int set_process_action(int argc, char **argv)
 {
 	int pid = -1;
 	int ret = 0;
-	int oomadj = 0;
 
 	if (argc < 1)
 		return -1;
@@ -260,7 +261,7 @@ static void process_init(void *data)
 				     NULL);
 	action_entry_add_internal(PREDEF_INACTIVE, set_inactive_action, NULL,
 				     NULL);
-	action_entry_add_internal(OOMADJ_SET, set_oomadj_action, NULL, NULL);
+	action_entry_add_internal(OOMADJ_SET, set_oom_score_adj_action, NULL, NULL);
 	action_entry_add_internal(PROCESS_GROUP_SET, set_process_group_action, NULL, NULL);
 }
 

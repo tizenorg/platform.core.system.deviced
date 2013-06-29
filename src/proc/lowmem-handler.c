@@ -372,9 +372,9 @@ static void make_memps_log(char *file, pid_t pid, char *victim_name)
 	/* will be removed, just for debugging */
 	if(ret > 0) {
 		FILE *fp;
-		fp = open_proc_oom_adj_file(ret, "w");
+		fp = open_proc_oom_score_adj_file(ret, "w");
 		if (fp != NULL) {
-			fprintf(fp, "%d", (-17));
+			fprintf(fp, "%d", 0);
 			fclose(fp);
 		}
 	}
@@ -416,7 +416,7 @@ static int lowmem_get_victim_pid()
 
 int lowmem_def_predefine_action(int argc, char **argv)
 {
-	int pid, ret, oom_adj;
+	int pid, ret, oom_score_adj;
 	char appname[PATH_MAX];
 
 	if (argc < 1)
@@ -430,15 +430,15 @@ int lowmem_def_predefine_action(int argc, char **argv)
 				_E("we will kill, lowmem lv2 = %d (%s)", pid, appname);
 				make_memps_log(MEMPS_LOG_FILE, pid, appname);
 
-				if(get_app_oomadj(pid, &oom_adj) < 0) {
-					_E("Failed to get oom_adj");
+				if(get_oom_score_adj(pid, &oom_score_adj) < 0) {
+					_E("Failed to get oom_score_adj");
 					return -1;
 				}
-				_D("%d will be killed with %d oom_adj value", pid, oom_adj);
+				_D("%d will be killed with %d oom_adj value", pid, oom_score_adj);
 
 				kill(pid, SIGTERM);
 
-				if (check_oomadj(oom_adj) == 0)
+				if (check_oom_score_adj(oom_score_adj) == 0)
 					return 0;
 
 				bundle *b = NULL;
@@ -452,8 +452,8 @@ int lowmem_def_predefine_action(int argc, char **argv)
 					return -1;
 				}
 
-				if (set_su_oomadj(ret) < 0) {
-					_E("Failed to set oom_adj");
+				if (set_su_oom_score_adj(ret) < 0) {
+					_E("Failed to set oom_score_adj");
 				}
 			}
 		}
