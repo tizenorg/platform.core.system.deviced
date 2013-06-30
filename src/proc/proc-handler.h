@@ -18,8 +18,6 @@
 #ifndef __SS_PROCMGR_H__
 #define __SS_PROCMGR_H__
 
-int ss_process_manager_init(void);
-
 int get_app_oomadj(int pid, int *oomadj);
 int set_app_oomadj(int pid, int new_oomadj);
 

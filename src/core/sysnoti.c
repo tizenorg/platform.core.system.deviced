@@ -24,6 +24,7 @@
 #include "log.h"
 #include "queue.h"
 #include "common.h"
+#include "devices.h"
 
 #define SYSNOTI_SOCKET_PATH "/tmp/sn"
 #define RETRY_READ_COUNT	5
@@ -296,11 +297,6 @@ static int ss_sysnoti_server_init(void)
 	return fd;
 }
 
-int ss_sysnoti_init(void)
-{
-	return __sysnoti_start();
-}
-
 static int __sysnoti_start(void)
 {
 	int fd;
@@ -328,3 +324,14 @@ static int __sysnoti_stop(int fd)
 	}
 	return 0;
 }
+
+static void sysnoti_init(void *data)
+{
+	struct ss_main_data *ad = (struct ss_main_data*)data;
+
+	ad->sysnoti_fd = __sysnoti_start();
+}
+
+const struct device_ops sysnoti_device_ops = {
+	.init = sysnoti_init,
+};

@@ -20,6 +20,7 @@
 #include "log.h"
 #include "predefine.h"
 #include "core.h"
+#include "devices.h"
 
 enum ss_core_cmd_type {
 	SS_CORE_ACT_RUN,
@@ -129,18 +130,6 @@ int ss_core_action_clear(int pid)
 	return 0;
 }
 
-int ss_core_init(struct ss_main_data *ad)
-{
-	__pipe_stop(core_pipe[0]);
-	__pipe_stop(core_pipe[1]);
-
-	if (__pipe_start(ad) == -1) {
-		PRT_TRACE_ERR("fail pipe control fd init");
-		return -1;
-	}
-	return 0;
-}
-
 static int __pipe_start(struct ss_main_data *ad)
 {
 	if (pipe(core_pipe) < 0) {
@@ -168,3 +157,18 @@ static int __pipe_stop(int fd)
 
 	return 0;
 }
+
+static void core_init(void *data)
+{
+	struct ss_main_data *ad = (struct ss_main_data*)data;
+
+	__pipe_stop(core_pipe[0]);
+	__pipe_stop(core_pipe[1]);
+
+	if (__pipe_start(ad) == -1)
+		PRT_TRACE_ERR("fail pipe control fd init");
+}
+
+const struct device_ops core_device_ops = {
+	.init = core_init,
+};

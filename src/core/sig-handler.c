@@ -22,6 +22,7 @@
 #include "core.h"
 #include "edbus-handler.h"
 #include "poll.h"
+#include "devices.h"
 
 #define PRT_TRACE_ERR(format, args...) do { \
 	char buf[255];\
@@ -59,7 +60,7 @@ static void sig_pipe_handler(int signo, siginfo_t *info, void *data)
 
 }
 
-void ss_signal_init(void)
+static void signal_init(void *data)
 {
 	struct sigaction sig_act;
 
@@ -76,5 +77,8 @@ void ss_signal_init(void)
 	sigaction(SIGPIPE, &sig_act, &sig_pipe_old_act);
 	register_edbus_signal_handler(SIGNAL_NAME_LCD_CONTROL,
 		    (void *)lcd_control_edbus_signal_handler);
-
 }
+
+const struct device_ops signal_device_ops = {
+	.init = signal_init,
+};

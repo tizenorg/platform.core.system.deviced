@@ -23,6 +23,7 @@
 
 #include "deviced/dd-led.h"
 #include "core/log.h"
+#include "core/devices.h"
 
 #define PREDEF_LED			"led"
 
@@ -41,7 +42,7 @@ static int set_brightness(int val)
 	return 0;
 }
 
-int led_def_predefine_action(int argc, char **argv)
+static int predefine_action(int argc, char **argv)
 {
 	int i;
 	int pid;
@@ -71,8 +72,11 @@ int led_def_predefine_action(int argc, char **argv)
 	return -1;
 }
 
-int led_init(void)
+static void led_init(void *data)
 {
-	ss_action_entry_add_internal(PREDEF_LED, led_def_predefine_action, NULL, NULL);
-	return 0;
+	ss_action_entry_add_internal(PREDEF_LED, predefine_action, NULL, NULL);
 }
+
+const struct device_ops led_device_ops = {
+	.init = led_init,
+};

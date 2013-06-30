@@ -27,8 +27,8 @@
 #include <aul.h>
 #include <bundle.h>
 #include <dirent.h>
-#include "dd-deviced.h"
 #include <libudev.h>
+#include "dd-deviced.h"
 #include "queue.h"
 #include "log.h"
 #include "device-handler.h"
@@ -37,6 +37,7 @@
 #include "data.h"
 #include "predefine.h"
 #include "poll.h"
+#include "devices.h"
 #include "sys_pci_noti/sys_pci_noti.h"
 
 #define PREDEF_USBCON			"usbcon"
@@ -693,43 +694,35 @@ static void pci_keyboard_remove_cb(struct ss_main_data *ad)
 	ss_launch_if_noexist("/usr/bin/sys_pci_noti", params);
 }
 
-void ss_predefine_device_change_init(void)
+static void device_change_init(void *data)
 {
 	ss_action_entry_add_internal(PREDEF_USBCON, usbcon_def_predefine_action, NULL, NULL);
 	ss_action_entry_add_internal(PREDEF_EARJACKCON, earjackcon_def_predefine_action, NULL, NULL);
 	ss_action_entry_add_internal(PREDEF_BATTERY_CF_OPENED, battery_def_cf_opened_actioin, NULL, NULL);
-}
-
-int ss_device_change_init(struct ss_main_data *ad)
-{
 	ss_action_entry_add_internal(PREDEF_DEVICE_CHANGED, changed_device_def_predefine_action, NULL, NULL);
 
 	if (uevent_control_start() == -1) {
 		PRT_TRACE_ERR("fail uevent control init");
-		return -1;
+		return;
 	}
 	/* for simple noti change cb */
-	ss_noti_add("device_usb_chgdet", (void *)usb_chgdet_cb, (void *)ad);
-	ss_noti_add("device_ta_chgdet", (void *)ta_chgdet_cb, (void *)ad);
-	ss_noti_add("device_earjack_chgdet", (void *)earjack_chgdet_cb, (void *)ad);
-	ss_noti_add("device_earkey_chgdet", (void *)earkey_chgdet_cb, (void *)ad);
-	ss_noti_add("device_tvout_chgdet", (void *)tvout_chgdet_cb, (void *)ad);
-	ss_noti_add("device_hdmi_chgdet", (void *)hdmi_chgdet_cb, (void *)ad);
-	ss_noti_add("device_keyboard_chgdet", (void *)keyboard_chgdet_cb, (void *)ad);
-
-	ss_noti_add("device_usb_host_add", (void *)usb_host_add_cb, (void *)ad);
+	ss_noti_add("device_usb_chgdet", (void *)usb_chgdet_cb, data);
+	ss_noti_add("device_ta_chgdet", (void *)ta_chgdet_cb, data);
+	ss_noti_add("device_earjack_chgdet", (void *)earjack_chgdet_cb, data);
+	ss_noti_add("device_earkey_chgdet", (void *)earkey_chgdet_cb, data);
+	ss_noti_add("device_tvout_chgdet", (void *)tvout_chgdet_cb, data);
+	ss_noti_add("device_hdmi_chgdet", (void *)hdmi_chgdet_cb, data);
+	ss_noti_add("device_keyboard_chgdet", (void *)keyboard_chgdet_cb, data);
+	ss_noti_add("device_usb_host_add", (void *)usb_host_add_cb, data);
 	ss_noti_add("mmcblk_add", (void *)mmc_chgdet_cb, (void *)1);
 	ss_noti_add("mmcblk_remove", (void *)mmc_chgdet_cb, NULL);
-
 	ss_noti_add("unmount_ums", (void *)ums_unmount_cb, NULL);
-	ss_noti_add("device_charge_chgdet", (void *)charge_cb, (void *)ad);
+	ss_noti_add("device_charge_chgdet", (void *)charge_cb, data);
+	ss_noti_add("device_pci_keyboard_add", (void *)pci_keyboard_add_cb, data);
+	ss_noti_add("device_pci_keyboard_remove", (void *)pci_keyboard_remove_cb, data);
 
-	ss_noti_add("device_pci_keyboard_add", (void *)pci_keyboard_add_cb, (void *)ad);
-	ss_noti_add("device_pci_keyboard_remove", (void *)pci_keyboard_remove_cb, (void *)ad);
-
-	if (vconf_notify_key_changed(VCONFKEY_SYSMAN_USB_HOST_STATUS, usb_host_chgdet_cb, NULL) < 0) {
+	if (vconf_notify_key_changed(VCONFKEY_SYSMAN_USB_HOST_STATUS, usb_host_chgdet_cb, NULL) < 0)
 		PRT_TRACE_ERR("vconf key notify failed(VCONFKEY_SYSMAN_USB_HOST_STATUS)");
-	}
 
 	/* check and set earjack init status */
 	earjackcon_def_predefine_action(0, NULL);
@@ -742,7 +735,7 @@ int ss_device_change_init(struct ss_main_data *ad)
 
 	e_dbus_signal_handler_add(conn, NULL, "/system/uevent/xxxxx",
 				  "system.uevent.xxxxx",
-				  "Change", cb_xxxxx_signaled, ad);
+				  "Change", cb_xxxxx_signaled, data);
 #endif				/* ENABLE_EDBUS_USE */
 
 	/* set initial state for devices */
@@ -750,6 +743,8 @@ int ss_device_change_init(struct ss_main_data *ad)
 	keyboard_chgdet_cb(NULL);
 	hdmi_chgdet_cb(NULL);
 	system(STORE_DEFAULT_USB_INFO);
-
-	return 0;
 }
+
+const struct device_ops change_device_ops = {
+	.init = device_change_init,
+};

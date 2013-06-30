@@ -17,32 +17,13 @@
 
 #include <stdio.h>
 #include <fcntl.h>
-#include <heynoti.h>
 #include <sys/reboot.h>
 
 #include "log.h"
-#include "core.h"
-#include "sig-handler.h"
-#include "device-handler.h"
-#include "noti.h"
-#include "queue.h"
-#include "predefine.h"
-#include "edbus-handler.h"
-#include "bs/bs.h"
-#include "cpu/cpu-handler.h"
 #include "data.h"
-#include "led/led.h"
-#include "proc/lowmem-handler.h"
-#include "battery/lowbat-handler.h"
-#include "proc/pmon-handler.h"
-#include "proc/proc-handler.h"
-#include "time/time-handler.h"
-#include "vibrator/vibrator.h"
-#include "sysnoti.h"
+#include "devices.h"
 
-static void fini(struct ss_main_data *ad)
-{
-}
+#define SS_PIDFILE_PATH		"/var/run/.system_server.pid"
 
 static void init_ad(struct ss_main_data *ad)
 {
@@ -60,68 +41,22 @@ static void writepid(char *pidpath)
 	}
 }
 
-static void system_server_init(struct ss_main_data *ad)
-{
-	ad->sysnoti_fd = ss_sysnoti_init();
-	if (ss_noti_init() < 0)
-		PRT_TRACE_ERR("init noti error");
-
-	ss_queue_init();
-	ss_core_init(ad);
-	ss_signal_init();
-	ss_predefine_internal_init();
-	ss_predefine_lowmem_init();
-	ss_predefine_lowbat_init();
-	ss_predefine_device_change_init();
-	ss_predefine_power_init();
-	ss_process_manager_init();
-	ss_time_manager_init();
-	ss_cpu_handler_init();
-
-	ss_lowmem_init(ad);
-	ss_lowbat_init(ad);
-	ss_power_init(ad);
-	ss_usb_init();
-	ss_ta_init();
-	ss_pmon_init(ad);
-	ss_device_change_init(ad);
-	led_init();
-	ss_mmc_init();
-	ss_bs_init();
-	vibrator_init();
-}
-
-#define SS_PIDFILE_PATH		"/var/run/.system_server.pid"
 static void sig_quit(int signo)
 {
 	PRT_TRACE_ERR("received SIGTERM signal %d", signo);
 }
+
 static int system_main(int argc, char **argv)
 {
 	struct ss_main_data ad;
 
 	init_ad(&ad);
-	if ((ad.noti_fd = heynoti_init()) < 0) {
-		PRT_TRACE_ERR("Hey Notification Initialize failed");
-		fini(&ad);
-		return 0;
-	}
-	if (heynoti_attach_handler(ad.noti_fd) != 0) {
-		PRT_TRACE_ERR("fail to attach hey noti handler");
-		fini(&ad);
-		return 0;
-	}
-	edbus_init();
-	system_server_init(&ad);
-	start_pm_main();
+	devices_init(&ad);
 	signal(SIGTERM, sig_quit);
 	ecore_main_loop_begin();
 
-	end_pm_main();
-	fini(&ad);
-	edbus_fini();
+	devices_exit(&ad);
 	ecore_shutdown();
-
 	return 0;
 }
 

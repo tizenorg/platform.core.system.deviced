@@ -16,15 +16,16 @@
 
 
 #include <vconf.h>
+#include <device-node.h>
+#include <poll.h>
 
-#include "device-node.h"
 #include "core/log.h"
 #include "core/data.h"
-#include "poll.h"
+#include "core/devices.h"
 
 #define RETRY	3
 
-int ss_ta_init()
+static void ta_init(void *data)
 {
 	int val = -1, i = 0, pid;
 
@@ -45,5 +46,8 @@ int ss_ta_init()
 			vconf_set_int(VCONFKEY_SYSMAN_CHARGER_STATUS,
 					VCONFKEY_SYSMAN_CHARGER_DISCONNECTED);
 	}
-	return 0;
 }
+
+const struct device_ops ta_device_ops = {
+	.init = ta_init,
+};

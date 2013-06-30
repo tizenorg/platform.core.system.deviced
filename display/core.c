@@ -45,6 +45,7 @@
 #include "device-node.h"
 #include "core/queue.h"
 #include "core/data.h"
+#include "core/devices.h"
 
 #define USB_CON_PIDFILE			"/var/run/.system_server.pid"
 #define PM_STATE_LOG_FILE		"/var/log/pm_state.log"
@@ -1554,7 +1555,7 @@ static int noti_fd = -1;
  * Power manager Main
  *
  */
-void start_pm_main(void)
+static void start_pm_main(void *data)
 {
 	int ret, i;
 	unsigned int flags = (WITHOUT_STARTNOTI | FLAG_X_DPMS);
@@ -1618,7 +1619,7 @@ void start_pm_main(void)
 	}
 }
 
-void end_pm_main(void)
+static void end_pm_main(void *data)
 {
 	int i;
 
@@ -1645,6 +1646,11 @@ void end_pm_main(void)
 
 	LOGINFO("Stop power manager");
 }
+
+const struct device_ops display_device_ops = {
+	.init = start_pm_main,
+	.exit = end_pm_main,
+};
 
 /**
  * @}

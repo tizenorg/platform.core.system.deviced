@@ -29,6 +29,4 @@ struct sysnoti {
 	char *argv[SYSMAN_MAXARG];
 };
 
-int ss_sysnoti_init(void);
-
 #endif /* __SS_SYSNOTI_H__ */

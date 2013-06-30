@@ -27,6 +27,7 @@
 #include "core/noti.h"
 #include "core/queue.h"
 #include "core/data.h"
+#include "core/devices.h"
 #include "device-node.h"
 #include "display/setting.h"
 
@@ -462,15 +463,12 @@ int lowbat_def_predefine_action(int argc, char **argv)
 	return 0;
 }
 
-void ss_predefine_lowbat_init(void)
+static void lowbat_init(void *data)
 {
+	struct ss_main_data *ad = (struct ss_main_data*)data;
+
 	ss_action_entry_add_internal(PREDEF_LOWBAT, lowbat_def_predefine_action,
 				     NULL, NULL);
-}
-
-int ss_lowbat_init(struct ss_main_data *ad)
-{
-	int i;
 
 	/* need check battery */
 	lowbat_timer =
@@ -481,6 +479,8 @@ int ss_lowbat_init(struct ss_main_data *ad)
 	ss_lowbat_is_charge_in_now();
 
 	vconf_notify_key_changed(VCONFKEY_PM_STATE, (void *)wakeup_cb, NULL);
-
-	return 0;
 }
+
+const struct device_ops lowbat_device_ops = {
+	.init = lowbat_init,
+};

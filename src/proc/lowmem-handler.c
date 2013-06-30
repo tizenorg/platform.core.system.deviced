@@ -32,6 +32,7 @@
 #include "core/queue.h"
 #include "core/predefine.h"
 #include "core/data.h"
+#include "core/devices.h"
 
 #define PREDEF_LOWMEM			"lowmem"
 #define OOM_MEM_ACT			"oom_mem_act"
@@ -437,25 +438,24 @@ int lowmem_def_predefine_action(int argc, char **argv)
 	}
 	return 0;
 }
-int ss_predefine_lowmem_init(void)
+
+static void lowmem_init(void *data)
 {
+	struct ss_main_data *ad = (struct ss_main_data*)data;
+	char lowmem_dev_node[PATH_MAX];
+
 	ss_action_entry_add_internal(PREDEF_LOWMEM, lowmem_def_predefine_action,
 				     NULL, NULL);
-}
-
-int ss_lowmem_init(struct ss_main_data *ad)
-{
-	char lowmem_dev_node[PATH_MAX];
 
 	if (device_get_property(DEVICE_TYPE_MEMORY, PROP_MEMORY_NODE, lowmem_dev_node) < 0) {
 		PRT_TRACE_ERR("Low memory handler fd init failed");
-		return -1;
+		return;
 	}
 
 	lowmem_fd = open(lowmem_dev_node, O_RDONLY);
 	if (lowmem_fd < 0) {
 		PRT_TRACE_ERR("ss_lowmem_init fd open failed");
-		return -1;
+		return;
 	}
 
 	oom_timer = NULL;
@@ -463,8 +463,10 @@ int ss_lowmem_init(struct ss_main_data *ad)
 				  NULL);
 	if (set_threshold() < 0) {
 		PRT_TRACE_ERR("Setting lowmem threshold is failed");
-		return -1;
+		return;
 	}
-
-	return 0;
 }
+
+const struct device_ops lowmem_device_ops = {
+	.init = lowmem_init,
+};

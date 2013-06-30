@@ -21,6 +21,5 @@
 int ss_noti_getfd(void);
 int ss_noti_send(char *filename);
 int ss_noti_add(const char *noti, void (*cb) (void *), void *data);
-int ss_noti_init(void);
 
 #endif /* __SS_NOTI_H__ */

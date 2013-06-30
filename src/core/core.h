@@ -18,10 +18,7 @@
 #ifndef __SS_CORE_H__
 #define __SS_CORE_H__
 
-#include "data.h"
-
 int ss_core_action_run();
 int ss_core_action_clear(int pid);
-int ss_core_init(struct ss_main_data *ad);
 
 #endif /* __SS_CORE_H__ */

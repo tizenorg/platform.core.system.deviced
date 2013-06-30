@@ -18,6 +18,7 @@ SET(SRCS
 	src/core/launch.c
 	src/core/queue.c
 	src/core/core.c
+	src/core/devices.c
 	src/core/sig-handler.c
 	src/core/log.c
 	src/core/device-change-handler.c

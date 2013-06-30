@@ -115,16 +115,6 @@ int (*pm_init_extention) (void *data);		/**< extention init function */
 void (*pm_exit_extention) (void);		/**< extention exit function */
 int check_processes(enum state_t prohibit_state);
 
-/*
- * Power manager Main loop
- *
- * @internal
- * @param[in] flags If the first bit of this is set, start managing without Start notification.
- * 					If the second bit of ths is set, use unified device manager functions.
- */
-void start_pm_main(void);
-void end_pm_main(void);
-
 /**
  * @}
  */

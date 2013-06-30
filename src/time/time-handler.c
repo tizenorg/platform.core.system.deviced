@@ -22,17 +22,18 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <vconf.h>
-
-#include "core/data.h"
-#include "core/queue.h"
-#include "core/log.h"
-#include "poll.h"
-
 #include <time.h>
 #include <sys/ioctl.h>
 #include <linux/rtc.h>
 #include <fcntl.h>
 #include <sys/timerfd.h>
+
+#include "core/data.h"
+#include "core/queue.h"
+#include "core/log.h"
+#include "core/devices.h"
+#include "poll.h"
+
 
 #define PREDEF_SET_DATETIME		"set_datetime"
 #define PREDEF_SET_TIMEZONE		"set_timezone"
@@ -246,7 +247,7 @@ static int tfd_cb(void *data, Ecore_Fd_Handler * fd_handler)
 	return 0;
 }
 
-int ss_time_manager_init(void)
+static void time_init(void *data)
 {
 	ss_action_entry_add_internal(PREDEF_SET_DATETIME, set_datetime_action,
 				     NULL, NULL);
@@ -254,7 +255,10 @@ int ss_time_manager_init(void)
 				     NULL, NULL);
 	if (timerfd_check_start() == -1) {
 		PRT_TRACE_ERR("fail system time change detector init");
-		return -1;
+		return;
 	}
-	return 0;
 }
+
+const struct device_ops time_device_ops = {
+	.init = time_init,
+};

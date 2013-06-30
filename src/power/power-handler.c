@@ -44,6 +44,7 @@
 #include "core/predefine.h"
 #include "core/data.h"
 #include "core/common.h"
+#include "core/devices.h"
 #include "proc/proc-handler.h"
 #include "poll.h"
 #include "setting.h"
@@ -504,9 +505,10 @@ int restart_def_predefine_action(int argc, char **argv)
 	return 0;
 }
 
-void ss_predefine_power_init(void)
+static void power_init(void *data)
 {
 	int bTelReady = 0;
+
 	if (vconf_get_bool(VCONFKEY_TELEPHONY_READY,&bTelReady) == 0) {
 		if (bTelReady == 1) {
 			tapi_handle = tel_init(NULL);
@@ -543,12 +545,10 @@ void ss_predefine_power_init(void)
 		PRT_TRACE_ERR("Vconf notify key chaneged failed: KEY(%s)", VCONFKEY_SYSMAN_POWER_OFF_STATUS);
 	}
 
-}
-int ss_power_init(struct ss_main_data *ad)
-{
-
 	register_edbus_signal_handler(SIGNAL_NAME_POWEROFF_POPUP,
 		    (void *)poweroff_popup_edbus_signal_handler);
-	return 0;
 }
 
+const struct device_ops power_device_ops = {
+	.init = power_init,
+};

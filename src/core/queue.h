@@ -61,6 +61,4 @@ int ss_run_queue_add(struct ss_action_entry *act_entry, int argc, char **argv);
 int ss_run_queue_del(struct ss_run_queue_entry *entry);
 int ss_run_queue_del_bypid(int pid);
 
-void ss_queue_init();
-
 #endif /* __SS_QUEUE_H__ */

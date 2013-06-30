@@ -17,6 +17,8 @@
 
 #include <heynoti.h>
 #include "log.h"
+#include "data.h"
+#include "devices.h"
 
 static int noti_fd;
 
@@ -30,22 +32,6 @@ int ss_noti_send(char *filename)
 	return heynoti_publish(filename);
 }
 
-int ss_noti_init()
-{
-	noti_fd = heynoti_init();
-	if (noti_fd < 0) {
-		PRT_TRACE_ERR("heynoti_init error");
-		return -1;
-	}
-
-	if (heynoti_attach_handler(noti_fd) < 0) {
-		PRT_TRACE_ERR("heynoti_attach_handler error");
-		return -1;
-	}
-
-	return 0;
-}
-
 int ss_noti_add(const char *noti, void (*cb) (void *), void *data)
 {
 	if (noti_fd < 0)
@@ -53,3 +39,41 @@ int ss_noti_add(const char *noti, void (*cb) (void *), void *data)
 
 	return heynoti_subscribe(noti_fd, noti, cb, data);
 }
+
+static void noti_init(void *data)
+{
+	struct ss_main_data *ad = (struct ss_main_data*)data;
+
+	if ((ad->noti_fd = heynoti_init()) < 0) {
+		PRT_TRACE_ERR("Hey Notification Initialize failed");
+		return;
+	}
+	if (heynoti_attach_handler(ad->noti_fd) != 0) {
+		PRT_TRACE_ERR("fail to attach hey noti handler");
+		return;
+	}
+
+	noti_fd = heynoti_init();
+	if (noti_fd < 0) {
+		PRT_TRACE_ERR("heynoti_init error");
+		return;
+	}
+
+	if (heynoti_attach_handler(noti_fd) < 0) {
+		PRT_TRACE_ERR("heynoti_attach_handler error");
+		return;
+	}
+}
+
+static void noti_exit(void *data)
+{
+	struct ss_main_data *ad = (struct ss_main_data*)data;
+
+	heynoti_close(ad->noti_fd);
+	heynoti_close(noti_fd);
+}
+
+const struct device_ops noti_device_ops = {
+	.init = noti_init,
+	.exit = noti_exit,
+};

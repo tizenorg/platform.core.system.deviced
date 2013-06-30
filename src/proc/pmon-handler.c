@@ -20,12 +20,13 @@
 #include <limits.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <device-node.h>
 
-#include "device-node.h"
 #include "core/log.h"
 #include "core/launch.h"
 #include "core/data.h"
 #include "core/common.h"
+#include "core/devices.h"
 
 #define PMON_PERMANENT_DIR	"/tmp/permanent"
 
@@ -215,20 +216,6 @@ static int pmon_cb(void *data, Ecore_Fd_Handler * fd_handler)
 	return 1;
 }
 
-int ss_pmon_init(struct ss_main_data *ad)
-{
-	int ret = -1;
-	if (pmon_efd) {
-		ecore_main_fd_handler_del(pmon_efd);
-		pmon_efd = NULL;
-	}
-	if (__pmon_start(ad) == -1) {
-		PRT_TRACE_ERR("fail pmon control fd init");
-		return -1;
-	}
-	return 0;
-}
-
 static int __pmon_start(struct ss_main_data *ad)
 {
 	int pmon_fd = -1;
@@ -262,3 +249,22 @@ static int __pmon_stop(int fd)
 	}
 	return 0;
 }
+
+static void pmon_init(void *data)
+{
+	struct ss_main_data *ad = (struct ss_main_data*)data;
+	int ret = -1;
+
+	if (pmon_efd) {
+		ecore_main_fd_handler_del(pmon_efd);
+		pmon_efd = NULL;
+	}
+	if (__pmon_start(ad) == -1) {
+		PRT_TRACE_ERR("fail pmon control fd init");
+		return;
+	}
+}
+
+const struct device_ops pmon_device_ops = {
+	.init = pmon_init,
+};

@@ -21,7 +21,6 @@
 #include "data.h"
 
 /* MMC functions */
-int ss_mmc_init();
 int ss_mmc_inserted();
 int ss_mmc_removed();
 
@@ -29,21 +28,8 @@ int ss_mmc_removed();
 int _ss_usb_storage_init(void);
 
 /* Battery functions */
-int ss_lowbat_init(struct ss_main_data *ad);
 int ss_lowbat_is_charge_in_now();
 int ss_lowbat_set_charge_on(int onoff);
 int ss_lowbat_monitor(void *data);
-
-/* Low memory functions */
-int ss_lowmem_init(struct ss_main_data *ad);
-
-/* USB functions */
-int ss_usb_init();
-
-/* TA functions */
-int ss_ta_init();
-
-/* device change init */
-int ss_device_change_init(struct ss_main_data *ad);
 
 #endif /* __SS_DEVICE_HANDLER_H__ */

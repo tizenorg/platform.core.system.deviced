@@ -21,6 +21,7 @@
 #include "core/log.h"
 #include "core/predefine.h"
 #include "core/data.h"
+#include "core/devices.h"
 
 #ifndef MERGE_BTW_APPLICATIONS
 #define MERGE_BTW_APPLICATIONS
@@ -313,8 +314,12 @@ int haptic_def_predefine_action(int argc, char **argv)
 	return -1;
 }
 
-int vibrator_init(void)
+static void vibrator_init(void *data)
 {
 	ss_action_entry_add_internal(PREDEF_HAPTIC, haptic_def_predefine_action,
 					NULL, NULL);
 }
+
+const struct device_ops vibrator_device_ops = {
+	.init = vibrator_init,
+};

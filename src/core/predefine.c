@@ -39,7 +39,7 @@
 #include "common.h"
 #include "poll.h"
 #include "setting.h"
-#include "led/led.h"
+#include "devices.h"
 
 #define PREDEFINE_SO_DIR		PREFIX"/lib/ss_predefine/"
 
@@ -182,12 +182,11 @@ static void ss_action_entry_load_from_sodir()
 	closedir(dp);
 }
 
-void ss_predefine_internal_init(void)
+static void predefine_init(void *data)
 {
-
-	/* telephony initialize */
-	int ret = 0;
-
 	ss_action_entry_load_from_sodir();
-
 }
+
+const struct device_ops predefine_device_ops = {
+	.init = predefine_init,
+};

@@ -20,7 +20,7 @@
 #include <bundle.h>
 
 int call_predefine_action(int argc, char **argv);
-void ss_predefine_internal_init(void);
 void predefine_pm_change_state(unsigned int s_bits);
 int predefine_control_launch(char *popup_name, bundle *b, int option);
+
 #endif /* __SS_PREDEFINE_H__ */

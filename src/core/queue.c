@@ -297,8 +297,3 @@ int ss_run_queue_del_bypid(int pid)
 
 	return 0;
 }
-
-void ss_queue_init()
-{
-
-}

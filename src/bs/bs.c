@@ -30,6 +30,7 @@
 #include <Ecore_File.h>
 #include "core/log.h"
 #include "core/launch.h"
+#include "core/devices.h"
 
 #define CRASH_PID_MAX 7
 #define CRASH_MODE_MAX 2
@@ -407,7 +408,7 @@ static int _check_disk_available(void)
 	return 1;
 }
 
-int ss_bs_init(void)
+static void bs_init(void *data)
 {
 	if (make_noti_file(CRASH_NOTI_DIR, CRASH_NOTI_FILE) < 0) {
 		PRT_TRACE_ERR("make_noti_file() failed");
@@ -434,8 +435,10 @@ int ss_bs_init(void)
 	if (!crash_file_monitor) {
 		PRT_TRACE_ERR("ecore_file_monitor_add() failed");
 		launch_crash_worker(CRASH_NOTI_PATH, CRASH_POPUP_OFF);
-		return -1;
+		return;
 	}
-
-	return 0;
 }
+
+const struct device_ops bs_device_ops = {
+	.init = bs_init,
+};

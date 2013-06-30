@@ -16,17 +16,18 @@
 
 
 #include <vconf.h>
+#include <device-node.h>
+#include <poll.h>
 
 #include "core/log.h"
-#include "device-node.h"
 #include "core/launch.h"
 #include "core/data.h"
-#include "poll.h"
+#include "core/devices.h"
 
 #define USBCON_EXEC_PATH	PREFIX"/bin/usb-server"
 #define RETRY			3
 
-int ss_usb_init()
+static void usb_init(void *data)
 {
 	int val = -1, i = 0, pid;
 
@@ -43,12 +44,14 @@ int ss_usb_init()
 			pid = ss_launch_if_noexist(USBCON_EXEC_PATH, NULL);
 			if (pid < 0) {
 				PRT_TRACE_ERR("usb appl launching failed\n");
-				return -1;
+				return;
 			}
 		}
 		else if (val==0)
 			vconf_set_int(VCONFKEY_SYSMAN_USB_STATUS,VCONFKEY_SYSMAN_USB_DISCONNECTED);
 	}
-
-	return 0;
 }
+
+const struct device_ops usb_device_ops = {
+	.init = usb_init,
+};

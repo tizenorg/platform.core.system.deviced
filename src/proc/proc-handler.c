@@ -26,6 +26,7 @@
 #include "core/queue.h"
 #include "core/log.h"
 #include "core/common.h"
+#include "core/devices.h"
 
 #define OOMADJ_SU                       (-17)
 #define OOMADJ_INIT                     (-16)
@@ -421,7 +422,7 @@ int set_process_group_action(int argc, char **argv)
 	return 0;
 }
 
-int ss_process_manager_init(void)
+static void process_init(void *data)
 {
 	ss_action_entry_add_internal(PREDEF_FOREGRD, set_foregrd_action, NULL,
 				     NULL);
@@ -433,5 +434,8 @@ int ss_process_manager_init(void)
 				     NULL);
 	ss_action_entry_add_internal(OOMADJ_SET, set_oomadj_action, NULL, NULL);
 	ss_action_entry_add_internal(PROCESS_GROUP_SET, set_process_group_action, NULL, NULL);
-	return 0;
 }
+
+const struct device_ops process_device_ops = {
+	.init = process_init,
+};

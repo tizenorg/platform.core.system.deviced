@@ -22,6 +22,7 @@
 #include "core/data.h"
 #include "core/edbus-handler.h"
 #include "core/common.h"
+#include "core/devices.h"
 
 #define EDBUS_INIT_RETRY_COUNT 5
 
@@ -209,14 +210,7 @@ int register_edbus_signal_handler(char *signal_name, E_DBus_Signal_Cb cb)
 	return 0;
 }
 
-void edbus_fini(void)
-{
-	unregister_edbus_signal_handle();
-	e_dbus_connection_close(edbus_conn);
-	e_dbus_shutdown();
-}
-
-void edbus_init(void)
+static void edbus_init(void *data)
 {
 	int retry = EDBUS_INIT_RETRY_COUNT;
 	int i, r;
@@ -272,3 +266,14 @@ err_dbus_shutdown:
 	return;
 }
 
+static void edbus_exit(void *data)
+{
+	unregister_edbus_signal_handle();
+	e_dbus_connection_close(edbus_conn);
+	e_dbus_shutdown();
+}
+
+const struct device_ops edbus_device_ops = {
+	.init = edbus_init,
+	.exit = edbus_exit,
+};

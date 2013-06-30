@@ -16,11 +16,12 @@
 
 
 #include <fcntl.h>
+#include <device-node.h>
+#include <vconf.h>
 
-#include "device-node.h"
 #include "core/log.h"
 #include "core/data.h"
-#include "vconf.h"
+#include "core/devices.h"
 
 #define PREDEF_SET_MAX_FREQUENCY	"set_max_frequency"
 #define PREDEF_SET_MIN_FREQUENCY	"set_min_frequency"
@@ -222,21 +223,6 @@ static int power_saving_cpu_cb(keynode_t *key_nodes, void *data)
 	return 0;
 }
 
-int ss_cpu_handler_init(void)
-{
-	__set_freq_limit();
-
-	ss_action_entry_add_internal(PREDEF_SET_MAX_FREQUENCY, set_max_frequency_action, NULL, NULL);
-	ss_action_entry_add_internal(PREDEF_SET_MIN_FREQUENCY, set_min_frequency_action, NULL, NULL);
-	ss_action_entry_add_internal(PREDEF_RELEASE_MAX_FREQUENCY, release_max_frequency_action, NULL, NULL);
-	ss_action_entry_add_internal(PREDEF_RELEASE_MIN_FREQUENCY, release_min_frequency_action, NULL, NULL);
-
-	vconf_notify_key_changed(VCONFKEY_SETAPPL_PWRSV_SYSMODE_STATUS, (void *)power_saving_cb, NULL);
-	vconf_notify_key_changed(VCONFKEY_SETAPPL_PWRSV_CUSTMODE_CPU, (void *)power_saving_cpu_cb, NULL);
-
-	return 0;
-}
-
 static void __set_freq_limit()
 {
 	int ret;
@@ -428,3 +414,20 @@ static int __write_min_cpu_freq(int freq)
 	
 	return 0;
 }
+
+static void cpu_init(void *data)
+{
+	__set_freq_limit();
+
+	ss_action_entry_add_internal(PREDEF_SET_MAX_FREQUENCY, set_max_frequency_action, NULL, NULL);
+	ss_action_entry_add_internal(PREDEF_SET_MIN_FREQUENCY, set_min_frequency_action, NULL, NULL);
+	ss_action_entry_add_internal(PREDEF_RELEASE_MAX_FREQUENCY, release_max_frequency_action, NULL, NULL);
+	ss_action_entry_add_internal(PREDEF_RELEASE_MIN_FREQUENCY, release_min_frequency_action, NULL, NULL);
+
+	vconf_notify_key_changed(VCONFKEY_SETAPPL_PWRSV_SYSMODE_STATUS, (void *)power_saving_cb, NULL);
+	vconf_notify_key_changed(VCONFKEY_SETAPPL_PWRSV_CUSTMODE_CPU, (void *)power_saving_cpu_cb, NULL);
+}
+
+const struct device_ops cpu_device_ops = {
+	.init = cpu_init,
+};

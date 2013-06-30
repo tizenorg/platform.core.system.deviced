@@ -15,6 +15,8 @@
  */
 
 
+#include <stdlib.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <sys/mount.h>
 #include <sys/smack.h>
@@ -25,9 +27,11 @@
 #include <dirent.h>
 #include <sys/statfs.h>
 #include <bundle.h>
+#include <signal.h>
+
 #include "core/log.h"
-#include "core/device-handler.h"
 #include "core/common.h"
+#include "core/devices.h"
 
 #define VCONFKEY_INTERNAL_PRIVATE_MMC_ID	"db/private/sysman/mmc_device_id"
 
@@ -789,7 +793,7 @@ static int ss_mmc_check_smack(int argc, char **argv)
 	return 0;
 }
 
-int ss_mmc_init(void)
+static void mmc_init(void *data)
 {
 	ss_action_entry_add_internal(PREDEF_MOUNT_MMC, ss_mmc_inserted, NULL, NULL);
 	ss_action_entry_add_internal(PREDEF_UNMOUNT_MMC, ss_mmc_unmounted, NULL, NULL);
@@ -800,5 +804,8 @@ int ss_mmc_init(void)
 	/* mmc card mount */
 	if (__check_mmc_fs() != 0)
 		PRT_TRACE_ERR("fail to check mmc");
-	return 0;
 }
+
+const struct device_ops mmc_device_ops = {
+	.init = mmc_init,
+};

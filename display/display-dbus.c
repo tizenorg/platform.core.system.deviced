@@ -31,20 +31,20 @@
 #include "core.h"
 #include "device-node.h"
 #include "core/common.h"
-
+#include "core/devices.h"
 
 #define DISP_INDEX_BIT 4
 #define COMBINE_DISP_CMD(cmd, prop, index) (cmd = (prop | (index << DISP_INDEX_BIT)))
 
 static DBusMessage *e_dbus_start_cb(E_DBus_Object *obj, DBusMessage *msg)
 {
-	start_pm_main();
+	display_device_ops.init(NULL);
 	return dbus_message_new_method_return(msg);
 }
 
 static DBusMessage *e_dbus_stop_cb(E_DBus_Object *obj, DBusMessage *msg)
 {
-	end_pm_main();
+	display_device_ops.exit(NULL);
 	return dbus_message_new_method_return(msg);
 }
 
