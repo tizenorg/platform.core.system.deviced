@@ -32,7 +32,7 @@
 #include "core/queue.h"
 #include "core/log.h"
 #include "core/devices.h"
-#include "poll.h"
+#include "display/poll.h"
 
 
 #define PREDEF_SET_DATETIME		"set_datetime"

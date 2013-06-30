@@ -36,7 +36,7 @@
 #include "noti.h"
 #include "data.h"
 #include "predefine.h"
-#include "poll.h"
+#include "display/poll.h"
 #include "devices.h"
 #include "sys_pci_noti/sys_pci_noti.h"
 

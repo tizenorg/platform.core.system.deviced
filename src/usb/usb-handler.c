@@ -17,12 +17,12 @@
 
 #include <vconf.h>
 #include <device-node.h>
-#include <poll.h>
 
 #include "core/log.h"
 #include "core/launch.h"
 #include "core/data.h"
 #include "core/devices.h"
+#include "display/poll.h"
 
 #define USBCON_EXEC_PATH	PREFIX"/bin/usb-server"
 #define RETRY			3

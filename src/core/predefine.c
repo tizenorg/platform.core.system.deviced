@@ -37,8 +37,8 @@
 #include "proc/proc-handler.h"
 #include "data.h"
 #include "common.h"
-#include "poll.h"
-#include "setting.h"
+#include "display/poll.h"
+#include "display/setting.h"
 #include "devices.h"
 
 #define PREDEFINE_SO_DIR		PREFIX"/lib/ss_predefine/"

@@ -1,6 +1,7 @@
 /*
- * power-manager
- * Copyright (c) 2012 Samsung Electronics Co., Ltd.
+ *  deviced
+ *
+ * Copyright (c) 2011 - 2013 Samsung Electronics Co., Ltd. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,12 +14,14 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
 */
 
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <util.h>
+
+#include "util.h"
 #include "setting.h"
 #include "conf.h"
 

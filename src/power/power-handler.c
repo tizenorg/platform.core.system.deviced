@@ -46,8 +46,8 @@
 #include "core/common.h"
 #include "core/devices.h"
 #include "proc/proc-handler.h"
-#include "poll.h"
-#include "setting.h"
+#include "display/poll.h"
+#include "display/setting.h"
 
 #define SIGNAL_NAME_POWEROFF_POPUP	"poweroffpopup"
 

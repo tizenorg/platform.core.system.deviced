@@ -40,16 +40,16 @@ SET(SRCS
 )
 
 SET(SRCS ${SRCS}
-	display/util.c
-	display/llinterface.c
-	display/conf.c
-	display/setting.c
-	display/poll.c
-	display/core.c
-	display/display-dbus.c
-	display/lsensor.c
-	display/key-filter.c
-	display/battery.c)
+	src/display/util.c
+	src/display/llinterface.c
+	src/display/conf.c
+	src/display/setting.c
+	src/display/poll.c
+	src/display/core.c
+	src/display/display-dbus.c
+	src/display/lsensor.c
+	src/display/key-filter.c
+	src/display/battery.c)
 
 SET(SRCS ${SRCS}
 	src/led/led.c)
@@ -81,7 +81,7 @@ SET(DEVICED_HEADERS
 	src/deviced/haptic-plugin-intf.h
 )
 
-INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/display ${CMAKE_CURRENT_SOURCE_DIR}/sysman ${CMAKE_CURRENT_SOURCE_DIR}/src)
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/sysman ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 # libdeviced
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/src/deviced)
