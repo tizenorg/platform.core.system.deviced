@@ -83,6 +83,69 @@ E_DBus_Interface *get_edbus_interface(const char *path)
 	return NULL;
 }
 
+pid_t get_edbus_sender_pid(DBusMessage *msg)
+{
+	const char *sender;
+	DBusMessage *send_msg;
+	DBusPendingCall *pending;
+	DBusMessageIter iter;
+	int ret;
+	pid_t pid;
+
+	if (!msg) {
+		PRT_TRACE_ERR("invalid argument!");
+		return -1;
+	}
+
+	sender = dbus_message_get_sender(msg);
+	if (!sender) {
+		PRT_TRACE_ERR("invalid sender!");
+		return -1;
+	}
+
+	send_msg = dbus_message_new_method_call(DBUS_SERVICE_DBUS,
+				    DBUS_PATH_DBUS,
+				    DBUS_INTERFACE_DBUS,
+				    "GetConnectionUnixProcessID");
+	if (!send_msg) {
+		PRT_TRACE_ERR("invalid send msg!");
+		return -1;
+	}
+
+	ret = dbus_message_append_args(send_msg, DBUS_TYPE_STRING,
+				    &sender, DBUS_TYPE_INVALID);
+	if (!ret) {
+		PRT_TRACE_ERR("fail to append args!");
+		dbus_message_unref(send_msg);
+		return -1;
+	}
+
+	pending = e_dbus_message_send(edbus_conn, send_msg, NULL, -1, NULL);
+	if (!pending) {
+		PRT_TRACE_ERR("pending is null!");
+		dbus_message_unref(send_msg);
+		return -1;
+	}
+
+	dbus_message_unref(send_msg);
+
+	/* block until reply is received */
+	dbus_pending_call_block(pending);
+
+	msg = dbus_pending_call_steal_reply(pending);
+	dbus_pending_call_unref(pending);
+	if (!msg) {
+		PRT_TRACE_ERR("reply msg is null!");
+		return -1;
+	}
+
+	dbus_message_iter_init(msg, &iter);
+	dbus_message_iter_get_basic(&iter, &pid);
+	dbus_message_unref(msg);
+
+	return pid;
+}
+
 static void unregister_edbus_signal_handle(void)
 {
 	Eina_List *tmp;

@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
-*/
+ */
 
 
 /**
@@ -24,6 +24,7 @@
  *
  */
 
+#include <error.h>
 #include <Ecore.h>
 
 #include "util.h"
@@ -31,22 +32,212 @@
 #include "device-node.h"
 #include "core/common.h"
 
+
 #define DISP_INDEX_BIT 4
 #define COMBINE_DISP_CMD(cmd, prop, index) (cmd = (prop | (index << DISP_INDEX_BIT)))
 
-static DBusMessage* e_dbus_start_cb(E_DBus_Object *obj, DBusMessage* msg)
+static DBusMessage *e_dbus_start_cb(E_DBus_Object *obj, DBusMessage *msg)
 {
 	start_pm_main();
 	return dbus_message_new_method_return(msg);
 }
 
-static DBusMessage* e_dbus_stop_cb(E_DBus_Object *obj, DBusMessage* msg)
+static DBusMessage *e_dbus_stop_cb(E_DBus_Object *obj, DBusMessage *msg)
 {
 	end_pm_main();
 	return dbus_message_new_method_return(msg);
 }
 
-static DBusMessage* e_dbus_getbrightness_cb(E_DBus_Object *obj, DBusMessage* msg)
+static DBusMessage *e_dbus_lockstate_cb(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusError err;
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	char *state_str;
+	char *option1_str;
+	char *option2_str;
+	int timeout;
+	pid_t pid;
+	int state;
+	int flag;
+	int ret;
+
+	dbus_error_init(&err);
+
+	if (!dbus_message_get_args(msg, &err,
+		    DBUS_TYPE_STRING, &state_str,
+		    DBUS_TYPE_STRING, &option1_str,
+		    DBUS_TYPE_STRING, &option2_str,
+		    DBUS_TYPE_INT32, &timeout, DBUS_TYPE_INVALID)) {
+		LOGERR("there is no message");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (!state_str || timeout < 0) {
+		LOGERR("message is invalid!");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	pid = get_edbus_sender_pid(msg);
+	if (kill(pid, 0) == -1) {
+		LOGERR("%d process does not exist, dbus ignored!", pid);
+		ret = -ESRCH;
+		goto out;
+	}
+
+	if (!strcmp(state_str, PM_LCDON_STR))
+		state = LCD_NORMAL;
+	else if (!strcmp(state_str, PM_LCDDIM_STR))
+		state = LCD_DIM;
+	else if (!strcmp(state_str, PM_LCDOFF_STR))
+		state = LCD_OFF;
+	else {
+		LOGERR("%s state is invalid, dbus ignored!", state_str);
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (!strcmp(option1_str, STAYCURSTATE_STR))
+		flag = STAY_CUR_STATE;
+	else if (!strcmp(option1_str, GOTOSTATENOW_STR))
+		flag = GOTO_STATE_NOW;
+	else {
+		LOGERR("%s option is invalid. set default option!", option1_str);
+		flag = STAY_CUR_STATE;
+	}
+
+	ret = pm_lock_internal(pid, state, flag, timeout);
+out:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+
+	return reply;
+}
+
+static DBusMessage *e_dbus_unlockstate_cb(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusError err;
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	char *state_str;
+	char *option_str;
+	pid_t pid;
+	int state;
+	int flag;
+	int ret;
+
+	dbus_error_init(&err);
+
+	if (!dbus_message_get_args(msg, &err,
+		    DBUS_TYPE_STRING, &state_str,
+		    DBUS_TYPE_STRING, &option_str, DBUS_TYPE_INVALID)) {
+		LOGERR("there is no message");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (!state_str) {
+		LOGERR("message is invalid!");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	pid = get_edbus_sender_pid(msg);
+	if (kill(pid, 0) == -1) {
+		LOGERR("%d process does not exist, dbus ignored!", pid);
+		ret = -ESRCH;
+		goto out;
+	}
+
+	if (!strcmp(state_str, PM_LCDON_STR))
+		state = LCD_NORMAL;
+	else if (!strcmp(state_str, PM_LCDDIM_STR))
+		state = LCD_DIM;
+	else if (!strcmp(state_str, PM_LCDOFF_STR))
+		state = LCD_OFF;
+	else {
+		LOGERR("%s state is invalid, dbus ignored!", state_str);
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (!strcmp(option_str, SLEEP_MARGIN_STR))
+		flag = PM_SLEEP_MARGIN;
+	else if (!strcmp(option_str, RESET_TIMER_STR))
+		flag = PM_RESET_TIMER;
+	else if (!strcmp(option_str, KEEP_TIMER_STR))
+		flag = PM_KEEP_TIMER;
+	else {
+		LOGERR("%s option is invalid. set default option!", option_str);
+		flag = PM_RESET_TIMER;
+	}
+
+	ret = pm_unlock_internal(pid, state, flag);
+out:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+
+	return reply;
+}
+
+static DBusMessage *e_dbus_changestate_cb(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusError err;
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	char *state_str;
+	pid_t pid;
+	int state;
+	int ret;
+
+	dbus_error_init(&err);
+
+	if (!dbus_message_get_args(msg, &err,
+		    DBUS_TYPE_STRING, &state_str, DBUS_TYPE_INVALID)) {
+		LOGERR("there is no message");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (!state_str) {
+		LOGERR("message is invalid!");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	pid = get_edbus_sender_pid(msg);
+	if (kill(pid, 0) == -1) {
+		LOGERR("%d process does not exist, dbus ignored!", pid);
+		ret = -ESRCH;
+		goto out;
+	}
+
+	if (!strcmp(state_str, PM_LCDON_STR))
+		state = LCD_NORMAL;
+	else if (!strcmp(state_str, PM_LCDDIM_STR))
+		state = LCD_DIM;
+	else if (!strcmp(state_str, PM_LCDOFF_STR))
+		state = LCD_OFF;
+	else {
+		LOGERR("%s state is invalid, dbus ignored!", state_str);
+		ret = -EINVAL;
+		goto out;
+	}
+
+	ret = pm_change_internal(pid, state);
+out:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+
+	return reply;
+}
+
+static DBusMessage *e_dbus_getbrightness_cb(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
@@ -66,7 +257,7 @@ static DBusMessage* e_dbus_getbrightness_cb(E_DBus_Object *obj, DBusMessage* msg
 	return reply;
 }
 
-static DBusMessage* e_dbus_setbrightness_cb(E_DBus_Object *obj, DBusMessage* msg)
+static DBusMessage *e_dbus_setbrightness_cb(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
@@ -95,11 +286,14 @@ static struct edbus_method {
 	const char *reply_signature;
 	E_DBus_Method_Cb func;
 } edbus_methods[] = {
-        { "start",           NULL,  NULL, e_dbus_start_cb },
-        { "stop",            NULL,  NULL, e_dbus_stop_cb },
-        { "getbrightness",   NULL,   "i", e_dbus_getbrightness_cb },
-        { "setbrightness",    "i",   "i", e_dbus_setbrightness_cb },
-        /* Add methods here */
+	{ "start",           NULL,  NULL, e_dbus_start_cb },
+	{ "stop",            NULL,  NULL, e_dbus_stop_cb },
+	{ "lockstate",     "sssi",   "i", e_dbus_lockstate_cb },
+	{ "unlockstate",     "ss",   "i", e_dbus_unlockstate_cb },
+	{ "changestate",      "s",   "i", e_dbus_changestate_cb },
+	{ "getbrightness",   NULL,   "i", e_dbus_getbrightness_cb },
+	{ "setbrightness",    "i",   "i", e_dbus_setbrightness_cb }
+	/* Add methods here */
 };
 
 int init_pm_dbus(void)

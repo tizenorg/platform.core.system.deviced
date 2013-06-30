@@ -48,5 +48,6 @@ void edbus_init(void);
 void edbus_fini(void);
 int register_edbus_signal_handler(char *signal_name, E_DBus_Signal_Cb cb);
 E_DBus_Interface *get_edbus_interface(const char *path);
+pid_t get_edbus_sender_pid(DBusMessage *msg);
 
 #endif /* __SS_EDBUS_HANDLE_H__ */

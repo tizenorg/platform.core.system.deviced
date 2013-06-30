@@ -51,8 +51,8 @@ enum {
 #define LCD_OFF		0x4		/**< LCD off state */
 #define POWER_OFF	0x16	/**< Sleep state */
 
-#define STAY_CUR_STATE	0x0
-#define GOTO_STATE_NOW	0x1
+#define STAY_CUR_STATE	0x1
+#define GOTO_STATE_NOW	0x2
 
 #define PM_SLEEP_MARGIN	0x0	/**< keep guard time for unlock */
 #define PM_RESET_TIMER	0x1	/**< reset timer for unlock */
@@ -65,6 +65,13 @@ enum {
 #define PM_LCDOFF_STR	"lcdoff"
 #define PM_LCDDIM_STR	"lcddim"
 #define PM_LCDON_STR	"lcdon"
+
+#define STAYCURSTATE_STR "staycurstate"
+#define GOTOSTATENOW_STR "gotostatenow"
+
+#define SLEEP_MARGIN_STR "sleepmargin"
+#define RESET_TIMER_STR  "resettimer"
+#define KEEP_TIMER_STR   "keeptimer"
 
 typedef struct {
 	pid_t pid;
