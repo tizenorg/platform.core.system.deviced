@@ -61,7 +61,6 @@
 
 #define POWEROFF_NOTI_NAME		"power_off_start"
 #define POWEROFF_DURATION		2
-#define POWEROFF_ANIMATION_PATH		"/usr/bin/boot-animation"
 #define MAX_RETRY			2
 
 static struct timeval tv_start_poweroff;
@@ -545,8 +544,12 @@ static void power_init(void *data)
 		PRT_TRACE_ERR("Vconf notify key chaneged failed: KEY(%s)", VCONFKEY_SYSMAN_POWER_OFF_STATUS);
 	}
 
-	register_edbus_signal_handler(SIGNAL_NAME_POWEROFF_POPUP,
+	register_edbus_signal_handler(OBJECT_PATH, INTERFACE_NAME,
+			SIGNAL_NAME_POWEROFF_POPUP,
 		    (void *)poweroff_popup_edbus_signal_handler);
+	register_edbus_signal_handler(OBJECT_PATH, INTERFACE_NAME,
+			SIGNAL_NAME_LCD_CONTROL,
+		    (void *)lcd_control_edbus_signal_handler);
 }
 
 const struct device_ops power_device_ops = {

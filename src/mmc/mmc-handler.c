@@ -120,18 +120,18 @@ static const char *vfat_arg[] = {
 };
 
 static const char *ext4_arg[] = {
-    "/sbin/mkfs.ext4",
-    NULL, NULL,
+	"/sbin/mkfs.ext4",
+	NULL, NULL,
 };
 
 static const char *vfat_check_arg[] = {
-    "/sbin/fsck.vfat",
-    "-a", NULL, NULL,
+	"/sbin/fsck.vfat",
+	"-a", NULL, NULL,
 };
 
 static const char *ext4_check_arg[] = {
-    "/sbin/fsck.ext4",
-    "-f", "-y", NULL, NULL,
+	"/sbin/fsck.ext4",
+	"-f", "-y", NULL, NULL,
 };
 
 
@@ -281,7 +281,7 @@ static int __umount_fs(void)
 {
 	int ret;
 	if ((ret = umount2(MMC_MOUNT_POINT, MNT_DETACH)) != 0) {
-		PRT_TRACE_ERR("Failed to unmount mmc card : %s\n", strerror(errno));
+		PRT_TRACE_ERR("Failed to unmount mmc card : %s", strerror(errno));
 	}
 	return ret;
 }

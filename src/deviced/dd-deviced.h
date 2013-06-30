@@ -142,7 +142,7 @@ int deviced_conf_set_permanent(void);
  * @brief This API is used to set a process which has pid as a permanent process.\n
  *              If the permanent process is dead, system server will relaunch the process automatically.
  * @return 0 on success, -1 if failed.
- * @see sysconf_set_permanent()
+ * @see deviced_set_permanent()
  * @par Example
  * @code
  *      ...

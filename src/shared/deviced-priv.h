@@ -28,7 +28,7 @@ extern "C" {
 #endif
 
 #define SYSTEM_NOTI_MAXARG 16
-#define SYSTEM_NOTI_MAXSTR 100
+#define SYSTEM_NOTI_MAXSTR 255
 #define BUFF_MAX 255
 
 struct sysnoti {

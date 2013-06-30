@@ -36,13 +36,13 @@
 #define SHIFT_UNLOCK			4
 #define SHIFT_UNLOCK_PARAMETER		12
 #define SHIFT_CHANGE_STATE		8
-#define SHIFT_HOLD_KEY_BLOCK		16
 #define TIMEOUT_RESET_BIT		0x80
 
-struct pwr_msg {
+struct disp_lock_msg {
 	pid_t pid;
 	unsigned int cond;
 	unsigned int timeout;
+	unsigned int timeout2;
 };
 
 API int display_get_count(void)
@@ -227,16 +227,17 @@ API int display_set_acl_status(int val)
 	return 0;
 }
 
-static int send_msg(unsigned int s_bits, unsigned int timeout)
+static int send_msg(unsigned int s_bits, unsigned int timeout, unsigned int timeout2)
 {
 	int rc = 0;
 	int sock;
-	struct pwr_msg p;
+	struct disp_lock_msg p;
 	struct sockaddr_un remote;
 
 	p.pid = getpid();
 	p.cond = s_bits;
 	p.timeout = timeout;
+	p.timeout2 = timeout2;
 
 	sock = socket(AF_UNIX, SOCK_DGRAM, 0);
 	if (sock == -1) {
@@ -280,7 +281,7 @@ API int display_change_state(unsigned int s_bits)
 	default:
 		return -1;
 	}
-	return send_msg(s_bits << SHIFT_CHANGE_STATE, 0);
+	return send_msg(s_bits << SHIFT_CHANGE_STATE, 0, 0);
 }
 
 API int display_lock_state(unsigned int s_bits, unsigned int flag,
@@ -297,10 +298,8 @@ API int display_lock_state(unsigned int s_bits, unsigned int flag,
 	if (flag & GOTO_STATE_NOW)
 		/* if the flag is true, go to the locking state directly */
 		s_bits = s_bits | (s_bits << SHIFT_CHANGE_STATE);
-	if (flag & HOLD_KEY_BLOCK)
-		s_bits = s_bits | (1 << SHIFT_HOLD_KEY_BLOCK);
 
-	return send_msg(s_bits, timeout);
+	return send_msg(s_bits, timeout, 0);
 }
 
 API int display_unlock_state(unsigned int s_bits, unsigned int flag)
@@ -316,5 +315,5 @@ API int display_unlock_state(unsigned int s_bits, unsigned int flag)
 
 	s_bits = (s_bits << SHIFT_UNLOCK);
 	s_bits = (s_bits | (flag << SHIFT_UNLOCK_PARAMETER));
-	return send_msg(s_bits, 0);
+	return send_msg(s_bits, 0, 0);
 }

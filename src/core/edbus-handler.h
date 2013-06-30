@@ -44,8 +44,11 @@
 #define DEVICED_PATH_DISPLAY		OBJECT_PATH"/Display"
 #define DEVICED_INTERFACE_DISPLAY	INTERFACE_NAME".display"
 
-int register_edbus_signal_handler(char *signal_name, E_DBus_Signal_Cb cb);
+int register_edbus_signal_handler(const char *path, const char *interface,
+		const char *name, E_DBus_Signal_Cb cb);
 E_DBus_Interface *get_edbus_interface(const char *path);
 pid_t get_edbus_sender_pid(DBusMessage *msg);
+int broadcast_edbus_signal(const char *path, const char *interface,
+		const char *name, int type, void *value);
 
 #endif /* __SS_EDBUS_HANDLE_H__ */

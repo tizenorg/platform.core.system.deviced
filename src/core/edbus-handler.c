@@ -163,26 +163,27 @@ static void unregister_edbus_signal_handle(void)
 	}
 }
 
-int register_edbus_signal_handler(char *signal_name, E_DBus_Signal_Cb cb)
+int register_edbus_signal_handler(const char *path, const char *interface,
+		const char *name, E_DBus_Signal_Cb cb)
 {
 	Eina_List *tmp;
 	struct edbus_list *entry;
 	E_DBus_Signal_Handler *handler;
 
 	EINA_LIST_FOREACH(edbus_handler_list, tmp, entry) {
-		if (entry != NULL && strncmp(entry->signal_name, signal_name, strlen(signal_name)) == 0)
+		if (entry != NULL && strncmp(entry->signal_name, name, strlen(name)) == 0)
 			return -1;
 	}
 
-	handler = e_dbus_signal_handler_add(edbus_conn, NULL, OBJECT_PATH,
-				INTERFACE_NAME, signal_name, cb, NULL);
+	handler = e_dbus_signal_handler_add(edbus_conn, NULL, path,
+				interface, name, cb, NULL);
 
 	if (!handler) {
 		PRT_TRACE_ERR("fail to add edbus handler");
 		return -1;
 	}
 
-	PRT_TRACE_ERR("add edbus service: %s", signal_name);
+	PRT_TRACE_ERR("add edbus service: %s", name);
 
 	entry = malloc(sizeof(struct edbus_list));
 
@@ -191,7 +192,7 @@ int register_edbus_signal_handler(char *signal_name, E_DBus_Signal_Cb cb)
 		return -1;
 	}
 
-	entry->signal_name = strndup(signal_name, strlen(signal_name));
+	entry->signal_name = strndup(name, strlen(name));
 
 	if (!entry->signal_name) {
 		PRT_TRACE_ERR("Malloc failed");
@@ -207,6 +208,28 @@ int register_edbus_signal_handler(char *signal_name, E_DBus_Signal_Cb cb)
 		free(entry);
 		return -1;
 	}
+	return 0;
+}
+
+int broadcast_edbus_signal(const char *path, const char *interface,
+		const char *name, int type, void *value)
+{
+	DBusMessage *signal;
+	DBusMessageIter iter;
+	DBusMessageIter val;
+	char sig[2] = {type, '\0'};
+
+	signal = dbus_message_new_signal(path, interface, name);
+	if (!signal) {
+		PRT_TRACE_ERR("fail to allocate new %s.%s signal", interface, name);
+		return -1;
+	}
+
+	dbus_message_append_args(signal, type, value, DBUS_TYPE_INVALID);
+
+	e_dbus_message_send(edbus_conn, signal, NULL, -1, NULL);
+
+	dbus_message_unref(signal);
 	return 0;
 }
 

@@ -705,6 +705,7 @@ static void device_change_init(void *data)
 		PRT_TRACE_ERR("fail uevent control init");
 		return;
 	}
+
 	/* for simple noti change cb */
 	ss_noti_add("device_usb_chgdet", (void *)usb_chgdet_cb, data);
 	ss_noti_add("device_ta_chgdet", (void *)ta_chgdet_cb, data);

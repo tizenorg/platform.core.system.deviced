@@ -26,15 +26,15 @@
 
 #include <error.h>
 #include <Ecore.h>
+#include <device-node.h>
 
 #include "util.h"
 #include "core.h"
-#include "device-node.h"
 #include "core/common.h"
 #include "core/devices.h"
 
-#define DISP_INDEX_BIT 4
-#define COMBINE_DISP_CMD(cmd, prop, index) (cmd = (prop | (index << DISP_INDEX_BIT)))
+#define DISP_INDEX_BIT 16
+#define DISP_CMD(prop, index) (prop | (index << DISP_INDEX_BIT))
 
 static DBusMessage *e_dbus_start_cb(E_DBus_Object *obj, DBusMessage *msg)
 {
@@ -245,7 +245,7 @@ static DBusMessage *e_dbus_getbrightness_cb(E_DBus_Object *obj, DBusMessage *msg
 	int cmd;
 	int brightness = -1;
 
-	COMBINE_DISP_CMD(cmd, PROP_DISPLAY_BRIGHTNESS, DEFAULT_DISPLAY);
+	cmd = DISP_CMD(PROP_DISPLAY_BRIGHTNESS, DEFAULT_DISPLAY);
 	ret = device_get_property(DEVICE_TYPE_DISPLAY, cmd, &brightness);
 
 	LOGINFO("get brightness %d, %d", brightness, ret);
@@ -268,7 +268,7 @@ static DBusMessage *e_dbus_setbrightness_cb(E_DBus_Object *obj, DBusMessage *msg
 	dbus_message_iter_init(msg, &iter);
 	dbus_message_iter_get_basic(&iter, &brightness);
 
-	COMBINE_DISP_CMD(cmd, PROP_DISPLAY_BRIGHTNESS, DEFAULT_DISPLAY);
+	cmd = DISP_CMD(PROP_DISPLAY_BRIGHTNESS, DEFAULT_DISPLAY);
 	ret = device_set_property(DEVICE_TYPE_DISPLAY, cmd, brightness);
 
 	LOGINFO("set brightness %d, %d", brightness, ret);
@@ -292,7 +292,7 @@ static struct edbus_method {
 	{ "unlockstate",     "ss",   "i", e_dbus_unlockstate_cb },
 	{ "changestate",      "s",   "i", e_dbus_changestate_cb },
 	{ "getbrightness",   NULL,   "i", e_dbus_getbrightness_cb },
-	{ "setbrightness",    "i",   "i", e_dbus_setbrightness_cb }
+	{ "setbrightness",    "i",   "i", e_dbus_setbrightness_cb },
 	/* Add methods here */
 };
 

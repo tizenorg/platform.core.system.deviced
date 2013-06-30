@@ -75,8 +75,6 @@ static void signal_init(void *data)
 	sig_act.sa_flags = SA_SIGINFO;
 	sigemptyset(&sig_act.sa_mask);
 	sigaction(SIGPIPE, &sig_act, &sig_pipe_old_act);
-	register_edbus_signal_handler(SIGNAL_NAME_LCD_CONTROL,
-		    (void *)lcd_control_edbus_signal_handler);
 }
 
 const struct device_ops signal_device_ops = {
