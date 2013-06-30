@@ -27,15 +27,7 @@
 #include "core/log.h"
 #include "core/common.h"
 #include "core/devices.h"
-
-#define OOMADJ_SU                       (-17)
-#define OOMADJ_INIT                     (-16)
-#define OOMADJ_FOREGRD_LOCKED           (-15)
-#define OOMADJ_FOREGRD_UNLOCKED         (-10)
-#define OOMADJ_BACKGRD_LOCKED           (-5)
-#define OOMADJ_BACKGRD_UNLOCKED         (1)
-
-#define OOMADJ_APP_LIMIT		(-16)
+#include "proc-handler.h"
 
 #define LIMITED_BACKGRD_NUM 15
 #define MAX_BACKGRD_OOMADJ (OOMADJ_BACKGRD_UNLOCKED + LIMITED_BACKGRD_NUM)

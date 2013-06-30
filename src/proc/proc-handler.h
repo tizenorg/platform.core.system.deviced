@@ -15,10 +15,19 @@
  */
 
 
-#ifndef __SS_PROCMGR_H__
-#define __SS_PROCMGR_H__
+#ifndef __PROC_HANDLER_H__
+#define __PROC_HANDLER_H__
+
+#define OOMADJ_SU                       (-17)
+#define OOMADJ_INIT                     (-16)
+#define OOMADJ_FOREGRD_LOCKED           (-15)
+#define OOMADJ_FOREGRD_UNLOCKED         (-10)
+#define OOMADJ_BACKGRD_LOCKED           (-5)
+#define OOMADJ_BACKGRD_UNLOCKED         (1)
+
+#define OOMADJ_APP_LIMIT		(-16)
 
 int get_app_oomadj(int pid, int *oomadj);
 int set_app_oomadj(int pid, int new_oomadj);
 
-#endif /* __SS_PROCMGR_H__ */
+#endif /* __PROC_HANDLER_H__ */
