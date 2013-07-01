@@ -81,7 +81,7 @@ static void stop_all_device(gpointer data, gpointer user_data)
 
 	node->level = 0;
 	node->play = 0;
-	PRT_TRACE_ERR("node handle : %d, level : %d, play : %d", node->handle, node->level, node->play);
+	_E("node handle : %d, level : %d, play : %d", node->handle, node->level, node->play);
 }
 #endif
 static int haptic_play(int handle)
@@ -89,10 +89,10 @@ static int haptic_play(int handle)
 	struct haptic_node *node;
 	int r;
 
-	PRT_TRACE("handle : %d", handle);
+	_D("handle : %d", handle);
 	node = find_node(handle);
 	if (node == NULL) {
-		PRT_TRACE_ERR("find_node(%d) fail", handle);
+		_E("find_node(%d) fail", handle);
 		return -1;
 	}
 #ifndef MERGE_BTW_APPLICATIONS
@@ -100,7 +100,7 @@ static int haptic_play(int handle)
 #endif
 	r = device_set_property(DEVICE_TYPE_VIBRATOR, PROP_VIBRATOR_ENABLE, 1);
 	if (r < 0) {
-		PRT_TRACE_ERR("set enable fail");
+		_E("set enable fail");
 		return -1;
 	}
 
@@ -114,22 +114,22 @@ static int haptic_oneshot(int handle, int duration, int level)
 	struct haptic_node *node;
 	int r;
 
-	PRT_TRACE("handle : %d", handle);
+	_D("handle : %d", handle);
 	node = find_node(handle);
 	if (node == NULL) {
-		PRT_TRACE_ERR("find_node(%d) fail", handle);
+		_E("find_node(%d) fail", handle);
 		return 0;
 	}
 
 	r = device_set_property(DEVICE_TYPE_VIBRATOR, PROP_VIBRATOR_LEVEL, level);
 	if (r < 0) {
-		PRT_TRACE_ERR("set level fail");
+		_E("set level fail");
 		return -1;
 	}
 
 	r = device_set_property(DEVICE_TYPE_VIBRATOR, PROP_VIBRATOR_ONESHOT, duration);
 	if (r < 0) {
-		PRT_TRACE_ERR("set oneshot fail");
+		_E("set oneshot fail");
 		return -1;
 	}
 
@@ -142,7 +142,7 @@ static void check_play_state(gpointer data, gpointer user_data)
 	int *play = (int*)user_data;
 
 	*play += node->play;
-	PRT_TRACE_ERR("node handle : %d, level : %d, play : %d", node->handle, node->level, node->play);
+	_E("node handle : %d, level : %d, play : %d", node->handle, node->level, node->play);
 }
 
 static int haptic_stop(int handle)
@@ -151,10 +151,10 @@ static int haptic_stop(int handle)
 	int play = 0;
 	int r;
 
-	PRT_TRACE("handle : %d", handle);
+	_D("handle : %d", handle);
 	node = find_node(handle);
 	if (node == NULL) {
-		PRT_TRACE_ERR("find_node(%d) fail", handle);
+		_E("find_node(%d) fail", handle);
 		return -1;
 	}
 
@@ -162,13 +162,13 @@ static int haptic_stop(int handle)
 	node->play = 0;
 
 	g_list_foreach(haptic_head, check_play_state, &play);
-	PRT_TRACE_ERR("play state : %d", play);
+	_E("play state : %d", play);
 
 	if (!play) {
-		PRT_TRACE_ERR("not playing anymore, will be stop");
+		_E("not playing anymore, will be stop");
 		r = device_set_property(DEVICE_TYPE_VIBRATOR, PROP_VIBRATOR_ENABLE, 0);
 		if (r < 0) {
-			PRT_TRACE_ERR("set enable fail");
+			_E("set enable fail");
 			return -1;
 		}
 	}
@@ -181,9 +181,9 @@ static void get_current_level(gpointer data, gpointer user_data)
 	struct haptic_node *node = (struct haptic_node*)data;
 	int *sum = (int*)user_data;
 
-	PRT_TRACE_ERR("node handle : %d, level : %d, play : %d", node->handle, node->level, node->play);
+	_E("node handle : %d, level : %d, play : %d", node->handle, node->level, node->play);
 	if (node->play == 1) {
-		PRT_TRACE_ERR("node->play : %d, sum : %d", node->play, *sum);
+		_E("node->play : %d, sum : %d", node->play, *sum);
 		*sum += node->level;
 	}
 }
@@ -194,28 +194,28 @@ static int haptic_change_level(int handle, int level)
 	int sum = 0;
 	int r;
 
-	PRT_TRACE_ERR("handle : %d, level : %d", handle, level);
+	_E("handle : %d, level : %d", handle, level);
 	node = find_node(handle);
 	if (node == NULL) {
-		PRT_TRACE_ERR("find_node(%d) fail", handle);
+		_E("find_node(%d) fail", handle);
 		return -1;
 	}
 
 	node->level = level;
 #ifdef MERGE_BTW_APPLICATIONS
 	g_list_foreach(haptic_head, get_current_level, &sum);
-	PRT_TRACE_ERR("current sum level : %d", sum);
+	_E("current sum level : %d", sum);
 #else
 	sum = level;
 	if (!node->play) {
-		PRT_TRACE_ERR("This handle is stoped by another handle");
+		_E("This handle is stoped by another handle");
 		return 0;
 	}
 #endif
 
 	r = device_set_property(DEVICE_TYPE_VIBRATOR, PROP_VIBRATOR_LEVEL, sum);
 	if (r < 0) {
-		PRT_TRACE_ERR("set level fail");
+		_E("set level fail");
 		return -1;
 	}
 
@@ -226,10 +226,10 @@ static int haptic_open(int handle)
 {
 	struct haptic_node *node;
 
-	PRT_TRACE("handle : %d", handle);
+	_D("handle : %d", handle);
 	node = malloc(sizeof(struct haptic_node));
 	if (node == NULL) {
-		PRT_TRACE_ERR("malloc fail");
+		_E("malloc fail");
 		return -1;
 	}
 
@@ -247,10 +247,10 @@ static int haptic_close(int handle)
 	int play = 0;
 	int r;
 
-	PRT_TRACE("handle : %d", handle);
+	_D("handle : %d", handle);
 	node = find_node(handle);
 	if (node == NULL) {
-		PRT_TRACE_ERR("find_node(%d) fail", handle);
+		_E("find_node(%d) fail", handle);
 		return -1;
 	}
 
@@ -261,13 +261,13 @@ static int haptic_close(int handle)
 	free(node);
 
 	g_list_foreach(haptic_head, check_play_state, &play);
-	PRT_TRACE_ERR("play state : %d", play);
+	_E("play state : %d", play);
 
 	if (!play) {
-		PRT_TRACE_ERR("not playing anymore, will be stop");
+		_E("not playing anymore, will be stop");
 		r = device_set_property(DEVICE_TYPE_VIBRATOR, PROP_VIBRATOR_ENABLE, 0);
 		if (r < 0) {
-			PRT_TRACE_ERR("set enable fail");
+			_E("set enable fail");
 			return -1;
 		}
 	}
@@ -282,19 +282,19 @@ int haptic_def_predefine_action(int argc, char **argv)
 	int mode;
 	int handle;
 
-	PRT_TRACE_ERR("argc : %d", argc);
+	_E("argc : %d", argc);
 	for (i = 0; i < argc; ++i)
-		PRT_TRACE_ERR("[%2d] %s", i, argv[i]);
+		_E("[%2d] %s", i, argv[i]);
 
 	if (argc <= 0 || argc > 5) {
-		PRT_TRACE_ERR("Haptic predefine action failed");
+		_E("Haptic predefine action failed");
 		return -1;
 	}
 
 	pid = atoi(argv[0]);
 	mode = atoi(argv[1]);
 	handle = atoi(argv[2]);
-	PRT_TRACE_ERR("pid : %d, mode : %d", pid, mode);
+	_E("pid : %d, mode : %d", pid, mode);
 
 	switch(mode) {
 	case OPEN:

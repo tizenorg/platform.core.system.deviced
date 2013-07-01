@@ -45,7 +45,7 @@ static void writepid(char *pidpath)
 
 static void sig_quit(int signo)
 {
-	PRT_TRACE_ERR("received SIGTERM signal %d", signo);
+	_E("received SIGTERM signal %d", signo);
 }
 
 static int system_main(int argc, char **argv)

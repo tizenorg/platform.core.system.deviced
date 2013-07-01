@@ -79,7 +79,7 @@ static Eina_Bool pm_handler(void *data, Ecore_Fd_Handler *fd_handler)
 	int clilen = sizeof(clientaddr);
 
 	if (device_get_status(&display_device_ops) != DEVICE_OPS_STATUS_START) {
-		LOGERR("display is not started!");
+		_E("display is not started!");
 		return EINA_FALSE;
 	}
 
@@ -106,16 +106,16 @@ static int init_sock(char *sock_path)
 	struct sockaddr_un serveraddr;
 	int fd;
 
-	LOGINFO("initialize pm_socket for pm_control library");
+	_I("initialize pm_socket for pm_control library");
 
 	if (sock_path == NULL || strcmp(sock_path, SOCK_PATH)) {
-		LOGERR("invalid sock_path= %s");
+		_E("invalid sock_path= %s");
 		return -1;
 	}
 
 	fd = socket(AF_UNIX, SOCK_DGRAM, 0);
 	if (fd < 0) {
-		LOGERR("socket error");
+		_E("socket error");
 		return -1;
 	}
 
@@ -126,18 +126,18 @@ static int init_sock(char *sock_path)
 	strncpy(serveraddr.sun_path, sock_path, sizeof(serveraddr.sun_path) - 1);
 
 	if (bind(fd, (struct sockaddr *)&serveraddr, sizeof(serveraddr)) < 0) {
-		LOGERR("bind error");
+		_E("bind error");
 		close(fd);
 		return -1;
 	}
 
 	if (chmod(sock_path, (S_IRWXU | S_IRWXG | S_IRWXO)) < 0)	/* 0777 */
-		LOGERR("failed to change the socket permission");
+		_E("failed to change the socket permission");
 
 	if (!strcmp(sock_path, SOCK_PATH))
 		sockfd = fd;
 
-	LOGINFO("init sock() sueccess!");
+	_I("init sock() sueccess!");
 	return fd;
 }
 
@@ -152,12 +152,12 @@ int init_pm_poll(int (*pm_callback) (int, PMMsg *))
 
 	g_pm_callback = pm_callback;
 
-	LOGINFO
+	_I
 	    ("initialize pm poll - input devices and domain socket(deviced)");
 
 	pm_input_env = getenv("PM_INPUT");
 	if ((pm_input_env != NULL) && (strlen(pm_input_env) < 1024)) {
-		LOGINFO("Getting input device path from environment: %s",
+		_I("Getting input device path from environment: %s",
 		       pm_input_env);
 		/* Add 2 bytes for following strncat() */
 		dev_paths_size =  strlen(pm_input_env) + strlen(SOCK_PATH) + strlen(DEV_PATH_DLM) + 1;
@@ -181,7 +181,7 @@ int init_pm_poll(int (*pm_callback) (int, PMMsg *))
 
 	path_tok = strtok_r(dev_paths, DEV_PATH_DLM, &save_ptr);
 	if (path_tok == NULL) {
-		LOGERR("Device Path Tokeninzing Failed");
+		_E("Device Path Tokeninzing Failed");
 		goto err_devpaths;
 	}
 
@@ -192,17 +192,17 @@ int init_pm_poll(int (*pm_callback) (int, PMMsg *))
 		if (strcmp(path_tok, SOCK_PATH) == 0) {
 			fd = init_sock(SOCK_PATH);
 			path = SOCK_PATH;
-			LOGINFO("pm_poll domain socket file: %s, fd: %d",
+			_I("pm_poll domain socket file: %s, fd: %d",
 			       path_tok, fd);
 		} else {
 			fd = open(path_tok, O_RDONLY);
 			path = path_tok;
-			LOGINFO("pm_poll input device file: %s, fd: %d",
+			_I("pm_poll input device file: %s, fd: %d",
 			       path_tok, fd);
 		}
 
 		if (fd == -1) {
-			LOGERR("Cannot open the file: %s", path_tok);
+			_E("Cannot open the file: %s", path_tok);
 			goto err_devpaths;
 		}
 
@@ -210,13 +210,13 @@ int init_pm_poll(int (*pm_callback) (int, PMMsg *))
 				    ECORE_FD_READ|ECORE_FD_ERROR,
 				    pm_handler, fd, NULL, NULL);
 		if (fd_handler == NULL) {
-			LOGERR("Failed ecore_main_handler_add() in init_pm_poll()");
+			_E("Failed ecore_main_handler_add() in init_pm_poll()");
 			goto err_fd;
 		}
 
 		new_dev = (indev *)malloc(sizeof(indev));
 		if (!new_dev) {
-			LOGERR("Fail to malloc for new_dev %s", path);
+			_E("Fail to malloc for new_dev %s", path);
 			goto err_fdhandler;
 		}
 
@@ -224,7 +224,7 @@ int init_pm_poll(int (*pm_callback) (int, PMMsg *))
 		len = strlen(path) + 1;
 		new_path = (char*) malloc(len);
 		if (!new_path) {
-			LOGERR("Fail to malloc for dev_path %s", path);
+			_E("Fail to malloc for dev_path %s", path);
 			goto err_dev;
 		}
 
@@ -266,7 +266,7 @@ int exit_pm_poll(void)
 
 	close(sockfd);
 	unlink(SOCK_PATH);
-	LOGINFO("pm_poll is finished");
+	_I("pm_poll is finished");
 	return 0;
 }
 
@@ -281,29 +281,29 @@ int init_pm_poll_input(int (*pm_callback)(int , PMMsg * ), const char *path)
 	char *dev_path = NULL;
 
 	if (!pm_callback || !path) {
-		LOGERR("argument is NULL! (%x,%x)", pm_callback, path);
+		_E("argument is NULL! (%x,%x)", pm_callback, path);
 		return -1;
 	}
 
 	EINA_LIST_FOREACH_SAFE(indev_list, l, l_next, data)
 		if(!strcmp(path, data->dev_path)) {
-			LOGERR("%s is already polled!", path);
+			_E("%s is already polled!", path);
 			return -1;
 		}
 
-	LOGINFO("initialize pm poll for bt %s", path);
+	_I("initialize pm poll for bt %s", path);
 
 	g_pm_callback = pm_callback;
 
 	fd = open(path, O_RDONLY);
 	if (fd == -1) {
-		LOGERR("Cannot open the file for BT: %s", path);
+		_E("Cannot open the file for BT: %s", path);
 		return -1;
 	}
 
 	dev_path = (char*)malloc(strlen(path) + 1);
 	if (!dev_path) {
-		LOGERR("Fail to malloc for dev_path");
+		_E("Fail to malloc for dev_path");
 		close(fd);
 		return -1;
 	}
@@ -313,7 +313,7 @@ int init_pm_poll_input(int (*pm_callback)(int , PMMsg * ), const char *path)
 			    ECORE_FD_READ|ECORE_FD_ERROR,
 			    pm_handler, fd, NULL, NULL);
 	if (!fd_handler) {
-		LOGERR("Fail to ecore fd handler add! %s", path);
+		_E("Fail to ecore fd handler add! %s", path);
 		close(fd);
 		free(dev_path);
 		return -1;
@@ -321,7 +321,7 @@ int init_pm_poll_input(int (*pm_callback)(int , PMMsg * ), const char *path)
 
 	new_dev = (indev *)malloc(sizeof(indev));
 	if (!new_dev) {
-		LOGERR("Fail to malloc for new_dev %s", path);
+		_E("Fail to malloc for new_dev %s", path);
 		ecore_main_fd_handler_del(fd_handler);
 		close(fd);
 		free(dev_path);
@@ -331,7 +331,7 @@ int init_pm_poll_input(int (*pm_callback)(int , PMMsg * ), const char *path)
 	new_dev->fd = fd;
 	new_dev->dev_fd = fd_handler;
 
-	LOGINFO("pm_poll for BT input device file(path: %s, fd: %d",
+	_I("pm_poll for BT input device file(path: %s, fd: %d",
 		    new_dev->dev_path, new_dev->fd);
 	indev_list = eina_list_append(indev_list, new_dev);
 
@@ -421,7 +421,7 @@ void lcd_control_edbus_signal_handler(void *data, DBusMessage *msg)
 	int timeout = -1;
 
 	if (dbus_message_is_signal(msg, INTERFACE_NAME, SIGNAL_NAME_LCD_CONTROL) == 0) {
-		LOGERR("there is lcd control signal");
+		_E("there is lcd control signal");
 		return;
 	}
 
@@ -432,17 +432,17 @@ void lcd_control_edbus_signal_handler(void *data, DBusMessage *msg)
 		    DBUS_TYPE_STRING, &lock_str,
 		    DBUS_TYPE_STRING, &state_str,
 		    DBUS_TYPE_INT32, &timeout, DBUS_TYPE_INVALID) == 0) {
-		LOGERR("there is no message");
+		_E("there is no message");
 		return;
 	}
 
 	if (pid == -1 || !lock_str || !state_str) {
-		LOGERR("message is invalid!!");
+		_E("message is invalid!!");
 		return;
 	}
 
 	if (kill(pid, 0) == -1) {
-		LOGERR("%d process does not exist, dbus ignored!", pid);
+		_E("%d process does not exist, dbus ignored!", pid);
 		return;
 	}
 
@@ -453,13 +453,13 @@ void lcd_control_edbus_signal_handler(void *data, DBusMessage *msg)
 	else if (!strcmp(state_str, PM_LCDOFF_STR))
 		state = LCD_OFF;
 	else {
-		LOGERR("%d process does not exist, dbus ignored!", pid);
+		_E("%d process does not exist, dbus ignored!", pid);
 		return;
 	}
 
 	if (!strcmp(lock_str, PM_LOCK_STR)) {
 		if (timeout < 0) {
-			LOGERR("pm_lock timeout is invalid! %d", timeout);
+			_E("pm_lock timeout is invalid! %d", timeout);
 			return;
 		}
 		pm_lock_internal(pid, state, STAY_CUR_STATE, timeout);
@@ -468,8 +468,8 @@ void lcd_control_edbus_signal_handler(void *data, DBusMessage *msg)
 	} else if (!strcmp(lock_str, PM_CHANGE_STR)) {
 		pm_change_internal(pid, state);
 	} else {
-		LOGERR("%s process does not exist, dbus ignored!", pid);
+		_E("%s process does not exist, dbus ignored!", pid);
 		return;
 	}
-	LOGINFO("dbus call success from %d\n", pid);
+	_I("dbus call success from %d\n", pid);
 }

@@ -66,7 +66,7 @@ int get_exec_pid(const char *execpath)
 
 	dp = opendir("/proc");
 	if (!dp) {
-		PRT_TRACE_ERR("open /proc");
+		_E("open /proc");
 		return -1;
 	}
 

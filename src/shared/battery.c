@@ -35,7 +35,7 @@ API int battery_get_percent(void)
 		return r;
 
 	if (val < 0 || val > 100) {
-		PRT_ERR("capacity value is wrong");
+		_E("capacity value is wrong");
 		errno = EPERM;
 		return -1;
 	}
@@ -68,7 +68,7 @@ API int battery_is_full(void)
 		return r;
 
 	if (val != 0 && val != 1) {
-		PRT_ERR("charge_full value is wrong");
+		_E("charge_full value is wrong");
 		errno = EPERM;
 		return -1;
 	}
@@ -86,7 +86,7 @@ API int battery_get_health(void)
 		return r;
 
 	if (val < BAT_UNKNOWN || val > BAT_COLD) {
-		PRT_ERR("battery health value is wrong");
+		_E("battery health value is wrong");
 		errno = EPERM;
 		return -1;
 	}

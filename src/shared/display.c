@@ -20,12 +20,12 @@
 #include <stdio.h>
 #include <vconf.h>
 #include <errno.h>
+#include <device-node.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
 #include <linux/limits.h>
-#include <device-node.h>
 
 #include "log.h"
 #include "dd-display.h"
@@ -87,19 +87,19 @@ API int display_set_brightness_with_setting(int val)
 	int r;
 
 	if (vconf_get_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT, &auto_brt_state) != 0) {
-		PRT_ERR("Failed to get VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT value");
+		_E("Failed to get VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT value");
 		errno = EPERM;
 		return -errno;
 	}
 
 	if (val == DISPLAY_DIM_BRIGHTNESS) {
-		PRT_DBG("application can not set this value(DIM VALUE:%d)", val);
+		_D("application can not set this value(DIM VALUE:%d)", val);
 		errno = EPERM;
 		return -errno;
 	}
 
 	if (auto_brt_state == SETTING_BRIGHTNESS_AUTOMATIC_ON) {
-		PRT_DBG("auto_brightness state is ON, can not change the brightness value");
+		_D("auto_brightness state is ON, can not change the brightness value");
 		return 0;
 	}
 
@@ -108,11 +108,11 @@ API int display_set_brightness_with_setting(int val)
 		return r;
 
 	if (vconf_set_int(VCONFKEY_SETAPPL_LCD_BRIGHTNESS, val) != 0) {
-		PRT_ERR("Failed to set VCONFKEY_SETAPPL_LCD_BRIGHTNESS value");
+		_E("Failed to set VCONFKEY_SETAPPL_LCD_BRIGHTNESS value");
 	}
 
 	if (vconf_set_int(VCONFKEY_PM_CURRENT_BRIGHTNESS, val) != 0) {
-		PRT_ERR("Failed to set VCONFKEY_PM_CURRENT_BRIGHTNESS value");
+		_E("Failed to set VCONFKEY_PM_CURRENT_BRIGHTNESS value");
 	}
 
 	return 0;
@@ -124,13 +124,13 @@ API int display_set_brightness(int val)
 	int r;
 
 	if (vconf_get_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT, &auto_brt_state) != 0) {
-		PRT_ERR("Failed to get VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT value");
+		_E("Failed to get VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT value");
 		errno = EPERM;
 		return -errno;
 	}
 
 	if (val == DISPLAY_DIM_BRIGHTNESS) {
-		PRT_DBG("application can not set this value(DIM VALUE:%d)", val);
+		_D("application can not set this value(DIM VALUE:%d)", val);
 		errno = EPERM;
 		return -errno;
 	}
@@ -141,12 +141,12 @@ API int display_set_brightness(int val)
 		return r;
 
 	if (auto_brt_state == SETTING_BRIGHTNESS_AUTOMATIC_ON) {
-		PRT_DBG("Auto brightness will be paused");
+		_D("Auto brightness will be paused");
 		vconf_set_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT, SETTING_BRIGHTNESS_AUTOMATIC_PAUSE);
 	}
 
 	if (vconf_set_int(VCONFKEY_PM_CURRENT_BRIGHTNESS, val) != 0) {
-		PRT_ERR("Failed to set VCONFKEY_PM_CURRENT_BRIGHTNESS value");
+		_E("Failed to set VCONFKEY_PM_CURRENT_BRIGHTNESS value");
 	}
 
 	return 0;
@@ -162,31 +162,31 @@ API int display_release_brightness(void)
 	int r;
 
 	if (vconf_get_int(VCONFKEY_SYSMAN_BATTERY_STATUS_LOW, &bat_state) != 0) {
-		PRT_ERR("Failed to get VCONFKEY_SYSMAN_BATTERY_STATUS_LOW value");
+		_E("Failed to get VCONFKEY_SYSMAN_BATTERY_STATUS_LOW value");
 		errno = EPERM;
 		return -1;
 	}
 
 	if (vconf_get_int(VCONFKEY_SYSMAN_CHARGER_STATUS, &charger_state) != 0) {
-		PRT_ERR("Failed to get VCONFKEY_SYSMAN_CHARGER_STATUS value");
+		_E("Failed to get VCONFKEY_SYSMAN_CHARGER_STATUS value");
 		errno = EPERM;
 		return -1;
 	}
 
 	if (vconf_get_bool(VCONFKEY_PM_BRIGHTNESS_CHANGED_IN_LPM, &brt_changed_state) != 0) {
-		PRT_ERR("Failed to get VCONFKEY_PM_BRIGHTNESS_CHANGED_IN_LPM value");
+		_E("Failed to get VCONFKEY_PM_BRIGHTNESS_CHANGED_IN_LPM value");
 		errno = EPERM;
 		return -1;
 	}
 
 	if (vconf_get_int(VCONFKEY_SETAPPL_LCD_BRIGHTNESS, &setting_val) != 0) {
-		PRT_ERR("Failed to get VCONFKEY_SETAPPL_LCD_BRIGHTNESS value");
+		_E("Failed to get VCONFKEY_SETAPPL_LCD_BRIGHTNESS value");
 		errno = EPERM;
 		return -1;
 	}
 
 	if (vconf_get_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT, &auto_brt_state) != 0) {
-		PRT_ERR("Failed to get VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT value");
+		_E("Failed to get VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT value");
 		errno = EPERM;
 		return -1;
 	}
@@ -196,7 +196,7 @@ API int display_release_brightness(void)
 	// check dim state
 	if (bat_state <= VCONFKEY_SYSMAN_BAT_WARNING_LOW &&
 		charger_state == VCONFKEY_SYSMAN_CHARGER_DISCONNECTED && !brt_changed_state) {
-		PRT_DBG("batt warning low : brightness is not changed!");
+		_D("batt warning low : brightness is not changed!");
 		device_set_property(DEVICE_TYPE_DISPLAY, PROP_DISPLAY_BRIGHTNESS, 0);
 		return 0;
 	}
@@ -204,10 +204,10 @@ API int display_release_brightness(void)
 	if (auto_brt_state == SETTING_BRIGHTNESS_AUTOMATIC_OFF) {
 		device_set_property(DEVICE_TYPE_DISPLAY, PROP_DISPLAY_BRIGHTNESS, setting_val);
 		if (vconf_set_int(VCONFKEY_PM_CURRENT_BRIGHTNESS, setting_val) != 0) {
-			PRT_ERR("Failed to set VCONFKEY_PM_CURRENT_BRIGHTNESS value");
+			_E("Failed to set VCONFKEY_PM_CURRENT_BRIGHTNESS value");
 		}
 	} else if (auto_brt_state == SETTING_BRIGHTNESS_AUTOMATIC_PAUSE) {
-		PRT_DBG("Auto brightness will be enable");
+		_D("Auto brightness will be enable");
 		vconf_set_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT, SETTING_BRIGHTNESS_AUTOMATIC_ON);
 	}
 
@@ -251,13 +251,13 @@ static int send_msg(unsigned int s_bits, unsigned int timeout, unsigned int time
 
 	sock = socket(AF_UNIX, SOCK_DGRAM, 0);
 	if (sock == -1) {
-		ERR("pm socket() failed");
+		_E("pm socket() failed");
 		return -1;
 	}
 
 	remote.sun_family = AF_UNIX;
 	if(strlen(SOCK_PATH) >= sizeof(remote.sun_path)) {
-		ERR("socket path is vey long");
+		_E("socket path is vey long");
 		return -1;
 	}
 	strncpy(remote.sun_path, SOCK_PATH, sizeof(remote.sun_path));
@@ -265,7 +265,7 @@ static int send_msg(unsigned int s_bits, unsigned int timeout, unsigned int time
 	rc = sendto(sock, (void *)&p, sizeof(p), 0, (struct sockaddr *)&remote,
 		    sizeof(struct sockaddr_un));
 	if (rc == -1) {
-		ERR("pm socket sendto() failed");
+		_E("pm socket sendto() failed");
 	} else
 		rc = 0;
 

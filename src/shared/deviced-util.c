@@ -47,7 +47,7 @@ API int deviced_get_pid(const char *execpath)
 
 	dp = opendir("/proc");
 	if (!dp) {
-		PRT_TRACE_ERR("open /proc");
+		_E("open /proc");
 		return -1;
 	}
 

@@ -84,7 +84,7 @@ int get_run_timeout(int *timeout)
 	get_dim_timeout(&dim_timeout);
 
 	if(dim_timeout < 0) {
-		LOGERR("Can not get dim timeout. set default 5 seconds");
+		_E("Can not get dim timeout. set default 5 seconds");
 		dim_timeout = 5;
 	}
 
@@ -104,7 +104,7 @@ int get_dim_timeout(int *timeout)
 	/* TODO if needed */
 	*timeout = 5;		/* default timeout */
 	get_env("PM_TO_LCDDIM", buf, sizeof(buf));
-	LOGINFO("Get lcddim timeout [%s]", buf);
+	_I("Get lcddim timeout [%s]", buf);
 	*timeout = atoi(buf);
 	return 0;
 }
@@ -115,7 +115,7 @@ int get_off_timeout(int *timeout)
 	/* TODO if needed */
 	*timeout = 5;		/* default timeout */
 	get_env("PM_TO_LCDOFF", buf, sizeof(buf));
-	LOGINFO("Get lcdoff timeout [%s]", buf);
+	_I("Get lcdoff timeout [%s]", buf);
 	*timeout = atoi(buf);
 	return 0;
 }
@@ -125,7 +125,7 @@ static int setting_cb(keynode_t *key_nodes, void *data)
 	keynode_t *tmp = key_nodes;
 
 	if ((int)data > SETTING_END) {
-		LOGERR("Unknown setting key: %s, idx=%d",
+		_E("Unknown setting key: %s, idx=%d",
 		       vconf_keynode_get_name(tmp), (int)data);
 		return -1;
 	}

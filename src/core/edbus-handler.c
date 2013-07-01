@@ -51,19 +51,19 @@ static int register_edbus_interface(struct edbus_object *object)
 	int ret;
 
 	if (!object) {
-		PRT_TRACE_ERR("object is invalid value!");
+		_E("object is invalid value!");
 		return -1;
 	}
 
 	object->obj = e_dbus_object_add(edbus_conn, object->path, NULL);
 	if (!object->obj) {
-		PRT_TRACE_ERR("fail to add edbus obj");
+		_E("fail to add edbus obj");
 		return -1;
 	}
 
 	object->iface = e_dbus_interface_new(object->interface);
 	if (!object->iface) {
-		PRT_TRACE_ERR("fail to add edbus interface");
+		_E("fail to add edbus interface");
 		return -1;
 	}
 
@@ -93,13 +93,13 @@ pid_t get_edbus_sender_pid(DBusMessage *msg)
 	pid_t pid;
 
 	if (!msg) {
-		PRT_TRACE_ERR("invalid argument!");
+		_E("invalid argument!");
 		return -1;
 	}
 
 	sender = dbus_message_get_sender(msg);
 	if (!sender) {
-		PRT_TRACE_ERR("invalid sender!");
+		_E("invalid sender!");
 		return -1;
 	}
 
@@ -108,21 +108,21 @@ pid_t get_edbus_sender_pid(DBusMessage *msg)
 				    DBUS_INTERFACE_DBUS,
 				    "GetConnectionUnixProcessID");
 	if (!send_msg) {
-		PRT_TRACE_ERR("invalid send msg!");
+		_E("invalid send msg!");
 		return -1;
 	}
 
 	ret = dbus_message_append_args(send_msg, DBUS_TYPE_STRING,
 				    &sender, DBUS_TYPE_INVALID);
 	if (!ret) {
-		PRT_TRACE_ERR("fail to append args!");
+		_E("fail to append args!");
 		dbus_message_unref(send_msg);
 		return -1;
 	}
 
 	pending = e_dbus_message_send(edbus_conn, send_msg, NULL, -1, NULL);
 	if (!pending) {
-		PRT_TRACE_ERR("pending is null!");
+		_E("pending is null!");
 		dbus_message_unref(send_msg);
 		return -1;
 	}
@@ -135,7 +135,7 @@ pid_t get_edbus_sender_pid(DBusMessage *msg)
 	msg = dbus_pending_call_steal_reply(pending);
 	dbus_pending_call_unref(pending);
 	if (!msg) {
-		PRT_TRACE_ERR("reply msg is null!");
+		_E("reply msg is null!");
 		return -1;
 	}
 
@@ -178,23 +178,23 @@ int register_edbus_signal_handler(const char *path, const char *interface,
 				interface, name, cb, NULL);
 
 	if (!handler) {
-		PRT_TRACE_ERR("fail to add edbus handler");
+		_E("fail to add edbus handler");
 		return -1;
 	}
 
-	PRT_TRACE_ERR("add edbus service: %s", name);
+	_E("add edbus service: %s", name);
 
 	entry = malloc(sizeof(struct edbus_list));
 
 	if (!entry) {
-		PRT_TRACE_ERR("Malloc failed");
+		_E("Malloc failed");
 		return -1;
 	}
 
 	entry->signal_name = strndup(name, strlen(name));
 
 	if (!entry->signal_name) {
-		PRT_TRACE_ERR("Malloc failed");
+		_E("Malloc failed");
 		free(entry);
 		return -1;
 	}
@@ -202,7 +202,7 @@ int register_edbus_signal_handler(const char *path, const char *interface,
 	entry->handler = handler;
 	edbus_handler_list = eina_list_prepend(edbus_handler_list, entry);
 	if (!edbus_handler_list) {
-		PRT_TRACE_ERR("eina_list_prepend failed");
+		_E("eina_list_prepend failed");
 		free(entry->signal_name);
 		free(entry);
 		return -1;
@@ -220,7 +220,7 @@ int broadcast_edbus_signal(const char *path, const char *interface,
 
 	signal = dbus_message_new_signal(path, interface, name);
 	if (!signal) {
-		PRT_TRACE_ERR("fail to allocate new %s.%s signal", interface, name);
+		_E("fail to allocate new %s.%s signal", interface, name);
 		return -1;
 	}
 
@@ -242,7 +242,7 @@ static void edbus_init(void *data)
 		if (edbus_init_val)
 			break;
 		if (!retry) {
-			PRT_TRACE_ERR("fail to init edbus");
+			_E("fail to init edbus");
 			return;
 		}
 	}
@@ -253,7 +253,7 @@ static void edbus_init(void *data)
 		if (edbus_conn)
 			break;
 		if (!retry) {
-			PRT_TRACE_ERR("fail to get edbus");
+			_E("fail to get edbus");
 			goto err_dbus_shutdown;
 		}
 	}
@@ -264,7 +264,7 @@ static void edbus_init(void *data)
 		if (edbus_request_name)
 			break;
 		if (!retry) {
-			PRT_TRACE_ERR("fail to request edbus name");
+			_E("fail to request edbus name");
 			goto err_dbus_close;
 		}
 	}
@@ -272,13 +272,13 @@ static void edbus_init(void *data)
 	for (i = 0; i < ARRAY_SIZE(edbus_objects); i++) {
 		r = register_edbus_interface(&edbus_objects[i]);
 		if (r < 0)
-			PRT_TRACE_ERR("fail to add obj & interface for %s",
+			_E("fail to add obj & interface for %s",
 				    edbus_objects[i].interface);
 
-		PRT_TRACE("add new obj for %s", edbus_objects[i].interface);
+		_I("add new obj for %s", edbus_objects[i].interface);
 	}
 
-	PRT_TRACE("start edbus service");
+	_D("start edbus service");
 	return;
 
 err_dbus_close:

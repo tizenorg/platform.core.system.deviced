@@ -33,7 +33,7 @@ static int pm_x_set_lcd_backlight(struct _PMSys *p, int on)
 	char cmd_line[8];
 	int ret;
 
-	LOGINFO("Backlight on=%d", on);
+	_I("Backlight on=%d", on);
 
 	switch (on) {
 	case STATUS_ON:
@@ -48,18 +48,18 @@ static int pm_x_set_lcd_backlight(struct _PMSys *p, int on)
 	pid = vfork();
 
 	if (pid < 0) {
-		LOGERR("[1] Failed to fork child process for LCD On/Off");
+		_E("[1] Failed to fork child process for LCD On/Off");
 		return -1;
 	}
 
 	if (pid == 0) {
-		LOGERR("[1] Child proccess for LCD %d was created (%s)",
+		_E("[1] Child proccess for LCD %d was created (%s)",
 		    on, cmd_line);
 		execl("/usr/bin/xset", "/usr/bin/xset", "dpms", "force",
 		    cmd_line, NULL);
 		_exit(0);
 	} else if (pid != (ret = waitpid(pid, NULL, 0))) {
-		LOGERR
+		_E
 		    ("[1] Waiting failed for the child process pid: %d, ret: %d, errno: %d",
 		     pid, ret, errno);
 	}

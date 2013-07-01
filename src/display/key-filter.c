@@ -68,7 +68,7 @@ static void longkey_pressed()
 {
 	int val = 0;
 	char *opt;
-	LOGINFO("Power key long pressed!");
+	_I("Power key long pressed!");
 	cancel_lcdoff = 1;
 
 	/* change state - LCD on */
@@ -156,13 +156,13 @@ static int process_power_key(struct input_event *pinput)
 	case KEY_PRESSED:
 		if (timediff_usec(pressed_time, pinput->time) <
 		    (POWER_KEY_PRESS_IGNORE_TIME * USEC_PER_SEC)) {
-			LOGINFO("power key double pressed ignored");
+			_I("power key double pressed ignored");
 			powerkey_ignored = true;
 			break;
 		} else {
 			powerkey_ignored = false;
 		}
-		LOGINFO("power key pressed");
+		_I("power key pressed");
 		pressed_time.tv_sec = (pinput->time).tv_sec;
 		pressed_time.tv_usec = (pinput->time).tv_usec;
 		if (key_combination == KEY_COMBINATION_STOP) {
@@ -179,7 +179,7 @@ static int process_power_key(struct input_event *pinput)
 				ecore_timer_del(combination_timeout_id);
 				combination_timeout_id = NULL;
 			}
-			LOGINFO("capture mode");
+			_I("capture mode");
 			key_combination = KEY_COMBINATION_SCREENCAPTURE;
 			ignore = false;
 		}
@@ -209,7 +209,7 @@ static int process_volumedown_key(struct input_event *pinput)
 				ecore_timer_del(combination_timeout_id);
 				combination_timeout_id = NULL;
 			}
-			LOGINFO("capture mode");
+			_I("capture mode");
 			key_combination = KEY_COMBINATION_SCREENCAPTURE;
 			ignore = false;
 		}

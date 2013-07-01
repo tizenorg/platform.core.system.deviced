@@ -65,20 +65,20 @@ static DBusMessage *e_dbus_lockstate_cb(E_DBus_Object *obj, DBusMessage *msg)
 		    DBUS_TYPE_STRING, &option1_str,
 		    DBUS_TYPE_STRING, &option2_str,
 		    DBUS_TYPE_INT32, &timeout, DBUS_TYPE_INVALID)) {
-		LOGERR("there is no message");
+		_E("there is no message");
 		ret = -EINVAL;
 		goto out;
 	}
 
 	if (!state_str || timeout < 0) {
-		LOGERR("message is invalid!");
+		_E("message is invalid!");
 		ret = -EINVAL;
 		goto out;
 	}
 
 	pid = get_edbus_sender_pid(msg);
 	if (kill(pid, 0) == -1) {
-		LOGERR("%d process does not exist, dbus ignored!", pid);
+		_E("%d process does not exist, dbus ignored!", pid);
 		ret = -ESRCH;
 		goto out;
 	}
@@ -90,7 +90,7 @@ static DBusMessage *e_dbus_lockstate_cb(E_DBus_Object *obj, DBusMessage *msg)
 	else if (!strcmp(state_str, PM_LCDOFF_STR))
 		state = LCD_OFF;
 	else {
-		LOGERR("%s state is invalid, dbus ignored!", state_str);
+		_E("%s state is invalid, dbus ignored!", state_str);
 		ret = -EINVAL;
 		goto out;
 	}
@@ -100,7 +100,7 @@ static DBusMessage *e_dbus_lockstate_cb(E_DBus_Object *obj, DBusMessage *msg)
 	else if (!strcmp(option1_str, GOTOSTATENOW_STR))
 		flag = GOTO_STATE_NOW;
 	else {
-		LOGERR("%s option is invalid. set default option!", option1_str);
+		_E("%s option is invalid. set default option!", option1_str);
 		flag = STAY_CUR_STATE;
 	}
 
@@ -130,20 +130,20 @@ static DBusMessage *e_dbus_unlockstate_cb(E_DBus_Object *obj, DBusMessage *msg)
 	if (!dbus_message_get_args(msg, &err,
 		    DBUS_TYPE_STRING, &state_str,
 		    DBUS_TYPE_STRING, &option_str, DBUS_TYPE_INVALID)) {
-		LOGERR("there is no message");
+		_E("there is no message");
 		ret = -EINVAL;
 		goto out;
 	}
 
 	if (!state_str) {
-		LOGERR("message is invalid!");
+		_E("message is invalid!");
 		ret = -EINVAL;
 		goto out;
 	}
 
 	pid = get_edbus_sender_pid(msg);
 	if (kill(pid, 0) == -1) {
-		LOGERR("%d process does not exist, dbus ignored!", pid);
+		_E("%d process does not exist, dbus ignored!", pid);
 		ret = -ESRCH;
 		goto out;
 	}
@@ -155,7 +155,7 @@ static DBusMessage *e_dbus_unlockstate_cb(E_DBus_Object *obj, DBusMessage *msg)
 	else if (!strcmp(state_str, PM_LCDOFF_STR))
 		state = LCD_OFF;
 	else {
-		LOGERR("%s state is invalid, dbus ignored!", state_str);
+		_E("%s state is invalid, dbus ignored!", state_str);
 		ret = -EINVAL;
 		goto out;
 	}
@@ -167,7 +167,7 @@ static DBusMessage *e_dbus_unlockstate_cb(E_DBus_Object *obj, DBusMessage *msg)
 	else if (!strcmp(option_str, KEEP_TIMER_STR))
 		flag = PM_KEEP_TIMER;
 	else {
-		LOGERR("%s option is invalid. set default option!", option_str);
+		_E("%s option is invalid. set default option!", option_str);
 		flag = PM_RESET_TIMER;
 	}
 
@@ -194,20 +194,20 @@ static DBusMessage *e_dbus_changestate_cb(E_DBus_Object *obj, DBusMessage *msg)
 
 	if (!dbus_message_get_args(msg, &err,
 		    DBUS_TYPE_STRING, &state_str, DBUS_TYPE_INVALID)) {
-		LOGERR("there is no message");
+		_E("there is no message");
 		ret = -EINVAL;
 		goto out;
 	}
 
 	if (!state_str) {
-		LOGERR("message is invalid!");
+		_E("message is invalid!");
 		ret = -EINVAL;
 		goto out;
 	}
 
 	pid = get_edbus_sender_pid(msg);
 	if (kill(pid, 0) == -1) {
-		LOGERR("%d process does not exist, dbus ignored!", pid);
+		_E("%d process does not exist, dbus ignored!", pid);
 		ret = -ESRCH;
 		goto out;
 	}
@@ -219,7 +219,7 @@ static DBusMessage *e_dbus_changestate_cb(E_DBus_Object *obj, DBusMessage *msg)
 	else if (!strcmp(state_str, PM_LCDOFF_STR))
 		state = LCD_OFF;
 	else {
-		LOGERR("%s state is invalid, dbus ignored!", state_str);
+		_E("%s state is invalid, dbus ignored!", state_str);
 		ret = -EINVAL;
 		goto out;
 	}
@@ -244,7 +244,7 @@ static DBusMessage *e_dbus_getbrightness_cb(E_DBus_Object *obj, DBusMessage *msg
 	cmd = DISP_CMD(PROP_DISPLAY_BRIGHTNESS, DEFAULT_DISPLAY);
 	ret = device_get_property(DEVICE_TYPE_DISPLAY, cmd, &brightness);
 
-	LOGINFO("get brightness %d, %d", brightness, ret);
+	_I("get brightness %d, %d", brightness, ret);
 
 	reply = dbus_message_new_method_return(msg);
 	dbus_message_iter_init_append(reply, &iter);
@@ -267,7 +267,7 @@ static DBusMessage *e_dbus_setbrightness_cb(E_DBus_Object *obj, DBusMessage *msg
 	cmd = DISP_CMD(PROP_DISPLAY_BRIGHTNESS, DEFAULT_DISPLAY);
 	ret = device_set_property(DEVICE_TYPE_DISPLAY, cmd, brightness);
 
-	LOGINFO("set brightness %d, %d", brightness, ret);
+	_I("set brightness %d, %d", brightness, ret);
 
 	reply = dbus_message_new_method_return(msg);
 	dbus_message_iter_init_append(reply, &iter);
@@ -300,10 +300,10 @@ int init_pm_dbus(void)
 
 	iface = get_edbus_interface(DEVICED_PATH_DISPLAY);
 
-	LOGINFO("%s, %x", DEVICED_PATH_DISPLAY, iface);
+	_I("%s, %x", DEVICED_PATH_DISPLAY, iface);
 
 	if (!iface) {
-		LOGERR("fail to get edbus interface!");
+		_E("fail to get edbus interface!");
 		return -1;
 	}
 
@@ -314,7 +314,7 @@ int init_pm_dbus(void)
 				    edbus_methods[i].reply_signature,
 				    edbus_methods[i].func);
 		if (!ret) {
-			LOGERR("fail to add method %s!", edbus_methods[i].member);
+			_E("fail to add method %s!", edbus_methods[i].member);
 			return -1;
 		}
 	}

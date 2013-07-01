@@ -31,11 +31,8 @@ static const struct control_device {
 	const int id;
 	const struct device_ops *ops;
 } devices[] = {
-	/*  code example
-	 * { DEVICE_CONTROL_DISPLAY,       &display_device_ops },
-	 */
 	/* Add id & ops to provide start/stop control */
-	{ DEVICE_CONTROL_MMC,	&mmc_device_ops },
+	{ DEVICE_CONTROL_MMC,        &mmc_device_ops },
 };
 
 static int control_handler(int argc, char **argv)
@@ -46,12 +43,12 @@ static int control_handler(int argc, char **argv)
 	bool enable;
 	int ret;
 
-	PRT_TRACE("argc : %d", argc);
+	_I("argc : %d", argc);
 	for (i = 0; i < argc; ++i)
-		PRT_TRACE("[%2d] %s", i, argv[i]);
+		_I("[%2d] %s", i, argv[i]);
 
 	if (argc > 5) {
-		PRT_TRACE_ERR("Invalid argument");
+		_E("Invalid argument");
 		errno = EINVAL;
 		return -1;
 	}
@@ -59,7 +56,7 @@ static int control_handler(int argc, char **argv)
 	pid = atoi(argv[0]);
 	device = atoi(argv[1]);
 	enable = atoi(argv[2]);
-	PRT_TRACE("pid : %d, device : %d, enable :%d", pid, device, enable);
+	_I("pid : %d, device : %d, enable :%d", pid, device, enable);
 
 	for (i = 0; i < ARRAY_SIZE(devices); i++)
 		if (devices[i].id == device)

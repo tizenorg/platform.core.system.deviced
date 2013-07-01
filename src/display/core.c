@@ -186,7 +186,7 @@ static PmLockNode *add_node(enum state_t s_index, pid_t pid, Ecore_Timer *timeou
 
 	n = (PmLockNode *) malloc(sizeof(PmLockNode));
 	if (n == NULL) {
-		LOGERR("Not enough memory, add cond. fail");
+		_E("Not enough memory, add cond. fail");
 		return NULL;
 	}
 
@@ -229,7 +229,7 @@ static int del_node(enum state_t s_index, PmLockNode *n)
 static Eina_Bool del_dim_cond(void *data)
 {
 	PmLockNode *tmp = NULL;
-	LOGINFO("delete prohibit dim condition by timeout\n");
+	_I("delete prohibit dim condition by timeout");
 
 	tmp = find_node(S_LCDDIM, (pid_t) data);
 	del_node(S_LCDDIM, tmp);
@@ -243,7 +243,7 @@ static Eina_Bool del_dim_cond(void *data)
 static Eina_Bool del_off_cond(void *data)
 {
 	PmLockNode *tmp = NULL;
-	LOGINFO("delete prohibit off condition by timeout\n");
+	_I("delete prohibit off condition by timeout");
 
 	tmp = find_node(S_LCDOFF, (pid_t) data);
 	del_node(S_LCDOFF, tmp);
@@ -257,7 +257,7 @@ static Eina_Bool del_off_cond(void *data)
 static Eina_Bool del_sleep_cond(void *data)
 {
 	PmLockNode *tmp = NULL;
-	LOGINFO("delete prohibit sleep condition by timeout\n");
+	_I("delete prohibit sleep condition by timeout");
 
 	tmp = find_node(S_SLEEP, (pid_t) data);
 	del_node(S_SLEEP, tmp);
@@ -311,7 +311,7 @@ static int proc_condition(PMMsg *data)
 			tmp->holdkey_block = holdkey_block;
 		}
 		/* for debug */
-		LOGINFO("[%s] locked by pid %d - process %s\n", "S_NORMAL", pid,
+		_I("[%s] locked by pid %d - process %s", "S_NORMAL", pid,
 			pname);
 	}
 	if (val & MASK_OFF) {
@@ -330,7 +330,7 @@ static int proc_condition(PMMsg *data)
 			tmp->holdkey_block = holdkey_block;
 		}
 		/* for debug */
-		LOGINFO("[%s] locked by pid %d - process %s\n", "S_LCDDIM", pid,
+		_I("[%s] locked by pid %d - process %s", "S_LCDDIM", pid,
 			pname);
 	}
 	if (val & MASK_SLP) {
@@ -350,7 +350,7 @@ static int proc_condition(PMMsg *data)
 		set_process_active(EINA_TRUE, pid);
 
 		/* for debug */
-		LOGINFO("[%s] locked by pid %d - process %s\n", "S_LCDOFF", pid,
+		_I("[%s] locked by pid %d - process %s", "S_LCDOFF", pid,
 			pname);
 	}
 
@@ -359,13 +359,13 @@ static int proc_condition(PMMsg *data)
 	if (val & MASK_DIM) {
 		tmp = find_node(S_LCDDIM, pid);
 		del_node(S_LCDDIM, tmp);
-		LOGINFO("[%s] unlocked by pid %d - process %s\n", "S_NORMAL",
+		_I("[%s] unlocked by pid %d - process %s", "S_NORMAL",
 			pid, pname);
 	}
 	if (val & MASK_OFF) {
 		tmp = find_node(S_LCDOFF, pid);
 		del_node(S_LCDOFF, tmp);
-		LOGINFO("[%s] unlocked by pid %d - process %s\n", "S_LCDDIM",
+		_I("[%s] unlocked by pid %d - process %s", "S_LCDDIM",
 			pid, pname);
 	}
 	if (val & MASK_SLP) {
@@ -373,22 +373,22 @@ static int proc_condition(PMMsg *data)
 		del_node(S_SLEEP, tmp);
 		set_process_active(EINA_FALSE, pid);
 
-		LOGINFO("[%s] unlocked by pid %d - process %s\n", "S_LCDOFF",
+		_I("[%s] unlocked by pid %d - process %s", "S_LCDOFF",
 			pid, pname);
 	}
 	val = val >> 8;
 	if (val != 0) {
 		if ((val & 0x1)) {
 			reset_timeout(states[pm_cur_state].timeout);
-			LOGINFO("reset timeout (%d seconds)",
-					states[pm_cur_state].timeout);
+			_I("reset timeout (%d seconds)",
+				states[pm_cur_state].timeout);
 		}
 	} else {
 		/* guard time for suspend */
 		if (pm_cur_state == S_LCDOFF) {
 			reset_timeout(states[S_LCDOFF].timeout);
-			LOGINFO("margin timeout (%d seconds)",
-					states[S_LCDOFF].timeout);
+			_I("margin timeout (%d seconds)",
+				states[S_LCDOFF].timeout);
 		}
 	}
 
@@ -410,7 +410,7 @@ static int proc_change_state(unsigned int cond)
 			break;
 		}
 	}
-	LOGINFO("Change State to %s", state_string[next_state]);
+	_I("Change State to %s", state_string[next_state]);
 
 	switch (next_state) {
 	case S_NORMAL:
@@ -427,7 +427,7 @@ static int proc_change_state(unsigned int cond)
 		}
 		break;
 	case S_SLEEP:
-		LOGINFO("Dangerous requests.");
+		_I("Dangerous requests.");
 		/* at first LCD_OFF and then goto sleep */
 		/* state transition */
 		pm_old_state = pm_cur_state;
@@ -460,7 +460,7 @@ int check_processes(enum state_t prohibit_state)
 
 	while (t != NULL) {
 		if (kill(t->pid, 0) == -1) {
-			LOGERR("%d process does not exist, delete the REQ"
+			_E("%d process does not exist, delete the REQ"
 				" - prohibit state %d ",
 				t->pid, prohibit_state);
 			tmp = t;
@@ -482,12 +482,12 @@ int check_holdkey_block(enum state_t state)
 	PmLockNode *t = cond_head[state];
 	int ret = 0;
 
-	LOGINFO("check holdkey block : state of %s", state_string[state]);
+	_I("check holdkey block : state of %s", state_string[state]);
 
 	while (t != NULL) {
 		if (t->holdkey_block == true) {
 			ret = 1;
-			LOGINFO("Hold key blocked by pid(%d)!", t->pid);
+			_I("Hold key blocked by pid(%d)!", t->pid);
 			break;
 		}
 		t = t->next;
@@ -502,7 +502,7 @@ int delete_condition(enum state_t state)
 	int ret = 0;
 	PmLockNode *tmp = NULL;
 
-	LOGINFO("delete condition : state of %s", state_string[state]);
+	_I("delete condition : state of %s", state_string[state]);
 
 	while (t != NULL) {
 		if (t->timeout_id > 0) {
@@ -510,7 +510,7 @@ int delete_condition(enum state_t state)
 		}
 		tmp = t;
 		t = t->next;
-		LOGINFO("delete node of pid(%d)", tmp->pid);
+		_I("delete node of pid(%d)", tmp->pid);
 		del_node(state, tmp);
 	}
 
@@ -691,7 +691,7 @@ static void sig_hup(int signo)
 /* timeout handler  */
 Eina_Bool timeout_handler(void *data)
 {
-	LOGINFO("Time out state %s\n", state_string[pm_cur_state]);
+	_I("Time out state %s", state_string[pm_cur_state]);
 
 	if (timeout_src_id != NULL) {
 		ecore_timer_del(timeout_src_id);
@@ -736,7 +736,7 @@ static int default_trans(int evt)
 	int next_state;
 
 	if (pm_cur_state == S_NORMAL && st->timeout == 0) {
-		LOGINFO("LCD always on enabled!");
+		_I("LCD always on enabled!");
 		return 0;
 	}
 
@@ -745,7 +745,7 @@ static int default_trans(int evt)
 	/* check conditions */
 	while (st->check && !st->check(next_state)) {
 		/* There is a condition. */
-		LOGINFO("%s -> %s : check fail", state_string[pm_cur_state],
+		_I("%s -> %s : check fail", state_string[pm_cur_state],
 		       state_string[next_state]);
 		if (!check_processes(next_state)) {
 			/* this is valid condition - the application that sent the condition is running now. */
@@ -762,7 +762,7 @@ static int default_trans(int evt)
 	if (st->action) {
 		if (pm_cur_state == S_LCDDIM && st->timeout == 0) {
 			/* dim timeout 0, enter next state directly */
-			LOGINFO("dim timeout 0, goto LCDOFF state");
+			_I("dim timeout 0, goto LCDOFF state");
 			states[pm_cur_state].trans(EVENT_TIMEOUT);
 		}
 		else {
@@ -785,7 +785,7 @@ static int default_action(int timeout)
 	struct itimerval val;
 
 	if (status != DEVICE_OPS_STATUS_START) {
-		LOGERR("display is not started!");
+		_E("display is not started!");
 		return -EINVAL;
 	}
 
@@ -808,7 +808,7 @@ static int default_action(int timeout)
 				i++) {
 				vconf_get_int(VCONFKEY_IDLE_LOCK_STATE,
 					&lock_state);
-				LOGERR("Idle lock check: %d, vonf: %d",
+				_E("Idle lock check: %d, vonf: %d",
 					i, lock_state);
 				if (lock_state)
 					break;
@@ -874,16 +874,16 @@ static int default_action(int timeout)
 		/* sleep state : set system mode to SUSPEND */
 		if (device_get_property(DEVICE_TYPE_POWER,
 		    PROP_POWER_WAKEUP_COUNT, &wakeup_count) < 0)
-			LOGERR("wakeup count read error");
+			_E("wakeup count read error");
 
 		if (wakeup_count < 0) {
-			LOGINFO("Wakup Event! Can not enter suspend mode.");
+			_I("Wakup Event! Can not enter suspend mode.");
 			goto go_lcd_off;
 		}
 
 		if (device_set_property(DEVICE_TYPE_POWER,
 		    PROP_POWER_WAKEUP_COUNT, wakeup_count) < 0) {
-			LOGERR("wakeup count write error");
+			_E("wakeup count write error");
 			goto go_lcd_off;
 		}
 		goto go_suspend;
@@ -891,7 +891,7 @@ static int default_action(int timeout)
 
 	/* set timer with current state timeout */
 	reset_timeout(timeout);
-	LOGINFO("timout set: %s state %d sec",
+	_I("timout set: %s state %d sec",
 		state_string[pm_cur_state], timeout);
 
 	return 0;
@@ -901,7 +901,7 @@ go_suspend:
 	pm_history_save(PM_LOG_SLEEP, pm_cur_state);
 #endif
 	power_ops.suspend();
-	LOGINFO("system wakeup!!");
+	_I("system wakeup!!");
 	system_wakeup_flag = true;
 	heynoti_publish(PM_WAKEUP_NOTI_NAME);
 	/* Resume !! */
@@ -930,11 +930,11 @@ static int default_check(int next)
 	int trans_cond = trans_condition & MASK_BIT;
 	int lock_state = -1;
 
-	LOGINFO("trans_cond : %x", trans_cond);
+	_I("trans_cond : %x", trans_cond);
 
 	vconf_get_int(VCONFKEY_IDLE_LOCK_STATE, &lock_state);
 	if (lock_state==VCONFKEY_IDLE_LOCK && next != S_SLEEP) {
-		LOGINFO("default_check:LOCK STATE, it's transitable");
+		_I("default_check:LOCK STATE, it's transitable");
 		return 1;
 	}
 
@@ -1005,7 +1005,7 @@ static int get_lcd_timeout_from_settings(void)
 				break;
 			}
 		}
-		LOGINFO("%s state : %d timeout", state_string[i],
+		_I("%s state : %d timeout", state_string[i],
 			states[i].timeout);
 	}
 
@@ -1029,14 +1029,14 @@ static int poll_callback(int condition, PMMsg *data)
 
 	if (condition == INPUT_POLL_EVENT) {
 		if (pm_cur_state == S_LCDOFF || pm_cur_state == S_SLEEP)
-			LOGINFO("Power key input");
+			_I("Power key input");
 		time(&now);
 		if (last_t != now) {
 			states[pm_cur_state].trans(EVENT_INPUT);
 			last_t = now;
 		}
 	} else if (condition == PM_CONTROL_EVENT) {
-		LOGINFO("process pid(%d) pm_control condition : %x ",
+		_I("process pid(%d) pm_control condition : %x ",
 			data->pid, data->cond);
 
 		if (data->cond & MASK_BIT
@@ -1044,7 +1044,7 @@ static int poll_callback(int condition, PMMsg *data)
 			proc_condition(data);
 
 		if (data->cond & CHANGE_STATE_BIT) {
-			LOGINFO("Change state by pid(%d) request.", data->pid);
+			_I("Change state by pid(%d) request.", data->pid);
 			proc_change_state(data->cond);
 		}
 	}
@@ -1065,11 +1065,11 @@ static int update_setting(int key_idx, int val)
 	case SETTING_TO_NORMAL:
 		ret = get_dim_timeout(&dim_timeout);
 		if (ret < 0 || dim_timeout < 0) {
-			LOGERR("Can not get dim timeout.set default 5 seconds");
+			_E("Can not get dim timeout.set default 5 seconds");
 			dim_timeout = DEFAULT_DIM_TIMEOUT;
 		}
 		if (val < 0) {
-			LOGERR("LCD timeout is wrong, set default 15 seconds");
+			_E("LCD timeout is wrong, set default 15 seconds");
 			val = 15;
 		}
 		if (val == 0) {
@@ -1120,13 +1120,13 @@ static int update_setting(int key_idx, int val)
 			pm_status_flag |= BRTCH_FLAG;
 			vconf_set_bool(VCONFKEY_PM_BRIGHTNESS_CHANGED_IN_LPM,
 			    true);
-			LOGINFO("brightness changed in low battery,"
+			_I("brightness changed in low battery,"
 				"escape dim state");
 		}
 		backlight_ops.set_default_brt(val);
 		snprintf(buf, sizeof(buf), "%s %d",
 			SET_BRIGHTNESS_IN_BOOTLOADER, val);
-		LOGINFO("Brightness set in bl : %d",val);
+		_I("Brightness set in bl : %d",val);
 		system(buf);
 		break;
 	case SETTING_LOCK_SCREEN:
@@ -1134,19 +1134,19 @@ static int update_setting(int key_idx, int val)
 			set_lock_screen_state(val);
 			states[S_NORMAL].timeout = LOCK_SCREEN_TIMEOUT;
 			states[S_LCDDIM].timeout = 0;
-			LOGERR("LOCKED: NORMAL timeout is set by %d seconds",
+			_E("LOCKED: NORMAL timeout is set by %d seconds",
 				LOCK_SCREEN_TIMEOUT);
 		} else {
 			set_lock_screen_state(val);
 			get_run_timeout(&run_timeout);
 			if (run_timeout < 0) {
-				LOGERR("Can not get run timeout."
+				_E("Can not get run timeout."
 					"set default 15 seconds");
 				run_timeout = 10;
 			}
 			states[S_NORMAL].timeout = run_timeout;
 			states[S_LCDDIM].timeout = DEFAULT_DIM_TIMEOUT;
-			LOGINFO("UNLOCKED: NORMAL timeout is set by"
+			_I("UNLOCKED: NORMAL timeout is set by"
 				" %d seconds", run_timeout);
 		}
 		if (pm_cur_state == S_NORMAL) {
@@ -1162,7 +1162,7 @@ static int update_setting(int key_idx, int val)
 		set_power_saving_display_stat(power_saving_display_stat);
 		if (device_set_property(DEVICE_TYPE_DISPLAY, PROP_DISPLAY_FRAME_RATE,
 		    power_saving_display_stat) < 0) {
-			LOGERR("Fail to set display frame rate!");
+			_E("Fail to set display frame rate!");
 		}
 		backlight_ops.restore();
 		break;
@@ -1177,7 +1177,7 @@ static int update_setting(int key_idx, int val)
 			set_power_saving_display_stat(power_saving_display_stat);
 			if (device_set_property(DEVICE_TYPE_DISPLAY,
 			    PROP_DISPLAY_FRAME_RATE, power_saving_display_stat) < 0) {
-				LOGERR("Fail to set display frame rate!");
+				_E("Fail to set display frame rate!");
 			}
 			backlight_ops.restore();
 		}
@@ -1218,13 +1218,13 @@ static void check_seed_status(void)
 
 	ret = get_setting_brightness(&tmp);
 	if (ret != 0 || (tmp < PM_MIN_BRIGHTNESS || tmp > PM_MAX_BRIGHTNESS)) {
-		LOGINFO("fail to read vconf value for brightness");
+		_I("fail to read vconf value for brightness");
 		brt = PM_DEFAULT_BRIGHTNESS;
 		if (tmp < PM_MIN_BRIGHTNESS || tmp > PM_MAX_BRIGHTNESS)
 			vconf_set_int(VCONFKEY_SETAPPL_LCD_BRIGHTNESS, brt);
 		tmp = brt;
 	}
-	LOGINFO("Set brightness from Setting App. %d", tmp);
+	_I("Set brightness from Setting App. %d", tmp);
 	backlight_ops.set_default_brt(tmp);
 
 	vconf_get_int(VCONFKEY_SYSMAN_BATTERY_STATUS_LOW, &bat_state);
@@ -1252,7 +1252,7 @@ static void check_seed_status(void)
 	if (lock_state == VCONFKEY_IDLE_LOCK) {
 		states[S_NORMAL].timeout = LOCK_SCREEN_TIMEOUT;
 		states[S_LCDDIM].timeout = 0;
-		LOGERR("LCD NORMAL timeout is set by %d seconds"
+		_E("LCD NORMAL timeout is set by %d seconds"
 			" for lock screen", LOCK_SCREEN_TIMEOUT);
 	}
 
@@ -1266,9 +1266,9 @@ static void check_seed_status(void)
 		    &power_saving_display_stat);
 	}
 	if (power_saving_display_stat < 0) {
-		LOGERR("failed to read power saving display stat!");
+		_E("failed to read power saving display stat!");
 	} else {
-		LOGINFO("power saving display stat : %d",
+		_I("power saving display stat : %d",
 		    power_saving_display_stat);
 		set_power_saving_display_stat(power_saving_display_stat);
 	}
@@ -1301,10 +1301,10 @@ void print_dev_list(int fd)
 	indev *tmp;
 
 	total = eina_list_count(indev_list);
-	LOGINFO("***** total list : %d *****", total);
+	_I("***** total list : %d *****", total);
 	for (i = 0; i < total; i++) {
 		tmp = (indev*)eina_list_nth(indev_list, i);
-		LOGINFO("* %d | path:%s, fd:%d, dev_fd:%d",
+		_I("* %d | path:%s, fd:%d, dev_fd:%d",
 			i, tmp->dev_path, tmp->fd, tmp->dev_fd);
 		if (fd >= 0) {
 			char buf[255];
@@ -1313,7 +1313,7 @@ void print_dev_list(int fd)
 			write(fd, buf, strlen(buf));
 		}
 	}
-	LOGINFO("***************************\n");
+	_I("***************************\n");
 }
 
 static int input_action(char* input_act, char* input_path)
@@ -1326,12 +1326,12 @@ static int input_action(char* input_act, char* input_path)
 	PmLockNode *tmp = NULL;
 
 	if (!strcmp("add", input_act)) {
-		LOGINFO("add input path : %s", input_path);
+		_I("add input path : %s", input_path);
 		ret = init_pm_poll_input(poll_callback, input_path);
 	} else if (!strcmp("remove", input_act)) {
 		EINA_LIST_FOREACH_SAFE(indev_list, l, l_next, data)
 			if(!strcmp(input_path, data->dev_path)) {
-				LOGINFO("remove %s", input_path);
+				_I("remove %s", input_path);
 				ecore_main_fd_handler_del(data->dev_fd);
 				close(data->fd);
 				free(data->dev_path);
@@ -1341,7 +1341,7 @@ static int input_action(char* input_act, char* input_path)
 		ret = 0;
 	} else if (!strcmp("change", input_act)) {
 		if (!strcmp("ESD", input_path)) {
-			LOGINFO("ESD on");
+			_I("ESD on");
 			if (pm_cur_state == S_NORMAL) {
 				backlight_ops.off();
 				backlight_ops.on();
@@ -1356,7 +1356,7 @@ static int input_action(char* input_act, char* input_path)
 		if (!strcmp("lcdoff", input_path)) {
 			tmp = find_node(S_SLEEP, 1);
 			if (!tmp && add_node(S_SLEEP, 1, -1, 0) != NULL)
-				LOGINFO("lock LCD OFF from pm_event");
+				_I("lock LCD OFF from pm_event");
 		}
 		ret = 0;
 	} else if (!strcmp("unlock", input_act)) {
@@ -1364,7 +1364,7 @@ static int input_action(char* input_act, char* input_path)
 			tmp = find_node(S_SLEEP, 1);
 			if (tmp != NULL) {
 				del_node(S_SLEEP, tmp);
-				LOGINFO("unlock LCD OFF from pm_event");
+				_I("unlock LCD OFF from pm_event");
 			}
 		}
 		ret = 0;
@@ -1381,13 +1381,13 @@ static void input_cb(void* data)
 
 	fp = fopen((char *) data, "r");
 	if (fp == NULL) {
-		LOGERR("input file open fail");
+		_E("input file open fail");
 		return ;
 	}
 
 	while (fgets(args, NAME_MAX + MAX_INPUT, fp) != NULL) {
 		if (args[strlen(args)-1] != '\n') {
-			LOGERR("input file must be terminated with"
+			_E("input file must be terminated with"
 				" new line character\n");
 			break;
 		}
@@ -1395,7 +1395,7 @@ static void input_cb(void* data)
 		for (i = 0; i< NAME_MAX + MAX_INPUT; i++) {
 			if (args[i] == ' ') {
 				if (i >= NAME_MAX) {
-					LOGERR("bsfile name is over"
+					_E("bsfile name is over"
 						" the name_max(255)\n");
 					break;
 				}
@@ -1433,21 +1433,21 @@ static int set_noti(int *noti_fd)
 
 	fd = heynoti_init();
 	if (fd < 0) {
-		LOGERR("heynoti_init error");
+		_E("heynoti_init error");
 		return -1;
 	}
 
 	if (heynoti_subscribe(fd, PM_EVENT_NOTI_NAME,
 	    input_cb, PM_EVENT_NOTI_PATH) < 0) {
-		LOGERR("input file change noti add failed(%s). %s",
+		_E("input file change noti add failed(%s). %s",
 		    buf, strerror(errno));
 		return -1;
 	} else {
-		LOGERR("input file change noti add ok");
+		_E("input file change noti add ok");
 	}
 
 	if (heynoti_attach_handler(fd) < 0) {
-		LOGERR("heynoti_attach_handler error");
+		_E("heynoti_attach_handler error");
 		return -1;
 	}
 
@@ -1458,13 +1458,13 @@ static int set_noti(int *noti_fd)
 static int unset_noti(int noti_fd)
 {
 	if (noti_fd < 0) {
-		LOGINFO("set noti already failed. nothing to do in unset");
+		_I("set noti already failed. nothing to do in unset");
 		return 0;
 	}
 
 	if (heynoti_unsubscribe(noti_fd, PM_EVENT_NOTI_NAME, input_cb) < 0
 		|| heynoti_detach_handler(noti_fd) < 0) {
-		LOGERR("heynoti unsubsribe or detach error");
+		_E("heynoti unsubsribe or detach error");
 		return -1;
 	}
 	return 0;
@@ -1506,7 +1506,7 @@ static void display_init(void *data)
 	unsigned int flags = (WITHOUT_STARTNOTI | FLAG_X_DPMS);
 	int timeout = 0;
 
-	LOGINFO("Start power manager");
+	_I("Start power manager");
 
 	signal(SIGHUP, sig_hup);
 
@@ -1528,16 +1528,16 @@ static void display_init(void *data)
 			ret = init_sysfs(flags);
 			break;
 		case INIT_POLL:
-			LOGINFO("poll init");
+			_I("poll init");
 			ret = init_pm_poll(poll_callback);
 			break;
 		case INIT_DBUS:
-			LOGINFO("dbus init");
+			_I("dbus init");
 			ret = init_pm_dbus();
 			break;
 		}
 		if (ret != 0) {
-			LOGERR("%s", errMSG[i]);
+			_E("%s", errMSG[i]);
 			break;
 		}
 	}
@@ -1552,7 +1552,7 @@ static void display_init(void *data)
 			pm_init_extention(NULL);
 
 		if (flags & WITHOUT_STARTNOTI) {	/* start without noti */
-			LOGINFO("Start Power managing without noti");
+			_I("Start Power managing without noti");
 			pm_cur_state = S_NORMAL;
 			set_setting_pmstate(pm_cur_state);
 
@@ -1597,7 +1597,7 @@ static void display_exit(void *data)
 	if (pm_exit_extention != NULL)
 		pm_exit_extention();
 
-	LOGINFO("Stop power manager");
+	_I("Stop power manager");
 }
 
 static int display_status(void)

@@ -97,7 +97,7 @@ int readpid(char *pidpath)
 	fp = fopen(pidpath, "r");
 	if (fp != NULL) {
 		if (fscanf(fp, "%5d", &ret) == EOF)
-			LOGERR("readpid fscanf failed!");
+			_E("readpid fscanf failed!");
 		fclose(fp);
 	}
 
@@ -125,7 +125,7 @@ int daemonize(void)
 
 	setsid();
 	if (chdir("/") == -1) {
-		LOGERR("Failed to chdir");
+		_E("Failed to chdir");
 	}
 
 	close(0);
@@ -134,11 +134,11 @@ int daemonize(void)
 
 	fd = open("/dev/null", O_RDONLY);
 	if (fd == -1) {
-		LOGERR("daemonize open failed [/dev/null RD]");
+		_E("daemonize open failed [/dev/null RD]");
 	}
 	fd = open("/dev/null", O_RDWR);
 	if (fd == -1) {
-		LOGERR("daemonize open failed [/dev/null RDWR]");
+		_E("daemonize open failed [/dev/null RDWR]");
 	}
 	dup(1);
 
@@ -164,14 +164,14 @@ int exec_process(char *name)
 	pid = fork();
 	switch (pid) {
 	case -1:
-		LOGERR("Fork error");
+		_E("Fork error");
 		ret = -1;
 		break;
 	case 0:
 		for (i = 0; i < _NSIG; i++)
 			signal(i, SIG_DFL);
 		execlp(name, name, NULL);
-		LOGERR("execlp() error : %s\n", strerror(errno));
+		_E("execlp() error : %s\n", strerror(errno));
 		exit(-1);
 		break;
 	default:

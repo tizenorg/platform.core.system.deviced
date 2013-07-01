@@ -31,7 +31,7 @@ static void ta_init(void *data)
 {
 	int val = -1, i = 0, pid;
 
-	PRT_TRACE("check ta connection");
+	_D("check ta connection");
 	if (device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_TA_ONLINE, &val) == 0) {
 		if ( val==1 ) {
 			vconf_set_int(VCONFKEY_SYSMAN_CHARGER_STATUS,
@@ -42,7 +42,7 @@ static void ta_init(void *data)
 				i++;
 				sleep(1);
 			}
-			PRT_TRACE("ta is connected");
+			_D("ta is connected");
 		}
 		else if ( val==0 )
 			vconf_set_int(VCONFKEY_SYSMAN_CHARGER_STATUS,

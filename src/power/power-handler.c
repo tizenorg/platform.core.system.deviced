@@ -27,11 +27,11 @@
 #include <limits.h>
 #include <heynoti.h>
 #include <vconf.h>
+#include <fcntl.h>
 #include <ITapiModem.h>
 #include <TelPower.h>
 #include <tapi_event.h>
 #include <tapi_common.h>
-#include <fcntl.h>
 #include <syspopup_caller.h>
 #include <sys/reboot.h>
 #include <sys/time.h>
@@ -79,14 +79,14 @@ static void poweroff_popup_edbus_signal_handler(void *data, DBusMessage *msg)
 	int val = 0;
 
 	if (dbus_message_is_signal(msg, INTERFACE_NAME, SIGNAL_NAME_POWEROFF_POPUP) == 0) {
-		PRT_TRACE_ERR("there is no power off popup signal");
+		_E("there is no power off popup signal");
 		return;
 	}
 
 	dbus_error_init(&err);
 
 	if (dbus_message_get_args(msg, &err, DBUS_TYPE_STRING, &str, DBUS_TYPE_INVALID) == 0) {
-		PRT_TRACE_ERR("there is no message");
+		_E("there is no message");
 		return;
 	}
 
@@ -97,7 +97,7 @@ static void poweroff_popup_edbus_signal_handler(void *data, DBusMessage *msg)
 	else if (strncmp(str, PREDEF_POWEROFF, strlen(PREDEF_REBOOT)) == 0)
 		val = VCONFKEY_SYSMAN_POWER_OFF_RESTART;
 	if (val == 0) {
-		PRT_TRACE_ERR("not supported message : %s", str);
+		_E("not supported message : %s", str);
 		return;
 	}
 	vconf_set_int(VCONFKEY_SYSMAN_POWER_OFF_STATUS, val);
@@ -159,13 +159,13 @@ static void enter_flight_mode_cb(TapiHandle *handle, int result, void *data, voi
 {
 	int bCurFlightMode = 0;
 	if (result != TAPI_POWER_FLIGHT_MODE_ENTER) {
-		PRT_TRACE_ERR("flight mode enter failed %d",result);
+		_E("flight mode enter failed %d",result);
 	} else {
-		PRT_TRACE("enter flight mode result : %d",result);
+		_D("enter flight mode result : %d",result);
 		if (vconf_get_bool(VCONFKEY_TELEPHONY_FLIGHT_MODE,&bCurFlightMode) == 0) {
-			PRT_TRACE("Flight Mode is %d", bCurFlightMode);
+			_D("Flight Mode is %d", bCurFlightMode);
 		} else {
-			PRT_TRACE_ERR("failed to get vconf key");
+			_E("failed to get vconf key");
 		}
 	}
 }
@@ -174,13 +174,13 @@ static void leave_flight_mode_cb(TapiHandle *handle, int result, void *data, voi
 {
 	int bCurFlightMode = 0;
 	if (result != TAPI_POWER_FLIGHT_MODE_LEAVE) {
-		PRT_TRACE_ERR("flight mode leave failed %d",result);
+		_E("flight mode leave failed %d",result);
 	} else {
-		PRT_TRACE("leave flight mode result : %d",result);
+		_D("leave flight mode result : %d",result);
 		if (vconf_get_bool(VCONFKEY_TELEPHONY_FLIGHT_MODE,&bCurFlightMode) == 0) {
-			PRT_TRACE("Flight Mode is %d", bCurFlightMode);
+			_D("Flight Mode is %d", bCurFlightMode);
 		} else {
-			PRT_TRACE_ERR("failed to get vconf key");
+			_E("failed to get vconf key");
 		}
 	}
 }
@@ -190,7 +190,7 @@ int flight_mode_def_predefine_action(int argc, char **argv)
 	int bCurFlightMode;
 	int err = TAPI_API_SUCCESS;
 	if (argc != 1 || argv[0] == NULL) {
-		PRT_TRACE_ERR("FlightMode Set predefine action failed");
+		_E("FlightMode Set predefine action failed");
 		return -1;
 	}
 	bCurFlightMode = atoi(argv[0]);
@@ -200,7 +200,7 @@ int flight_mode_def_predefine_action(int argc, char **argv)
 		err = tel_set_flight_mode(tapi_handle, TAPI_POWER_FLIGHT_MODE_ENTER, enter_flight_mode_cb, NULL);
 	}
 	if (err != TAPI_API_SUCCESS)
-		PRT_TRACE_ERR("FlightMode tel api action failed %d",err);
+		_E("FlightMode tel api action failed %d",err);
 	return 0;
 
 }
@@ -213,10 +213,10 @@ static void __tel_init_cb(keynode_t *key_nodes,void *data)
 		vconf_ignore_key_changed(VCONFKEY_TELEPHONY_READY, (void*)__tel_init_cb);
 		tapi_handle = tel_init(NULL);
 		if (tapi_handle == NULL) {
-			PRT_TRACE_ERR("tapi init error");
+			_E("tapi init error");
 		}
 	} else {
-		PRT_TRACE_ERR("tapi is not ready yet");
+		_E("tapi is not ready yet");
 	}
 }
 
@@ -245,7 +245,7 @@ Eina_Bool powerdown_ap_by_force(void *data)
 		gettimeofday(&now, NULL);
 	}
 
-	PRT_TRACE("Power off by force\n");
+	_D("Power off by force\n");
 	/* give a chance to be terminated for each process */
 	power_off = 1;
 	sync();
@@ -269,7 +269,7 @@ static void powerdown_ap(TapiHandle *handle, const char *noti_id, void *data, vo
 		tel_deinit(tapi_handle);
 		tapi_handle = NULL;
 	}
-	PRT_TRACE("Power off \n");
+	_D("Power off \n");
 
 	/* Getting poweroff duration */
 	buf = getenv("PWROFF_DUR");
@@ -293,7 +293,7 @@ static void powerdown_ap(TapiHandle *handle, const char *noti_id, void *data, vo
 }
 static void powerdown_res_cb(TapiHandle *handle, int result, void *data, void *user_data)
 {
-	PRT_TRACE("poweroff command request : %d",result);
+	_D("poweroff command request : %d",result);
 }
 
 
@@ -310,7 +310,7 @@ int internal_poweroff_def_predefine_action(int argc, char **argv)
 		ret = tel_register_noti_event(tapi_handle, TAPI_NOTI_MODEM_POWER, powerdown_ap, NULL);
 
 		if (ret != TAPI_API_SUCCESS) {
-			PRT_TRACE_ERR
+			_E
 			    ("tel_register_event is not subscribed. error %d\n", ret);
 			powerdown_ap_by_force(NULL);
 			return 0;
@@ -318,7 +318,7 @@ int internal_poweroff_def_predefine_action(int argc, char **argv)
 
 		ret = tel_process_power_command(tapi_handle, TAPI_PHONE_POWER_OFF, powerdown_res_cb, NULL);
 		if (ret != TAPI_API_SUCCESS) {
-			PRT_TRACE_ERR("tel_process_power_command() error %d\n", ret);
+			_E("tel_process_power_command() error %d\n", ret);
 			powerdown_ap_by_force(NULL);
 			return 0;
 		}
@@ -356,7 +356,7 @@ static void restart_ap(TapiHandle *handle, const char *noti_id, void *data, void
 		tapi_handle = NULL;
 	}
 
-	PRT_INFO("Restart\n");
+	_I("Restart\n");
 	vconf_ignore_key_changed(VCONFKEY_SYSMAN_POWER_OFF_STATUS, (void*)poweroff_control_cb);
 	power_off = 1;
 	sync();
@@ -394,7 +394,7 @@ static void restart_ap_by_force(void *data)
 		tapi_handle = NULL;
 	}
 
-	PRT_INFO("Restart\n");
+	_I("Restart\n");
 	power_off = 1;
 	sync();
 
@@ -421,7 +421,7 @@ int entersleep_def_predefine_action(int argc, char **argv)
 	sync();
 
 	ret = tel_set_flight_mode(tapi_handle, TAPI_POWER_FLIGHT_MODE_ENTER, enter_flight_mode_cb, NULL);
-	PRT_TRACE_ERR("request for changing into flight mode : %d\n", ret);
+	_E("request for changing into flight mode : %d\n", ret);
 
 	system("/etc/rc.d/rc.entersleep");
 	pm_change_internal(getpid(), POWER_OFF);
@@ -437,7 +437,7 @@ int poweroff_def_predefine_action(int argc, char **argv)
 
 	while (retry_count < MAX_RETRY) {
 		if (ss_action_entry_call_internal(PREDEF_INTERNAL_POWEROFF, 0) < 0) {
-			PRT_TRACE_ERR("failed to request poweroff to system_server \n");
+			_E("failed to request poweroff to system_server \n");
 			retry_count++;
 			continue;
 		}
@@ -456,7 +456,7 @@ int launching_predefine_action(int argc, char **argv)
 
 	/* current just launching poweroff-popup */
 	if (predefine_control_launch("poweroff-syspopup", NULL, 0) < 0) {
-		PRT_TRACE_ERR("poweroff-syspopup launch failed");
+		_E("poweroff-syspopup launch failed");
 		return -1;
 	}
 	return 0;
@@ -470,7 +470,7 @@ int leavesleep_def_predefine_action(int argc, char **argv)
 	sync();
 
 	ret = tel_set_flight_mode(tapi_handle, TAPI_POWER_FLIGHT_MODE_LEAVE, leave_flight_mode_cb, NULL);
-	PRT_TRACE_ERR("request for changing into flight mode : %d\n", ret);
+	_E("request for changing into flight mode : %d\n", ret);
 
 	return 0;
 }
@@ -490,7 +490,7 @@ int restart_def_predefine_action(int argc, char **argv)
 	ret =
 	    tel_register_noti_event(tapi_handle, TAPI_NOTI_MODEM_POWER, restart_ap, NULL);
 	if (ret != TAPI_API_SUCCESS) {
-		PRT_TRACE_ERR
+		_E
 		    ("tel_register_event is not subscribed. error %d\n", ret);
 		restart_ap_by_force((void *)-1);
 		return 0;
@@ -499,7 +499,7 @@ int restart_def_predefine_action(int argc, char **argv)
 
 	ret = tel_process_power_command(tapi_handle, TAPI_PHONE_POWER_OFF, powerdown_res_cb, NULL);
 	if (ret != TAPI_API_SUCCESS) {
-		PRT_TRACE_ERR("tel_process_power_command() error %d\n", ret);
+		_E("tel_process_power_command() error %d\n", ret);
 		restart_ap_by_force((void *)-1);
 		return 0;
 	}
@@ -516,13 +516,13 @@ static void power_init(void *data)
 		if (bTelReady == 1) {
 			tapi_handle = tel_init(NULL);
 			if (tapi_handle == NULL) {
-				PRT_TRACE_ERR("tapi init error");
+				_E("tapi init error");
 			}
 		} else {
 			vconf_notify_key_changed(VCONFKEY_TELEPHONY_READY, (void *)__tel_init_cb, NULL);
 		}
 	} else {
-		PRT_TRACE_ERR("failed to get tapi vconf key");
+		_E("failed to get tapi vconf key");
 	}
 
 	ss_action_entry_add_internal(PREDEF_ENTERSLEEP,
@@ -545,7 +545,7 @@ static void power_init(void *data)
 				     flight_mode_def_predefine_action, NULL, NULL);
 
 	if (vconf_notify_key_changed(VCONFKEY_SYSMAN_POWER_OFF_STATUS, (void *)poweroff_control_cb, NULL) < 0) {
-		PRT_TRACE_ERR("Vconf notify key chaneged failed: KEY(%s)", VCONFKEY_SYSMAN_POWER_OFF_STATUS);
+		_E("Vconf notify key chaneged failed: KEY(%s)", VCONFKEY_SYSMAN_POWER_OFF_STATUS);
 	}
 
 	register_edbus_signal_handler(OBJECT_PATH, INTERFACE_NAME,

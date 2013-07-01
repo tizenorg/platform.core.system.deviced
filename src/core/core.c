@@ -51,7 +51,7 @@ static int _ss_core_action_run(void *user_data,
 	ret = act_entry->predefine_action(rq_entry->argc, rq_entry->argv);
 	if (ret <= 0) {
 		if (ret < 0)
-			PRT_TRACE_ERR("[SYSMAN] predefine action failed");
+			_E("[SYSMAN] predefine action failed");
 		goto fast_done;
 	} else {
 		snprintf(tmp, sizeof(tmp), "/proc/%d/status", ret);
@@ -76,8 +76,7 @@ static int core_pipe_cb(void *userdata, Ecore_Fd_Handler * fd_handler)
 	int retry_count = 0;
 	int r = -1;
 	if (!ecore_main_fd_handler_active_get(fd_handler, ECORE_FD_READ)) {
-		PRT_TRACE_ERR
-		    ("ecore_main_fd_handler_active_get error , return\n");
+		_E("ecore_main_fd_handler_active_get error , return");
 		return 1;
 	}
 
@@ -85,13 +84,13 @@ static int core_pipe_cb(void *userdata, Ecore_Fd_Handler * fd_handler)
 		r = read(core_pipe[0], &p_msg, sizeof(struct _internal_msg));
 		if (r < 0) {
 			if (errno == EINTR) {
-				PRT_TRACE_ERR("Re-read for error(EINTR)");
+				_E("Re-read for error(EINTR)");
 				retry_count++;
 				continue;
 			} else {
 				__pipe_stop(core_pipe[0]);
 				__pipe_stop(core_pipe[1]);
-				PRT_TRACE_ERR("restart pipe fd");
+				_E("restart pipe fd");
 				__pipe_start(ad);
 			}
 		} else {
@@ -135,14 +134,14 @@ int ss_core_action_clear(int pid)
 static int __pipe_start(struct ss_main_data *ad)
 {
 	if (pipe(core_pipe) < 0) {
-		PRT_TRACE_ERR("pipe cannot create");
+		_E("pipe cannot create");
 		exit(EXIT_FAILURE);
 	}
 
 	g_pipe_efd = ecore_main_fd_handler_add(core_pipe[0], ECORE_FD_READ,
 				  core_pipe_cb, ad, NULL, NULL);
 	if (!g_pipe_efd) {
-		PRT_TRACE_ERR("error ecore_main_fd_handler_add");
+		_E("error ecore_main_fd_handler_add");
 		return -1;
 	}
 	return 0;
@@ -168,7 +167,7 @@ static void core_init(void *data)
 	__pipe_stop(core_pipe[1]);
 
 	if (__pipe_start(ad) == -1)
-		PRT_TRACE_ERR("fail pipe control fd init");
+		_E("fail pipe control fd init");
 }
 
 const struct device_ops core_device_ops = {

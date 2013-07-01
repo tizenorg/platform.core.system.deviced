@@ -82,7 +82,7 @@ static int _bl_brt(PMSys *p, int brightness)
 	/* Update device brightness */
 	ret = device_set_property(DEVICE_TYPE_DISPLAY, cmd, brightness);
 
-	LOGERR("set brightness %d, %d", brightness, ret);
+	_E("set brightness %d, %d", brightness, ret);
 
 	return ret;
 }
@@ -189,7 +189,7 @@ static void _init_pmsys(PMSys *p)
 
 static void *_system_suspend_cb(void *data)
 {
-	LOGINFO("enter system suspend");
+	_I("enter system suspend");
 	if (pmsys && pmsys->sys_power_state)
 		return pmsys->sys_power_state(pmsys, POWER_STATE_SUSPEND);
 	return 0;
@@ -202,7 +202,7 @@ static int system_suspend(void)
 
 	ret = pthread_create(&pth, 0, _system_suspend_cb, (void*)NULL);
 	if (ret < 0) {
-		LOGERR("pthread creation failed!, suspend directly!");
+		_E("pthread creation failed!, suspend directly!");
 		_system_suspend_cb((void*)NULL);
 	} else {
 		pthread_join(pth, NULL);
@@ -213,7 +213,7 @@ static int system_suspend(void)
 
 static int system_pre_suspend(void)
 {
-	LOGINFO("enter system pre suspend");
+	_I("enter system pre suspend");
 	if (pmsys && pmsys->sys_power_state)
 		return pmsys->sys_power_state(pmsys, POWER_STATE_PRE_SUSPEND);
 
@@ -222,7 +222,7 @@ static int system_pre_suspend(void)
 
 static int system_post_resume(void)
 {
-	LOGINFO("enter system post resume");
+	_I("enter system post resume");
 	if (pmsys && pmsys->sys_power_state)
 		return pmsys->sys_power_state(pmsys, POWER_STATE_POST_RESUME);
 
@@ -267,7 +267,7 @@ static int backlight_on(void)
 	int ret = -1;
 	int i;
 
-	LOGINFO("LCD on");
+	_I("LCD on");
 
 	if (!pmsys || !pmsys->bl_onoff)
 		return -1;
@@ -284,9 +284,9 @@ static int backlight_on(void)
 			pm_history_save(PM_LOG_LCD_ON_FAIL, pm_cur_state);
 #endif
 #ifdef ENABLE_X_LCD_ONOFF
-			LOGERR("Failed to LCD on, through xset");
+			_E("Failed to LCD on, through xset");
 #else
-			LOGERR("Failed to LCD on, through OAL");
+			_E("Failed to LCD on, through OAL");
 #endif
 			ret = -1;
 		}
@@ -299,7 +299,7 @@ static int backlight_off(void)
 	int ret = -1;
 	int i;
 
-	LOGINFO("LCD off");
+	_I("LCD off");
 
 	if (!pmsys || !pmsys->bl_onoff)
 		return -1;
@@ -320,9 +320,9 @@ static int backlight_off(void)
 			pm_history_save(PM_LOG_LCD_OFF_FAIL, pm_cur_state);
 #endif
 #ifdef ENABLE_X_LCD_ONOFF
-			LOGERR("Failed to LCD off, through xset");
+			_E("Failed to LCD off, through xset");
 #else
-			LOGERR("Failed to LCD off, through OAL");
+			_E("Failed to LCD off, through OAL");
 #endif
 			ret = -1;
 		}
@@ -352,7 +352,7 @@ static int backlight_restore(void)
 
 	ret = vconf_get_int(VCONFKEY_PM_CUSTOM_BRIGHTNESS_STATUS, &val);
 	if (ret == 0 && val == VCONFKEY_PM_CUSTOM_BRIGHTNESS_ON) {
-		LOGINFO("custom brightness mode! brt no restored");
+		_I("custom brightness mode! brt no restored");
 		return 0;
 	}
 	if ((pm_status_flag & PWRSV_FLAG) && !(pm_status_flag & BRTCH_FLAG)) {
@@ -405,7 +405,7 @@ int init_sysfs(unsigned int flags)
 
 	pmsys = (PMSys *) malloc(sizeof(PMSys));
 	if (pmsys == NULL) {
-		LOGERR("Not enough memory to alloc PM Sys");
+		_E("Not enough memory to alloc PM Sys");
 		return -1;
 	}
 
@@ -415,7 +415,7 @@ int init_sysfs(unsigned int flags)
 	_init_bldev(pmsys, flags);
 
 	if (pmsys->bl_onoff == NULL || pmsys->sys_power_state == NULL) {
-		LOGERR
+		_E
 		    ("We have no managable resource to reduce the power consumption");
 		return -1;
 	}
@@ -431,7 +431,7 @@ int exit_sysfs(void)
 
 	fd = open("/tmp/sem.pixmap_1", O_RDONLY);
 	if (fd == -1) {
-		LOGERR("X server disable");
+		_E("X server disable");
 		backlight_on();
 	}
 

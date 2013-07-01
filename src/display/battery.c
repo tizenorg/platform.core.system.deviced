@@ -73,7 +73,7 @@ static void print_all_batt_node(enum state_b b_index)
 	Batt_node *node = NULL;
 	int cnt = 0;
 
-	LOGINFO("print_all_batt_node [%d]", b_index);
+	_I("print_all_batt_node [%d]", b_index);
 
 	if(b_index < 0 || b_index >= B_END)
 		return;
@@ -84,7 +84,7 @@ static void print_all_batt_node(enum state_b b_index)
 	node = batt_head[b_index];
 	while(node != NULL) {
 		cnt++;
-		LOGINFO("[%d] capacity %5d, time %s", cnt, node->capacity,
+		_I("[%d] capacity %5d, time %s", cnt, node->capacity,
 				ctime(&node->clock));
 		node = node->next;
 	}
@@ -105,14 +105,14 @@ static int check_value_validity(enum state_b b_index,time_t clock,int capacity)
 	old_capacity = batt_head[b_index]->capacity;
 
 	if(system_wakeup_flag == true) {
-		LOGERR("check value validity : invalid cuz system suspend!");
+		_E("check value validity : invalid cuz system suspend!");
 		system_wakeup_flag = false;
 		return -1;
 	}
 	/* capacity */
 	capadiff = capacity - old_capacity;
 	if((capadiff * multiply_value[b_index]) <= 0) {
-		LOGERR("check value validity : capadiff(%d) wrong!", capadiff);
+		_E("check value validity : capadiff(%d) wrong!", capadiff);
 		return -1;
 	}
 	return 0;
@@ -129,7 +129,7 @@ static int add_batt_node(enum state_b b_index, time_t clock, int capacity)
 
 	node = (Batt_node *) malloc(sizeof(Batt_node));
 	if(node == NULL) {
-		LOGERR("Not enough memory, add battery node fail!");
+		_E("Not enough memory, add battery node fail!");
 		return -1;
 	}
 
@@ -235,7 +235,7 @@ static float update_factor(enum state_b b_index)
 		node = node->next;
 		cnt++;
 
-		/*LOGINFO("[%d] timediff(%lf) / capadiff(%lf) = factor(%lf)",
+		/*_I("[%d] timediff(%lf) / capadiff(%lf) = factor(%lf)",
 			cnt, timediff, capadiff, factor);*/
 		factor = 0.0;
 
@@ -246,9 +246,9 @@ static float update_factor(enum state_b b_index)
 			break;
 		}
 	}
-	LOGINFO(" sum = %lf", total_factor);
+	_I(" sum = %lf", total_factor);
 	total_factor /= (float)cnt;
-	LOGINFO(" avg_factor = %lf", total_factor);
+	_I(" avg_factor = %lf", total_factor);
 
 	return total_factor;
 }
@@ -267,12 +267,12 @@ static void update_time(enum state_a a_index, int seconds)
 		case A_TIMETOFULL:
 			vconf_set_int(VCONFKEY_PM_BATTERY_TIMETOFULL,
 				seconds);
-			LOGINFO("update time[%d,%d]", a_index, seconds);
+			_I("update time[%d,%d]", a_index, seconds);
 			break;
 		case A_TIMETOEMPTY:
 			vconf_set_int(VCONFKEY_PM_BATTERY_TIMETOEMPTY,
 				seconds);
-			LOGINFO("update time[%d,%d]", a_index, seconds);
+			_I("update time[%d,%d]", a_index, seconds);
 			break;
 	}
 }
@@ -303,7 +303,7 @@ int battinfo_calculation(void)
 				>= BATTERY_FULL_THRESHOLD) {
 			if(battery_ops.get_charge_full()) {
 				del_all_batt_node(B_CHARGING);
-				LOGINFO("battery fully charged!");
+				_I("battery fully charged!");
 				update_time(A_TIMETOFULL, 0);
 				return 0;
 			}
@@ -349,7 +349,7 @@ static int init_battery_func(void)
 	if(ret >= 0) {
 		get_battery_capacity = battery_ops.get_capacity_raw;
 		full_capacity = FULL_CAPACITY_RAW;
-		LOGINFO("init_battery_func : full capacity(%d)", full_capacity);
+		_I("init_battery_func : full capacity(%d)", full_capacity);
 		return 0;
 	}
 
@@ -357,11 +357,11 @@ static int init_battery_func(void)
 	if(ret >= 0) {
 		get_battery_capacity = battery_ops.get_capacity;
 		full_capacity = FULL_CAPACITY;
-		LOGINFO("init_battery_func : full capacity(%d)", full_capacity);
+		_I("init_battery_func : full capacity(%d)", full_capacity);
 		return 0;
 	}
 
-	LOGERR("init_battery_func : fail to get battery info!");
+	_E("init_battery_func : fail to get battery info!");
 	return -1;
 }
 
@@ -369,10 +369,10 @@ int start_battinfo_gathering(int timeout)
 {
 	int ret;
 
-	LOGINFO("Start battery gathering!");
+	_I("Start battery gathering!");
 
 	if(timeout < 0) {
-		LOGERR("invalid timeout value [%d]!", timeout);
+		_E("invalid timeout value [%d]!", timeout);
 		return -1;
 	}
 	if(init_battery_func() != 0)
@@ -389,19 +389,19 @@ int start_battinfo_gathering(int timeout)
 		/* Using heynoti from system-server(udev)
 					for gathering battery info */
 	        if((noti_fd = heynoti_init()) < 0) {
-	                LOGERR("heynoti init failed!");
+	                _E("heynoti init failed!");
 	                return -1;
 	        }
 		ret = heynoti_subscribe(noti_fd, "device_charge_chgdet",
 				(void *)battinfo_calculation, (void *)NULL);
 		if(ret != 0) {
-			LOGERR("heynoti subscribe fail!");
+			_E("heynoti subscribe fail!");
 			return -1;
 		}
 
 		ret = heynoti_attach_handler(noti_fd);
 		if(ret != 0) {
-			LOGERR("heynoti attach handler fail!");
+			_E("heynoti attach handler fail!");
 			return -1;
 		}
 	}
@@ -410,7 +410,7 @@ int start_battinfo_gathering(int timeout)
 
 void end_battinfo_gathering(void)
 {
-	LOGINFO("End battery gathering!");
+	_I("End battery gathering!");
 
 	if (!timeout_id) {
 		ecore_timer_del(timeout_id);

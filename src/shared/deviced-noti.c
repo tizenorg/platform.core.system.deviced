@@ -82,7 +82,7 @@ static inline int send_str(int fd, char *str)
 
 static int deviced_noti_send(struct sysnoti *msg)
 {
-	PRT_TRACE_ERR("--- %s: start", __FUNCTION__);
+	_E("--- %s: start", __FUNCTION__);
 	int client_len;
 	int client_sockfd;
 	int result;
@@ -93,7 +93,7 @@ static int deviced_noti_send(struct sysnoti *msg)
 
 	client_sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (client_sockfd == -1) {
-		PRT_TRACE_ERR("%s: socket create failed\n", __FUNCTION__);
+		_E("%s: socket create failed\n", __FUNCTION__);
 		return -1;
 	}
 	bzero(&clientaddr, sizeof(clientaddr));
@@ -103,7 +103,7 @@ static int deviced_noti_send(struct sysnoti *msg)
 
 	if (connect(client_sockfd, (struct sockaddr *)&clientaddr, client_len) <
 	    0) {
-		PRT_TRACE_ERR("%s: connect failed\n", __FUNCTION__);
+		_E("%s: connect failed\n", __FUNCTION__);
 		close(client_sockfd);
 		return -1;
 	}
@@ -116,16 +116,16 @@ static int deviced_noti_send(struct sysnoti *msg)
 	for (i = 0; i < msg->argc; i++)
 		send_str(client_sockfd, msg->argv[i]);
 
-	PRT_TRACE_ERR("--- %s: read", __FUNCTION__);
+	_E("--- %s: read", __FUNCTION__);
 	while (retry_count < RETRY_READ_COUNT) {
 		r = read(client_sockfd, &result, sizeof(int));
 		if (r < 0) {
 			if (errno == EINTR) {
-				PRT_TRACE_ERR("Re-read for error(EINTR)");
+				_E("Re-read for error(EINTR)");
 				retry_count++;
 				continue;
 			}
-			PRT_TRACE_ERR("Read fail for str length");
+			_E("Read fail for str length");
 			result = -1;
 			break;
 
@@ -133,17 +133,17 @@ static int deviced_noti_send(struct sysnoti *msg)
 		break;
 	}
 	if (retry_count == RETRY_READ_COUNT) {
-		PRT_TRACE_ERR("Read retry failed");
+		_E("Read retry failed");
 	}
 
 	close(client_sockfd);
-	PRT_TRACE_ERR("--- %s: end", __FUNCTION__);
+	_E("--- %s: end", __FUNCTION__);
 	return result;
 }
 
 API int deviced_call_predef_action(const char *type, int num, ...)
 {
-	PRT_TRACE_ERR("--- %s: start", __FUNCTION__);
+	_E("--- %s: start", __FUNCTION__);
 	struct sysnoti *msg;
 	int ret;
 	va_list argptr;
@@ -176,11 +176,11 @@ API int deviced_call_predef_action(const char *type, int num, ...)
 	}
 	va_end(argptr);
 
-	PRT_TRACE_ERR("--- %s: send msg", __FUNCTION__);
+	_E("--- %s: send msg", __FUNCTION__);
 	ret = deviced_noti_send(msg);
 	free(msg);
 
-	PRT_TRACE_ERR("--- %s: end", __FUNCTION__);
+	_E("--- %s: end", __FUNCTION__);
 	return ret;
 }
 
@@ -255,17 +255,17 @@ static int deviced_noti_mount_mmc_cb(keynode_t *key_nodes, void *data)
 	struct mmc_contents *mmc_data;
 	int mmc_err = 0;
 	mmc_data = (struct mmc_contents *)data;
-	PRT_TRACE("mountmmc_cb called");
+	_D("mountmmc_cb called");
 	if (vconf_keynode_get_int(key_nodes) ==
 	    VCONFKEY_SYSMAN_MMC_MOUNT_COMPLETED) {
-		PRT_TRACE("mount ok");
+		_D("mount ok");
 		(mmc_data->mmc_cb)(0, mmc_data->user_data);
 	} else if (vconf_keynode_get_int(key_nodes) ==
 		   VCONFKEY_SYSMAN_MMC_MOUNT_ALREADY) {
-		PRT_TRACE("mount already");
+		_D("mount already");
 		(mmc_data->mmc_cb)(-2, mmc_data->user_data);
 	} else {
-		PRT_TRACE("mount fail");
+		_D("mount fail");
 		vconf_get_int(VCONFKEY_SYSMAN_MMC_ERR_STATUS, &mmc_err);
 		(mmc_data->mmc_cb)(mmc_err, mmc_data->user_data);
 	}
@@ -287,13 +287,13 @@ static int deviced_noti_unmount_mmc_cb(keynode_t *key_nodes, void *data)
 	struct mmc_contents *mmc_data;
 	int mmc_err = 0;
 	mmc_data = (struct mmc_contents *)data;
-	PRT_TRACE("unmountmmc_cb called");
+	_D("unmountmmc_cb called");
 	if (vconf_keynode_get_int(key_nodes) ==
 	    VCONFKEY_SYSMAN_MMC_UNMOUNT_COMPLETED) {
-		PRT_TRACE("unmount ok");
+		_D("unmount ok");
 		(mmc_data->mmc_cb)(0, mmc_data->user_data);
 	} else {
-		PRT_TRACE("unmount fail");
+		_D("unmount fail");
 		vconf_get_int(VCONFKEY_SYSMAN_MMC_ERR_STATUS, &mmc_err);
 		(mmc_data->mmc_cb)(mmc_err, mmc_data->user_data);
 	}
@@ -306,7 +306,7 @@ API int deviced_request_unmount_mmc(struct mmc_contents *mmc_data, int option)
 {
 	char buf[255];
 	if (option != 1 && option != 2) {
-		PRT_TRACE("option is wrong. default option 1 will be used");
+		_D("option is wrong. default option 1 will be used");
 		option = 1;
 	}
 	snprintf(buf, sizeof(buf), "%d", option);
@@ -322,14 +322,14 @@ static int deviced_noti_format_mmc_cb(keynode_t *key_nodes, void *data)
 {
 	struct mmc_contents *mmc_data;
 	mmc_data = (struct mmc_contents *)data;
-	PRT_TRACE("format_cb called");
+	_D("format_cb called");
 	if (vconf_keynode_get_int(key_nodes) ==
 	    VCONFKEY_SYSMAN_MMC_FORMAT_COMPLETED) {
-		PRT_TRACE("format ok");
+		_D("format ok");
 		(mmc_data->mmc_cb)(0, mmc_data->user_data);
 
 	} else {
-		PRT_TRACE("format fail");
+		_D("format fail");
 		(mmc_data->mmc_cb)(-1, mmc_data->user_data);
 	}
 	vconf_ignore_key_changed(VCONFKEY_SYSMAN_MMC_FORMAT,

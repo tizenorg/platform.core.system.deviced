@@ -54,7 +54,7 @@ int ss_action_entry_add_internal(char *type,
 	data = malloc(sizeof(struct ss_action_entry));
 
 	if (data == NULL) {
-		PRT_TRACE_ERR("Malloc failed");
+		_E("Malloc failed");
 		return -1;
 	}
 
@@ -75,12 +75,12 @@ int ss_action_entry_add_internal(char *type,
 
 	predef_act_list = eina_list_prepend(predef_act_list, data);
 
-	PRT_TRACE_ERR("[SYSMAN] add predefine action entry suceessfully - %s",
+	_E("[SYSMAN] add predefine action entry suceessfully - %s",
 		  data->type);
 	return 0;
  err:
 	if (data->type != NULL)
-		PRT_TRACE_ERR("[SYSMAN] add predefine action entry -%s",
+		_E("[SYSMAN] add predefine action entry -%s",
 			      data->type);
 	free(data);
 	return -1;
@@ -93,7 +93,7 @@ int ss_action_entry_add(struct sysnoti *msg)
 	data = malloc(sizeof(struct ss_action_entry));
 
 	if (data == NULL) {
-		PRT_TRACE_ERR("Malloc failed");
+		_E("Malloc failed");
 		return -1;
 	}
 
@@ -102,13 +102,13 @@ int ss_action_entry_add(struct sysnoti *msg)
 
 	data->handle = dlopen(msg->path, RTLD_LAZY);
 	if (!data->handle) {
-		PRT_TRACE_ERR("cannot find such library");
+		_E("cannot find such library");
 		goto err;
 	}
 
 	data->predefine_action = dlsym(data->handle, SS_PREDEFINE_ACT_FUNC_STR);
 	if (data->predefine_action == NULL) {
-		PRT_TRACE_ERR("cannot find predefine_action symbol : %s",
+		_E("cannot find predefine_action symbol : %s",
 			      SS_PREDEFINE_ACT_FUNC_STR);
 		goto err;
 	}
@@ -121,11 +121,11 @@ int ss_action_entry_add(struct sysnoti *msg)
 
 	predef_act_list = eina_list_prepend(predef_act_list, data);
 
-	PRT_TRACE_ERR("[SYSMAN]add predefine action entry suceessfully - %s",
+	_E("[SYSMAN]add predefine action entry suceessfully - %s",
 		  data->type);
 	return 0;
  err:
-	PRT_TRACE_ERR("[SYSMAN] FAIL predefine action entry - %s", msg->type);
+	_E("[SYSMAN] FAIL predefine action entry - %s", msg->type);
 	free(data);
 	return -1;
 }
@@ -157,9 +157,9 @@ int ss_action_entry_call_internal(char *type, int argc, ...)
 
 			int ret;
 			ret=ss_run_queue_add(data, argc, argv);
-			PRT_TRACE_ERR("ss_run_queue_add : %d",ret);
+			_E("ss_run_queue_add : %d", ret);
 			ret=ss_core_action_run();
-			PRT_TRACE_ERR("ss_core_action_run : %d",ret);
+			_E("ss_core_action_run : %d", ret);
 			return 0;
 		}
 	}
@@ -177,21 +177,21 @@ int ss_action_entry_call(struct sysnoti *msg, int sockfd)
 		if ((data != NULL) && (!strcmp(data->type, msg->type))) {
 			if (data->is_accessible != NULL
 			    && data->is_accessible(sockfd) == 0) {
-				PRT_TRACE_ERR
+				_E
 				    ("%d cannot call that predefine module",
 				     msg->pid);
 				return -1;
 			}
 			int ret;
 			ret=ss_run_queue_add(data, msg->argc, msg->argv);
-			PRT_TRACE_ERR("ss_run_queue_add : %d",ret);
+			_E("ss_run_queue_add : %d",ret);
 			ret=ss_core_action_run();
-			PRT_TRACE_ERR("ss_core_action_run : %d",ret);
+			_E("ss_core_action_run : %d",ret);
 			return 0;
 		}
 	}
 
-	PRT_TRACE_EM("[SYSMAN] cannot found action");
+	_E("[SYSMAN] cannot found action");
 	return -1;
 }
 
@@ -203,7 +203,7 @@ int ss_run_queue_add(struct ss_action_entry *act_entry, int argc, char **argv)
 	rq_entry = malloc(sizeof(struct ss_run_queue_entry));
 
 	if (rq_entry == NULL) {
-		PRT_TRACE_ERR("Malloc failed");
+		_E("Malloc failed");
 		return -1;
 	}
 
@@ -220,7 +220,7 @@ int ss_run_queue_add(struct ss_action_entry *act_entry, int argc, char **argv)
 
 	run_queue = eina_list_prepend(run_queue, rq_entry);
 
-	PRT_TRACE_EM("[SYSMAN] new action called : %s", act_entry->type);
+	_E("[SYSMAN] new action called : %s", act_entry->type);
 	return 0;
 }
 
@@ -264,7 +264,7 @@ int ss_run_queue_del(struct ss_run_queue_entry *entry)
 	EINA_LIST_FOREACH_SAFE(run_queue, tmp, tmp_next, rq_entry) {
 		if ((rq_entry != NULL) && (rq_entry == entry)) {
 			run_queue = eina_list_remove(run_queue, rq_entry);
-			PRT_TRACE_EM("[SYSMAN] action deleted : %s",
+			_E("[SYSMAN] action deleted : %s",
 				     rq_entry->action_entry->type);
 			for (i = 0; i < rq_entry->argc; i++) {
 				if (rq_entry->argv[i])
@@ -287,7 +287,7 @@ int ss_run_queue_del_bypid(int pid)
 	EINA_LIST_FOREACH_SAFE(run_queue, tmp, tmp_next, rq_entry) {
 		if ((rq_entry != NULL) && (rq_entry->forked_pid == pid)) {
 			run_queue = eina_list_remove(run_queue, rq_entry);
-			PRT_TRACE_EM("[SYSMAN] action deleted : %s",
+			_E("[SYSMAN] action deleted : %s",
 				     rq_entry->action_entry->type);
 			for (i = 0; i < rq_entry->argc; i++) {
 				if (rq_entry->argv[i])

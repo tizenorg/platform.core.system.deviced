@@ -49,19 +49,19 @@ static int predefine_action(int argc, char **argv)
 	int pid;
 	int prop;
 
-	PRT_TRACE("argc : %d", argc);
+	_D("argc : %d", argc);
 	for (i = 0; i < argc; ++i)
-		PRT_TRACE("[%2d] %s", i, argv[i]);
+		_D("[%2d] %s", i, argv[i]);
 
 	if (argc > 4) {
-		PRT_TRACE_ERR("Invalid argument");
+		_E("Invalid argument");
 		errno = EINVAL;
 		return -1;
 	}
 
 	pid = atoi(argv[0]);
 	prop = atoi(argv[1]);
-	PRT_TRACE("pid : %d, prop : %d", pid, prop);
+	_D("pid : %d, prop : %d", pid, prop);
 
 	switch(prop) {
 	case SET_BRT:

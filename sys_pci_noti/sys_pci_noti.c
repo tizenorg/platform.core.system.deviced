@@ -34,7 +34,7 @@ static void show_tickernoti(char *msg)
 	notification_error_e noti_err = NOTIFICATION_ERROR_NONE;
 	noti_err = notification_status_message_post(gettext(msg));
 	if (noti_err != NOTIFICATION_ERROR_NONE)
-		PRT_TRACE_ERR("FAIL: notification_status_message_post(msg)");
+		_E("FAIL: notification_status_message_post(msg)");
 }
 
 static void pci_noti(pci_noti_type iPCI)
@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
 		pci_noti(cb_type);
 	}
 	else {
-		PRT_TRACE_ERR("FAIL param error");
+		_E("FAIL param error");
 	}
 
 	return 0;

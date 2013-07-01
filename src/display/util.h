@@ -29,8 +29,24 @@
  * @{
  */
 
-#ifdef ENABLE_DLOG_OUT
-#define LOG_TAG         "POWER_MANAGER"
+#ifndef FEATURE_POWER_MANAGER_DLOG
+#define FEATURE_POWER_MANAGER_DLOG
+#endif
+
+#ifdef FEATURE_POWER_MANAGER_DLOG
+#define LOG_TAG	"POWER_MANAGER"
+#include <dlog.h>
+#define _D(fmt, arg...) \
+	do { SLOGD(fmt, ##arg); } while(0)
+#define _I(fmt, arg...) \
+	do { SLOGI(fmt, ##arg); } while(0)
+#define _E(fmt, arg...) \
+	do { SLOGE(fmt, ##arg); } while(0)
+#else
+#  include <syslog.h>
+#define _D(fmt, arg...) pm_log(LOG_INFO, fmt, ## arg)
+#define _I(fmt, arg...) pm_log(LOG_INFO, fmt, ## arg)
+#define _E(fmt, arg...) pm_log(LOG_ERR, fmt, ## arg)
 #endif
 
 #define SEC_TO_MSEC(x)	((x)*1000)
@@ -92,16 +108,6 @@ extern char *get_pkgname(char *exepath);
  * @param[in] fmt format string
  */
 extern void pm_log(int priority, char *fmt, ...);
-
-#if defined(ENABLE_DLOG_OUT)
-#  include <dlog.h>
-#  define LOGINFO LOGI
-#  define LOGERR LOGE
-#else
-#  include <syslog.h>
-#  define LOGINFO(fmt, arg...) pm_log(LOG_INFO, fmt, ## arg)
-#  define LOGERR(fmt, arg...) pm_log(LOG_ERR, fmt, ## arg)
-#endif
 
 /**
  * @}

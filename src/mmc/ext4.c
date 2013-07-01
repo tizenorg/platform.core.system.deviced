@@ -46,7 +46,7 @@ static int mmc_check_smack(void)
 	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_MOUNTED);
 	vconf_set_int(VCONFKEY_SYSMAN_MMC_MOUNT, VCONFKEY_SYSMAN_MMC_MOUNT_COMPLETED);
 	if (mmc_popup_pid > 0) {
-		PRT_TRACE_ERR("will be killed mmc-popup(%d)", mmc_popup_pid);
+		_E("will be killed mmc-popup(%d)", mmc_popup_pid);
 		kill(mmc_popup_pid, SIGTERM);
 	}
 	return 0;
@@ -63,7 +63,7 @@ static int check_smack_popup(void)
 	ret = vconf_get_int(VCONFKEY_STARTER_SEQUENCE, &val);
 	if (val == 1 || ret != 0) {
 		if ((mmc_popup_pid = syspopup_launch("mmc-syspopup", b)) < 0) {
-			PRT_TRACE_EM("popup launch failed\n");
+			_E("popup launch failed\n");
 		}
 	}
 	bundle_free(b);
@@ -83,15 +83,15 @@ static int ext4_init(void *data)
 	ext4_check_arg[argc - 2] = path;
 
 	if ((fd = open(path, O_RDONLY)) < 0) {
-		PRT_TRACE_ERR("can't open the '%s': %s", path, strerror(errno));
+		_E("can't open the '%s': %s", path, strerror(errno));
 		return -EINVAL;
 	}
 	/* check fs type with magic code */
 	lseek(fd, fs_ext4_type.offset, SEEK_SET);
 	ret = read(fd, buf, 2);
-	PRT_TRACE("mmc search magic : 0x%2x, 0x%2x", buf[0],buf[1]);
+	_D("mmc search magic : 0x%2x, 0x%2x", buf[0],buf[1]);
 	if (!memcmp(buf, fs_ext4_type.magic, fs_ext4_type.magic_sz)) {
-		PRT_TRACE("mmc type : %s", fs_ext4_type.name);
+		_D("mmc type : %s", fs_ext4_type.name);
 		close(fd);
 
 		return fs_ext4_type.type;
@@ -107,7 +107,7 @@ static const char **ext4_check(void)
 
 static int ext4_mount(int smack, void *data)
 {
-	PRT_TRACE_ERR("ext4_mount");
+	_E("ext4_mount");
 	if (mount_fs((char *)data, "ext4", NULL) != 0)
 		return errno;
 	if (smack) {

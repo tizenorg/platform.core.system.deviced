@@ -63,7 +63,7 @@ static int __predefine_get_pid(const char *execpath)
 
 	dp = opendir("/proc");
 	if (!dp) {
-		PRT_TRACE_ERR("open /proc");
+		_E("open /proc");
 		return -1;
 	}
 
@@ -101,7 +101,7 @@ int predefine_control_launch(char *name, bundle *b, int option)
 	//lowbat-popup
 	if (strncmp(name, LOWBAT_POPUP_NAME, strlen(LOWBAT_POPUP_NAME)) == 0) {
 		if (launched_poweroff == 1) {
-			PRT_TRACE_ERR("will be foreced power off");
+			_E("will be foreced power off");
 			internal_poweroff_def_predefine_action(0,NULL);
 			return 0;
 		}
@@ -111,7 +111,7 @@ int predefine_control_launch(char *name, bundle *b, int option)
 
 		pid = __predefine_get_pid(LOWBAT_EXEC_PATH);
 		if (pid > 0) {
-			PRT_TRACE_ERR("pre launched %s destroy", LOWBAT_EXEC_PATH);
+			_E("pre launched %s destroy", LOWBAT_EXEC_PATH);
 			kill(pid, SIGTERM);
 		}
 		if (syspopup_launch(name, b) < 0)
@@ -155,13 +155,13 @@ static void ss_action_entry_load_from_sodir()
 
 	dp = opendir(PREDEFINE_SO_DIR);
 	if (!dp) {
-		ERR("fail open %s", PREDEFINE_SO_DIR);
+		_E("fail open %s", PREDEFINE_SO_DIR);
 		return;
 	}
 
 	msg = malloc(sizeof(struct sysnoti));
 	if (msg == NULL) {
-		ERR("Malloc failed");
+		_E("Malloc failed");
 		closedir(dp);
 		return;
 	}

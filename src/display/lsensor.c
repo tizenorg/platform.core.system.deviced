@@ -58,7 +58,7 @@ static bool alc_handler(void* data)
 			fault_count++;
 		} else {
 			if (light_data.values[0] < 0.0 || light_data.values[0] > 10.0) {
-				LOGINFO("fail to load light data : %d",	(int)light_data.values[0]);
+				_I("fail to load light data : %d",	(int)light_data.values[0]);
 				fault_count++;
 			} else {
 				int tmp_value;
@@ -71,7 +71,7 @@ static bool alc_handler(void* data)
 					backlight_ops.set_default_brt(value);
 					backlight_ops.restore();
 				}
-				LOGINFO("load light data : %d, brightness : %d", (int)light_data.values[0], value);
+				_I("load light data : %d, brightness : %d", (int)light_data.values[0], value);
 			}
 		}
 	}
@@ -82,7 +82,7 @@ static bool alc_handler(void* data)
 		alc_timeout_id = NULL;
 		vconf_set_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT,
 		    SETTING_BRIGHTNESS_AUTOMATIC_OFF);
-		LOGERR("Fault counts is over %d, disable automatic brightness",
+		_E("Fault counts is over %d, disable automatic brightness",
 		    MAX_FAULT);
 		return EINA_FALSE;
 	}
@@ -95,7 +95,7 @@ static bool alc_handler(void* data)
 
 static int alc_action(int timeout)
 {
-	LOGINFO("alc action");
+	_I("alc action");
 	/* sampling timer add */
 	if (alc_timeout_id == 0 && !(pm_status_flag & PWRSV_FLAG))
 		alc_timeout_id =
@@ -113,15 +113,15 @@ static int connect_sfsvc(void)
 {
 	int sf_state = -1;
 	/* connect with sensor fw */
-	LOGINFO("connect with sensor fw");
+	_I("connect with sensor fw");
 	sf_handle = sf_connect(LIGHT_SENSOR);
 	if (sf_handle < 0) {
-		LOGERR("sensor attach fail");
+		_E("sensor attach fail");
 		return -1;
 	}
 	sf_state = sf_start(sf_handle, 0);
 	if (sf_state < 0) {
-		LOGERR("sensor attach fail");
+		_E("sensor attach fail");
 		sf_disconnect(sf_handle);
 		sf_handle = -1;
 		return -2;
@@ -132,7 +132,7 @@ static int connect_sfsvc(void)
 
 static int disconnect_sfsvc(void)
 {
-	LOGINFO("disconnect with sensor fw");
+	_I("disconnect with sensor fw");
 	if(sf_handle >= 0)
 	{
 		sf_stop(sf_handle);
@@ -157,7 +157,7 @@ static inline void set_brtch_state(void)
 	if (pm_status_flag & PWRSV_FLAG) {
 		pm_status_flag |= BRTCH_FLAG;
 		vconf_set_bool(VCONFKEY_PM_BRIGHTNESS_CHANGED_IN_LPM, true);
-		LOGINFO("brightness changed in low battery,"
+		_I("brightness changed in low battery,"
 		    "escape dim state (light)");
 	}
 }
@@ -171,7 +171,7 @@ static int set_alc_function(keynode_t *key_nodes, void *data)
 	int max_brt = -1;
 
 	if (key_nodes == NULL) {
-		LOGERR("wrong parameter, key_nodes is null");
+		_E("wrong parameter, key_nodes is null");
 		return -1;
 	}
 
@@ -191,7 +191,7 @@ static int set_alc_function(keynode_t *key_nodes, void *data)
 		    ecore_timer_add(SAMPLING_INTERVAL,
 			    (Ecore_Task_Cb)alc_handler, NULL);
 	} else if (onoff == SETTING_BRIGHTNESS_AUTOMATIC_PAUSE) {
-		LOGINFO("auto brightness paused!");
+		_I("auto brightness paused!");
 		disconnect_sfsvc();
 	} else {
 		disconnect_sfsvc();
@@ -200,7 +200,7 @@ static int set_alc_function(keynode_t *key_nodes, void *data)
 
 		ret = get_setting_brightness(&default_brt);
 		if (ret != 0 || (default_brt < PM_MIN_BRIGHTNESS || default_brt > PM_MAX_BRIGHTNESS)) {
-			LOGINFO("fail to read vconf value for brightness");
+			_I("fail to read vconf value for brightness");
 			brt = PM_DEFAULT_BRIGHTNESS;
 			if(default_brt < PM_MIN_BRIGHTNESS || default_brt > PM_MAX_BRIGHTNESS)
 				vconf_set_int(VCONFKEY_SETAPPL_LCD_BRIGHTNESS, brt);
@@ -220,7 +220,7 @@ static bool check_sfsvc(void* data)
 	int vconf_auto;
 	int sf_state = 0;
 
-	LOGINFO("register sfsvc");
+	_I("register sfsvc");
 
 	vconf_get_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT, &vconf_auto);
 	if (vconf_auto == SETTING_BRIGHTNESS_AUTOMATIC_ON) {
@@ -239,7 +239,7 @@ static bool check_sfsvc(void* data)
 		disconnect_sfsvc();
 		return EINA_TRUE;
 	}
-	LOGINFO("change vconf value before registering sfsvc");
+	_I("change vconf value before registering sfsvc");
 	return EINA_FALSE;
 }
 
@@ -265,7 +265,7 @@ static int prepare_lsensor(void *data)
 
 void set_power_saving_display_stat(int stat)
 {
-	LOGINFO("stat = %d", stat);
+	_I("stat = %d", stat);
 	power_saving_display_stat = stat;
 }
 

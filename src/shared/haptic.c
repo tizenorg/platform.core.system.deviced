@@ -51,30 +51,30 @@ static int __module_init(void)
 	const struct haptic_ops *(*get_haptic_plugin_interface) () = NULL;
 
 	if (stat(HAPTIC_MODULE_PATH, &buf)) {
-		PRT_ERR("file(%s) is not presents", HAPTIC_MODULE_PATH);
+		_E("file(%s) is not presents", HAPTIC_MODULE_PATH);
 		goto EXIT;
 	}
 
 	dlopen_handle = dlopen(HAPTIC_MODULE_PATH, RTLD_NOW);
 	if (!dlopen_handle) {
-		PRT_ERR("dlopen failed: %s", dlerror());
+		_E("dlopen failed: %s", dlerror());
 		goto EXIT;
 	}
 
 
 	get_haptic_plugin_interface = dlsym(dlopen_handle, "get_haptic_plugin_interface");
 	if (!get_haptic_plugin_interface) {
-		PRT_ERR("dlsym failed : %s", dlerror());
+		_E("dlsym failed : %s", dlerror());
 		goto EXIT;
 	}
 
 	plugin_intf = get_haptic_plugin_interface();
 	if (!plugin_intf) {
-		PRT_ERR("get_haptic_plugin_interface() failed");
+		_E("get_haptic_plugin_interface() failed");
 		goto EXIT;
 	}
 
-	PRT_DBG("This device can vibe");
+	_D("This device can vibe");
 	return 0;
 
 EXIT:
@@ -83,7 +83,7 @@ EXIT:
 		dlopen_handle = NULL;
 	}
 
-	PRT_DBG("This device can not vibe");
+	_D("This device can not vibe");
 	return -1;
 }
 
@@ -94,7 +94,7 @@ static int __module_fini(void)
 		dlopen_handle = NULL;
 	}
 
-	PRT_DBG("haptic module is released");
+	_D("haptic module is released");
 	return 0;
 }
 
@@ -128,23 +128,23 @@ API int haptic_get_count(int *device_number)
 	int ret;
 
 	if (__handle_cnt == 0) {
-		PRT_ERR("Not initialized");
+		_E("Not initialized");
 		return HAPTIC_ERROR_NOT_INITIALIZED;
 	}
 
 	if (device_number == NULL) {
-		PRT_ERR("Invalid parameter : device_number(NULL)");
+		_E("Invalid parameter : device_number(NULL)");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (!plugin_intf || !plugin_intf->get_device_count) {
-		PRT_ERR("plugin_intf == NULL || plugin_intf->get_device_count == NULL");
+		_E("plugin_intf == NULL || plugin_intf->get_device_count == NULL");
 		return HAPTIC_ERROR_OPERATION_FAILED;
 	}
 
 	ret = plugin_intf->get_device_count(device_number);
 	if (ret != HAPTIC_MODULE_ERROR_NONE) {
-		PRT_ERR("haptic_internal_get_device_count is failed : %d", ret);
+		_E("haptic_internal_get_device_count is failed : %d", ret);
 		return HAPTIC_ERROR_OPERATION_FAILED;
 	}
 
@@ -157,31 +157,31 @@ API int haptic_open(haptic_device_e device_index, haptic_device_h *device_handle
 	int handle;
 
 	if (!(device_index == HAPTIC_DEVICE_0 || device_index == HAPTIC_DEVICE_1 || device_index == HAPTIC_DEVICE_ALL)) {
-		PRT_ERR("Invalid parameter : device_index(%d)", device_index);
+		_E("Invalid parameter : device_index(%d)", device_index);
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (device_handle == NULL) {
-		PRT_ERR("Invalid parameter : device_handle(NULL)");
+		_E("Invalid parameter : device_handle(NULL)");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (__handle_cnt == 0) {
 		ret = __module_init();
 		if (ret < 0) {
-			PRT_ERR("__module_init failed");
+			_E("__module_init failed");
 			return HAPTIC_ERROR_OPERATION_FAILED;
 		}
 	}
 
 	if (!plugin_intf || !plugin_intf->open_device) {
-		PRT_ERR("plugin_intf == NULL || plugin_intf->open_device == NULL");
+		_E("plugin_intf == NULL || plugin_intf->open_device == NULL");
 		return HAPTIC_ERROR_OPERATION_FAILED;
 	}
 
 	ret = plugin_intf->open_device((int)device_index, &handle);
 	if (ret != HAPTIC_MODULE_ERROR_NONE) {
-		PRT_ERR("haptic_internal_open_device is failed : %d", ret);
+		_E("haptic_internal_open_device is failed : %d", ret);
 		__module_fini();
 		return HAPTIC_ERROR_OPERATION_FAILED;
 	}
@@ -196,23 +196,23 @@ API int haptic_close(haptic_device_h device_handle)
 	int ret;
 
 	if (__handle_cnt == 0) {
-		PRT_ERR("Not initialized");
+		_E("Not initialized");
 		return HAPTIC_ERROR_NOT_INITIALIZED;
 	}
 
 	if (device_handle < 0) {
-		PRT_ERR("Invalid parameter : device_handle(%d)", device_handle);
+		_E("Invalid parameter : device_handle(%d)", device_handle);
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (!plugin_intf || !plugin_intf->close_device) {
-		PRT_ERR("plugin_intf == NULL || plugin_intf->close_device == NULL");
+		_E("plugin_intf == NULL || plugin_intf->close_device == NULL");
 		return HAPTIC_ERROR_OPERATION_FAILED;
 	}
 
 	ret = plugin_intf->close_device((int)device_handle);
 	if (ret != HAPTIC_MODULE_ERROR_NONE) {
-		PRT_ERR("haptic_internal_close_device is failed : %d", ret);
+		_E("haptic_internal_close_device is failed : %d", ret);
 		return HAPTIC_ERROR_OPERATION_FAILED;
 	}
 
@@ -243,44 +243,44 @@ API int haptic_vibrate_monotone_with_detail(haptic_device_h device_handle,
 	int handle;
 
 	if (__handle_cnt == 0) {
-		PRT_ERR("Not initialized");
+		_E("Not initialized");
 		return HAPTIC_ERROR_NOT_INITIALIZED;
 	}
 
 	if (device_handle < 0) {
-		PRT_ERR("Invalid parameter : device_handle(%d)", device_handle);
+		_E("Invalid parameter : device_handle(%d)", device_handle);
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (duration < 0) {
-		PRT_ERR("Invalid parameter : duration(%d)", duration);
+		_E("Invalid parameter : duration(%d)", duration);
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (feedback < HAPTIC_FEEDBACK_0 || feedback > HAPTIC_FEEDBACK_AUTO) {
-		PRT_ERR("Invalid parameter : feedback(%d)", feedback);
+		_E("Invalid parameter : feedback(%d)", feedback);
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (priority < HAPTIC_PRIORITY_MIN || priority > HAPTIC_PRIORITY_HIGH) {
-		PRT_ERR("Invalid parameter : priority(%d)", priority);
+		_E("Invalid parameter : priority(%d)", priority);
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (!plugin_intf || !plugin_intf->vibrate_monotone) {
-		PRT_ERR("plugin_intf == NULL || plugin_intf->vibrate_monotone == NULL");
+		_E("plugin_intf == NULL || plugin_intf->vibrate_monotone == NULL");
 		return HAPTIC_ERROR_OPERATION_FAILED;
 	}
 
 	if (feedback == HAPTIC_FEEDBACK_AUTO) {
-		PRT_DBG("Auto feedback level, feedback value will be changed");
+		_D("Auto feedback level, feedback value will be changed");
 		feedback = __get_setting_feedback_level();
 	}
 
-	PRT_DBG("duration : %d, feedback : %d, priority : %d", duration, feedback, priority);
+	_D("duration : %d, feedback : %d, priority : %d", duration, feedback, priority);
 	ret = plugin_intf->vibrate_monotone((int)device_handle, duration, feedback, priority, &handle);
 	if (ret != HAPTIC_MODULE_ERROR_NONE) {
-		PRT_ERR("haptic_internal_vibrate_monotone is failed : %d", ret);
+		_E("haptic_internal_vibrate_monotone is failed : %d", ret);
 		return HAPTIC_ERROR_OPERATION_FAILED;
 	}
 
@@ -313,54 +313,54 @@ API int haptic_vibrate_file_with_detail(haptic_device_h device_handle,
 	struct stat buf;
 
 	if (__handle_cnt == 0) {
-		PRT_ERR("Not initialized");
+		_E("Not initialized");
 		return HAPTIC_ERROR_NOT_INITIALIZED;
 	}
 
 	if (device_handle < 0) {
-		PRT_ERR("Invalid parameter : device_handle(%d)", device_handle);
+		_E("Invalid parameter : device_handle(%d)", device_handle);
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (file_path == NULL) {
-		PRT_ERR("Invalid parameter : file_path(NULL)");
+		_E("Invalid parameter : file_path(NULL)");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (stat(file_path, &buf)) {
-		PRT_ERR("Invalid parameter : (%s) is not presents", file_path);
+		_E("Invalid parameter : (%s) is not presents", file_path);
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (iteration < HAPTIC_ITERATION_ONCE || iteration > HAPTIC_ITERATION_INFINITE) {
-		PRT_ERR("Invalid parameter : iteration(%d)", iteration);
+		_E("Invalid parameter : iteration(%d)", iteration);
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (feedback < HAPTIC_FEEDBACK_0 || feedback > HAPTIC_FEEDBACK_AUTO) {
-		PRT_ERR("Invalid parameter : feedback(%d)", feedback);
+		_E("Invalid parameter : feedback(%d)", feedback);
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (priority < HAPTIC_PRIORITY_MIN || priority > HAPTIC_PRIORITY_HIGH) {
-		PRT_ERR("Invalid parameter : priority(%d)", priority);
+		_E("Invalid parameter : priority(%d)", priority);
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (!plugin_intf || !plugin_intf->vibrate_file) {
-		PRT_ERR("plugin_intf == NULL || plugin_intf->vibrate_file == NULL");
+		_E("plugin_intf == NULL || plugin_intf->vibrate_file == NULL");
 		return HAPTIC_ERROR_OPERATION_FAILED;
 	}
 
 	if (feedback == HAPTIC_FEEDBACK_AUTO) {
-		PRT_DBG("Auto feedback level, feedback value will be changed");
+		_D("Auto feedback level, feedback value will be changed");
 		feedback = __get_setting_feedback_level();
 	}
 
-	PRT_DBG("file_path : %s, iteration : %d, feedback : %d, priority : %d", file_path, iteration, feedback, priority);
+	_D("file_path : %s, iteration : %d, feedback : %d, priority : %d", file_path, iteration, feedback, priority);
 	ret = plugin_intf->vibrate_file((int)device_handle, file_path, iteration, feedback, priority, &handle);
 	if (ret != HAPTIC_MODULE_ERROR_NONE) {
-		PRT_ERR("haptic_internal_vibrate_file is failed : %d", ret);
+		_E("haptic_internal_vibrate_file is failed : %d", ret);
 		return HAPTIC_ERROR_OPERATION_FAILED;
 	}
 
@@ -424,49 +424,49 @@ API int haptic_vibrate_buffers_with_detail(haptic_device_h device_handle,
 	int handle;
 
 	if (__handle_cnt == 0) {
-		PRT_ERR("Not initialized");
+		_E("Not initialized");
 		return HAPTIC_ERROR_NOT_INITIALIZED;
 	}
 
 	if (device_handle < 0) {
-		PRT_ERR("Invalid parameter : device_handle(%d)", device_handle);
+		_E("Invalid parameter : device_handle(%d)", device_handle);
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (vibe_buffer == NULL) {
-		PRT_ERR("Invalid parameter : vibe_buffer(NULL)");
+		_E("Invalid parameter : vibe_buffer(NULL)");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (iteration < HAPTIC_ITERATION_ONCE || iteration > HAPTIC_ITERATION_INFINITE) {
-		PRT_ERR("Invalid parameter : iteration(%d)", iteration);
+		_E("Invalid parameter : iteration(%d)", iteration);
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (feedback < HAPTIC_FEEDBACK_0 || feedback > HAPTIC_FEEDBACK_AUTO) {
-		PRT_ERR("Invalid parameter : feedback(%d)", feedback);
+		_E("Invalid parameter : feedback(%d)", feedback);
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (priority < HAPTIC_PRIORITY_MIN || priority > HAPTIC_PRIORITY_HIGH) {
-		PRT_ERR("Invalid parameter : priority(%d)", priority);
+		_E("Invalid parameter : priority(%d)", priority);
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (!plugin_intf || !plugin_intf->vibrate_buffer) {
-		PRT_ERR("plugin_intf == NULL || plugin_intf->vibrate_buffer == NULL");
+		_E("plugin_intf == NULL || plugin_intf->vibrate_buffer == NULL");
 		return HAPTIC_ERROR_OPERATION_FAILED;
 	}
 
 	if (feedback == HAPTIC_FEEDBACK_AUTO) {
-		PRT_DBG("Auto feedback level, feedback value will be changed");
+		_D("Auto feedback level, feedback value will be changed");
 		feedback = __get_setting_feedback_level();
 	}
 
-	PRT_DBG("iteration : %d, feedback : %d, priority : %d", iteration, feedback, priority);
+	_D("iteration : %d, feedback : %d, priority : %d", iteration, feedback, priority);
 	ret = plugin_intf->vibrate_buffer((int)device_handle, vibe_buffer, iteration, feedback, priority, &handle);
 	if (ret != HAPTIC_MODULE_ERROR_NONE) {
-		PRT_ERR("haptic_internal_vibrate_buffer is failed : %d", ret);
+		_E("haptic_internal_vibrate_buffer is failed : %d", ret);
 		return HAPTIC_ERROR_OPERATION_FAILED;
 	}
 
@@ -487,23 +487,23 @@ API int haptic_stop_all_effects(haptic_device_h device_handle)
 	int ret;
 
 	if (__handle_cnt == 0) {
-		PRT_ERR("Not initialized");
+		_E("Not initialized");
 		return HAPTIC_ERROR_NOT_INITIALIZED;
 	}
 
 	if (device_handle < 0) {
-		PRT_ERR("Invalid parameter : device_handle(%d)", device_handle);
+		_E("Invalid parameter : device_handle(%d)", device_handle);
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (!plugin_intf || !plugin_intf->stop_all_effects) {
-		PRT_ERR("plugin_intf == NULL || plugin_intf->stop_all_effects == NULL");
+		_E("plugin_intf == NULL || plugin_intf->stop_all_effects == NULL");
 		return HAPTIC_ERROR_OPERATION_FAILED;
 	}
 
 	ret = plugin_intf->stop_all_effects((int)device_handle);
 	if (ret != HAPTIC_MODULE_ERROR_NONE) {
-		PRT_ERR("haptic_internal_stop_all_effects is failed : %d", ret);
+		_E("haptic_internal_stop_all_effects is failed : %d", ret);
 		return HAPTIC_ERROR_OPERATION_FAILED;
 	}
 
@@ -516,33 +516,33 @@ API int haptic_get_effect_state(haptic_device_h device_handle, haptic_effect_h e
 	int state;
 
 	if (__handle_cnt == 0) {
-		PRT_ERR("Not initialized");
+		_E("Not initialized");
 		return HAPTIC_ERROR_NOT_INITIALIZED;
 	}
 
 	if (device_handle < 0) {
-		PRT_ERR("Invalid parameter : device_handle(%d)", device_handle);
+		_E("Invalid parameter : device_handle(%d)", device_handle);
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (effect_handle < 0) {
-		PRT_ERR("Invalid parameter : effect_handle(%d)", effect_handle);
+		_E("Invalid parameter : effect_handle(%d)", effect_handle);
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (effect_state == NULL) {
-		PRT_ERR("Invalid parameter : effect_state(NULL)");
+		_E("Invalid parameter : effect_state(NULL)");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (!plugin_intf || !plugin_intf->get_effect_state) {
-		PRT_ERR("plugin_intf == NULL || plugin_intf->get_effect_state == NULL");
+		_E("plugin_intf == NULL || plugin_intf->get_effect_state == NULL");
 		return HAPTIC_ERROR_OPERATION_FAILED;
 	}
 
 	ret = plugin_intf->get_effect_state((int)device_handle, (int)effect_handle, &state);
 	if (ret != HAPTIC_MODULE_ERROR_NONE) {
-		PRT_ERR("haptic_internal_get_effect_state is failed : %d", ret);
+		_E("haptic_internal_get_effect_state is failed : %d", ret);
 		return HAPTIC_ERROR_OPERATION_FAILED;
 	}
 
@@ -559,32 +559,32 @@ API int haptic_create_effect(unsigned char *vibe_buffer,
 	int i;
 
 	if (__handle_cnt == 0) {
-		PRT_ERR("Not initialized");
+		_E("Not initialized");
 		return HAPTIC_ERROR_NOT_INITIALIZED;
 	}
 
 	if (vibe_buffer == NULL) {
-		PRT_ERR("Invalid parameter : vibe_buffer(NULL)");
+		_E("Invalid parameter : vibe_buffer(NULL)");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (max_bufsize <= 0) {
-		PRT_ERR("Invalid parameter : max_bufsize(%d)", max_bufsize);
+		_E("Invalid parameter : max_bufsize(%d)", max_bufsize);
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (elem_arr == NULL) {
-		PRT_ERR("Invalid parameter : elem_arr(NULL)");
+		_E("Invalid parameter : elem_arr(NULL)");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (max_elemcnt <= 0) {
-		PRT_ERR("Invalid parameter : max_elemcnt(%d)", max_elemcnt);
+		_E("Invalid parameter : max_elemcnt(%d)", max_elemcnt);
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (!plugin_intf || !plugin_intf->create_effect) {
-		PRT_ERR("plugin_intf == NULL || plugin_intf->create_effect == NULL");
+		_E("plugin_intf == NULL || plugin_intf->create_effect == NULL");
 		return HAPTIC_ERROR_OPERATION_FAILED;
 	}
 
@@ -597,7 +597,7 @@ API int haptic_create_effect(unsigned char *vibe_buffer,
 
 	ret = plugin_intf->create_effect(vibe_buffer, max_bufsize, (haptic_module_effect_element*)elem_arr, max_elemcnt);
 	if (ret != HAPTIC_MODULE_ERROR_NONE) {
-		PRT_ERR("haptic_internal_create_effect is failed : %d", ret);
+		_E("haptic_internal_create_effect is failed : %d", ret);
 		return HAPTIC_ERROR_OPERATION_FAILED;
 	}
 
@@ -612,39 +612,39 @@ API int haptic_save_effect(const unsigned char *vibe_buffer,
 	struct stat buf;
 
 	if (__handle_cnt == 0) {
-		PRT_ERR("Not initialized");
+		_E("Not initialized");
 		return HAPTIC_ERROR_NOT_INITIALIZED;
 	}
 
 	if (vibe_buffer == NULL) {
-		PRT_ERR("Invalid parameter : vibe_buffer(NULL)");
+		_E("Invalid parameter : vibe_buffer(NULL)");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (max_bufsize <= 0) {
-		PRT_ERR("Invalid parameter : max_bufsize(%d)", max_bufsize);
+		_E("Invalid parameter : max_bufsize(%d)", max_bufsize);
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (file_path == NULL) {
-		PRT_ERR("Invalid parameter : file_path(NULL)");
+		_E("Invalid parameter : file_path(NULL)");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (!stat(file_path, &buf)) {
-		PRT_ERR("Already exist : file_path(%s)", file_path);
+		_E("Already exist : file_path(%s)", file_path);
 		return HAPTIC_ERROR_FILE_EXISTS;
 	}
 
 	if (!plugin_intf || !plugin_intf->save_effect) {
-		PRT_ERR("plugin_intf == NULL || plugin_intf->save_effect == NULL");
+		_E("plugin_intf == NULL || plugin_intf->save_effect == NULL");
 		return HAPTIC_ERROR_OPERATION_FAILED;
 	}
 
-	PRT_DBG("file path : %s", file_path);
+	_D("file path : %s", file_path);
 	ret = plugin_intf->save_effect(vibe_buffer, max_bufsize, file_path);
 	if (ret != HAPTIC_MODULE_ERROR_NONE) {
-		PRT_ERR("haptic_internal_save_effect is failed : %d", ret);
+		_E("haptic_internal_save_effect is failed : %d", ret);
 		return HAPTIC_ERROR_OPERATION_FAILED;
 	}
 
@@ -658,38 +658,38 @@ API int haptic_get_file_duration(haptic_device_h device_handle, const char *file
 	int duration;
 
 	if (__handle_cnt == 0) {
-		PRT_ERR("Not initialized");
+		_E("Not initialized");
 		return HAPTIC_ERROR_NOT_INITIALIZED;
 	}
 
 	if (device_handle < 0) {
-		PRT_ERR("Invalid parameter : device_handle(%d)", device_handle);
+		_E("Invalid parameter : device_handle(%d)", device_handle);
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (file_path == NULL) {
-		PRT_ERR("Invalid parameter : file_path(NULL)");
+		_E("Invalid parameter : file_path(NULL)");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (stat(file_path, &buf)) {
-		PRT_ERR("Invalid parameter : (%s) is not presents", file_path);
+		_E("Invalid parameter : (%s) is not presents", file_path);
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (file_duration == NULL) {
-		PRT_ERR("Invalid parameter : file_duration(NULL)");
+		_E("Invalid parameter : file_duration(NULL)");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (!plugin_intf || !plugin_intf->get_file_duration) {
-		PRT_ERR("plugin_intf == NULL || plugin_intf->get_file_duration == NULL");
+		_E("plugin_intf == NULL || plugin_intf->get_file_duration == NULL");
 		return HAPTIC_ERROR_OPERATION_FAILED;
 	}
 
 	ret = plugin_intf->get_file_duration((int)device_handle, file_path, &duration);
 	if (ret != HAPTIC_MODULE_ERROR_NONE) {
-		PRT_ERR("haptic_internal_stop_get_file_duration is failed : %d", ret);
+		_E("haptic_internal_stop_get_file_duration is failed : %d", ret);
 		return HAPTIC_ERROR_OPERATION_FAILED;
 	}
 
@@ -711,33 +711,33 @@ API int haptic_get_buffers_duration(haptic_device_h device_handle, const unsigne
 	int duration;
 
 	if (__handle_cnt == 0) {
-		PRT_ERR("Not initialized");
+		_E("Not initialized");
 		return HAPTIC_ERROR_NOT_INITIALIZED;
 	}
 
 	if (device_handle < 0) {
-		PRT_ERR("Invalid parameter : device_handle(%d)", device_handle);
+		_E("Invalid parameter : device_handle(%d)", device_handle);
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (vibe_buffer == NULL) {
-		PRT_ERR("Invalid parameter : vibe_buffer(NULL)");
+		_E("Invalid parameter : vibe_buffer(NULL)");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (buffer_duration == NULL) {
-		PRT_ERR("Invalid parameter : buffer_duration(NULL)");
+		_E("Invalid parameter : buffer_duration(NULL)");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (!plugin_intf || !plugin_intf->get_buffer_duration) {
-		PRT_ERR("plugin_intf == NULL || plugin_intf->get_buffer_duration == NULL");
+		_E("plugin_intf == NULL || plugin_intf->get_buffer_duration == NULL");
 		return HAPTIC_ERROR_OPERATION_FAILED;
 	}
 
 	ret = plugin_intf->get_buffer_duration((int)device_handle, vibe_buffer, &duration);
 	if (ret != HAPTIC_MODULE_ERROR_NONE) {
-		PRT_ERR("haptic_internal_stop_get_buffer_duration is failed : %d", ret);
+		_E("haptic_internal_stop_get_buffer_duration is failed : %d", ret);
 		return HAPTIC_ERROR_OPERATION_FAILED;
 	}
 
@@ -751,39 +751,39 @@ API int haptic_save_led(const unsigned char *vibe_buffer, int max_bufsize, const
 	struct stat buf;
 
 	if (__handle_cnt == 0) {
-		PRT_ERR("Not initialized");
+		_E("Not initialized");
 		return HAPTIC_ERROR_NOT_INITIALIZED;
 	}
 
 	if (vibe_buffer == NULL) {
-		PRT_ERR("Invalid parameter : vibe_buffer(NULL)");
+		_E("Invalid parameter : vibe_buffer(NULL)");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (max_bufsize <= 0) {
-		PRT_ERR("Invalid parameter : max_bufsize(%d)", max_bufsize);
+		_E("Invalid parameter : max_bufsize(%d)", max_bufsize);
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (file_path == NULL) {
-		PRT_ERR("Invalid parameter : file_path(NULL)");
+		_E("Invalid parameter : file_path(NULL)");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	if (!stat(file_path, &buf)) {
-		PRT_ERR("Already exist : file_path(%s)", file_path);
+		_E("Already exist : file_path(%s)", file_path);
 		return HAPTIC_ERROR_FILE_EXISTS;
 	}
 
 	if (!plugin_intf || !plugin_intf->convert_binary) {
-		PRT_ERR("plugin_intf == NULL || plugin_intf->convert_binary == NULL");
+		_E("plugin_intf == NULL || plugin_intf->convert_binary == NULL");
 		return HAPTIC_ERROR_OPERATION_FAILED;
 	}
 
-	PRT_DBG("file path : %s", file_path);
+	_D("file path : %s", file_path);
 	ret = plugin_intf->convert_binary(vibe_buffer, max_bufsize, file_path);
 	if (ret != HAPTIC_MODULE_ERROR_NONE) {
-		PRT_ERR("haptic_internal_save_effect is failed : %d", ret);
+		_E("haptic_internal_save_effect is failed : %d", ret);
 		return HAPTIC_ERROR_OPERATION_FAILED;
 	}
 

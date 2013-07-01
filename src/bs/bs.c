@@ -85,7 +85,7 @@ static int make_noti_file(const char *path, const char *file)
 	struct group *group_entry;
 	mode_t old_mask;
 
-	PRT_TRACE("Make Noti File");
+	_D("Make Noti File");
 	snprintf(buf, sizeof(buf), "%s/%s", path, file);	/* buf - full path to file */
 	if (access(buf, F_OK) == 0)				/* if file exists then return -1 */
 		return -1;
@@ -116,7 +116,7 @@ static int make_coredump_dir(void)
 	gid_t group_id;
 	struct group *group_entry;
 
-	PRT_TRACE("Make core dump directory");
+	_D("Make core dump directory");
 	if (access(CRASH_COREDUMP_PATH, F_OK) == 0)				/* if file exists then return -1 */
 		return -1;
 
@@ -140,7 +140,7 @@ static int make_info_dir(void)
 	gid_t group_id;
 	struct group *group_entry;
 
-	PRT_TRACE("Make crash info directory");
+	_D("Make crash info directory");
 	if (access(CRASH_INFO_PATH, F_OK) == 0)				/* if file exists then return -1 */
 		return -1;
 
@@ -165,7 +165,7 @@ static int clean_coredump_dir(void)
 	int dfd;
 	dir = opendir(CRASH_COREDUMP_PATH);
 	if (!dir) {
-		PRT_TRACE_ERR("opendir failed");
+		_E("opendir failed");
 		return 0;
 	}
 	dfd = dirfd(dir);
@@ -178,7 +178,7 @@ static int clean_coredump_dir(void)
 			if ((name[1] == '.') && (name[2] == 0)) continue;
 		}
 		if (unlinkat(dfd, name, 0) < 0) {
-			PRT_TRACE_ERR("clean_coredump_dir (%s)",name);
+			_E("clean_coredump_dir (%s)",name);
 			continue;
 		}
 	}
@@ -193,7 +193,7 @@ static int clean_dump_dir(void)
 
 	dir = opendir(CRASH_DUMP_PATH);
 	if (!dir) {
-		PRT_TRACE_ERR("opendir failed");
+		_E("opendir failed");
 		return 0;
 	}
 	while ((dp = readdir(dir)) != NULL) {
@@ -206,7 +206,7 @@ static int clean_dump_dir(void)
 			}
 			snprintf(dirname, sizeof(dirname), "%s/%s", CRASH_DUMP_PATH, name);
 			if (ecore_file_recursive_rm(dirname) == EINA_FALSE) {
-				PRT_TRACE_ERR("clean_dump_dir (%s)",dirname);
+				_E("clean_dump_dir (%s)",dirname);
 				continue;
 			}
 		}
@@ -221,7 +221,7 @@ static int clean_info_dir(void)
 	int dfd;
 	dir = opendir(CRASH_INFO_PATH);
 	if (!dir) {
-		PRT_TRACE_ERR("opendir failed");
+		_E("opendir failed");
 		return 0;
 	}
 	dfd = dirfd(dir);
@@ -234,7 +234,7 @@ static int clean_info_dir(void)
 			if ((name[1] == '.') && (name[2] == 0)) continue;
 		}
 		if (unlinkat(dfd, name, 0) < 0) {
-			PRT_TRACE_ERR("clean_info_dir (%s)",name);
+			_E("clean_info_dir (%s)",name);
 			continue;
 		}
 	}
@@ -248,48 +248,48 @@ static int crash_arg_parser(char *linebuffer, struct crash_arg *arg)
 	int verify_arg_num = 0;
 
 	if (linebuffer == NULL || arg == NULL) {
-		PRT_TRACE_ERR("crash_arg_parser input arguments is NULL");
+		_E("crash_arg_parser input arguments is NULL");
 		return -1;
 	}
 	ptr = strtok(linebuffer, CRASH_DELIMITER);
 	if (ptr == NULL) {
-		PRT_TRACE_ERR("can't strtok linebuffer ptr(%s)", ptr);
+		_E("can't strtok linebuffer ptr(%s)", ptr);
 		return -1;
 	}
 	snprintf(arg->crash_mode, CRASH_MODE_MAX, "%s",  ptr);
 	ptr = strtok(NULL, CRASH_DELIMITER);
 	if (ptr == NULL) {
-		PRT_TRACE_ERR("can't strtok linebuffer ptr(%s)", ptr);
+		_E("can't strtok linebuffer ptr(%s)", ptr);
 		return -1;
 	}
 	snprintf(arg->crash_processname, CRASH_PROCESSNAME_MAX, "%s",  ptr);
 	ptr = strtok(NULL, CRASH_DELIMITER);
 	if (ptr == NULL) {
-		PRT_TRACE_ERR("can't strtok linebuffer ptr(%s)", ptr);
+		_E("can't strtok linebuffer ptr(%s)", ptr);
 		return -1;
 	}
 	snprintf(arg->crash_timestr, CRASH_TIME_MAX, "%s", ptr);
 	ptr = strtok(NULL, CRASH_DELIMITER);
 	if (ptr == NULL) {
-		PRT_TRACE_ERR("can't strtok linebuffer ptr(%s)", ptr);
+		_E("can't strtok linebuffer ptr(%s)", ptr);
 		return -1;
 	}
 	snprintf(arg->crash_pid, CRASH_PID_MAX, "%s", ptr);
 	ptr = strtok(NULL, CRASH_DELIMITER);
 	if (ptr == NULL) {
-		PRT_TRACE_ERR("can't strtok linebuffer ptr(%s)", ptr);
+		_E("can't strtok linebuffer ptr(%s)", ptr);
 		return -1;
 	}
 	snprintf(arg->crash_exepath, CRASH_EXEPATH_MAX, "%s", ptr);
 	ptr = strtok(NULL, CRASH_DELIMITER);
 	if (ptr == NULL) {
-		PRT_TRACE_ERR("can't strtok linebuffer ptr(%s)", ptr);
+		_E("can't strtok linebuffer ptr(%s)", ptr);
 		return -1;
 	}
 	snprintf(arg->crash_verify, CRASH_VERIFY_MAX, "%s", ptr);
 	verify_num = strlen(arg->crash_processname) + strlen(arg->crash_exepath);
 	verify_arg_num = atoi(arg->crash_verify);
-	PRT_TRACE("vnum %d vanum %d", verify_num, verify_arg_num);
+	_D("vnum %d vanum %d", verify_num, verify_arg_num);
 	if (verify_num == verify_arg_num)
 		return 1;
 	else
@@ -312,7 +312,7 @@ static void launch_crash_worker(const char *filename, int popup_on)
 	while (fgets(linebuffer, CRASH_ARG_MAX, fp) != NULL) {
 		len = strlen(linebuffer);
 		if (!len || linebuffer[len - 1] != '\n') {
-			PRT_TRACE_ERR("crash inoti msg  must be terminated with new line character\n");
+			_E("crash inoti msg  must be terminated with new line character\n");
 			break;
 		}
 		/* change last caracter from \n to \0 */
@@ -322,8 +322,8 @@ static void launch_crash_worker(const char *filename, int popup_on)
 		snprintf(crash_worker_args, sizeof(crash_worker_args), "%s %s %s %s %s",
 				parsing_arg.crash_mode, parsing_arg.crash_processname,
 				parsing_arg.crash_timestr, parsing_arg.crash_pid, parsing_arg.crash_exepath);
-		PRT_TRACE("crash_worker args(%s)", crash_worker_args);
-		PRT_TRACE("(%s%s%s)", parsing_arg.crash_mode,
+		_D("crash_worker args(%s)", crash_worker_args);
+		_D("(%s%s%s)", parsing_arg.crash_mode,
 				parsing_arg.crash_processname, parsing_arg.crash_timestr);
 		ret = ss_launch_evenif_exist (CRASH_WORKER_PATH, crash_worker_args);
 		if (ret > 0) {
@@ -342,7 +342,7 @@ static void launch_crash_worker(const char *filename, int popup_on)
 		}
 
 		if (popup_pid < 0) {
-			PRT_TRACE_ERR("popup failed)\n");
+			_E("popup failed)\n");
 			break;
 		}
 	}
@@ -413,7 +413,7 @@ static int _check_disk_available(void)
 static void bs_init(void *data)
 {
 	if (make_noti_file(CRASH_NOTI_DIR, CRASH_NOTI_FILE) < 0) {
-		PRT_TRACE_ERR("make_noti_file() failed");
+		_E("make_noti_file() failed");
 		launch_crash_worker(CRASH_NOTI_PATH, CRASH_POPUP_OFF);
 	}
 	if (make_info_dir() < 0) {
@@ -429,13 +429,13 @@ static void bs_init(void *data)
 		clean_dump_dir();
 
 	if (ecore_file_init() == 0) {
-		PRT_TRACE_ERR("ecore_file_init() failed");
+		_E("ecore_file_init() failed");
 		launch_crash_worker(CRASH_NOTI_PATH, CRASH_POPUP_OFF);
 	}
 
 	crash_file_monitor = ecore_file_monitor_add(CRASH_NOTI_PATH,(void *) __crash_file_cb, NULL);
 	if (!crash_file_monitor) {
-		PRT_TRACE_ERR("ecore_file_monitor_add() failed");
+		_E("ecore_file_monitor_add() failed");
 		launch_crash_worker(CRASH_NOTI_PATH, CRASH_POPUP_OFF);
 		return;
 	}

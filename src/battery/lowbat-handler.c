@@ -109,7 +109,7 @@ static void print_lowbat_state(unsigned int bat_percent)
 #if 0
 	int i;
 	for (i = 0; i < BAT_MON_SAMPLES; i++)
-		PRT_TRACE("\t%d", recent_bat_percent[i]);
+		_D("\t%d", recent_bat_percent[i]);
 #endif
 }
 
@@ -150,8 +150,8 @@ static int battery_charge_act(void *data)
 
 int ss_lowbat_set_charge_on(int onoff)
 {
-	if(vconf_set_int(VCONFKEY_SYSMAN_BATTERY_CHARGE_NOW, onoff)!=0) {
-		PRT_TRACE_ERR("fail to set charge vconf value");
+	if(vconf_set_int(VCONFKEY_SYSMAN_BATTERY_CHARGE_NOW, onoff) != 0) {
+		_E("fail to set charge vconf value");
 		return -1;
 	}
 	if (update_pm_setting)
@@ -159,11 +159,11 @@ int ss_lowbat_set_charge_on(int onoff)
 	return 0;
 }
 
-int ss_lowbat_is_charge_in_now()
+int ss_lowbat_is_charge_in_now(void)
 {
 	int val = 0;
 	if (device_get_property(DEVICE_TYPE_POWER, PROP_POWER_CHARGE_NOW, &val) < 0) {
-		PRT_TRACE_ERR("fail to read charge now from kernel");
+		_E("fail to read charge now from kernel");
 		ss_lowbat_set_charge_on(0);
 		return 0;
 	}
@@ -186,25 +186,27 @@ static int lowbat_process(int bat_percent, void *ad)
 	int i, ret = 0;
 	int val = 0;
 	int status = -1;
+
 	new_bat_capacity = bat_percent;
 	if (new_bat_capacity < 0)
 		return -1;
+
 	if (new_bat_capacity != cur_bat_capacity) {
-		PRT_TRACE("[BAT_MON] cur = %d new = %d", cur_bat_capacity, new_bat_capacity);
+		_D("[BAT_MON] cur = %d new = %d", cur_bat_capacity, new_bat_capacity);
 		if (vconf_set_int(VCONFKEY_SYSMAN_BATTERY_CAPACITY, new_bat_capacity) == 0)
 			cur_bat_capacity = new_bat_capacity;
 	}
 
 	if (vconf_get_int(VCONFKEY_SYSMAN_BATTERY_STATUS_LOW, &vconf_state) < 0) {
-		PRT_TRACE_ERR("vconf_get_int() failed");
+		_E("vconf_get_int() failed");
 		return -1;
 	}
 
 	if (new_bat_capacity <= BATTERY_REAL_POWER_OFF) {
 		if (device_get_property(DEVICE_TYPE_POWER, PROP_POWER_CHARGE_NOW, &val) < 0) {
-			PRT_TRACE_ERR("fail to read charge now from kernel");
+			_E("fail to read charge now from kernel");
 		}
-		PRT_TRACE("charge_now status %d",val);
+		_D("charge_now status %d",val);
 		if (val == 1) {
 			new_bat_state = BATTERY_POWER_OFF;
 			if (vconf_state != VCONFKEY_SYSMAN_BAT_POWER_OFF)
@@ -280,7 +282,7 @@ static int lowbat_process(int bat_percent, void *ad)
 			}
 		}
 	}
-	PRT_TRACE("[BATMON] Unknown battery state cur:%d new:%d",cur_bat_state,new_bat_state);
+	_D("[BATMON] Unknown battery state cur:%d new:%d", cur_bat_state, new_bat_state);
 	cur_bat_state = new_bat_state;
 	return -1;
 }
@@ -302,7 +304,7 @@ static void __ss_change_lowbat_level(int bat_percent)
 		return;
 
 	if (vconf_get_int(VCONFKEY_SYSMAN_BATTERY_LEVEL_STATUS, &prev) < 0) {
-		PRT_TRACE_ERR("vconf_get_int() failed");
+		_E("vconf_get_int() failed");
 		return;
 	}
 
@@ -332,8 +334,7 @@ static int __check_lowbat_percent(void)
 		ecore_timer_interval_set(lowbat_timer, BAT_MON_INTERVAL_MIN);
 		bat_err_count++;
 		if (bat_err_count > MAX_BATTERY_ERROR) {
-			PRT_TRACE_ERR
-			    ("[BATMON] Cannot read battery gage. stop read fuel gage");
+			_E("[BATMON] Cannot read battery gage. stop read fuel gage");
 			return 0;
 		}
 		return 1;
@@ -378,9 +379,9 @@ static int check_battery()
 	int ret = -1;
 
 	if (device_get_property(DEVICE_TYPE_POWER, PROP_POWER_PRESENT, &ret) < 0) {
-		PRT_TRACE_ERR("[BATMON] battery check : %d", ret);
+		_E("[BATMON] battery check : %d", ret);
 	}
-	PRT_TRACE("[BATMON] battery check : %d", ret);
+	_D("[BATMON] battery check : %d", ret);
 
 	return ret;
 }
@@ -404,7 +405,7 @@ int lowbat_popup(void *data)
 
 		ret = syspopup_launch("lowbat-syspopup", b);
 		if (ret < 0) {
-			PRT_TRACE_EM("popup lauch failed\n");
+			_E("popup lauch failed");
 			bundle_free(b);
 			return 1;
 		}
@@ -412,7 +413,7 @@ int lowbat_popup(void *data)
 		lowbat_popup_option = 0;
 		bundle_free(b);
 	} else {
-		PRT_TRACE_EM("boot-animation running yet");
+		_E("boot-animation running yet");
 		return 1;
 	}
 
@@ -452,13 +453,13 @@ int lowbat_def_predefine_action(int argc, char **argv)
 	ret = vconf_get_int(VCONFKEY_STARTER_SEQUENCE, &state);
 	if (state == 1 || ret != 0) {
 		if (predefine_control_launch("lowbat-syspopup", b, lowbat_popup_option) < 0) {
-				PRT_TRACE_ERR("popup lauch failed\n");
+				_E("popup lauch failed\n");
 				bundle_free(b);
 				lowbat_popup_option = 0;
 				return -1;
 		}
 	} else {
-		PRT_TRACE_EM("boot-animation running yet");
+		_E("boot-animation running yet");
 		lowbat_popup_id = ecore_timer_add(1, lowbat_popup, NULL);
 	}
 	bundle_free(b);

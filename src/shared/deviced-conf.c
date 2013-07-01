@@ -58,12 +58,12 @@ int util_process_group_set(const char* name, int pid)
 
 	if (strncmp(PROCESS_VIP, name, strlen(name)) != 0 &&
 	    strncmp(PROCESS_PERMANENT, name, strlen(name)) != 0) {
-		PRT_TRACE_ERR("fail to insert at %s group", name);
+		_E("fail to insert at %s group", name);
 		return -1;
 	}
 
 	snprintf(buf, sizeof(buf), "%d", pid);
-	PRT_TRACE_ERR("pid(%d) is inserted at vip", pid);
+	_E("pid(%d) is inserted at vip", pid);
 
 	return deviced_call_predef_action(PROCESS_GROUP_SET, 2, buf, name);
 }
@@ -101,7 +101,7 @@ static int already_permanent(int pid)
 	snprintf(buf, BUFF_MAX, "%s/%d", PERMANENT_DIR, pid);
 
 	if (access(buf, R_OK) == 0) {
-		PRT_TRACE("already_permanent process : %d", pid);
+		_D("already_permanent process : %d", pid);
 		return 1;
 	}
 	return 0;
@@ -116,10 +116,10 @@ static int copy_cmdline(int pid)
 	int r;
 
 	if (access(PERMANENT_DIR, R_OK) < 0) {
-		PRT_TRACE("no predefined matrix dir = %s, so created", PERMANENT_DIR);
+		_D("no predefined matrix dir = %s, so created", PERMANENT_DIR);
 		r = mkdir(PERMANENT_DIR, 0777);
 		if(r < 0) {
-			PRT_TRACE_ERR("permanent directory mkdir is failed");
+			_E("permanent directory mkdir is failed");
 			return -1;
 		}
 	}
@@ -128,7 +128,7 @@ static int copy_cmdline(int pid)
 
 	fd = open(filepath, O_RDONLY);
 	if (fd == -1) {
-		PRT_TRACE("Failed to open");
+		_D("Failed to open");
 		return -1;
 	}
 
@@ -137,7 +137,7 @@ static int copy_cmdline(int pid)
 
 	if (cnt <= 0) {
 		/* Read /proc/<pid>/cmdline error */
-		PRT_TRACE("Failed to read");
+		_D("Failed to read");
 		return -1;
 	}
 
@@ -145,12 +145,12 @@ static int copy_cmdline(int pid)
 
 	fd = open(filepath, O_CREAT | O_WRONLY, 0644);
 	if (fd == -1) {
-		PRT_TRACE("Failed to open");
+		_D("Failed to open");
 		return -1;
 	}
 
 	if (write(fd, buf, cnt) == -1) {
-		PRT_TRACE("Failed to write");
+		_D("Failed to write");
 		close(fd);
 		return -1;
 	}
@@ -169,10 +169,10 @@ API int deviced_conf_set_vip(int pid)
 		return -1;
 
 	if (access(VIP_DIR, R_OK) < 0) {
-		PRT_TRACE("no predefined matrix dir = %s, so created", VIP_DIR);
+		_D("no predefined matrix dir = %s, so created", VIP_DIR);
 		r = mkdir(VIP_DIR, 0777);
 		if(r < 0) {
-			PRT_TRACE_ERR("sysconf_set_vip vip mkdir is failed");
+			_E("sysconf_set_vip vip mkdir is failed");
 			return -1;
 		}
 	}
@@ -180,12 +180,12 @@ API int deviced_conf_set_vip(int pid)
 	snprintf(buf, BUFF_MAX, "%s/%d", VIP_DIR, pid);
 	fd = open(buf, O_CREAT | O_RDWR, 0644);
 	if (fd < 0) {
-		PRT_TRACE_ERR("sysconf_set_vip fd open failed");
+		_E("sysconf_set_vip fd open failed");
 		return -1;
 	}
 	close(fd);
 	if (util_process_group_set(PROCESS_VIP, pid) < 0) {
-		PRT_TRACE_ERR("set vip failed");
+		_E("set vip failed");
 		return -1;
 	}
 
@@ -217,7 +217,7 @@ API int deviced_conf_set_permanent_bypid(int pid)
 		return -1;
 
 	if (util_process_group_set(PROCESS_PERMANENT, pid) < 0) {
-		PRT_TRACE_ERR("set vip failed");
+		_E("set vip failed");
 		return -1;
 	}
 

@@ -40,22 +40,22 @@ int register_notifier(enum device_notifier_type status, int (*func)(void *data))
 	Eina_List *n, *next;
 	struct device_notifier *data, *notifier;
 
-	PRT_TRACE("%d, %x", status, func);
+	_I("%d, %x", status, func);
 
 	if (!func) {
-		PRT_TRACE_ERR("invalid func address!");
+		_E("invalid func address!");
 		return -EINVAL;
 	}
 
 	FIND_NOTIFIER(device_notifier_list, n, next, notifier, status, func) {
-		PRT_TRACE_ERR("function is already registered! [%d, %x]",
+		_E("function is already registered! [%d, %x]",
 		    status, func);
 		return -EINVAL;
 	}
 
 	notifier = malloc(sizeof(struct device_notifier));
 	if (!notifier) {
-		PRT_TRACE_ERR("Fail to malloc for notifier!");
+		_E("Fail to malloc for notifier!");
 		return -ENOMEM;
 	}
 
@@ -73,12 +73,12 @@ int unregister_notifier(enum device_notifier_type status, int (*func)(void *data
 	struct device_notifier *notifier;
 
 	if (!func) {
-		PRT_TRACE_ERR("invalid func address!");
+		_E("invalid func address!");
 		return -EINVAL;
 	}
 
 	FIND_NOTIFIER(device_notifier_list, n, next, notifier, status, func) {
-		PRT_TRACE("[%d, %x]", status, func);
+		_I("[%d, %x]", status, func);
 		free(notifier);
 		EINA_LIST_REMOVE_LIST(device_notifier_list, n);
 	}
@@ -101,7 +101,7 @@ void device_notify(enum device_notifier_type status, void *data)
 		}
 	}
 
-	PRT_TRACE("cb is called! status:%d, cnt:%d ", status, cnt);
+	_I("cb is called! status:%d, cnt:%d ", status, cnt);
 }
 
 static void device_notifier_exit(void)
@@ -115,7 +115,7 @@ static void device_notifier_exit(void)
 			EINA_LIST_REMOVE_LIST(device_notifier_list, n);
 		}
 
-	PRT_TRACE("all deleted!");
+	_I("all deleted!");
 }
 
 const struct device_ops notifier_device_ops = {

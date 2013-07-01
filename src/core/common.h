@@ -17,9 +17,10 @@
  */
 
 
-#ifndef _SS_COMMON_H
-#define _SS_COMMON_H
+#ifndef __COMMON_H__
+#define __COMMON_H__
 
+#include <stdio.h>
 #include <unistd.h>
 
 #define ARRAY_SIZE(name) (sizeof(name)/sizeof(name[0]))
@@ -29,5 +30,5 @@ int get_exec_pid(const char *execpath);
 int get_cmdline_name(pid_t pid, char *cmdline, size_t cmdline_size);
 int is_vip(int pid);
 
-#endif	/* _SS_COMMON_H */
+#endif	/* __COMMON_H__ */
 

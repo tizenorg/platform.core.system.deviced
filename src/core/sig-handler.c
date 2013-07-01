@@ -22,21 +22,10 @@
 #include <sys/wait.h>
 #include <vconf.h>
 #include "core.h"
+#include "log.h"
 #include "edbus-handler.h"
 #include "display/poll.h"
 #include "devices.h"
-
-#define PRT_TRACE_ERR(format, args...) do { \
-	char buf[255];\
-	snprintf(buf, 255, format, ##args);\
-	write(2, buf, strlen(buf));\
-} while (0);
-
-#define PRT_TRACE(format, args...) do { \
-	char buf[255];\
-	snprintf(buf, 255, format, ##args);\
-	write(1, buf, strlen(buf));\
-} while (0);
 
 static struct sigaction sig_child_old_act;
 static struct sigaction sig_pipe_old_act;
@@ -48,11 +37,11 @@ static void sig_child_handler(int signo, siginfo_t *info, void *data)
 
 	pid = waitpid(info->si_pid, &status, 0);
 	if (pid == -1) {
-		PRT_TRACE_ERR("SIGCHLD received\n");
+		_E("SIGCHLD received\n");
 		return;
 	}
 
-	PRT_TRACE("sig child actend call - %d\n", info->si_pid);
+	_D("sig child actend call - %d\n", info->si_pid);
 
 	ss_core_action_clear(info->si_pid);
 }
