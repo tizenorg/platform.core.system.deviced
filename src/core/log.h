@@ -1,11 +1,13 @@
 /*
- * Copyright (c) 2012 Samsung Electronics Co., Ltd.
+ * deviced
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Copyright (c) 2012 - 2013 Samsung Electronics Co., Ltd.
+ *
+ * Licensed under the Apache License, Version 2.0 (the License);
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,7 +29,7 @@
 #define __LOG(prio, fmt, arg...) \
 	do { SLOG(prio, LOG_TAG, fmt, ##arg); } while (0)
 #define __LOGD(prio, fmt, arg...) \
-	do { SLOG(prio, LOG_TAG, "%s: %s(%d) > " fmt, __MODULE__, __func__, __LINE__, ##arg); } while (0)
+	do { SLOG(prio, LOG_TAG, fmt, ##arg); } while (0)
 #define __PRT(prio, fmt, arg...) \
 	do { fprintf(((D##prio) == DLOG_ERR ? stderr : stdout), fmt"\n", ##arg); } while (0)
 #define __PRTD(prio, fmt, arg...) \

@@ -1,5 +1,6 @@
 /*
  * deviced
+ *
  * Copyright (c) 2012 - 2013 Samsung Electronics Co., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the License);
@@ -35,7 +36,6 @@ extern "C" {
 
 enum control_device_type {
 	/* Add device define here  */
-	/* DEVICE_CONTROL_DISPLAY, */
 	DEVICE_CONTROL_MMC,
 	DEVICE_CONTROL_MAX,
 };
