@@ -98,13 +98,26 @@ enum snd_jack_types {
 
 #define CHANGE_ACTION		"change"
 #define ENV_FILTER		"CHGDET"
-#define ENV_VALUE_USB		"usb"
-#define ENV_VALUE_CHARGER 	"charger"
-#define ENV_VALUE_EARJACK 	"earjack"
-#define ENV_VALUE_EARKEY 	"earkey"
-#define ENV_VALUE_TVOUT 	"tvout"
-#define ENV_VALUE_HDMI 		"hdmi"
-#define ENV_VALUE_KEYBOARD 	"keyboard"
+#define USB_NAME                "usb"
+#define USB_NAME_LEN            3
+
+#define CHARGER_NAME            "charger"
+#define CHARGER_NAME_LEN        7
+
+#define EARJACK_NAME            "earjack"
+#define EARJACK_NAME_LEN        7
+
+#define EARKEY_NAME             "earkey"
+#define EARKEY_NAME_LEN         6
+
+#define TVOUT_NAME              "tvout"
+#define TVOUT_NAME_LEN          5
+
+#define HDMI_NAME               "hdmi"
+#define HDMI_NAME_LEN           4
+
+#define KEYBOARD_NAME           "keyboard"
+#define KEYBOARD_NAME_LEN       8
 
 #define SWITCH_DEVICE_USB 	"usb_cable"
 
@@ -801,44 +814,34 @@ out:
 	return EINA_TRUE;
 }
 
-int changed_device_def_predefine_action(int argc, char **argv)
+static int changed_device(int argc, char **argv)
 {
-	int state;
+	int *state = NULL;
+	int i;
 
-	if (argc ==2 && argv[0] != NULL && argv[1] != NULL) {
-		state = atoi(argv[1]);
-		goto switch_device;
+	for (i = 0 ; i < argc ; i++) {
+		if (argv[i] == NULL) {
+			_E("param is failed");
+			return -EINVAL;
+		}
 	}
-
-	if (argc != 1 || argv[0] == NULL) {
-		_E("param is failed");
-		return -1;
-	}
-
-	if (strncmp(argv[0], ENV_VALUE_USB, strlen(ENV_VALUE_USB)) == 0)
-		usb_chgdet_cb(NULL);
-	if (strncmp(argv[0], ENV_VALUE_EARJACK, strlen(ENV_VALUE_EARJACK)) == 0)
-		earjack_chgdet_cb(NULL);
-	if (strncmp(argv[0], ENV_VALUE_EARKEY, strlen(ENV_VALUE_EARKEY)) == 0)
-		earkey_chgdet_cb(NULL);
-	if (strncmp(argv[0], ENV_VALUE_TVOUT, strlen(ENV_VALUE_TVOUT)) == 0)
-		tvout_chgdet_cb(NULL);
-	if (strncmp(argv[0], ENV_VALUE_HDMI, strlen(ENV_VALUE_HDMI)) == 0)
-		hdmi_chgdet_cb(NULL);
-	if (strncmp(argv[0], ENV_VALUE_KEYBOARD, strlen(ENV_VALUE_KEYBOARD)) == 0)
-		keyboard_chgdet_cb(NULL);
-	if (strncmp(argv[0], POWER_SUBSYSTEM, strlen(POWER_SUBSYSTEM)) == 0)
-		power_supply(NULL);
-
-	return 0;
-
-	switch_device:
-		if (strncmp(argv[0], SWITCH_DEVICE_USB, strlen(SWITCH_DEVICE_USB)) == 0)
+		if (strncmp(argv[0], USB_NAME, USB_NAME_LEN) == 0)
 			usb_chgdet_cb((void *)state);
+		else if (strncmp(argv[0], EARJACK_NAME, EARJACK_NAME_LEN) == 0)
+			earjack_chgdet_cb((void *)state);
+		else if (strncmp(argv[0], EARKEY_NAME, EARKEY_NAME_LEN) == 0)
+			earkey_chgdet_cb((void *)state);
+		else if (strncmp(argv[0], TVOUT_NAME, TVOUT_NAME_LEN) == 0)
+			tvout_chgdet_cb((void *)state);
+		else if (strncmp(argv[0], HDMI_NAME, HDMI_NAME_LEN) == 0)
+			hdmi_chgdet_cb((void *)state);
+		else if (strncmp(argv[0], KEYBOARD_NAME, KEYBOARD_NAME_LEN) == 0)
+			keyboard_chgdet_cb((void *)state);
+
 		return 0;
 }
 
-int usbcon_def_predefine_action(int argc, char **argv)
+static int changed_dev_usb(int argc, char **argv)
 {
 	int pid;
 	int val = -1;
@@ -870,7 +873,7 @@ int usbcon_def_predefine_action(int argc, char **argv)
 	return -1;
 }
 
-int earjackcon_def_predefine_action(int argc, char **argv)
+static int changed_dev_earjack(int argc, char **argv)
 {
 	int val;
 
@@ -884,7 +887,7 @@ int earjackcon_def_predefine_action(int argc, char **argv)
 	return -1;
 }
 
-static int battery_def_cf_opened_actioin(int argc, char **argv)
+static int changed_battery_cf(int argc, char **argv)
 {
 	int ret;
 	static int present_status = 1;
@@ -935,10 +938,10 @@ static void device_change_init(void *data)
 {
 	if (extcon_count_init() != 0)
 		_E("fail to init extcon files");
-	action_entry_add_internal(PREDEF_USBCON, usbcon_def_predefine_action, NULL, NULL);
-	action_entry_add_internal(PREDEF_EARJACKCON, earjackcon_def_predefine_action, NULL, NULL);
-	action_entry_add_internal(PREDEF_BATTERY_CF_OPENED, battery_def_cf_opened_actioin, NULL, NULL);
-	action_entry_add_internal(PREDEF_DEVICE_CHANGED, changed_device_def_predefine_action, NULL, NULL);
+	action_entry_add_internal(PREDEF_USBCON, changed_dev_usb, NULL, NULL);
+	action_entry_add_internal(PREDEF_EARJACKCON, changed_dev_earjack, NULL, NULL);
+	action_entry_add_internal(PREDEF_BATTERY_CF_OPENED, changed_battery_cf, NULL, NULL);
+	action_entry_add_internal(PREDEF_DEVICE_CHANGED, changed_device, NULL, NULL);
 
 	if (uevent_control_start() != 0) {
 		_E("fail uevent control init");
@@ -967,7 +970,7 @@ static void device_change_init(void *data)
 	}
 
 	/* check and set earjack init status */
-	earjackcon_def_predefine_action(0, NULL);
+	changed_dev_earjack(0, NULL);
 	/* dbus noti change cb */
 #ifdef ENABLE_EDBUS_USE
 	e_dbus_init();
