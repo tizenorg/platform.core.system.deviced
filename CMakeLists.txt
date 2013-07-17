@@ -29,6 +29,8 @@ SET(SRCS
 	src/core/edbus-handler.c
 	src/cpu/cpu-handler.c
 	src/mmc/mmc-handler.c
+	src/mmc/ext4.c
+	src/mmc/vfat.c
 	src/power/power-handler.c
 	src/proc/lowmem-handler.c
 	src/proc/pmon-handler.c

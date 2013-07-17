@@ -35,48 +35,25 @@
 #include "core/log.h"
 #include "core/common.h"
 #include "core/devices.h"
+#include "mmc-handler.h"
 
 #define VCONFKEY_INTERNAL_PRIVATE_MMC_ID	"db/private/sysman/mmc_device_id"
 
 #define PREDEF_MOUNT_MMC		"mountmmc"
 #define PREDEF_UNMOUNT_MMC		"unmountmmc"
 #define PREDEF_FORMAT_MMC		"formatmmc"
-#define PREDEF_CHECK_SMACK_MMC		"checksmackmmc"
 
-#define MMC_MOUNT_POINT			"/opt/storage/sdcard"
-
+#define MMC_PARENT_PATH     	"/opt/storage"
 #define MMC_DEV			"/dev/mmcblk"
-#define MOVINAND_DEV		"/dev/mmcblk0p1"
-#define FORMAT_MMC		PREFIX"/sbin/mkfs.vfat "
-#define FORMAT_MOVINAND		PREFIX"/bin/movi_format.sh"
-
-#define FS_VFAT_NAME "mkdosfs"
-#define FS_VFAT_MOUNT_OPT  "uid=0,gid=0,dmask=0000,fmask=0111,iocharset=iso8859-1,utf8,shortname=mixed"
-#define FS_VFAT_CHECKER "/sbin/fsck.vfat"
-#define FS_EXT4_CHECKER "/sbin/fsck.ext4"
-#define FS_VFAT_CHECK_PARAM "-a %s"
-#define FS_EXT4_CHECK_PARAM "-f -y %s"
-#define FS_EXT4_SMACK_LABEL "mmc-smack-label "MMC_MOUNT_POINT
 
 #define SMACKFS_MAGIC		0x43415d53
 #define SMACKFS_MNT		"/smack"
-#define SMACKFS_MOUNT_OPT	"smackfsroot=*,smackfsdef=*"
 
 #ifndef ST_RDONLY
-#define ST_RDONLY	0x0001
+#define ST_RDONLY		0x0001
 #endif
 
-#define MMC_PARENT_PATH     "/opt/storage"
-
-#define BUF_LEN             20
-
 #define MMC_32GB_SIZE           61315072
-
-typedef enum {
-	FS_TYPE_NONE = 0,
-	FS_TYPE_FAT = 1,
-	FS_TYPE_EXT4
-} mmc_fs_type;
 
 typedef enum {
 	FS_MOUNT_ERR = -1,
@@ -84,73 +61,22 @@ typedef enum {
 	FS_MOUNT_SUCCESS = 1,
 } mmc_mount_type;
 
-
-struct fs_check {
-	unsigned int type;
-	char *name;
-	unsigned int offset;
-	unsigned int magic_sz;
-	char magic[4];
-};
-
-static struct fs_check fs_types[2] = {
-	{
-		FS_TYPE_FAT,
-		"vfat",
-		0x1fe,
-		2,
-		{0x55, 0xaa}
-	},
-	{
-		FS_TYPE_EXT4,
-		"ext4",
-		0x438,
-		2,
-		{0x53, 0xef}
-	},
-};
-
-
-static const char *fsstr[] = {
-    [FS_TYPE_FAT] = "mkdosfs",
-};
-
-static const char *vfat_arg[] = {
-	"/sbin/mkfs.vfat",
-	NULL, NULL,
-};
-
-static const char *ext4_arg[] = {
-	"/sbin/mkfs.ext4",
-	NULL, NULL,
-};
-
-static const char *vfat_check_arg[] = {
-	"/sbin/fsck.vfat",
-	"-a", NULL, NULL,
-};
-
-static const char *ext4_check_arg[] = {
-	"/sbin/fsck.ext4",
-	"-f", "-y", NULL, NULL,
-};
-
-
-static int smack;
-static int mmc_popup_pid;
-static mmc_fs_type inserted_type;
+static int smack = 0;
+static int mmc_popup_pid = 0;
+static enum mmc_fs_type inserted_type;
 static bool mmc_disabled = false;
+static char mmc_node[PATH_MAX];
+static const struct mmc_filesystem_ops *filesystem_type[] = {
+	&vfat_ops,
+	&ext4_ops,
+};
+
+static struct mmc_filesystem_ops *mmc_filesystem;
 
 static void __attribute__ ((constructor)) smack_check(void)
 {
 	struct statfs sfs;
 	int ret;
-
-	if (mmc_disabled) {
-		PRT_TRACE("mmc is blocked!");
-		vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_INSERTED_NOT_MOUNTED);
-		return -ENODEV;
-	}
 
 	do {
 		ret = statfs(SMACKFS_MNT, &sfs);
@@ -183,7 +109,6 @@ static int exec_process(const char **argv)
 			exit(EXIT_FAILURE);
 		}
 	}
-
 	return pid;
 }
 
@@ -285,98 +210,57 @@ int get_mmcblk_num(void)
 	return -1;
 }
 
-static int __umount_fs(void)
+static int mmc_umount(int option)
 {
 	int ret;
-	if ((ret = umount2(MMC_MOUNT_POINT, MNT_DETACH)) != 0) {
-		PRT_TRACE_ERR("Failed to unmount mmc card : %s", strerror(errno));
-	}
+	ret = umount2(MMC_MOUNT_POINT, option);
+	if (ret != 0)
+		PRT_TRACE_ERR("Failed to unmount mmc card\n");
 	return ret;
 }
 
-static int __check_mmc_fs_type(const char *path)
+static int mmc_check_fs_type(void)
 {
-	int fd, ret, i;
-	char buf[20];
-	int len = 20;
-	char *tmpbuf = buf;
-	int cnr = 0;
-	struct statfs sfs;
-
+	int ret, i;
+	struct mmc_filesystem_ops *filesystem;
 	inserted_type = FS_TYPE_NONE;
-	if ((fd = open(path, O_RDONLY)) < 0) {
-		PRT_TRACE_ERR("can't open the '%s': %s", path, strerror(errno));
-		return -1;
+
+	for (i = 0; i < ARRAY_SIZE(filesystem_type); i++) {
+		filesystem = filesystem_type[i];
+		if (!filesystem)
+			continue;
+		ret = filesystem->init((void *)mmc_node);
+		if (ret == -EINVAL)
+			continue;
+		inserted_type = ret;
+		mmc_filesystem = filesystem;
+		return 0;
 	}
 
-	while (len != 0 && (ret = read(fd, tmpbuf, len)) != 0) {
-		if (ret == -1) {
-			if (errno == EINTR) {
-				PRT_TRACE_ERR("check_mmc_fs error(%d)", errno);
-				continue;
-			}
-			PRT_TRACE_ERR("Can't read the '%s': %s", path, strerror(errno));
-			inserted_type = FS_TYPE_FAT;
-			goto check_return;
-		}
-		len -= ret;
-		tmpbuf += ret;
-		cnr += ret;
-	}
-	PRT_TRACE("mmc search path: %s, %s", path, buf);
-
-	/* check fs type with magic code */
-	for (i = 0; i < ARRAY_SIZE(fs_types); i++)
-	{
-		lseek(fd, fs_types[i].offset, SEEK_SET);
-		ret = read(fd, buf, 2);
-		PRT_TRACE("mmc search magic : 0x%2x, 0x%2x", buf[0],buf[1]);
-		if (!memcmp(buf, fs_types[i].magic, fs_types[i].magic_sz)) {
-			inserted_type =  fs_types[i].type;
-			PRT_TRACE("mmc type : %s", fs_types[i].name);
-			goto check_return;
-		}
-	}
-
-	if (inserted_type == FS_TYPE_NONE)
+	if (inserted_type == FS_TYPE_NONE) {
+		PRT_TRACE_ERR("set default file system");
 		inserted_type = FS_TYPE_FAT;
-
-check_return:
-	close(fd);
+		mmc_filesystem = &vfat_ops;
+		if (!mmc_filesystem) {
+			PRT_TRACE_ERR("fail to init mmc file system");
+			return -EINVAL;
+		}
+		mmc_filesystem->init((void *)mmc_node);
+	}
 	return 0;
 }
 
-static int get_format_type(const char *path)
+static int get_format_type(void)
 {
 	unsigned int size;
 
-	if (__check_mmc_fs_type(path) != 0) {
-		PRT_TRACE_ERR("fail to check mount point %s", path);
-		return -1;
-	}
+	if (mmc_check_fs_type())
+		return -EINVAL;
+
 	if (inserted_type == FS_TYPE_EXT4)
 		return 0;
 
 	return 0;
-}
-
-static const char **get_argument(const char *path)
-{
-	int argc;
-
-	switch (inserted_type) {
-	case FS_TYPE_FAT:
-		argc = ARRAY_SIZE(vfat_arg);
-		vfat_arg[argc - 2] = path;
-		return vfat_arg;
-	case FS_TYPE_EXT4:
-		argc = ARRAY_SIZE(ext4_arg);
-		ext4_arg[argc - 2] = path;
-		return ext4_arg;
-	default:
-		break;
-	}
-	return NULL;
 }
 
 static int check_mount_state(void)
@@ -409,13 +293,11 @@ static int create_partition(const char *dev_path)
 	r = system("printf \"n\\n\\n\\n\\n\\nw\" | fdisk /dev/mmcblk1");
 	if (WIFSIGNALED(r) && (WTERMSIG(r) == SIGINT || WTERMSIG(r) == SIGQUIT || WEXITSTATUS(r)))
 		return -1;
-
 	return 0;
 }
 
-static int format_mmc(const char *path)
+static int mmc_format_exec(char *path)
 {
-	mmc_fs_type type;
 	unsigned int size;
 	int mkfs_pid;
 	const char **argv;
@@ -424,23 +306,25 @@ static int format_mmc(const char *path)
 
 	if (path == NULL) {
 		PRT_TRACE_ERR("Invalid parameter");
-		return -1;
+		return -EINVAL;
 	}
 
-	if (get_format_type(path) < 0) {
+	if (get_format_type() != 0) {
 		PRT_TRACE_ERR("Invalid parameter");
-		return -1;
+		return -EINVAL;
 	}
-	argv = get_argument(path);
+
+	argv = mmc_filesystem->format((void *)path);
+
 	if (argv == NULL) {
 		PRT_TRACE_ERR("get_argument fail");
-		return -1;
+		return -EINVAL;
 	}
 
 	mkfs_pid = exec_process(argv);
 	if (mkfs_pid < 0) {
 		PRT_TRACE_ERR("%s fail");
-		return -1;
+		return -EINVAL;
 	}
 
 	snprintf(buf, sizeof(buf), "%s%d", "/proc/", mkfs_pid);
@@ -451,11 +335,10 @@ static int format_mmc(const char *path)
 		if (access(buf, R_OK) != 0)
 			break;
 	}
-
 	return 0;
 }
 
-static int format_exec(int blknum)
+static int mmc_format(int blknum)
 {
 	char dev_mmcblk[NAME_MAX];
 	char dev_mmcblkp[NAME_MAX];
@@ -463,11 +346,12 @@ static int format_exec(int blknum)
 
 	if (check_mount_state() == 1) {
 		PRT_TRACE_ERR("Mounted, will be unmounted");
-		r = __umount_fs();
+		r = mmc_umount(MNT_DETACH);
 		if (r != 0) {
 			PRT_TRACE_ERR("unmount_mmc fail");
-			vconf_set_int(VCONFKEY_SYSMAN_MMC_FORMAT, VCONFKEY_SYSMAN_MMC_FORMAT_FAILED);
-			return -1;
+			vconf_set_int(VCONFKEY_SYSMAN_MMC_FORMAT,
+				VCONFKEY_SYSMAN_MMC_FORMAT_FAILED);
+			return r;
 		}
 	}
 
@@ -476,20 +360,19 @@ static int format_exec(int blknum)
 	if (access(dev_mmcblkp, R_OK) < 0) {
 		PRT_TRACE_ERR("%s is not valid, create the primary partition", dev_mmcblkp);
 		r = create_partition(dev_mmcblk);
-		if (r < 0) {
+		if (r != 0) {
 			PRT_TRACE_ERR("create_partition failed");
 			vconf_set_int(VCONFKEY_SYSMAN_MMC_FORMAT, VCONFKEY_SYSMAN_MMC_FORMAT_FAILED);
 			heynoti_publish("mmcblk_remove");
-			return -1;
+			return r;
 		}
 	}
-
-	r = format_mmc(dev_mmcblkp);
-	if (r < 0) {
+	r = mmc_format_exec(dev_mmcblkp);
+	if (r != 0) {
 		PRT_TRACE_ERR("format_mmc fail");
 		vconf_set_int(VCONFKEY_SYSMAN_MMC_FORMAT, VCONFKEY_SYSMAN_MMC_FORMAT_FAILED);
 		heynoti_publish("mmcblk_remove");
-		return -1;
+		return r;
 	}
 
 	PRT_TRACE_ERR("Format Successful");
@@ -497,75 +380,7 @@ static int format_exec(int blknum)
 	return 0;
 }
 
-static const char **get_check_argument(const char *path)
-{
-	int argc;
-
-	switch (inserted_type) {
-	case FS_TYPE_EXT4:
-		argc = ARRAY_SIZE(ext4_check_arg);
-		ext4_check_arg[argc - 2] = path;
-		return ext4_check_arg;
-	default:
-		break;
-	}
-	return NULL;
-}
-
-int ss_mmc_unmounted(int argc, char **argv)
-{
-	int option = -1;
-	int mmc_err = 0;
-	if (argc < 1) {
-		PRT_TRACE_ERR("Option is wong");
-		return -1;
-	}
-	if ((option = atoi(argv[0])) < 0) {
-		PRT_TRACE_ERR("Option is wong : %d", option);
-		return -1;
-	}
-
-	if (umount2(MMC_MOUNT_POINT, option) != 0) {
-		mmc_err = errno;
-		PRT_TRACE_ERR("Failed to unmount mmc card\n");
-		vconf_set_int(VCONFKEY_SYSMAN_MMC_UNMOUNT,
-			      VCONFKEY_SYSMAN_MMC_UNMOUNT_FAILED);
-		vconf_set_int(VCONFKEY_SYSMAN_MMC_ERR_STATUS,
-				mmc_err);
-		return -1;
-
-	}
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS,
-		      VCONFKEY_SYSMAN_MMC_INSERTED_NOT_MOUNTED);
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_UNMOUNT,
-		      VCONFKEY_SYSMAN_MMC_UNMOUNT_COMPLETED);
-	return 0;
-}
-
-static int __ss_check_smack_popup(void)
-{
-	bundle *b = NULL;
-	int ret = -1;
-	int val = -1;
-
-	b = bundle_create();
-	bundle_add(b, "_SYSPOPUP_CONTENT_", "checksmack");
-	ret = vconf_get_int(VCONFKEY_STARTER_SEQUENCE, &val);
-	if (val == 1 || ret != 0) {
-		if ((mmc_popup_pid = syspopup_launch("mmc-syspopup", b)) < 0) {
-			PRT_TRACE_EM("popup launch failed\n");
-		}
-	}
-	bundle_free(b);
-
-	if (ss_action_entry_call_internal(PREDEF_CHECK_SMACK_MMC, 0) < 0) {
-		PRT_TRACE_ERR("fail to launch mmc checker,direct mount mmc");
-	}
-	return 0;
-
-}
-
-static int __mount_fs(char *path, const char *fs_name, const char *mount_data)
+int mount_fs(char *path, const char *fs_name, const char *mount_data)
 {
 	int ret, retry = 0;
 
@@ -580,57 +395,7 @@ static int __mount_fs(char *path, const char *fs_name, const char *mount_data)
 	return errno;
 }
 
-static int __mmc_mount_fs(void)
-{
-	char buf[NAME_MAX];
-	char params[NAME_MAX];
-	char options[NAME_MAX];
-	int fd;
-	int blk_num;
-
-	if (access(MMC_MOUNT_POINT, R_OK) != 0) {
-		if (mkdir(MMC_MOUNT_POINT, 0755) < 0) {
-			PRT_TRACE_ERR("Make Directory is failed");
-			return errno;
-		}
-	}
-
-	blk_num = get_mmcblk_num();
-	if (blk_num  == -1) {
-		PRT_TRACE_ERR("fail to check mmc block");
-		return -1;
-	}
-
-	snprintf(buf, sizeof(buf), "%s%dp1", MMC_DEV, blk_num);
-	fd = open(buf, O_RDONLY);
-	if (fd < 0) {
-		PRT_TRACE_ERR("can't open the '%s': %s", buf, strerror(errno));
-		snprintf(buf, sizeof(buf), "%s%d", MMC_DEV, blk_num);
-	} else
-		close(fd);
-
-	switch (inserted_type) {
-	case FS_TYPE_FAT:
-		if (smack)
-			snprintf(options, sizeof(options), "%s,%s", FS_VFAT_MOUNT_OPT, SMACKFS_MOUNT_OPT);
-		else
-			snprintf(options, sizeof(options), "%s", FS_VFAT_MOUNT_OPT);
-		if (__mount_fs(buf, "vfat", options) != 0)
-			return -1;
-		break;
-	case FS_TYPE_EXT4:
-		if (__mount_fs(buf, "ext4", NULL) != 0)
-			return errno;
-		if (smack) {
-			if (__ss_check_smack_popup() != 0)
-				return -1;
-		}
-		return smack;
-	}
-	return 0;
-}
-
-static int __ss_rw_mount(const char* szPath)
+static int __ss_rw_mount(const char *szPath)
 {
 	struct statvfs mount_stat;
 	if (!statvfs(szPath, &mount_stat)) {
@@ -640,67 +405,8 @@ static int __ss_rw_mount(const char* szPath)
 	return 0;
 }
 
-static int mmc_check_mount(void)
+static int mmc_check_node(void)
 {
-	int r;
-	r = __mmc_mount_fs();
-	if (r == 0)
-		goto mount_complete;
-	else if (r == 1)
-		goto mount_wait;
-	else if (r == -1)
-		goto mount_fail;
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_INSERTED_NOT_MOUNTED);
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_MOUNT, VCONFKEY_SYSMAN_MMC_MOUNT_FAILED);
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_ERR_STATUS, errno);
-	PRT_TRACE_ERR("Failed to mount mmc card\n");
-	return -1;
-
-mount_complete:
-	r = __ss_rw_mount(MMC_MOUNT_POINT);
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_MOUNTED);
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_MOUNT, VCONFKEY_SYSMAN_MMC_MOUNT_COMPLETED);
-	if (r == -1)
-		return -1;
-	return 0;
-mount_fail:
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_REMOVED);
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_MOUNT, VCONFKEY_SYSMAN_MMC_MOUNT_FAILED);
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_ERR_STATUS, VCONFKEY_SYSMAN_MMC_EINVAL);
-	return -1;
-mount_wait:
-	PRT_TRACE_ERR("wait ext4 smack rule checking");
-	return 0;
-}
-
-static int mmc_check_process_launch(char *path)
-{
-	const char **params;
-	char buf[NAME_MAX];
-	int pid;
-
-	params = get_check_argument((const char*)path);
-	if ((pid = exec_process(params)) < 0) {
-		PRT_TRACE_ERR("mmc checker failed");
-		goto run_mount;
-	}
-
-	snprintf(buf, sizeof(buf), "%s%d", "/proc/", pid);
-	PRT_TRACE_ERR("child process : %s", buf);
-
-	while (1) {
-		PRT_TRACE_ERR("mmc checking ....");
-		if (access(buf, R_OK) != 0)
-			break;
-		sleep(1);
-	}
-run_mount:
-	return mmc_check_mount();
-}
-
-static int __check_mmc_fs(void)
-{
-	char buf[NAME_MAX];
 	int fd;
 	int blk_num;
 	int ret = 0;
@@ -718,26 +424,122 @@ static int __check_mmc_fs(void)
 		return -1;
 	}
 
-	snprintf(buf, sizeof(buf), "%s%dp1", MMC_DEV, blk_num);
-	fd = open(buf, O_RDONLY);
+	snprintf(mmc_node, sizeof(mmc_node), "%s%dp1", MMC_DEV, blk_num);
+	fd = open(mmc_node, O_RDONLY);
 	if (fd < 0) {
-		PRT_TRACE_ERR("can't open the '%s': %s", buf, strerror(errno));
-		snprintf(buf, sizeof(buf), "%s%d", MMC_DEV, blk_num);
+		PRT_TRACE_ERR("can't open the '%s(%d)': %s",
+			mmc_node, sizeof(mmc_node), strerror(errno));
+		snprintf(mmc_node, sizeof(mmc_node), "%s%d", MMC_DEV, blk_num);
+		fd = open(mmc_node, O_RDONLY);
+		if (fd < 0) {
+			PRT_TRACE_ERR("can't open the '%s(%d)': %s",
+				mmc_node, sizeof(mmc_node), strerror(errno));
+			return -1;
+		}
 	}
 	close(fd);
+	return 0;
+}
 
-	if (__check_mmc_fs_type(buf) != 0) {
-		PRT_TRACE_ERR("fail to check mount point %s", buf);
-		return -1;
+static void mmc_check_fs(void)
+{
+	const char **params;
+	char buf[NAME_MAX];
+	int pid;
+
+	if (!mmc_filesystem) {
+		PRT_TRACE_ERR("no inserted mmc");
+		return;
 	}
-	ret = mmc_check_process_launch(buf);
-	return ret;
+	params = mmc_filesystem->check();
+
+	pid = exec_process(params);
+	if (pid < 0) {
+		PRT_TRACE_ERR("mmc checker failed");
+		return;
+	}
+
+	snprintf(buf, sizeof(buf), "%s%d", "/proc/", pid);
+	PRT_TRACE_ERR("child process : %s", buf);
+
+	while (1) {
+		PRT_TRACE_ERR("mmc checking ....");
+		if (access(buf, R_OK) != 0)
+			break;
+		sleep(1);
+	}
+}
+
+static int mmc_mount(void)
+{
+	int r;
+
+	r = mmc_check_node();
+	if (r != 0) {
+		PRT_TRACE_ERR("fail to check mmc");
+		return r;
+	}
+
+	if (mmc_check_fs_type())
+		goto mount_fail;
+
+	mmc_check_fs();
+
+	r = mmc_filesystem->mount(smack, mmc_node);
+
+	if (r == 0)
+		goto mount_complete;
+	else if (r == 1)
+		goto mount_wait;
+	else if (r == -1)
+		goto mount_fail;
+
+	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_INSERTED_NOT_MOUNTED);
+	vconf_set_int(VCONFKEY_SYSMAN_MMC_MOUNT, VCONFKEY_SYSMAN_MMC_MOUNT_FAILED);
+	vconf_set_int(VCONFKEY_SYSMAN_MMC_ERR_STATUS, errno);
+	PRT_TRACE_ERR("Failed to mount mmc card\n");
+	return -1;
+
+mount_complete:
+	r = __ss_rw_mount(MMC_MOUNT_POINT);
+	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_MOUNTED);
+	vconf_set_int(VCONFKEY_SYSMAN_MMC_MOUNT, VCONFKEY_SYSMAN_MMC_MOUNT_COMPLETED);
+	if (r == -1)
+		return -1;
+	return 0;
+
+mount_fail:
+	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_REMOVED);
+	vconf_set_int(VCONFKEY_SYSMAN_MMC_MOUNT, VCONFKEY_SYSMAN_MMC_MOUNT_FAILED);
+	vconf_set_int(VCONFKEY_SYSMAN_MMC_ERR_STATUS, VCONFKEY_SYSMAN_MMC_EINVAL);
+	return -1;
+
+mount_wait:
+	PRT_TRACE_ERR("wait ext4 smack rule checking");
+	return 0;
+}
+
+int ss_mmc_removed(void)
+{
+	int mmc_err = 0;
+
+	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_REMOVED);
+	mmc_err = mmc_umount(MNT_DETACH);
+	vconf_set_int(VCONFKEY_SYSMAN_MMC_ERR_STATUS, mmc_err);
+	mmc_filesystem = NULL;
+	return 0;
 }
 
 int ss_mmc_inserted(void)
 {
 	int mmc_status;
 	int ret;
+
+	if (mmc_disabled) {
+		PRT_TRACE("mmc is blocked!");
+		vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_INSERTED_NOT_MOUNTED);
+		return -ENODEV;
+	}
 
 	vconf_get_int(VCONFKEY_SYSMAN_MMC_STATUS, &mmc_status);
 
@@ -747,49 +549,56 @@ int ss_mmc_inserted(void)
 		return 0;
 	}
 
-	if ((ret = __check_mmc_fs()) != 0)
-		PRT_TRACE_ERR("fail to check mmc");
+	ret = mmc_mount();
+
 	return ret;
 }
 
-int ss_mmc_removed(void)
+static int ss_mmc_unmounted(int argc, char **argv)
 {
-	int mmc_err = 0;
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_REMOVED);
-	mmc_err = __umount_fs();
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_ERR_STATUS, mmc_err);
+	int option = -1;
 
+	if (argc < 1) {
+		PRT_TRACE_ERR("Option is wong");
+		return -1;
+	}
+
+	option = atoi(argv[0]);
+	if (option < 0) {
+		PRT_TRACE_ERR("Option is wong : %d", option);
+		return -1;
+	}
+
+	if (mmc_umount(option) != 0) {
+		PRT_TRACE_ERR("Failed to unmount mmc card\n");
+		vconf_set_int(VCONFKEY_SYSMAN_MMC_UNMOUNT,
+			VCONFKEY_SYSMAN_MMC_UNMOUNT_FAILED);
+		vconf_set_int(VCONFKEY_SYSMAN_MMC_ERR_STATUS, errno);
+		return -1;
+
+	}
+	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS,
+		VCONFKEY_SYSMAN_MMC_INSERTED_NOT_MOUNTED);
+	vconf_set_int(VCONFKEY_SYSMAN_MMC_UNMOUNT,
+		VCONFKEY_SYSMAN_MMC_UNMOUNT_COMPLETED);
 	return 0;
 }
 
 static int ss_mmc_format(int argc, char **argv)
 {
+	int ret;
+
 	PRT_TRACE_ERR("mmc format called");
-	__umount_fs();
+	mmc_umount(MNT_DETACH);
 
 	vconf_set_int(VCONFKEY_SYSMAN_MMC_FORMAT_PROGRESS, VCONFKEY_SYSMAN_MMC_FORMAT_PROGRESS_NOW);
-	format_exec(get_mmcblk_num());
+	ret = mmc_format(get_mmcblk_num());
 	vconf_set_int(VCONFKEY_SYSMAN_MMC_FORMAT_PROGRESS, VCONFKEY_SYSMAN_MMC_FORMAT_PROGRESS_NONE);
+	if (ret != 0)
+		return ret;
 
-	if (__check_mmc_fs() != 0)
-		PRT_TRACE_ERR("fail to check mmc");
-
-	return 0;
-}
-
-static int ss_mmc_check_smack(int argc, char **argv)
-{
-	int smack_checked;
-	int pid;
-	system(FS_EXT4_SMACK_LABEL);
-	PRT_TRACE_ERR("smack labeling script is run(%d)", smack_checked);
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_MOUNTED);
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_MOUNT, VCONFKEY_SYSMAN_MMC_MOUNT_COMPLETED);
-	if (mmc_popup_pid > 0) {
-		PRT_TRACE_ERR("will be killed mmc-popup(%d)", mmc_popup_pid);
-		kill(mmc_popup_pid, SIGTERM);
-	}
-	return 0;
+	ret = mmc_mount();
+	return ret;
 }
 
 static void mmc_init(void *data)
@@ -797,10 +606,8 @@ static void mmc_init(void *data)
 	ss_action_entry_add_internal(PREDEF_MOUNT_MMC, ss_mmc_inserted, NULL, NULL);
 	ss_action_entry_add_internal(PREDEF_UNMOUNT_MMC, ss_mmc_unmounted, NULL, NULL);
 	ss_action_entry_add_internal(PREDEF_FORMAT_MMC, ss_mmc_format, NULL, NULL);
-	ss_action_entry_add_internal(PREDEF_CHECK_SMACK_MMC, ss_mmc_check_smack, NULL, NULL);
 	/* mmc card mount */
-	if (__check_mmc_fs() != 0)
-		PRT_TRACE_ERR("fail to check mmc");
+	mmc_mount();
 }
 
 static void mmc_start(void)
