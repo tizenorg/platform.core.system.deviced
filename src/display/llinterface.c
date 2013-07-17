@@ -73,13 +73,13 @@ static int _bl_brt(PMSys *p, int brightness)
 {
 	int cmd;
 	int ret;
-	int old_brt;
+	int prev;
 
 	COMBINE_DISP_CMD(cmd, PROP_DISPLAY_BRIGHTNESS, DEFAULT_DISPLAY);
-	ret = device_get_property(DEVICE_TYPE_DISPLAY, cmd, &old_brt);
+	ret = device_get_property(DEVICE_TYPE_DISPLAY, cmd, &prev);
 
 	/* Update new brightness to vconf */
-	if (!ret && (brightness != old_brt))
+	if (!ret && (brightness != prev))
 		vconf_set_int(VCONFKEY_PM_CURRENT_BRIGHTNESS, brightness);
 
 	/* Update device brightness */

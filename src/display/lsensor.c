@@ -73,7 +73,6 @@ static bool alc_handler(void* data)
 				if (!ret && (tmp_value != value)) {
 					backlight_ops.set_default_brt(value);
 					backlight_ops.restore();
-					vconf_set_int(VCONFKEY_PM_CURRENT_BRIGHTNESS, value);
 				}
 				LOGINFO("load light data : %d, brightness : %d", (int)light_data.values[0], value);
 			}
