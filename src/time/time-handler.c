@@ -82,13 +82,25 @@ int handle_timezone(char *str)
 {
 	int ret;
 	struct stat sts;
+	time_t now;
+	struct tm *ts;
 	const char *sympath = default_localtime;
 
 	if (str == NULL)
 		return -1;
 	const char *tzpath = str;
 
-	PRT_TRACE("TZPATH = %s\n", tzpath);
+	PRT_TRACE_ERR("TZPATH = %s\n", tzpath);
+
+	if (stat(tzpath, &sts) == -1 && errno == ENOENT) {
+		PRT_TRACE_ERR("invalid tzpath(%s)", tzpath);
+		return -EINVAL;
+	}
+
+	/* FIXME for debugging purpose */
+	time(&now);
+	ts = localtime(&now);
+	PRT_TRACE_ERR("cur local time is %s", asctime(ts));
 
 	/* unlink current link
 	 * eg. rm /opt/etc/localtime */
@@ -97,11 +109,11 @@ int handle_timezone(char *str)
 	} else {
 		ret = unlink(sympath);
 		if (ret < 0) {
-			PRT_TRACE("unlink error : [%d]%s\n", ret,
+			PRT_TRACE_ERR("unlink error : [%d]%s\n", ret,
 				  strerror(errno));
 			return -1;
 		} else
-			PRT_TRACE("unlink success\n");
+			PRT_TRACE_ERR("unlink success\n");
 
 	}
 
@@ -109,12 +121,16 @@ int handle_timezone(char *str)
 	 * eg. ln -s /usr/share/zoneinfo/Asia/Seoul /opt/etc/localtime */
 	ret = symlink(tzpath, sympath);
 	if (ret < 0) {
-		PRT_TRACE("symlink error : [%d]%s\n", ret, strerror(errno));
+		PRT_TRACE_ERR("symlink error : [%d]%s\n", ret, strerror(errno));
 		return -1;
 	} else
-		PRT_TRACE("symlink success\n");
+		PRT_TRACE_ERR("symlink success\n");
 
 	tzset();
+
+	/* FIXME for debugging purpose */
+	ts = localtime(&now);
+	PRT_TRACE_ERR("new local time is %s", asctime(ts));
 	return 0;
 }
 
@@ -133,7 +149,7 @@ int handle_date(char *str)
 	tmp = (long int)atoi(str);
 	timet = (time_t) tmp;
 
-	PRT_TRACE("ctime = %s", ctime(&timet));
+	PRT_TRACE_ERR("ctime = %s", ctime(&timet));
 	vconf_set_int(VCONFKEY_SYSTEM_TIMECHANGE, timet);
 
 	return 0;
