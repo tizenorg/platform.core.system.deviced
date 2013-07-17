@@ -34,9 +34,6 @@
 #include "core.h"
 #include "device-node.h"
 
-#define DISP_INDEX_BIT		4
-#define COMBINE_DISP_CMD(cmd, prop, index)	(cmd = (prop | (index << DISP_INDEX_BIT)))
-
 typedef struct _PMSys PMSys;
 struct _PMSys {
 	int def_brt;
@@ -63,9 +60,9 @@ static bool x_dpms_enable = false;
 
 static int _bl_onoff(PMSys *p, int on)
 {
-	int cmd = 0;
+	int cmd;
 
-	COMBINE_DISP_CMD(cmd, PROP_DISPLAY_ONOFF, DEFAULT_DISPLAY);
+	cmd = DISP_CMD(PROP_DISPLAY_ONOFF, DEFAULT_DISPLAY);
 	return device_set_property(DEVICE_TYPE_DISPLAY, cmd, on);
 }
 
@@ -75,7 +72,7 @@ static int _bl_brt(PMSys *p, int brightness)
 	int ret;
 	int prev;
 
-	COMBINE_DISP_CMD(cmd, PROP_DISPLAY_BRIGHTNESS, DEFAULT_DISPLAY);
+	cmd = DISP_CMD(PROP_DISPLAY_BRIGHTNESS, DEFAULT_DISPLAY);
 	ret = device_get_property(DEVICE_TYPE_DISPLAY, cmd, &prev);
 
 	/* Update new brightness to vconf */
@@ -101,9 +98,9 @@ static int _sys_get_lcd_power(PMSys *p)
 {
 	int value = -1;
 	int ret = -1;
-	int cmd = 0;
+	int cmd;
 
-	COMBINE_DISP_CMD(cmd, PROP_DISPLAY_ONOFF, DEFAULT_DISPLAY);
+	cmd = DISP_CMD(PROP_DISPLAY_ONOFF, DEFAULT_DISPLAY);
 	ret = device_get_property(DEVICE_TYPE_DISPLAY, cmd, &value);
 
 	if (ret < 0 || value < 0)

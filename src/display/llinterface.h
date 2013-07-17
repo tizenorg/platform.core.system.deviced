@@ -41,6 +41,9 @@
 
 #define PM_LCD_RETRY_CNT	3
 
+#define DISP_INDEX_SHIFT	16
+#define DISP_CMD(prop, index)	((index << DISP_INDEX_SHIFT) | prop)
+
 /*
  * Event type enumeration
  */

@@ -32,9 +32,6 @@
 #include "core/common.h"
 #include "core/devices.h"
 
-#define DISP_INDEX_BIT 16
-#define DISP_CMD(prop, index) (prop | (index << DISP_INDEX_BIT))
-
 static DBusMessage *e_dbus_start_cb(E_DBus_Object *obj, DBusMessage *msg)
 {
 	display_device_ops.init(NULL);

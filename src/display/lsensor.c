@@ -35,9 +35,6 @@
 #define SAMPLING_INTERVAL	1	/* 1 sec */
 #define MAX_FAULT		5
 
-#define DISP_INDEX_BIT		4
-#define COMBINE_DISP_CMD(cmd, prop, index)	(cmd = (prop | (index << DISP_INDEX_BIT)))
-
 static int (*prev_init_extention) (void *data);
 static int (*_default_action) (int);
 static Ecore_Timer *alc_timeout_id = 0;
@@ -68,7 +65,7 @@ static bool alc_handler(void* data)
 				int cmd;
 				int ret;
 				value = PM_MAX_BRIGHTNESS * (int)light_data.values[0] / 10;
-				COMBINE_DISP_CMD(cmd, PROP_DISPLAY_BRIGHTNESS, DEFAULT_DISPLAY);
+				cmd = DISP_CMD(PROP_DISPLAY_BRIGHTNESS, DEFAULT_DISPLAY);
 				ret = device_get_property(DEVICE_TYPE_DISPLAY, cmd, &tmp_value);
 				if (!ret && (tmp_value != value)) {
 					backlight_ops.set_default_brt(value);
