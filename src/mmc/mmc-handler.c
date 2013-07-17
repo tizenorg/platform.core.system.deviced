@@ -148,7 +148,7 @@ static void __attribute__ ((constructor)) smack_check(void)
 
 	if (mmc_disabled) {
 		PRT_TRACE("mmc is blocked!");
-		vconf_set_int(VCONFKEY_SYSMAN_MMC_UNMOUNT, VCONFKEY_SYSMAN_MMC_UNMOUNT_COMPLETED);
+		vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_INSERTED_NOT_MOUNTED);
 		return -ENODEV;
 	}
 
@@ -812,8 +812,7 @@ static void mmc_start(void)
 static void mmc_stop(void)
 {
 	mmc_disabled = true;
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_UNMOUNT, VCONFKEY_SYSMAN_MMC_UNMOUNT_COMPLETED);
-
+	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_REMOVED);
 	PRT_TRACE("stop");
 }
 
