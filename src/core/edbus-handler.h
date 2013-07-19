@@ -82,6 +82,9 @@
 #define DEVICED_PATH_LED               OBJECT_PATH"/Led"
 #define DEVICED_INTERFACE_LED          INTERFACE_NAME".Led"
 
+#define DEVICED_PATH_SYSNOTI           OBJECT_PATH"/SysNoti"
+#define DEVICED_INTERFACE_SYSNOTI      INTERFACE_NAME".SysNoti"
+
 /*
  * Power service
  *   set resetkey disable
@@ -90,6 +93,14 @@
 #define DEVICED_PATH_POWER             OBJECT_PATH"/Power"
 #define DEVICED_INTERFACE_POWER                INTERFACE_NAME".power"
 
+struct edbus_method {
+	const char *member;
+	const char *signature;
+	const char *reply_signature;
+	E_DBus_Method_Cb func;
+};
+
+int register_edbus_method(const char *path, struct edbus_method *edbus_methods, int size);
 int register_edbus_signal_handler(const char *path, const char *interface,
 		const char *name, E_DBus_Signal_Cb cb);
 E_DBus_Interface *get_edbus_interface(const char *path);

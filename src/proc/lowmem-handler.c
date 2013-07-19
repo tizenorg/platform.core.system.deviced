@@ -478,12 +478,7 @@ static DBusMessage *e_dbus_getstatus(E_DBus_Object *obj, DBusMessage *msg)
 	return reply;
 }
 
-static struct edbus_method {
-	const char *member;
-	const char *signature;
-	const char *reply_signature;
-	E_DBus_Method_Cb func;
-} edbus_methods[] = {
+static struct edbus_method edbus_methods[] = {
 	{ "getstorage",       NULL,   "i", e_dbus_getstatus },
 	/* Add methods here */
 };
@@ -521,8 +516,12 @@ static void lowmem_init(void *data)
 {
 	struct ss_main_data *ad = (struct ss_main_data*)data;
 	char lowmem_dev_node[PATH_MAX];
+	int ret;
 
-	lowmem_dbus_init();
+	ret = register_edbus_method(DEVICED_PATH_STORAGE, edbus_methods, ARRAY_SIZE(edbus_methods));
+	if (ret < 0)
+		_E("fail to init edbus method(%d)", ret);
+
 	action_entry_add_internal(PREDEF_LOWMEM, lowmem_def_predefine_action,
 				     NULL, NULL);
 

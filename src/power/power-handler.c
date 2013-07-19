@@ -51,6 +51,7 @@
 #include "display/poll.h"
 #include "display/setting.h"
 #include "display/core.h"
+#include "core/edbus-handler.h"
 
 #define SIGNAL_NAME_POWEROFF_POPUP	"poweroffpopup"
 
@@ -525,9 +526,117 @@ int restart_def_predefine_action(int argc, char **argv)
 	return 0;
 }
 
+static DBusMessage *dbus_power_handler(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusError err;
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	pid_t pid;
+	int ret;
+	int argc;
+	char *type_str;
+
+	dbus_error_init(&err);
+
+	if (!dbus_message_get_args(msg, &err,
+		    DBUS_TYPE_STRING, &type_str,
+		    DBUS_TYPE_INT32, &argc, DBUS_TYPE_INVALID)) {
+		_E("there is no message");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (argc < 0) {
+		_E("message is invalid!");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	pid = get_edbus_sender_pid(msg);
+	if (kill(pid, 0) == -1) {
+		_E("%d process does not exist, dbus ignored!", pid);
+		ret = -ESRCH;
+		goto out;
+	}
+
+	if (strncmp(type_str, PREDEF_ENTERSLEEP, strlen(PREDEF_ENTERSLEEP)) == 0)
+		entersleep_def_predefine_action(0, NULL);
+	else if(strncmp(type_str, PREDEF_LEAVESLEEP, strlen(PREDEF_LEAVESLEEP)) == 0)
+		leavesleep_def_predefine_action(0, NULL);
+	else if(strncmp(type_str, PREDEF_REBOOT, strlen(PREDEF_REBOOT)) == 0)
+		restart_def_predefine_action(0, NULL);
+	else if(strncmp(type_str, PREDEF_PWROFF_POPUP, strlen(PREDEF_PWROFF_POPUP)) == 0)
+		launching_predefine_action(0, NULL);
+out:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+
+	return reply;
+}
+
+static DBusMessage *dbus_flightmode_handler(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusError err;
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	pid_t pid;
+	int ret;
+	int argc;
+	char *type_str;
+	char *argv;
+
+	dbus_error_init(&err);
+
+	if (!dbus_message_get_args(msg, &err,
+		    DBUS_TYPE_STRING, &type_str,
+		    DBUS_TYPE_INT32, &argc,
+		    DBUS_TYPE_STRING, &argv, DBUS_TYPE_INVALID)) {
+		_E("there is no message");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (argc < 0) {
+		_E("message is invalid!");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	pid = get_edbus_sender_pid(msg);
+	if (kill(pid, 0) == -1) {
+		_E("%d process does not exist, dbus ignored!", pid);
+		ret = -ESRCH;
+		goto out;
+	}
+
+	flight_mode_def_predefine_action(argc, (char **)&argv);
+out:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+
+	return reply;
+}
+
+static const struct edbus_method edbus_methods[] = {
+	 { PREDEF_ENTERSLEEP, "si", "i", dbus_power_handler },
+	 { PREDEF_LEAVESLEEP, "si", "i", dbus_power_handler },
+	 { PREDEF_REBOOT, "si", "i", dbus_power_handler },
+	 { PREDEF_PWROFF_POPUP, "si", "i", dbus_power_handler },
+	 { PREDEF_FLIGHT_MODE, "sis", "i", dbus_flightmode_handler },
+	 /* Add methods here */
+};
+
 static void power_init(void *data)
 {
 	int bTelReady = 0;
+	int ret;
+
+	/* init dbus interface*/
+	ret = register_edbus_method(DEVICED_PATH_POWER, edbus_methods, ARRAY_SIZE(edbus_methods));
+	if (ret < 0)
+		_E("fail to init edbus method(%d)", ret);
 
 	if (vconf_get_bool(VCONFKEY_TELEPHONY_READY,&bTelReady) == 0) {
 		if (bTelReady == 1) {
