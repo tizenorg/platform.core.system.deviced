@@ -591,12 +591,7 @@ error:
 	return reply;
 }
 
-static const struct edbus_method {
-	const char *member;
-	const char *signature;
-	const char *reply_signature;
-	E_DBus_Method_Cb func;
-} edbus_methods[] = {
+static const struct edbus_method edbus_methods[] = {
 	{ "start",           NULL,  NULL, e_dbus_start },
 	{ "stop",            NULL,  NULL, e_dbus_stop },
 	{ "lockstate",     "sssi",   "i", e_dbus_lockstate },
@@ -621,31 +616,6 @@ static const struct edbus_method {
 
 int init_pm_dbus(void)
 {
-	E_DBus_Interface *iface;
-	int ret;
-	int i;
-
-	iface = get_edbus_interface(DEVICED_PATH_DISPLAY);
-
-	_I("%s, %x", DEVICED_PATH_DISPLAY, iface);
-
-	if (!iface) {
-		_E("fail to get edbus interface!");
-		return -1;
-	}
-
-	for (i = 0; i < ARRAY_SIZE(edbus_methods); i++) {
-		ret = e_dbus_interface_method_add(iface,
-				    edbus_methods[i].member,
-				    edbus_methods[i].signature,
-				    edbus_methods[i].reply_signature,
-				    edbus_methods[i].func);
-		if (!ret) {
-			_E("fail to add method %s!", edbus_methods[i].member);
-			return -1;
-		}
-	}
-
-	return 0;
+	return 	register_edbus_method(DEVICED_PATH_DISPLAY, edbus_methods, ARRAY_SIZE(edbus_methods));
 }
 

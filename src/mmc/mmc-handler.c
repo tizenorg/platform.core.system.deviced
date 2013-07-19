@@ -31,13 +31,14 @@
 #include <signal.h>
 #include <stdbool.h>
 #include <mntent.h>
+#include <tzplatform_config.h>
 
 #include "core/log.h"
 #include "core/device-notifier.h"
 #include "core/common.h"
 #include "core/devices.h"
 #include "mmc-handler.h"
-#include <tzplatform_config.h>
+#include "core/edbus-handler.h"
 
 #define VCONFKEY_INTERNAL_PRIVATE_MMC_ID	"db/private/sysman/mmc_device_id"
 #define VCONFKEY_SYSMAN_MMC_INIT	-1
@@ -801,10 +802,68 @@ static int ss_mmc_booting_done(void* data)
 	return ss_mmc_inserted();
 }
 
+static DBusMessage *dbus_mmc_handler(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusError err;
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	pid_t pid;
+	int ret;
+	int argc;
+	char *type_str;
+	char *argv;
+
+	dbus_error_init(&err);
+
+	if (!dbus_message_get_args(msg, &err,
+		    DBUS_TYPE_STRING, &type_str,
+		    DBUS_TYPE_INT32, &argc,
+		    DBUS_TYPE_STRING, &argv, DBUS_TYPE_INVALID)) {
+		_E("there is no message");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (argc < 0) {
+		_E("message is invalid!");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	pid = get_edbus_sender_pid(msg);
+	if (kill(pid, 0) == -1) {
+		_E("%d process does not exist, dbus ignored!", pid);
+		ret = -ESRCH;
+		goto out;
+	}
+
+	if (strncmp(type_str, PREDEF_MOUNT_MMC, strlen(PREDEF_MOUNT_MMC)) == 0)
+		ret = ss_mmc_inserted();
+	else if (strncmp(type_str, PREDEF_UNMOUNT_MMC, strlen(PREDEF_UNMOUNT_MMC)) == 0)
+		ret = ss_mmc_unmounted(argc, (char **)&argv);
+	else if (strncmp(type_str, PREDEF_FORMAT_MMC, strlen(PREDEF_FORMAT_MMC)) == 0)
+		ret = ss_mmc_format(argc, (char **)&argv);
+out:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+
+	return reply;
+}
+
+static const struct edbus_method edbus_methods[] = {
+	{ PREDEF_MOUNT_MMC, "sis", "i", dbus_mmc_handler },
+	{ PREDEF_UNMOUNT_MMC, "sis", "i", dbus_mmc_handler },
+	{ PREDEF_FORMAT_MMC, "sis", "i", dbus_mmc_handler },
+};
+
 static void mmc_init(void *data)
 {
-	int ret, op;
+	int ret;
 
+	ret = register_edbus_method(DEVICED_PATH_SYSNOTI, edbus_methods, ARRAY_SIZE(edbus_methods));
+	if (ret < 0)
+		 _E("fail to init edbus method(%d)", ret);
 	/* IPC between libdeviced and deviced, used by setting application */
 	action_entry_add_internal(PREDEF_MOUNT_MMC, ss_mmc_inserted, NULL, NULL);
 	action_entry_add_internal(PREDEF_UNMOUNT_MMC, ss_mmc_unmounted, NULL, NULL);

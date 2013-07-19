@@ -46,6 +46,7 @@ static struct edbus_object {
 	{ DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY, NULL, NULL },
 	{ DEVICED_PATH_STORAGE, DEVICED_INTERFACE_STORAGE, NULL, NULL },
 	{ DEVICED_PATH_HAPTIC , DEVICED_INTERFACE_HAPTIC , NULL, NULL },
+	{ DEVICED_PATH_SYSNOTI, DEVICED_INTERFACE_SYSNOTI, NULL, NULL },
 	{ DEVICED_PATH_LED    , DEVICED_INTERFACE_LED    , NULL, NULL },
 	/* Add new object & interface here*/
 };
@@ -365,6 +366,34 @@ static void unregister_edbus_watch_all(void)
 		EINA_LIST_REMOVE(edbus_watch_list, watch);
 		free(watch);
 	}
+}
+
+int register_edbus_method(const char *path, struct edbus_method *edbus_methods, int size)
+{
+	E_DBus_Interface *iface;
+	int ret;
+	int i;
+
+	iface = get_edbus_interface(path);
+
+	if (!iface) {
+		_E("fail to get edbus interface!");
+		return -ENODEV;
+	}
+
+	for (i = 0; i < size; i++) {
+		ret = e_dbus_interface_method_add(iface,
+				edbus_methods[i].member,
+				edbus_methods[i].signature,
+				edbus_methods[i].reply_signature,
+				edbus_methods[i].func);
+		if (!ret) {
+			_E("fail to add method %s!", edbus_methods[i].member);
+			return -EINVAL;
+		}
+	}
+
+	return 0;
 }
 
 void edbus_init(void *data)

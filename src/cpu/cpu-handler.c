@@ -24,6 +24,8 @@
 #include "core/log.h"
 #include "core/data.h"
 #include "core/devices.h"
+#include "core/edbus-handler.h"
+#include "core/common.h"
 
 #define PREDEF_SET_MAX_FREQUENCY	"set_max_frequency"
 #define PREDEF_SET_MIN_FREQUENCY	"set_min_frequency"
@@ -417,8 +419,73 @@ static int __write_min_cpu_freq(int freq)
 	return 0;
 }
 
+static DBusMessage *dbus_cpu_handler(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusError err;
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	pid_t pid;
+	int ret;
+	int argc;
+	char *type_str;
+	char *argv[2];
+
+	dbus_error_init(&err);
+
+	 if (!dbus_message_get_args(msg, &err,
+		     DBUS_TYPE_STRING, &type_str,
+		     DBUS_TYPE_INT32, &argc,
+		     DBUS_TYPE_STRING, &argv[0],
+		     DBUS_TYPE_STRING, &argv[1], DBUS_TYPE_INVALID)) {
+		 _E("there is no message");
+		 ret = -EINVAL;
+		 goto out;
+	 }
+
+	 if (argc < 0) {
+		 _E("message is invalid!");
+		 ret = -EINVAL;
+		 goto out;
+	 }
+
+	 pid = get_edbus_sender_pid(msg);
+	 if (kill(pid, 0) == -1) {
+		 _E("%d process does not exist, dbus ignored!", pid);
+		 ret = -ESRCH;
+		 goto out;
+	 }
+
+	 if (strncmp(type_str, PREDEF_SET_MAX_FREQUENCY, strlen(PREDEF_SET_MAX_FREQUENCY)) == 0)
+		 ret = set_max_frequency_action(argc, (char **)&argv);
+	 else if (strncmp(type_str, PREDEF_SET_MIN_FREQUENCY, strlen(PREDEF_SET_MIN_FREQUENCY)) == 0)
+		 ret = set_min_frequency_action(argc, (char **)&argv);
+	 else if (strncmp(type_str, PREDEF_RELEASE_MAX_FREQUENCY, strlen(PREDEF_RELEASE_MAX_FREQUENCY)) == 0)
+		 ret = release_max_frequency_action(argc, (char **)&argv);
+	 else if (strncmp(type_str, PREDEF_RELEASE_MIN_FREQUENCY, strlen(PREDEF_RELEASE_MIN_FREQUENCY)) == 0)
+		 ret = release_min_frequency_action(argc, (char **)&argv);
+out:
+	 reply = dbus_message_new_method_return(msg);
+	 dbus_message_iter_init_append(reply, &iter);
+	 dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+
+	 return reply;
+}
+
+static const struct edbus_method edbus_methods[] = {
+	{ PREDEF_SET_MAX_FREQUENCY, "siss", "i", dbus_cpu_handler },
+	{ PREDEF_SET_MIN_FREQUENCY, "siss", "i", dbus_cpu_handler },
+	{ PREDEF_RELEASE_MAX_FREQUENCY, "siss", "i", dbus_cpu_handler },
+	{ PREDEF_RELEASE_MIN_FREQUENCY, "siss", "i", dbus_cpu_handler },
+};
+
 static void cpu_init(void *data)
 {
+	int ret;
+
+	ret = register_edbus_method(DEVICED_PATH_SYSNOTI, edbus_methods, ARRAY_SIZE(edbus_methods));
+	if (ret < 0)
+		_E("fail to init edbus method(%d)", ret);
+
 	__set_freq_limit();
 	action_entry_add_internal(PREDEF_SET_MAX_FREQUENCY, set_max_frequency_action, NULL, NULL);
 	action_entry_add_internal(PREDEF_SET_MIN_FREQUENCY, set_min_frequency_action, NULL, NULL);

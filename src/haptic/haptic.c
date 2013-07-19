@@ -441,12 +441,7 @@ static void release_module(void)
 	_D("haptic module is released");
 }
 
-static struct edbus_method {
-	const char *member;
-	const char *signature;
-	const char *reply_signature;
-	E_DBus_Method_Cb func;
-} edbus_methods[] = {
+static const struct edbus_method edbus_methods[] = {
 	{ "GetCount",          NULL,   "i", edbus_get_count },
 	{ "OpenDevice",         "i",   "i", edbus_open_device },
 	{ "CloseDevice",        "u",   "i", edbus_close_device },
@@ -460,41 +455,14 @@ static struct edbus_method {
 	/* Add methods here */
 };
 
-static int haptic_dbus_init(void)
-{
-	E_DBus_Interface *iface;
-	int ret, i;
-
-	iface = get_edbus_interface(DEVICED_PATH_HAPTIC);
-
-	_D("%s, %x", DEVICED_PATH_HAPTIC, iface);
-
-	if (!iface) {
-		_E("fail to get edbus interface!");
-		return -EPERM;
-	}
-
-	for (i = 0; i < ARRAY_SIZE(edbus_methods); i++) {
-		ret = e_dbus_interface_method_add(iface,
-				    edbus_methods[i].member,
-				    edbus_methods[i].signature,
-				    edbus_methods[i].reply_signature,
-				    edbus_methods[i].func);
-		if (!ret) {
-			_E("fail to add method %s!", edbus_methods[i].member);
-			return -EPERM;
-		}
-	}
-
-	return 0;
-}
-
 static void haptic_init(void *data)
 {
 	int r;
 
 	/* init dbus interface */
-	haptic_dbus_init();
+	r = register_edbus_method(DEVICED_PATH_HAPTIC, edbus_methods, ARRAY_SIZE(edbus_methods));
+	if (r < 0)
+		_E("fail to init edbus method(%d)", r);
 
 	/* load haptic plugin module */
 	r = load_module();
