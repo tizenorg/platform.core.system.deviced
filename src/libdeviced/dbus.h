@@ -33,7 +33,7 @@
 #define DEVICED_INTERFACE_HAPTIC	INTERFACE_NAME".haptic"
 
 struct dbus_byte {
-	char *data;
+	const char *data;
 	int size;
 };
 

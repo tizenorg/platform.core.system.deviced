@@ -795,9 +795,9 @@ int register_mmc_handler(const char *name, const struct mmc_filesystem_ops files
 	return -1;
 }
 
-static void ss_mmc_booting_done(void* data)
+static int ss_mmc_booting_done(void* data)
 {
-	ss_mmc_inserted();
+	return ss_mmc_inserted();
 }
 
 static void mmc_init(void *data)

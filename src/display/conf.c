@@ -50,9 +50,9 @@ static const char *def_values[][IDX_END] = {
 	{"PM_END", ""},
 };
 
-static char *_find_default(char *name)
+static const char *_find_default(const char *name)
 {
-	char *ret = NULL;
+	const char *ret = NULL;
 	int i = 0;
 
 	while (strcmp("PM_END", def_values[i][IDX_NAME])) {
@@ -65,9 +65,9 @@ static char *_find_default(char *name)
 	return ret;
 }
 
-int get_env(char *name, char *buf, int size)
+int get_env(const char *name, char *buf, int size)
 {
-	char *ret;
+	const char *ret;
 
 	ret = getenv(name);
 	if ((ret == NULL) || (strlen(ret) > 1024)) {

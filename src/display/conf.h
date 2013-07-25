@@ -22,6 +22,6 @@
 
 #define EN_SYS_DIMBRT "PM_SYS_DIMBRT"
 
-extern int get_env(char *, char *, int);
+int get_env(const char *, char *, int);
 
 #endif
