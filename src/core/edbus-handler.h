@@ -100,7 +100,7 @@ struct edbus_method {
 	E_DBus_Method_Cb func;
 };
 
-int register_edbus_method(const char *path, struct edbus_method *edbus_methods, int size);
+int register_edbus_method(const char *path, const struct edbus_method *edbus_methods, int size);
 int register_edbus_signal_handler(const char *path, const char *interface,
 		const char *name, E_DBus_Signal_Cb cb);
 E_DBus_Interface *get_edbus_interface(const char *path);

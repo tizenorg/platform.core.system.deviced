@@ -368,7 +368,7 @@ static void unregister_edbus_watch_all(void)
 	}
 }
 
-int register_edbus_method(const char *path, struct edbus_method *edbus_methods, int size)
+int register_edbus_method(const char *path, const struct edbus_method *edbus_methods, int size)
 {
 	E_DBus_Interface *iface;
 	int ret;
