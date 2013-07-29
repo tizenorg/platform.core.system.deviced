@@ -304,7 +304,7 @@ static void usb_chgdet_cb(void *data)
 	if (data == NULL)
 		ret = device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_USB_ONLINE, &val);
 	else
-		val = (int)data;
+		val = *(int *)data;
 	if (ret == 0) {
 		_I("jack - usb changed %d",val);
 		check_lowbat_charge_device(val);
@@ -817,6 +817,7 @@ out:
 
 static int changed_device(int argc, char **argv)
 {
+	int val = 0;
 	int *state = NULL;
 	int i;
 
@@ -827,8 +828,13 @@ static int changed_device(int argc, char **argv)
 		}
 	}
 
-	if (argc == 2)
-		state = atoi(argv[1]);
+	if (argc == 2) {
+		if (argv[1] == NULL)
+			val = 0;
+		else
+			val = atoi(argv[1]);
+		state = &val;
+	}
 
 	if (strncmp(argv[0], USB_NAME, USB_NAME_LEN) == 0)
 		usb_chgdet_cb((void *)state);
@@ -862,10 +868,8 @@ static int changed_dev_usb(int argc, char **argv)
 			pm_unlock_internal(getpid(), LCD_OFF, STAY_CUR_STATE);
 			return 0;
 		}
-
 		if ( vconf_get_int(VCONFKEY_SYSMAN_USB_STATUS, &val) == 0 && val == VCONFKEY_SYSMAN_USB_AVAILABLE)
 			return 0;
-
 		vconf_set_int(VCONFKEY_SYSMAN_USB_STATUS,
 			      VCONFKEY_SYSMAN_USB_AVAILABLE);
 		pm_lock_internal(getpid(), LCD_OFF, STAY_CUR_STATE, 0);
