@@ -44,6 +44,7 @@ static int fault_count = 0;
 static int power_saving_display_stat = 0;
 static int sampling_interval = SAMPLING_INTERVAL;
 static int min_brightness = PM_MIN_BRIGHTNESS;
+static char *min_brightness_name = 0;
 
 static bool alc_handler(void* data)
 {
@@ -290,14 +291,46 @@ int set_autobrightness_interval(int val)
 	return 0;
 }
 
-int set_autobrightness_min(int val)
+int set_autobrightness_min(int val, char *name)
 {
+	if (!name)
+		return -EINVAL;
+
 	if (val < PM_MIN_BRIGHTNESS || val > PM_MAX_BRIGHTNESS)
 		return -EINVAL;
 
 	min_brightness = val;
 
+	if (min_brightness_name) {
+		free(min_brightness_name);
+		min_brightness_name = 0;
+	}
+	min_brightness_name = strndup(name, strlen(name));
+
+	_I("auto brightness min value changed! (%d, %s)",
+	    min_brightness, min_brightness_name);
+
 	return 0;
+}
+
+void reset_autobrightness_min(char *name)
+{
+	if (!name)
+		return;
+
+	if (!min_brightness_name)
+		return;
+
+	if (strcmp(name, min_brightness_name))
+		return;
+
+	_I("change to default %d -> %d, %s", min_brightness,
+	    PM_MIN_BRIGHTNESS, min_brightness_name);
+	min_brightness = PM_MIN_BRIGHTNESS;
+	if (min_brightness_name) {
+		free(min_brightness_name);
+		min_brightness_name = 0;
+	}
 }
 
 static void __attribute__ ((constructor)) pm_lsensor_init(void)

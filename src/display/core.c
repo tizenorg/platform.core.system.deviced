@@ -1550,6 +1550,16 @@ static int input_device_remove(void *data)
 	return 0;
 }
 
+static int process_terminated(void *data)
+{
+	const char *name = data;
+
+	_I("%s is terminated!", name);
+	reset_autobrightness_min(name);
+
+	return 0;
+}
+
 /**
  * Power manager Main
  *
@@ -1571,6 +1581,7 @@ static void display_init(void *data)
 
 	register_notifier(DEVICE_NOTIFIER_INPUT_ADD, input_device_add);
 	register_notifier(DEVICE_NOTIFIER_INPUT_REMOVE, input_device_remove);
+	register_notifier(DEVICE_NOTIFIER_PROCESS_TERMINATED, process_terminated);
 
 	for (i = INIT_SETTING; i < INIT_END; i++) {
 		switch (i) {
@@ -1639,9 +1650,11 @@ static void display_exit(void *data)
 			break;
 		case INIT_POLL:
 			unregister_notifier(DEVICE_NOTIFIER_INPUT_ADD,
-				input_device_add);
-			unregister_notifier(DEVICE_NOTIFIER_INPUT_REMOVE,
-				input_device_remove);
+			    input_device_add);
+		        unregister_notifier(DEVICE_NOTIFIER_INPUT_REMOVE,
+			    input_device_remove);
+			unregister_notifier(DEVICE_NOTIFIER_PROCESS_TERMINATED,
+			    process_terminated);
 			unset_noti(noti_fd);
 			exit_pm_poll();
 			break;

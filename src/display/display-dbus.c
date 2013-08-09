@@ -344,17 +344,26 @@ static DBusMessage *e_dbus_setautobrightnessmin(E_DBus_Object *obj, DBusMessage 
 	DBusMessage *reply;
 	int val, ret;
 	pid_t pid;
+	char *sender;
 
+	sender = dbus_message_get_sender(msg);
+        if (!sender) {
+                _E("invalid sender name!");
+                ret = -EINVAL;
+		goto error;
+        }
 	dbus_message_iter_init(msg, &iter);
 	dbus_message_iter_get_basic(&iter, &val);
 
 	pid = get_edbus_sender_pid(msg);
-	ret = set_autobrightness_min(val);
-	if (ret)
-		_E("fail to set autobrightness min %d, %d by %d", val, ret, pid);
-	else
+	ret = set_autobrightness_min(val, sender);
+	if (ret) {
+		_I("fail to set autobrightness min %d, %d by %d", val, ret, pid);
+	} else {
+		register_edbus_watch(msg);
 		_I("set autobrightness min %d by %d", val, pid);
-
+	}
+error:
 	reply = dbus_message_new_method_return(msg);
 	dbus_message_iter_init_append(reply, &iter);
 	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);

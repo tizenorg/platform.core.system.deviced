@@ -22,8 +22,15 @@
 #include "core/edbus-handler.h"
 #include "core/common.h"
 #include "core/devices.h"
+#include "core/device-notifier.h"
+#include "core/list.h"
 
 #define EDBUS_INIT_RETRY_COUNT 5
+#define NAME_OWNER_CHANGED "NameOwnerChanged"
+#define NAME_OWNER_MATCH "type='signal',sender='org.freedesktop.DBus',\
+	path='/org/freedesktop/DBus',interface='org.freedesktop.DBus',\
+	member='NameOwnerChanged',arg0='%s'"
+
 
 struct edbus_list{
 	char *signal_name;
@@ -42,7 +49,9 @@ static struct edbus_object {
 };
 
 static Eina_List *edbus_handler_list;
+static Eina_List *edbus_watch_list;
 static int edbus_init_val;
+static DBusConnection *conn;
 static E_DBus_Connection *edbus_conn;
 static DBusPendingCall *edbus_request_name;
 
@@ -232,6 +241,106 @@ int broadcast_edbus_signal(const char *path, const char *interface,
 	return 0;
 }
 
+int register_edbus_watch(DBusMessage *msg)
+{
+	char match[256];
+	const char *sender, *watch;
+	Eina_List *l;
+
+	if (!msg) {
+		_E("invalid argument!");
+		return -EINVAL;
+	}
+
+	sender = dbus_message_get_sender(msg);
+	if (!sender) {
+		_E("invalid sender!");
+		return -EINVAL;
+	}
+
+	/* check the sender is already registered */
+	EINA_LIST_FOREACH(edbus_watch_list, l, watch) {
+		if (strcmp(sender, watch)) continue;
+
+		_I("%s is already watched!", watch);
+		return 0;
+	}
+
+	watch = strndup(sender, strlen(sender));
+	if (!watch) {
+		_E("Malloc failed");
+		return -ENOMEM;
+	}
+
+	/* Add sender to watch list */
+	EINA_LIST_APPEND(edbus_watch_list, watch);
+
+	snprintf(match, sizeof(match), NAME_OWNER_MATCH, watch);
+	dbus_bus_add_match(conn, match, NULL);
+
+	_I("%s is watched by dbus!", watch);
+}
+
+static DBusHandlerResult message_filter(DBusConnection *connection,
+		DBusMessage *message, void *data)
+{
+	char match[256];
+	int ret;
+	const char *iface, *member, *watch, *arg = NULL;
+	Eina_List *l;
+
+	if (dbus_message_get_type(message) != DBUS_MESSAGE_TYPE_SIGNAL)
+		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+
+	iface = dbus_message_get_interface(message);
+	member = dbus_message_get_member(message);
+
+	if (strcmp(iface, DBUS_INTERFACE_DBUS))
+		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+
+	if (strcmp(member, NAME_OWNER_CHANGED))
+		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+
+	ret = dbus_message_get_args(message, NULL, DBUS_TYPE_STRING, &arg,
+		    DBUS_TYPE_INVALID);
+	if (!ret) {
+		_E("no message");
+		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+	}
+
+	_D("Argument : %s", arg);
+
+	EINA_LIST_FOREACH(edbus_watch_list, l, watch) {
+		if (strcmp(arg, watch)) continue;
+
+		/* notify 'process terminated' to device notifiers */
+		device_notify(DEVICE_NOTIFIER_PROCESS_TERMINATED, watch);
+
+		/* remove registered sender */
+		snprintf(match, sizeof(match), NAME_OWNER_MATCH, watch);
+		dbus_bus_remove_match(conn, match, NULL);
+		EINA_LIST_REMOVE(edbus_watch_list, watch);
+		free(watch);
+		break;
+	}
+
+	return DBUS_HANDLER_RESULT_HANDLED;
+}
+
+static unregister_edbus_watch_all(void)
+{
+	char match[256];
+	Eina_List *n, *next;
+	struct edbus_list *watch;
+
+	EINA_LIST_FOREACH_SAFE(edbus_watch_list, n, next, watch) {
+		snprintf(match, sizeof(match), NAME_OWNER_MATCH, watch);
+		dbus_bus_remove_match(conn, match, NULL);
+		EINA_LIST_REMOVE(edbus_watch_list, watch);
+		free(watch);
+	}
+}
+
 static void edbus_init(void *data)
 {
 	int retry = EDBUS_INIT_RETRY_COUNT;
@@ -291,6 +400,8 @@ err_dbus_shutdown:
 static void edbus_exit(void *data)
 {
 	unregister_edbus_signal_handle();
+	dbus_connection_remove_filter(conn, message_filter, NULL);
+	unregister_edbus_watch_all();
 	e_dbus_connection_close(edbus_conn);
 	e_dbus_shutdown();
 }
