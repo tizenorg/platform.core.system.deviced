@@ -338,6 +338,30 @@ static DBusMessage *e_dbus_setautobrightnessinterval(E_DBus_Object *obj, DBusMes
 	return reply;
 }
 
+static DBusMessage *e_dbus_setautobrightnessmin(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int val, ret;
+	pid_t pid;
+
+	dbus_message_iter_init(msg, &iter);
+	dbus_message_iter_get_basic(&iter, &val);
+
+	pid = get_edbus_sender_pid(msg);
+	ret = set_autobrightness_min(val);
+	if (ret)
+		_E("fail to set autobrightness min %d, %d by %d", val, ret, pid);
+	else
+		_I("set autobrightness min %d by %d", val, pid);
+
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+
+	return reply;
+}
+
 static struct edbus_method {
 	const char *member;
 	const char *signature;
@@ -354,6 +378,7 @@ static struct edbus_method {
 	{ "setframerate",     "i",   "i", e_dbus_setframerate },
 	{ "getautobrightnessinterval",  NULL,   "i", e_dbus_getautobrightnessinterval },
 	{ "setautobrightnessinterval",   "i",   "i", e_dbus_setautobrightnessinterval },
+	{ "setautobrightnessmin", "i", "i", e_dbus_setautobrightnessmin },
 	/* Add methods here */
 };
 

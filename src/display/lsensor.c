@@ -43,6 +43,7 @@ static int sf_handle = -1;
 static int fault_count = 0;
 static int power_saving_display_stat = 0;
 static int sampling_interval = SAMPLING_INTERVAL;
+static int min_brightness = PM_MIN_BRIGHTNESS;
 
 static bool alc_handler(void* data)
 {
@@ -285,6 +286,16 @@ int set_autobrightness_interval(int val)
 
 	if (alc_timeout_id > 0)
 		ecore_timer_interval_set(alc_timeout_id, val);
+
+	return 0;
+}
+
+int set_autobrightness_min(int val)
+{
+	if (val < PM_MIN_BRIGHTNESS || val > PM_MAX_BRIGHTNESS)
+		return -EINVAL;
+
+	min_brightness = val;
 
 	return 0;
 }
