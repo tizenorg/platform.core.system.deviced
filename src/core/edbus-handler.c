@@ -242,46 +242,6 @@ int broadcast_edbus_signal(const char *path, const char *interface,
 	return 0;
 }
 
-int register_edbus_watch(DBusMessage *msg)
-{
-	char match[256];
-	const char *sender, *watch;
-	Eina_List *l;
-
-	if (!msg) {
-		_E("invalid argument!");
-		return -EINVAL;
-	}
-
-	sender = dbus_message_get_sender(msg);
-	if (!sender) {
-		_E("invalid sender!");
-		return -EINVAL;
-	}
-
-	/* check the sender is already registered */
-	EINA_LIST_FOREACH(edbus_watch_list, l, watch) {
-		if (strcmp(sender, watch)) continue;
-
-		_I("%s is already watched!", watch);
-		return 0;
-	}
-
-	watch = strndup(sender, strlen(sender));
-	if (!watch) {
-		_E("Malloc failed");
-		return -ENOMEM;
-	}
-
-	/* Add sender to watch list */
-	EINA_LIST_APPEND(edbus_watch_list, watch);
-
-	snprintf(match, sizeof(match), NAME_OWNER_MATCH, watch);
-	dbus_bus_add_match(conn, match, NULL);
-
-	_I("%s is watched by dbus!", watch);
-}
-
 static DBusHandlerResult message_filter(DBusConnection *connection,
 		DBusMessage *message, void *data)
 {
@@ -325,7 +285,64 @@ static DBusHandlerResult message_filter(DBusConnection *connection,
 		break;
 	}
 
+	if (eina_list_count(edbus_watch_list) == 0) {
+		dbus_connection_remove_filter(conn, message_filter, NULL);
+		_I("remove message filter, no watcher!");
+	}
+
 	return DBUS_HANDLER_RESULT_HANDLED;
+}
+
+int register_edbus_watch(DBusMessage *msg)
+{
+	char match[256];
+	const char *sender, *watch;
+	Eina_List *l;
+	int ret;
+
+	if (!msg) {
+		_E("invalid argument!");
+		return -EINVAL;
+	}
+
+	sender = dbus_message_get_sender(msg);
+	if (!sender) {
+		_E("invalid sender!");
+		return -EINVAL;
+	}
+
+	/* check the sender is already registered */
+	EINA_LIST_FOREACH(edbus_watch_list, l, watch) {
+		if (strcmp(sender, watch)) continue;
+
+		_I("%s is already watched!", watch);
+		return 0;
+	}
+
+	watch = strndup(sender, strlen(sender));
+	if (!watch) {
+		_E("Malloc failed");
+		return -ENOMEM;
+	}
+
+	/* Add message filter */
+	if (eina_list_count(edbus_watch_list) == 0) {
+		ret = dbus_connection_add_filter(conn, message_filter, NULL, NULL);
+		if (!ret) {
+			_E("fail to add message filter!");
+			free(watch);
+			return -ENOMEM;
+		}
+		_I("success to add message filter!");
+	}
+
+	/* Add sender to watch list */
+	EINA_LIST_APPEND(edbus_watch_list, watch);
+
+	snprintf(match, sizeof(match), NAME_OWNER_MATCH, watch);
+	dbus_bus_add_match(conn, match, NULL);
+
+	_I("%s is watched by dbus!", watch);
 }
 
 static unregister_edbus_watch_all(void)
@@ -387,8 +404,6 @@ static void edbus_init(void *data)
 
 		_I("add new obj for %s", edbus_objects[i].interface);
 	}
-
-	_D("start edbus service");
 	return;
 
 err_dbus_close:
