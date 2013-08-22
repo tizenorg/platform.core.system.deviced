@@ -330,6 +330,8 @@ static int proc_condition(PMMsg *data)
 		r = read(fd_cmdline, pname, PATH_MAX);
 		if ((r >= 0) && (r < PATH_MAX))
 			pname[r] = '\0';
+		else
+			pname[0] = '\0';
 		close(fd_cmdline);
 	}
 

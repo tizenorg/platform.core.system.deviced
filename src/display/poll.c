@@ -113,15 +113,19 @@ int init_pm_poll(int (*pm_callback) (int, PMMsg *))
 		/* Add 2 bytes for following strncat() */
 		dev_paths_size =  strlen(pm_input_env) + 1;
 		dev_paths = (char *)malloc(dev_paths_size);
-		if (!dev_paths)
-			return -1;
+		if (!dev_paths) {
+			_E("Fail to malloc for dev path");
+			return -ENOMEM;
+		}
 		snprintf(dev_paths, dev_paths_size, "%s", pm_input_env);
 	} else {
 		/* Add 2 bytes for following strncat() */
 		dev_paths_size = strlen(DEFAULT_DEV_PATH) + 1;
 		dev_paths = (char *)malloc(dev_paths_size);
-		if (!dev_paths)
-			return -1;
+		if (!dev_paths) {
+			_E("Fail to malloc for dev path");
+			return -ENOMEM;
+		}
 		snprintf(dev_paths, dev_paths_size, "%s", DEFAULT_DEV_PATH);
 	}
 
@@ -186,7 +190,7 @@ err_dev:
 err_fdhandler:
 	ecore_main_fd_handler_del(fd_handler);
 err_fd:
-	fclose(fd);
+	close(fd);
 err_devpaths:
 	free(dev_paths);
 	return -1;
