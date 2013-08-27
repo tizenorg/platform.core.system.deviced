@@ -43,6 +43,13 @@
 #define METHOD_LOCK_STATE		"lockstate"
 #define METHOD_UNLOCK_STATE		"unlockstate"
 #define METHOD_CHANGE_STATE		"changestate"
+#define METHOD_GET_DISPLAY_COUNT	"GetDisplayCount"
+#define METHOD_GET_BRIGHTNESS	"GetBrightness"
+#define METHOD_SET_BRIGHTNESS	"SetBrightness"
+#define METHOD_HOLD_BRIGHTNESS	"HoldBrightness"
+#define METHOD_RELEASE_BRIGHTNESS	"ReleaseBrightness"
+#define METHOD_GET_ACL_STATUS	"GetAclStatus"
+#define METHOD_SET_ACL_STATUS	"SetAclStatus"
 
 #define STR_LCD_OFF   "lcdoff"
 #define STR_LCD_DIM   "lcddim"
@@ -62,14 +69,26 @@
 
 API int display_get_count(void)
 {
-	int val;
-	int r;
+	DBusError err;
+	DBusMessage *msg;
+	int ret, ret_val;
 
-	r = device_get_property(DEVICE_TYPE_DISPLAY, PROP_DISPLAY_DISPLAY_COUNT, &val);
-	if (r < 0)
-		return r;
+	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
+			METHOD_GET_DISPLAY_COUNT, NULL, NULL);
+	if (!msg)
+		return -EBADMSG;
 
-	return val;
+	dbus_error_init(&err);
+
+	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
+	if (!ret) {
+		_E("no message : [%s:%s]", err.name, err.message);
+		ret_val = -EBADMSG;
+	}
+
+	dbus_message_unref(msg);
+	dbus_error_free(&err);
+	return ret_val;
 }
 
 API int display_get_max_brightness(void)
@@ -84,170 +103,161 @@ API int display_get_min_brightness(void)
 
 API int display_get_brightness(void)
 {
-	int val;
-	int r;
+	DBusError err;
+	DBusMessage *msg;
+	int ret, ret_val;
 
-	r = device_get_property(DEVICE_TYPE_DISPLAY, PROP_DISPLAY_BRIGHTNESS, &val);
-	if (r < 0)
-		return r;
+	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
+			METHOD_GET_BRIGHTNESS, NULL, NULL);
+	if (!msg)
+		return -EBADMSG;
 
-	return val;
+	dbus_error_init(&err);
+
+	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
+	if (!ret) {
+		_E("no message : [%s:%s]", err.name, err.message);
+		ret_val = -EBADMSG;
+	}
+
+	dbus_message_unref(msg);
+	dbus_error_free(&err);
+	return ret_val;
 }
 
 API int display_set_brightness_with_setting(int val)
 {
-	int auto_brt_state;
-	int r;
+	DBusError err;
+	DBusMessage *msg;
+	char str_val[32];
+	char *arr[1];
+	int ret, ret_val;
 
-	if (vconf_get_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT, &auto_brt_state) != 0) {
-		_E("Failed to get VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT value");
-		errno = EPERM;
-		return -errno;
+	snprintf(str_val, sizeof(str_val), "%d", val);
+	arr[0] = str_val;
+
+	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
+			METHOD_SET_BRIGHTNESS, "i", arr);
+	if (!msg)
+		return -EBADMSG;
+
+	dbus_error_init(&err);
+
+	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
+	if (!ret) {
+		_E("no message : [%s:%s]", err.name, err.message);
+		ret_val = -EBADMSG;
 	}
 
-	if (val == DISPLAY_DIM_BRIGHTNESS) {
-		_E("application can not set this value(DIM VALUE:%d)", val);
-		errno = EPERM;
-		return -errno;
-	}
-
-	if (auto_brt_state == SETTING_BRIGHTNESS_AUTOMATIC_ON) {
-		_D("auto_brightness state is ON, can not change the brightness value");
-		return 0;
-	}
-
-	r = device_set_property(DEVICE_TYPE_DISPLAY, PROP_DISPLAY_BRIGHTNESS, val);
-	if (r < 0)
-		return r;
-
-	if (vconf_set_int(VCONFKEY_SETAPPL_LCD_BRIGHTNESS, val) != 0) {
-		_E("Failed to set VCONFKEY_SETAPPL_LCD_BRIGHTNESS value");
-	}
-
-	if (vconf_set_int(VCONFKEY_PM_CURRENT_BRIGHTNESS, val) != 0) {
-		_E("Failed to set VCONFKEY_PM_CURRENT_BRIGHTNESS value");
-	}
-
-	return 0;
+	dbus_message_unref(msg);
+	dbus_error_free(&err);
+	return ret_val;
 }
 
 API int display_set_brightness(int val)
 {
-	int auto_brt_state;
-	int r;
+	DBusError err;
+	DBusMessage *msg;
+	char str_val[32];
+	char *arr[1];
+	int ret, ret_val;
 
-	if (vconf_get_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT, &auto_brt_state) != 0) {
-		_E("Failed to get VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT value");
-		errno = EPERM;
-		return -errno;
+	snprintf(str_val, sizeof(str_val), "%d", val);
+	arr[0] = str_val;
+
+	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
+			METHOD_HOLD_BRIGHTNESS, "i", arr);
+	if (!msg)
+		return -EBADMSG;
+
+	dbus_error_init(&err);
+
+	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
+	if (!ret) {
+		_E("no message : [%s:%s]", err.name, err.message);
+		ret_val = -EBADMSG;
 	}
 
-	if (val == DISPLAY_DIM_BRIGHTNESS) {
-		_E("application can not set this value(DIM VALUE:%d)", val);
-		errno = EPERM;
-		return -errno;
-	}
-
-	vconf_set_int(VCONFKEY_PM_CUSTOM_BRIGHTNESS_STATUS, VCONFKEY_PM_CUSTOM_BRIGHTNESS_ON);
-	r = device_set_property(DEVICE_TYPE_DISPLAY, PROP_DISPLAY_BRIGHTNESS, val);
-	if (r < 0)
-		return r;
-
-	if (auto_brt_state == SETTING_BRIGHTNESS_AUTOMATIC_ON) {
-		_D("Auto brightness will be paused");
-		vconf_set_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT, SETTING_BRIGHTNESS_AUTOMATIC_PAUSE);
-	}
-
-	if (vconf_set_int(VCONFKEY_PM_CURRENT_BRIGHTNESS, val) != 0) {
-		_E("Failed to set VCONFKEY_PM_CURRENT_BRIGHTNESS value");
-	}
-
-	return 0;
+	dbus_message_unref(msg);
+	dbus_error_free(&err);
+	return ret_val;
 }
 
 API int display_release_brightness(void)
 {
-	int bat_state;
-	int setting_val;
-	int auto_brt_state;
-	int charger_state;
-	int brt_changed_state;
-	int r;
+	DBusError err;
+	DBusMessage *msg;
+	int ret, ret_val;
 
-	if (vconf_get_int(VCONFKEY_SYSMAN_BATTERY_STATUS_LOW, &bat_state) != 0) {
-		_E("Failed to get VCONFKEY_SYSMAN_BATTERY_STATUS_LOW value");
-		errno = EPERM;
-		return -1;
+	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
+			METHOD_RELEASE_BRIGHTNESS, NULL, NULL);
+	if (!msg)
+		return -EBADMSG;
+
+	dbus_error_init(&err);
+
+	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
+	if (!ret) {
+		_E("no message : [%s:%s]", err.name, err.message);
+		ret_val = -EBADMSG;
 	}
 
-	if (vconf_get_int(VCONFKEY_SYSMAN_CHARGER_STATUS, &charger_state) != 0) {
-		_E("Failed to get VCONFKEY_SYSMAN_CHARGER_STATUS value");
-		errno = EPERM;
-		return -1;
-	}
-
-	if (vconf_get_bool(VCONFKEY_PM_BRIGHTNESS_CHANGED_IN_LPM, &brt_changed_state) != 0) {
-		_E("Failed to get VCONFKEY_PM_BRIGHTNESS_CHANGED_IN_LPM value");
-		errno = EPERM;
-		return -1;
-	}
-
-	if (vconf_get_int(VCONFKEY_SETAPPL_LCD_BRIGHTNESS, &setting_val) != 0) {
-		_E("Failed to get VCONFKEY_SETAPPL_LCD_BRIGHTNESS value");
-		errno = EPERM;
-		return -1;
-	}
-
-	if (vconf_get_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT, &auto_brt_state) != 0) {
-		_E("Failed to get VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT value");
-		errno = EPERM;
-		return -1;
-	}
-
-	vconf_set_int(VCONFKEY_PM_CUSTOM_BRIGHTNESS_STATUS, VCONFKEY_PM_CUSTOM_BRIGHTNESS_OFF);
-
-	// check dim state
-	if (bat_state <= VCONFKEY_SYSMAN_BAT_CRITICAL_LOW &&
-		charger_state == VCONFKEY_SYSMAN_CHARGER_DISCONNECTED && !brt_changed_state) {
-		_D("batt warning low : brightness is not changed!");
-		device_set_property(DEVICE_TYPE_DISPLAY, PROP_DISPLAY_BRIGHTNESS, 0);
-		return 0;
-	}
-
-	if (auto_brt_state == SETTING_BRIGHTNESS_AUTOMATIC_OFF) {
-		device_set_property(DEVICE_TYPE_DISPLAY, PROP_DISPLAY_BRIGHTNESS, setting_val);
-		if (vconf_set_int(VCONFKEY_PM_CURRENT_BRIGHTNESS, setting_val) != 0) {
-			_E("Failed to set VCONFKEY_PM_CURRENT_BRIGHTNESS value");
-		}
-	} else if (auto_brt_state == SETTING_BRIGHTNESS_AUTOMATIC_PAUSE) {
-		_D("Auto brightness will be enable");
-		vconf_set_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT, SETTING_BRIGHTNESS_AUTOMATIC_ON);
-	}
-
-	return 0;
+	dbus_message_unref(msg);
+	dbus_error_free(&err);
+	return ret_val;
 }
 
 API int display_get_acl_status(void)
 {
-	int val;
-	int r;
+	DBusError err;
+	DBusMessage *msg;
+	int ret, ret_val;
 
-	r = device_get_property(DEVICE_TYPE_DISPLAY, PROP_DISPLAY_ACL_CONTROL, &val);
-	if (r < 0)
-		return r;
+	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
+			METHOD_GET_ACL_STATUS, NULL, NULL);
+	if (!msg)
+		return -EBADMSG;
 
-	return val;
+	dbus_error_init(&err);
+
+	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
+	if (!ret) {
+		_E("no message : [%s:%s]", err.name, err.message);
+		ret_val = -EBADMSG;
+	}
+
+	dbus_message_unref(msg);
+	dbus_error_free(&err);
+	return ret_val;
 }
 
 API int display_set_acl_status(int val)
 {
-	int r;
+	DBusError err;
+	DBusMessage *msg;
+	char str_val[32];
+	char *arr[1];
+	int ret, ret_val;
 
-	r = device_set_property(DEVICE_TYPE_DISPLAY, PROP_DISPLAY_ACL_CONTROL, val);
-	if (r < 0)
-		return r;
+	snprintf(str_val, sizeof(str_val), "%d", val);
+	arr[0] = str_val;
 
-	return 0;
+	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
+			METHOD_SET_ACL_STATUS, "i", arr);
+	if (!msg)
+		return -EBADMSG;
+
+	dbus_error_init(&err);
+
+	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
+	if (!ret) {
+		_E("no message : [%s:%s]", err.name, err.message);
+		ret_val = -EBADMSG;
+	}
+
+	dbus_message_unref(msg);
+	dbus_error_free(&err);
+	return ret_val;
 }
 
 API int display_set_frame_rate(int val)
@@ -276,8 +286,6 @@ API int display_set_frame_rate(int val)
 
 	dbus_message_unref(msg);
 	dbus_error_free(&err);
-
-	_D("%s-%s : %d", DEVICED_INTERFACE_DISPLAY, METHOD_SET_FRAME_RATE, ret_val);
 	return ret_val;
 }
 

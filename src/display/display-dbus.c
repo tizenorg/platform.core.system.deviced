@@ -33,6 +33,8 @@
 #include "core/common.h"
 #include "core/devices.h"
 
+#define DISPLAY_DIM_BRIGHTNESS  0
+
 static DBusMessage *e_dbus_start(E_DBus_Object *obj, DBusMessage *msg)
 {
 	display_device_ops.init(NULL);
@@ -234,23 +236,39 @@ out:
 	return reply;
 }
 
+static DBusMessage *e_dbus_getdisplaycount(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int cmd, cnt, ret;
+
+	cmd = DISP_CMD(PROP_DISPLAY_DISPLAY_COUNT, DEFAULT_DISPLAY);
+	ret = device_get_property(DEVICE_TYPE_DISPLAY, cmd, &cnt);
+	if (ret >= 0)
+		ret = cnt;
+
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+	return reply;
+}
+
 static DBusMessage *e_dbus_getbrightness(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
-	int ret;
-	int cmd;
-	int brightness = -1;
+	int cmd, brt, ret;
 
 	cmd = DISP_CMD(PROP_DISPLAY_BRIGHTNESS, DEFAULT_DISPLAY);
-	ret = device_get_property(DEVICE_TYPE_DISPLAY, cmd, &brightness);
+	ret = device_get_property(DEVICE_TYPE_DISPLAY, cmd, &brt);
+	if (ret >= 0)
+		ret = brt;
 
-	_I("get brightness %d, %d", brightness, ret);
+	_I("get brightness %d, %d", brt, ret);
 
 	reply = dbus_message_new_method_return(msg);
 	dbus_message_iter_init_append(reply, &iter);
-	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &brightness);
-
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &brt);
 	return reply;
 }
 
@@ -258,22 +276,190 @@ static DBusMessage *e_dbus_setbrightness(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
-	int ret;
-	int cmd;
-	int brightness;
+	int cmd, brt, autobrt, ret;
 
 	dbus_message_iter_init(msg, &iter);
-	dbus_message_iter_get_basic(&iter, &brightness);
+	dbus_message_iter_get_basic(&iter, &brt);
+
+	if (brt == DISPLAY_DIM_BRIGHTNESS) {
+		_E("application can not set this value(DIM VALUE:%d)", brt);
+		ret = -EPERM;
+		goto error;
+	}
+
+	if (vconf_get_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT, &autobrt) != 0) {
+		_E("Failed to get VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT value");
+		autobrt = SETTING_BRIGHTNESS_AUTOMATIC_OFF;
+	}
+
+	if (autobrt == SETTING_BRIGHTNESS_AUTOMATIC_ON) {
+		_D("auto_brightness state is ON, can not change the brightness value");
+		ret = 0;
+		goto error;
+	}
 
 	cmd = DISP_CMD(PROP_DISPLAY_BRIGHTNESS, DEFAULT_DISPLAY);
-	ret = device_set_property(DEVICE_TYPE_DISPLAY, cmd, brightness);
+	ret = device_set_property(DEVICE_TYPE_DISPLAY, cmd, brt);
+	if (ret < 0)
+		goto error;
 
-	_I("set brightness %d, %d", brightness, ret);
+	if (vconf_set_int(VCONFKEY_SETAPPL_LCD_BRIGHTNESS, brt) != 0)
+		_E("Failed to set VCONFKEY_SETAPPL_LCD_BRIGHTNESS value");
+
+	if (vconf_set_int(VCONFKEY_PM_CURRENT_BRIGHTNESS, brt) != 0)
+		_E("Failed to set VCONFKEY_PM_CURRENT_BRIGHTNESS value");
+
+	_I("set brightness %d, %d", brt, ret);
+
+error:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+	return reply;
+}
+
+static DBusMessage *e_dbus_holdbrightness(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int cmd, brt, autobrt, ret;
+
+	dbus_message_iter_init(msg, &iter);
+	dbus_message_iter_get_basic(&iter, &brt);
+
+	if (brt == DISPLAY_DIM_BRIGHTNESS) {
+		_E("application can not set this value(DIM VALUE:%d)", brt);
+		ret = -EPERM;
+		goto error;
+	}
+
+	if (vconf_get_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT, &autobrt) != 0) {
+		_E("Failed to get VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT value");
+		autobrt = SETTING_BRIGHTNESS_AUTOMATIC_OFF;
+	}
+
+	cmd = DISP_CMD(PROP_DISPLAY_BRIGHTNESS, DEFAULT_DISPLAY);
+	ret = device_set_property(DEVICE_TYPE_DISPLAY, cmd, brt);
+	if (ret < 0)
+		goto error;
+
+	if (autobrt == SETTING_BRIGHTNESS_AUTOMATIC_ON) {
+		_D("Auto brightness will be paused");
+		vconf_set_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT, SETTING_BRIGHTNESS_AUTOMATIC_PAUSE);
+	}
+
+	if (vconf_set_int(VCONFKEY_PM_CURRENT_BRIGHTNESS, brt) != 0)
+		_E("Failed to set VCONFKEY_PM_CURRENT_BRIGHTNESS value");
+
+	_I("hold brightness %d, %d", brt, ret);
+
+error:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+	return reply;
+
+}
+
+static DBusMessage *e_dbus_releasebrightness(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int cmd, bat, charger, changed, setting, autobrt, ret = 0;
+
+	if (vconf_get_int(VCONFKEY_SYSMAN_BATTERY_STATUS_LOW, &bat) != 0) {
+		_E("Failed to get VCONFKEY_SYSMAN_BATTERY_STATUS_LOW value");
+		ret = -EPERM;
+		goto error;
+	}
+
+	if (vconf_get_int(VCONFKEY_SYSMAN_CHARGER_STATUS, &charger) != 0) {
+		_E("Failed to get VCONFKEY_SYSMAN_CHARGER_STATUS value");
+		ret = -EPERM;
+		goto error;
+	}
+
+	if (vconf_get_bool(VCONFKEY_PM_BRIGHTNESS_CHANGED_IN_LPM, &changed) != 0) {
+		_E("Failed to get VCONFKEY_PM_BRIGHTNESS_CHANGED_IN_LPM value");
+		ret = -EPERM;
+		goto error;
+	}
+
+	if (vconf_get_int(VCONFKEY_SETAPPL_LCD_BRIGHTNESS, &setting) != 0) {
+		_E("Failed to get VCONFKEY_SETAPPL_LCD_BRIGHTNESS value");
+		ret = -EPERM;
+		goto error;
+	}
+
+	if (vconf_get_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT, &autobrt) != 0) {
+		_E("Failed to get VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT value");
+		ret = -EPERM;
+		goto error;
+	}
+
+	vconf_set_int(VCONFKEY_PM_CUSTOM_BRIGHTNESS_STATUS, VCONFKEY_PM_CUSTOM_BRIGHTNESS_OFF);
+
+	// check dim state
+	if (bat <= VCONFKEY_SYSMAN_BAT_CRITICAL_LOW &&
+		charger == VCONFKEY_SYSMAN_CHARGER_DISCONNECTED && !changed) {
+		_D("batt warning low : brightness is not changed!");
+		device_set_property(DEVICE_TYPE_DISPLAY, PROP_DISPLAY_BRIGHTNESS, 0);
+		goto error;
+	}
+
+	if (autobrt == SETTING_BRIGHTNESS_AUTOMATIC_OFF) {
+		device_set_property(DEVICE_TYPE_DISPLAY, PROP_DISPLAY_BRIGHTNESS, setting);
+		if (vconf_set_int(VCONFKEY_PM_CURRENT_BRIGHTNESS, setting) != 0) {
+			_E("Failed to set VCONFKEY_PM_CURRENT_BRIGHTNESS value");
+		}
+	} else if (autobrt == SETTING_BRIGHTNESS_AUTOMATIC_PAUSE) {
+		_D("Auto brightness will be enable");
+		vconf_set_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT, SETTING_BRIGHTNESS_AUTOMATIC_ON);
+	}
+
+error:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+	return reply;
+}
+
+static DBusMessage *e_dbus_getaclstatus(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int cmd, st, ret;
+
+	cmd = DISP_CMD(PROP_DISPLAY_ACL_CONTROL, DEFAULT_DISPLAY);
+	ret = device_get_property(DEVICE_TYPE_DISPLAY, cmd, &st);
+	if (ret >= 0)
+		ret = st;
+
+	_I("get acl status %d, %d", st, ret);
 
 	reply = dbus_message_new_method_return(msg);
 	dbus_message_iter_init_append(reply, &iter);
 	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+	return reply;
+}
 
+static DBusMessage *e_dbus_setaclstatus(E_DBus_Object *ob, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int cmd, st, ret;
+
+	dbus_message_iter_init(msg, &iter);
+	dbus_message_iter_get_basic(&iter, &st);
+
+	cmd = DISP_CMD(PROP_DISPLAY_ACL_CONTROL, DEFAULT_DISPLAY);
+	ret = device_set_property(DEVICE_TYPE_DISPLAY, cmd, st);
+
+	_I("set acl status %d, %d", st, ret);
+
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
 	return reply;
 }
 
@@ -421,6 +607,13 @@ static const struct edbus_method {
 	{ "setautobrightnessinterval",   "i",   "i", e_dbus_setautobrightnessinterval },
 	{ "setautobrightnessmin", "i", "i", e_dbus_setautobrightnessmin },
 	{ "LockScreenBgOn", "s", "i", e_dbus_lockscreenbgon },
+	{ "GetDisplayCount", NULL,   "i", e_dbus_getdisplaycount },
+	{ "GetBrightness",   NULL,   "i", e_dbus_getbrightness },
+	{ "SetBrightness",    "i",   "i", e_dbus_setbrightness },
+	{ "HoldBrightness",   "i",   "i", e_dbus_holdbrightness },
+	{ "ReleaseBrightness", NULL, "i", e_dbus_releasebrightness },
+	{ "GetAclStatus",    NULL,   "i", e_dbus_getaclstatus },
+	{ "SetAclStatus",    NULL,   "i", e_dbus_setaclstatus },
 	/* Add methods here */
 };
 
