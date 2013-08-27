@@ -129,7 +129,7 @@ static int exec_process(const char **argv)
 	if (!pid) {
 		for (i = 0; i < _NSIG; ++i)
 			signal(i, SIG_DFL);
-		r = execv(argv[0], argv);
+		r = execv(argv[0], (char **)argv);
 		if (r == -1) {
 			_E("execv() error");
 			exit(EXIT_FAILURE);
@@ -324,7 +324,7 @@ static int create_partition(const char *dev_path)
 static int kill_app_accessing_mmc(void)
 {
 	int pid;
-	char *argv[4] = {"/sbin/fuser", "-mk", MMC_MOUNT_POINT, NULL};
+	const char *argv[4] = {"/sbin/fuser", "-mk", MMC_MOUNT_POINT, NULL};
 	char buf[256];
 	int retry = 10;
 
@@ -796,17 +796,19 @@ static void mmc_init(void *data)
 	mmc_mount();
 }
 
-static void mmc_start(void)
+static int mmc_start(void)
 {
 	mmc_disabled = false;
 	_D("start");
+	return 0;
 }
 
-static void mmc_stop(void)
+static int mmc_stop(void)
 {
 	mmc_disabled = true;
 	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_REMOVED);
 	_D("stop");
+	return 0;
 }
 
 const struct device_ops mmc_device_ops = {

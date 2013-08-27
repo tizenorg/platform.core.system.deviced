@@ -69,7 +69,7 @@ static int _ss_core_action_run(void *user_data,
 	return 0;
 }
 
-static int core_pipe_cb(void *userdata, Ecore_Fd_Handler * fd_handler)
+static Eina_Bool core_pipe_cb(void *userdata, Ecore_Fd_Handler * fd_handler)
 {
 	struct ss_main_data *ad = (struct ss_main_data *)userdata;
 	struct _internal_msg p_msg;
@@ -77,7 +77,7 @@ static int core_pipe_cb(void *userdata, Ecore_Fd_Handler * fd_handler)
 	int r = -1;
 	if (!ecore_main_fd_handler_active_get(fd_handler, ECORE_FD_READ)) {
 		_E("ecore_main_fd_handler_active_get error , return");
-		return 1;
+		return EINA_TRUE;
 	}
 
 	while (retry_count < 5) {
@@ -106,7 +106,7 @@ static int core_pipe_cb(void *userdata, Ecore_Fd_Handler * fd_handler)
 		ss_run_queue_del_bypid(p_msg.pid);
 		break;
 	}
-	return 1;
+	return EINA_TRUE;
 }
 
 int ss_core_action_run()

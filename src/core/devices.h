@@ -40,7 +40,7 @@ enum device_ops_status {
 void devices_init(void *data);
 void devices_exit(void *data);
 
-static inline int device_start(struct device_ops *dev)
+static inline int device_start(const struct device_ops *dev)
 {
 	if (dev && dev->start)
 		return dev->start();
@@ -48,7 +48,7 @@ static inline int device_start(struct device_ops *dev)
 	return -EINVAL;
 }
 
-static inline int device_stop(struct device_ops *dev)
+static inline int device_stop(const struct device_ops *dev)
 {
 	if (dev && dev->stop)
 		return dev->stop();
@@ -56,7 +56,7 @@ static inline int device_stop(struct device_ops *dev)
 	return -EINVAL;
 }
 
-static inline int device_get_status(struct device_ops *dev)
+static inline int device_get_status(const struct device_ops *dev)
 {
 	if (dev && dev->status)
 		return dev->status();

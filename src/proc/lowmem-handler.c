@@ -64,7 +64,7 @@
 struct lowmem_process_entry {
 	unsigned cur_mem_state;
 	unsigned new_mem_state;
-	int (*action) (void *);
+	Eina_Bool (*action) (void *);
 };
 
 static int lowmem_fd = -1;
@@ -73,9 +73,9 @@ static int cur_mem_state = MEMNOTIFY_NORMAL;
 Ecore_Timer *oom_timer;
 #define OOM_TIMER_INTERVAL	5
 
-static int memory_low_act(void *ad);
-static int memory_oom_act(void *ad);
-static int memory_normal_act(void *ad);
+static Eina_Bool memory_low_act(void *ad);
+static Eina_Bool memory_oom_act(void *ad);
+static Eina_Bool memory_normal_act(void *ad);
 
 static struct lowmem_process_entry lpe[] = {
 	{MEMNOTIFY_NORMAL, MEMNOTIFY_LOW, memory_low_act},
@@ -215,7 +215,7 @@ static void make_LMM_log(char *file, pid_t pid, char *victim_name)
 
 
 
-static int memory_low_act(void *data)
+static Eina_Bool memory_low_act(void *data)
 {
 	char lowmem_noti_name[NAME_MAX];
 
@@ -227,10 +227,10 @@ static int memory_low_act(void *data)
 	vconf_set_int(VCONFKEY_SYSMAN_LOW_MEMORY,
 		      VCONFKEY_SYSMAN_LOW_MEMORY_SOFT_WARNING);
 
-	return 0;
+	return EINA_TRUE;
 }
 
-static int memory_oom_act(void *data)
+static Eina_Bool memory_oom_act(void *data)
 {
 	unsigned int cur_time;
 	char lowmem_noti_name[NAME_MAX];
@@ -252,15 +252,15 @@ static int memory_oom_act(void *data)
 	vconf_set_int(VCONFKEY_SYSMAN_LOW_MEMORY,
 		      VCONFKEY_SYSMAN_LOW_MEMORY_HARD_WARNING);
 
-	return 1;
+	return EINA_TRUE;
 }
 
-static int memory_normal_act(void *data)
+static Eina_Bool memory_normal_act(void *data)
 {
 	_I("[LOW MEM STATE] memory normal state");
 	vconf_set_int(VCONFKEY_SYSMAN_LOW_MEMORY,
 		      VCONFKEY_SYSMAN_LOW_MEMORY_NORMAL);
-	return 0;
+	return EINA_TRUE;
 }
 
 static int lowmem_process(unsigned int mem_state, void *ad)
@@ -292,7 +292,7 @@ static unsigned int lowmem_read(int fd)
 	}
 	return mem_state;
 }
-static int lowmem_cb(void *data, Ecore_Fd_Handler * fd_handler)
+static Eina_Bool lowmem_cb(void *data, Ecore_Fd_Handler * fd_handler)
 {
 	int fd;
 	struct ss_main_data *ad = (struct ss_main_data *)data;
@@ -300,20 +300,20 @@ static int lowmem_cb(void *data, Ecore_Fd_Handler * fd_handler)
 
 	if (!ecore_main_fd_handler_active_get(fd_handler, ECORE_FD_READ)) {
 		_E("ecore_main_fd_handler_active_get error, return");
-		return -1;
+		goto out;
 	}
 
 	fd = ecore_main_fd_handler_fd_get(fd_handler);
 	if (fd < 0) {
 		_E("ecore_main_fd_handler_fd_get error, return");
-		return -1;
+		goto out;
 	}
 	mem_state = lowmem_read(fd);
 	print_lowmem_state(mem_state);
 	lowmem_process(mem_state, ad);
 	cur_mem_state = mem_state;
-
-	return 1;
+out:
+	return EINA_TRUE;
 }
 
 static int set_threshold()

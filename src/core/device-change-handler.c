@@ -126,7 +126,7 @@ static struct extcon_device {
 	{ EXTCON_EARJACK, "/csa/factory/earjack_count", 0, 0},
 };
 
-static int uevent_control_cb(void *data, Ecore_Fd_Handler *fd_handler);
+static Eina_Bool uevent_control_cb(void *data, Ecore_Fd_Handler *fd_handler);
 extern int battery_power_off_act(void *data);
 extern int battery_charge_err_act(void *data);
 static int check_lowbat_charge_device(int bInserted)
@@ -326,6 +326,7 @@ static void ta_chgdet_cb(struct ss_main_data *ad)
 			snprintf(params, sizeof(params), "%d", DEVICE_NOTI_BATT_CHARGE);
 			ss_launch_if_noexist("/usr/bin/sys_device_noti", params);
 			_D("ta device notification");
+			device_notify(DEVICE_NOTIFIER_TA, (void *)TRUE);
 		}
 		__sync_usb_status();
 	}
@@ -658,37 +659,41 @@ static int uevent_control_start(void)
 	return 0;
 }
 
-static int uevent_control_cb(void *data, Ecore_Fd_Handler *fd_handler)
+static Eina_Bool uevent_control_cb(void *data, Ecore_Fd_Handler *fd_handler)
 {
 	struct udev_device *dev = NULL;
 	struct udev_list_entry *list_entry = NULL;
-	char *env_name = NULL;
-	char *env_value = NULL;
+	const char *env_name = NULL;
+	const char *env_value = NULL;
+	const char *devpath;
+	const char *devnode;
+	const char *action;
 	int ufd = -1;
 	int ret = -1;
+	int i, len;
 
 	if (!ecore_main_fd_handler_active_get(fd_handler,ECORE_FD_READ))
-		return -1;
+		goto out;
 	if ((ufd = ecore_main_fd_handler_fd_get(fd_handler)) == -1)
-		return -1;
+		goto out;
 	if ((dev = udev_monitor_receive_device(mon)) == NULL)
-		return -1;
+		goto out;
 
 	env_name = udev_device_get_subsystem(dev);
 	if (strncmp(env_name, INPUT_SUBSYSTEM, strlen(INPUT_SUBSYSTEM)) == 0) {
 		char *devpath = udev_device_get_devpath(dev);
 		/* check new input device */
 		if (!fnmatch(INPUT_PATH, devpath, 0)) {
-			char *action = udev_device_get_action(dev);
-			char *devnode = udev_device_get_devnode(dev);
+			action = udev_device_get_action(dev);
+			devnode = udev_device_get_devnode(dev);
 			if (!strcmp(action, ADD))
-				device_notify(DEVICE_NOTIFIER_INPUT_ADD, devnode);
+				device_notify(DEVICE_NOTIFIER_INPUT_ADD, (void *)devnode);
 			else if (!strcmp(action, REMOVE))
-				device_notify(DEVICE_NOTIFIER_INPUT_REMOVE, devnode);
+				device_notify(DEVICE_NOTIFIER_INPUT_REMOVE, (void *)devnode);
 			udev_device_unref(dev);
 			uevent_control_stop(ufd);
 			uevent_control_start();
-			return 0;
+			return EINA_TRUE;
 		}
 	}
 
@@ -703,7 +708,7 @@ static int uevent_control_cb(void *data, Ecore_Fd_Handler *fd_handler)
 
 	if (ret != 0) {
 		udev_device_unref(dev);
-		return -1;
+		goto out;
 	}
 
 	_I("UEVENT DETECTED (%s)", env_value);
@@ -712,8 +717,8 @@ static int uevent_control_cb(void *data, Ecore_Fd_Handler *fd_handler)
 	udev_device_unref(dev);
 	uevent_control_stop(ufd);
 	uevent_control_start();
-
-	return 0;
+out:
+	return EINA_TRUE;
 }
 
 int changed_device_def_predefine_action(int argc, char **argv)
@@ -864,8 +869,10 @@ static void device_change_init(void *data)
 	ss_noti_add("device_pci_keyboard_add", (void *)pci_keyboard_add_cb, data);
 	ss_noti_add("device_pci_keyboard_remove", (void *)pci_keyboard_remove_cb, data);
 
-	if (vconf_notify_key_changed(VCONFKEY_SYSMAN_USB_HOST_STATUS, usb_host_chgdet_cb, NULL) < 0)
+	if (vconf_notify_key_changed(VCONFKEY_SYSMAN_USB_HOST_STATUS,
+		(void *)usb_host_chgdet_cb, NULL) < 0) {
 		_E("vconf key notify failed(VCONFKEY_SYSMAN_USB_HOST_STATUS)");
+	}
 
 	/* check and set earjack init status */
 	earjackcon_def_predefine_action(0, NULL);

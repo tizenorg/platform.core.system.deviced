@@ -20,6 +20,8 @@
 #ifndef __SS_DEVICE_HANDLER_H__
 #define __SS_DEVICE_HANDLER_H__
 
+#include "data.h"
+
 enum extcon_type {
 	EXTCON_TA = 0,
 	EXTCON_EARJACK,
@@ -37,7 +39,7 @@ int _ss_usb_storage_init(void);
 /* Battery functions */
 int ss_lowbat_is_charge_in_now();
 int ss_lowbat_set_charge_on(int onoff);
-int ss_lowbat_monitor(void *data);
+Eina_Bool ss_lowbat_monitor(void *data);
 
 int extcon_set_count(int index);
 

@@ -187,40 +187,41 @@ static unsigned int pmon_read(int fd)
 }
 */
 
-static int pmon_cb(void *data, Ecore_Fd_Handler * fd_handler)
+static Eina_Bool pmon_cb(void *data, Ecore_Fd_Handler * fd_handler)
 {
 	int fd;
 	struct ss_main_data *ad = (struct ss_main_data *)data;
 	int dead_pid;
 	if (!ecore_main_fd_handler_active_get(fd_handler, ECORE_FD_READ)) {
 		_E("ecore_main_fd_handler_active_get error , return");
-		return -1;
+		goto out;
 	}
 
 	fd = ecore_main_fd_handler_fd_get(fd_handler);
 
 	if (fd < 0) {
 		_E("ecore_main_fd_handler_fd_get error , return");
-		return -1;
+		goto out;
 	}
 	if (read(fd, &dead_pid, sizeof(dead_pid)) < 0) {
 		__pmon_stop(fd);
 		_E("Reading DEAD_PID failed, restart ecore fd");
 		__pmon_start(ad);
-		return -1;
+		goto out;
 	}
 
 	print_pmon_state(dead_pid);
 	pmon_process(dead_pid, ad);
-
-	return 1;
+out:
+	return EINA_TRUE;
 }
 
 static int __pmon_start(struct ss_main_data *ad)
 {
 	int pmon_fd = -1;
 	char pmon_dev_node[PATH_MAX];
-	if (device_get_property(DEVICE_TYPE_PROCESS, PROP_PROCESS_NODE, pmon_dev_node) < 0) {
+	if (device_get_property(DEVICE_TYPE_PROCESS, PROP_PROCESS_NODE,
+		(int *)pmon_dev_node) < 0) {
 		_E("ss_pmon_init get dev node path failed");
 		return -1;
 	}

@@ -56,7 +56,7 @@ void devices_init(void *data)
 {
 	int i;
 	int size;
-	struct device_ops *dev;
+	const struct device_ops *dev;
 
 	size = ARRAY_SIZE(devices);
 	for(i = 0; i < size; ++i) {
@@ -70,7 +70,7 @@ void devices_exit(void *data)
 {
 	int i;
 	int size;
-	struct device_ops *dev;
+	const struct device_ops *dev;
 
 	size = ARRAY_SIZE(devices);
 	for(i = 0; i < size; ++i) {

@@ -39,7 +39,8 @@ int ss_set_current_lang(void)
 {
 	char *lang;
 	int ret;
-	lang = vconf_get_str(VCONFKEY_LANGSET);
+
+	lang = (char *)vconf_get_str(VCONFKEY_LANGSET);
 	if (lang == NULL)
 		return -1;
 	ret = setenv("LANG", lang, 1);

@@ -293,6 +293,7 @@ static int crash_arg_parser(char *linebuffer, struct crash_arg *arg)
 	else
 		return 0;
 }
+
 static void launch_crash_worker(const char *filename, int popup_on)
 {
 	static int popup_pid = 0;

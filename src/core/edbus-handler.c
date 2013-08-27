@@ -248,7 +248,8 @@ static DBusHandlerResult message_filter(DBusConnection *connection,
 {
 	char match[256];
 	int ret;
-	const char *iface, *member, *watch, *arg = NULL;
+	const char *iface, *member, *arg = NULL;
+	char *watch;
 	Eina_List *l;
 
 	if (dbus_message_get_type(message) != DBUS_MESSAGE_TYPE_SIGNAL)
@@ -276,7 +277,7 @@ static DBusHandlerResult message_filter(DBusConnection *connection,
 		if (strcmp(arg, watch)) continue;
 
 		/* notify 'process terminated' to device notifiers */
-		device_notify(DEVICE_NOTIFIER_PROCESS_TERMINATED, watch);
+		device_notify(DEVICE_NOTIFIER_PROCESS_TERMINATED, (void *)watch);
 
 		/* remove registered sender */
 		snprintf(match, sizeof(match), NAME_OWNER_MATCH, watch);
@@ -297,7 +298,8 @@ static DBusHandlerResult message_filter(DBusConnection *connection,
 int register_edbus_watch(DBusMessage *msg)
 {
 	char match[256];
-	const char *sender, *watch;
+	const char *sender;
+	char *watch;
 	Eina_List *l;
 	int ret;
 

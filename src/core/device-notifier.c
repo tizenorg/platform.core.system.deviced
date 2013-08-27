@@ -102,7 +102,7 @@ void device_notify(enum device_notifier_type status, void *data)
 	}
 }
 
-static void device_notifier_exit(void)
+static void device_notifier_exit(void *data)
 {
 	Eina_List *n, *next;
 	struct device_notifier *notifier;

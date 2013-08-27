@@ -65,7 +65,7 @@ static const char default_localtime[] = "/opt/etc/localtime";
 static const time_t default_time = 2147483645; // max(32bit) -3sec
 static Ecore_Fd_Handler *tfdh = NULL; // tfd change noti
 
-static int tfd_cb(void *data, Ecore_Fd_Handler * fd_handler);
+static Eina_Bool tfd_cb(void *data, Ecore_Fd_Handler * fd_handler);
 static int timerfd_check_stop(int fd);
 static int timerfd_check_start(void);
 
@@ -235,7 +235,7 @@ static int timerfd_check_stop(int tfd)
 	return 0;
 }
 
-static int tfd_cb(void *data, Ecore_Fd_Handler * fd_handler)
+static Eina_Bool tfd_cb(void *data, Ecore_Fd_Handler * fd_handler)
 {
 	int tfd = -1;
 	u_int64_t ticks;
@@ -243,12 +243,12 @@ static int tfd_cb(void *data, Ecore_Fd_Handler * fd_handler)
 
 	if (!ecore_main_fd_handler_active_get(fd_handler,ECORE_FD_READ)) {
 		_E("error ecore_main_fd_handler_get()");
-		return -1;
+		goto out;
 	}
 
 	if((tfd = ecore_main_fd_handler_fd_get(fd_handler)) == -1) {
 		_E("error ecore_main_fd_handler_fd_get()");
-		return -1;
+		goto out;
 	}
 
 	ret = read(tfd,&ticks,sizeof(ticks));
@@ -260,7 +260,8 @@ static int tfd_cb(void *data, Ecore_Fd_Handler * fd_handler)
 	} else {
 		_E("unexpected read (err:%d)", errno);
 	}
-	return 0;
+out:
+	return EINA_TRUE;
 }
 
 static void time_init(void *data)

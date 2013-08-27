@@ -30,7 +30,7 @@
 #define EINA_LIST_REMOVE_LIST(a, b) \
 	a = eina_list_remove_list(a, b)
 
-#define EINA_LIST_FREE(a) \
+#define EINA_LIST_FREE_LIST(a) \
 	a = eina_list_free(a)
 
 #endif
