@@ -74,7 +74,7 @@ static Eina_Bool pm_handler(void *data, Ecore_Fd_Handler *fd_handler)
 	char buf[1024];
 	struct sockaddr_un clientaddr;
 
-	int *fd = (int *)data;
+	int fd = (int)data;
 	int ret;
 
 	if (device_get_status(&display_device_ops) != DEVICE_OPS_STATUS_START) {
@@ -154,7 +154,7 @@ int init_pm_poll(int (*pm_callback) (int, PMMsg *))
 
 		fd_handler = ecore_main_fd_handler_add(fd,
 				    ECORE_FD_READ|ECORE_FD_ERROR,
-				    pm_handler, fd, NULL, NULL);
+				    pm_handler, (void *)fd, NULL, NULL);
 		if (fd_handler == NULL) {
 			_E("Failed ecore_main_handler_add() in init_pm_poll()");
 			goto err_fd;
@@ -255,7 +255,7 @@ int init_pm_poll_input(int (*pm_callback)(int , PMMsg * ), const char *path)
 
 	fd_handler = ecore_main_fd_handler_add(fd,
 			    ECORE_FD_READ|ECORE_FD_ERROR,
-			    pm_handler, fd, NULL, NULL);
+			    pm_handler, (void *)fd, NULL, NULL);
 	if (!fd_handler) {
 		_E("Fail to ecore fd handler add! %s", path);
 		close(fd);

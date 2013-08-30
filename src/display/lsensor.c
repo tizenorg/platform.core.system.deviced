@@ -354,16 +354,16 @@ int set_autobrightness_min(int val, char *name)
 	return 0;
 }
 
-void reset_autobrightness_min(char *name)
+int reset_autobrightness_min(char *name)
 {
 	if (!name)
-		return;
+		return -EINVAL;
 
 	if (!min_brightness_name)
-		return;
+		return -EINVAL;
 
 	if (strcmp(name, min_brightness_name))
-		return;
+		return -EINVAL;
 
 	_I("change to default %d -> %d, %s", min_brightness,
 	    PM_MIN_BRIGHTNESS, min_brightness_name);
@@ -372,6 +372,8 @@ void reset_autobrightness_min(char *name)
 		free(min_brightness_name);
 		min_brightness_name = 0;
 	}
+
+	return 0;
 }
 
 static void __attribute__ ((constructor)) pm_lsensor_init(void)

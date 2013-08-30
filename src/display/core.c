@@ -49,6 +49,7 @@
 #include "core/devices.h"
 #include "core/device-notifier.h"
 #include "core/udev.h"
+#include "core/list.h"
 
 #define USB_CON_PIDFILE			"/var/run/.system_server.pid"
 #define PM_STATE_LOG_FILE		"/var/log/pm_state.log"
@@ -267,7 +268,7 @@ static Eina_Bool del_dim_cond(void *data)
 	tmp = find_node(S_LCDDIM, (pid_t) data);
 	del_node(S_LCDDIM, tmp);
 
-	if (timeout_src_id == NULL)
+	if (!timeout_src_id)
 		states[pm_cur_state].trans(EVENT_TIMEOUT);
 
 	return EINA_FALSE;
@@ -281,7 +282,7 @@ static Eina_Bool del_off_cond(void *data)
 	tmp = find_node(S_LCDOFF, (pid_t) data);
 	del_node(S_LCDOFF, tmp);
 
-	if (timeout_src_id == NULL)
+	if (!timeout_src_id)
 		states[pm_cur_state].trans(EVENT_TIMEOUT);
 
 	return EINA_FALSE;
@@ -295,7 +296,7 @@ static Eina_Bool del_sleep_cond(void *data)
 	tmp = find_node(S_SLEEP, (pid_t) data);
 	del_node(S_SLEEP, tmp);
 
-	if (timeout_src_id == NULL)
+	if (!timeout_src_id)
 		states[pm_cur_state].trans(EVENT_TIMEOUT);
 
 	set_process_active(EINA_FALSE, (pid_t)data);
@@ -608,7 +609,7 @@ void pm_history_print(int fd, int count)
 	char time_buf[30];
 
 	if (count <= 0 || count > max_history_count)
-		return 0;
+		return;
 
 	start_index = (history_count - count + max_history_count)
 		    % max_history_count;
@@ -632,6 +633,29 @@ void pm_history_print(int fd, int count)
 	}
 }
 #endif
+
+/* logging indev_list for debug */
+void print_dev_list(int fd)
+{
+	int i;
+	unsigned int total = 0;
+	indev *tmp;
+
+	total = eina_list_count(indev_list);
+	_I("***** total list : %d *****", total);
+	for (i = 0; i < total; i++) {
+		tmp = (indev*)eina_list_nth(indev_list, i);
+		_I("* %d | path:%s, fd:%d, dev_fd:%d",
+			i, tmp->dev_path, tmp->fd, tmp->dev_fd);
+		if (fd >= 0) {
+			char buf[255];
+			snprintf(buf, sizeof(buf), " %2d| path:%s, fd:%d, dev_fd:%d\n",
+				i, tmp->dev_path, tmp->fd, tmp->dev_fd);
+			write(fd, buf, strlen(buf));
+		}
+	}
+	_I("***************************\n");
+}
 
 void print_info(int fd)
 {
@@ -672,7 +696,6 @@ void print_info(int fd)
 		t = cond_head[s_index];
 
 		while (t != NULL) {
-			pname[0] = NULL;
 			snprintf(buf, sizeof(buf), "/proc/%d/cmdline", t->pid);
 			fd_cmdline = open(buf, O_RDONLY);
 			if (fd_cmdline < 0) {
@@ -684,6 +707,8 @@ void print_info(int fd)
 				r = read(fd_cmdline, pname, PATH_MAX);
 				if ((r >= 0) && (r < PATH_MAX))
 					pname[r] = '\0';
+				else
+					pname[0] = '\0';
 				close(fd_cmdline);
 			}
 			ctime_r(&t->time, time_buf);
@@ -745,7 +770,7 @@ Eina_Bool timeout_handler(void *data)
 {
 	_I("Time out state %s", state_string[pm_cur_state]);
 
-	if (timeout_src_id != NULL) {
+	if (timeout_src_id) {
 		ecore_timer_del(timeout_src_id);
 		timeout_src_id = NULL;
 	}
@@ -843,7 +868,7 @@ static int default_action(int timeout)
 
 	if (pm_cur_state != pm_old_state && pm_cur_state != S_SLEEP) {
 		set_setting_pmstate(pm_cur_state);
-		device_notify(DEVICE_NOTIFIER_LCD, pm_cur_state);
+		device_notify(DEVICE_NOTIFIER_LCD, (void *)pm_cur_state);
 	}
 	switch (pm_cur_state) {
 	case S_NORMAL:
@@ -1357,29 +1382,6 @@ static char *errMSG[INIT_END] = {
 	[INIT_DBUS] = "d-bus init error",
 };
 
-/* logging indev_list for debug */
-void print_dev_list(int fd)
-{
-	int i;
-	unsigned int total = 0;
-	indev *tmp;
-
-	total = eina_list_count(indev_list);
-	_I("***** total list : %d *****", total);
-	for (i = 0; i < total; i++) {
-		tmp = (indev*)eina_list_nth(indev_list, i);
-		_I("* %d | path:%s, fd:%d, dev_fd:%d",
-			i, tmp->dev_path, tmp->fd, tmp->dev_fd);
-		if (fd >= 0) {
-			char buf[255];
-			snprintf(buf, sizeof(buf), " %2d| path:%s, fd:%d, dev_fd:%d\n",
-				i, tmp->dev_path, tmp->fd, tmp->dev_fd);
-			write(fd, buf, strlen(buf));
-		}
-	}
-	_I("***************************\n");
-}
-
 static int input_action(char* input_act, char* input_path)
 {
 	int ret = -1;
@@ -1538,7 +1540,7 @@ static int noti_fd = -1;
 
 static int input_device_add(void *data)
 {
-	char *path = data;
+	char *path = (char *)data;
 
 	if (!path)
 		return -EINVAL;
@@ -1550,7 +1552,7 @@ static int input_device_add(void *data)
 
 static int input_device_remove(void *data)
 {
-	char *path = data;
+	char *path = (char *)data;
 
 	if (!path)
 		return -EINVAL;
