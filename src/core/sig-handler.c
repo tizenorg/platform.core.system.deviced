@@ -26,6 +26,7 @@
 #include "edbus-handler.h"
 #include "display/poll.h"
 #include "devices.h"
+#include "common.h"
 
 static struct sigaction sig_child_old_act;
 static struct sigaction sig_pipe_old_act;
@@ -68,6 +69,10 @@ static void signal_init(void *data)
 	sigaction(SIGPIPE, &sig_act, &sig_pipe_old_act);
 }
 
-const struct device_ops signal_device_ops = {
-	.init = signal_init,
+static const struct device_ops signal_device_ops = {
+	.priority = DEVICE_PRIORITY_NORMAL,
+	.name     = "signal",
+	.init     = signal_init,
 };
+
+DEVICE_OPS_REGISTER(&signal_device_ops)

@@ -21,6 +21,7 @@
 #include "log.h"
 #include "data.h"
 #include "devices.h"
+#include "common.h"
 
 static int noti_fd;
 
@@ -75,7 +76,11 @@ static void noti_exit(void *data)
 	heynoti_close(noti_fd);
 }
 
-const struct device_ops noti_device_ops = {
-	.init = noti_init,
-	.exit = noti_exit,
+static const struct device_ops noti_device_ops = {
+	.priority = DEVICE_PRIORITY_NORMAL,
+	.name     = "noti",
+	.init     = noti_init,
+	.exit     = noti_exit,
 };
+
+DEVICE_OPS_REGISTER(&noti_device_ops)

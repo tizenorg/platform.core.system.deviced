@@ -998,7 +998,11 @@ static void device_change_exit(void *data)
 
 }
 
-const struct device_ops change_device_ops = {
-	.init = device_change_init,
-	.exit = device_change_exit,
+static const struct device_ops change_device_ops = {
+	.priority = DEVICE_PRIORITY_NORMAL,
+	.name     = "device change",
+	.init     = device_change_init,
+	.exit     = device_change_exit,
 };
+
+DEVICE_OPS_REGISTER(&change_device_ops)

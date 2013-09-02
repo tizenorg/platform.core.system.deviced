@@ -21,8 +21,16 @@
 #define __DEVICES_H__
 
 #include <errno.h>
+#include "common.h"
+
+enum device_priority {
+	DEVICE_PRIORITY_NORMAL = 0,
+	DEVICE_PRIORITY_HIGH,
+};
 
 struct device_ops {
+	enum device_priority priority;
+	char *name;
 	void (*init) (void *data);
 	void (*exit) (void *data);
 	int (*start) (void);
@@ -64,29 +72,17 @@ static inline int device_get_status(const struct device_ops *dev)
 	return -EINVAL;
 }
 
-extern const struct device_ops edbus_device_ops;
-extern const struct device_ops display_device_ops;
-extern const struct device_ops sysnoti_device_ops;
-extern const struct device_ops noti_device_ops;
-extern const struct device_ops control_device_ops;
-extern const struct device_ops core_device_ops;
-extern const struct device_ops signal_device_ops;
-extern const struct device_ops predefine_device_ops;
-extern const struct device_ops lowmem_device_ops;
-extern const struct device_ops lowbat_device_ops;
-extern const struct device_ops change_device_ops;
-extern const struct device_ops power_device_ops;
-extern const struct device_ops bs_device_ops;
-extern const struct device_ops process_device_ops;
-extern const struct device_ops time_device_ops;
-extern const struct device_ops cpu_device_ops;
-extern const struct device_ops usb_device_ops;
-extern const struct device_ops ta_device_ops;
-extern const struct device_ops pmon_device_ops;
-extern const struct device_ops mmc_device_ops;
-extern const struct device_ops haptic_device_ops;
-extern const struct device_ops led_device_ops;
-extern const struct device_ops vibrator_device_ops;
-extern const struct device_ops notifier_device_ops;
+#define DEVICE_OPS_REGISTER(dev)       \
+static void __CONSTRUCTOR__ module_init(void)  \
+{      \
+	add_device(dev);        \
+}      \
+static void __DESTRUCTOR__ module_exit(void)   \
+{      \
+	remove_device(dev);     \
+}
+
+void add_device(const struct device_ops *dev);
+void remove_device(const struct device_ops *dev);
 
 #endif

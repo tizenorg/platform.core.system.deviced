@@ -832,7 +832,11 @@ static int mmc_stop(void)
 }
 
 const struct device_ops mmc_device_ops = {
+	.priority = DEVICE_PRIORITY_NORMAL,
+	.name     = "mmc",
 	.init = mmc_init,
 	.start = mmc_start,
 	.stop = mmc_stop,
 };
+
+DEVICE_OPS_REGISTER(&mmc_device_ops)

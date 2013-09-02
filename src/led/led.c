@@ -69,6 +69,10 @@ static void led_init(void *data)
 	action_entry_add_internal(PREDEF_LED, predefine_action, NULL, NULL);
 }
 
-const struct device_ops led_device_ops = {
+static const struct device_ops led_device_ops = {
+	.priority = DEVICE_PRIORITY_NORMAL,
+	.name     = "led",
 	.init = led_init,
 };
+
+DEVICE_OPS_REGISTER(&led_device_ops)

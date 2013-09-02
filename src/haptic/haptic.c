@@ -508,7 +508,11 @@ static void haptic_exit(void *data)
 	release_module();
 }
 
-const struct device_ops haptic_device_ops = {
-	.init = haptic_init,
-	.exit = haptic_exit,
+static const struct device_ops haptic_device_ops = {
+	.priority = DEVICE_PRIORITY_NORMAL,
+	.name     = "haptic",
+	.init     = haptic_init,
+	.exit     = haptic_exit,
 };
+
+DEVICE_OPS_REGISTER(&haptic_device_ops)

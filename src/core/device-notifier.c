@@ -23,6 +23,7 @@
 #include "devices.h"
 #include "device-notifier.h"
 #include "list.h"
+#include "common.h"
 
 struct device_notifier {
 	enum device_notifier_type status;
@@ -116,7 +117,10 @@ static void device_notifier_exit(void *data)
 	_I("all deleted!");
 }
 
-const struct device_ops notifier_device_ops = {
+static const struct device_ops notifier_device_ops = {
+	.priority = DEVICE_PRIORITY_NORMAL,
+	.name = "notifier",
 	.exit = device_notifier_exit,
 };
 
+DEVICE_OPS_REGISTER(&notifier_device_ops)

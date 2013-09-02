@@ -23,6 +23,7 @@
 
 #include "log.h"
 #include "data.h"
+#include "edbus-handler.h"
 #include "devices.h"
 
 #define SS_PIDFILE_PATH		"/var/run/.system_server.pid"
@@ -60,6 +61,7 @@ static int system_main(int argc, char **argv)
 	struct ss_main_data ad;
 
 	init_ad(&ad);
+	edbus_init(&ad);
 	devices_init(&ad);
 	signal(SIGTERM, sig_quit);
 	signal(SIGUSR1, sig_usr1);
@@ -67,6 +69,7 @@ static int system_main(int argc, char **argv)
 	ecore_main_loop_begin();
 
 	devices_exit(&ad);
+	edbus_exit(&ad);
 	ecore_shutdown();
 	return 0;
 }

@@ -81,4 +81,7 @@ pid_t get_edbus_sender_pid(DBusMessage *msg);
 int broadcast_edbus_signal(const char *path, const char *interface,
 		const char *name, int type, void *value);
 
+void edbus_init(void *data);
+void edbus_exit(void *data);
+
 #endif /* __SS_EDBUS_HANDLE_H__ */

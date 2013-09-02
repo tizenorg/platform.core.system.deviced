@@ -546,6 +546,10 @@ static void lowmem_init(void *data)
 	}
 }
 
-const struct device_ops lowmem_device_ops = {
-	.init = lowmem_init,
+static const struct device_ops lowmem_device_ops = {
+	.priority = DEVICE_PRIORITY_NORMAL,
+	.name     = "lowmem",
+	.init     = lowmem_init,
 };
+
+DEVICE_OPS_REGISTER(&lowmem_device_ops)

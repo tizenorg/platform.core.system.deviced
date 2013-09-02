@@ -24,6 +24,7 @@
 #include "core/data.h"
 #include "core/devices.h"
 #include "display/poll.h"
+#include "core/common.h"
 
 #define RETRY	3
 
@@ -54,6 +55,10 @@ static void ta_init(void *data)
 		vconf_set_int(VCONFKEY_SYSMAN_BATTERY_CHARGE_NOW, val);
 }
 
-const struct device_ops ta_device_ops = {
-	.init = ta_init,
+static const struct device_ops ta_device_ops = {
+	.priority = DEVICE_PRIORITY_NORMAL,
+	.name     = "ta",
+	.init     = ta_init,
 };
+
+DEVICE_OPS_REGISTER(&ta_device_ops)

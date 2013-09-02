@@ -189,6 +189,10 @@ static void predefine_init(void *data)
 	action_entry_load_from_sodir();
 }
 
-const struct device_ops predefine_device_ops = {
-	.init = predefine_init,
+static const struct device_ops predefine_device_ops = {
+	.priority = DEVICE_PRIORITY_NORMAL,
+	.name     = "predefine",
+	.init     = predefine_init,
 };
+
+DEVICE_OPS_REGISTER(&predefine_device_ops)

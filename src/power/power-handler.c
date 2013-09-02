@@ -50,6 +50,7 @@
 #include "proc/proc-handler.h"
 #include "display/poll.h"
 #include "display/setting.h"
+#include "display/core.h"
 
 #define SIGNAL_NAME_POWEROFF_POPUP	"poweroffpopup"
 
@@ -572,6 +573,10 @@ static void power_init(void *data)
 		    (void *)lcd_control_edbus_signal_handler);
 }
 
-const struct device_ops power_device_ops = {
+static const struct device_ops power_device_ops = {
+	.priority = DEVICE_PRIORITY_NORMAL,
+	.name     = "power",
 	.init = power_init,
 };
+
+DEVICE_OPS_REGISTER(&power_device_ops)

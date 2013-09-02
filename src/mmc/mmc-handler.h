@@ -78,4 +78,6 @@ struct mmc_filesystem_info {
 int mount_fs(char *path, const char *fs_name, const char *mount_data);
 int register_mmc_handler(const char *name, struct mmc_filesystem_ops filesystem_type);
 
+extern const struct device_ops mmc_device_ops;
+
 #endif /* __MMC_HANDLER_H__ */

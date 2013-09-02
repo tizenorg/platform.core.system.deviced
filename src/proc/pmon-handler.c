@@ -266,6 +266,10 @@ static void pmon_init(void *data)
 	}
 }
 
-const struct device_ops pmon_device_ops = {
-	.init = pmon_init,
+static const struct device_ops pmon_device_ops = {
+	.priority = DEVICE_PRIORITY_NORMAL,
+	.name     = "pmon",
+	.init     = pmon_init,
 };
+
+DEVICE_OPS_REGISTER(&pmon_device_ops)

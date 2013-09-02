@@ -328,6 +328,10 @@ static void sysnoti_init(void *data)
 	ad->sysnoti_fd = __sysnoti_start();
 }
 
-const struct device_ops sysnoti_device_ops = {
+static const struct device_ops sysnoti_device_ops = {
+	.priority = DEVICE_PRIORITY_NORMAL,
+	.name     = "sysnoti",
 	.init = sysnoti_init,
 };
+
+DEVICE_OPS_REGISTER(&sysnoti_device_ops)

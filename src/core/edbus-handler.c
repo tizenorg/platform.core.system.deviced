@@ -21,7 +21,6 @@
 #include "core/data.h"
 #include "core/edbus-handler.h"
 #include "core/common.h"
-#include "core/devices.h"
 #include "core/device-notifier.h"
 #include "core/list.h"
 
@@ -367,7 +366,7 @@ static void unregister_edbus_watch_all(void)
 	}
 }
 
-static void edbus_init(void *data)
+void edbus_init(void *data)
 {
 	int retry = EDBUS_INIT_RETRY_COUNT;
 	int i, r;
@@ -421,15 +420,10 @@ err_dbus_shutdown:
 	return;
 }
 
-static void edbus_exit(void *data)
+void edbus_exit(void *data)
 {
 	unregister_edbus_signal_handle();
 	unregister_edbus_watch_all();
 	e_dbus_connection_close(edbus_conn);
 	e_dbus_shutdown();
 }
-
-const struct device_ops edbus_device_ops = {
-	.init = edbus_init,
-	.exit = edbus_exit,
-};

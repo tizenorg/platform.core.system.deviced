@@ -23,6 +23,7 @@
 #include "predefine.h"
 #include "core.h"
 #include "devices.h"
+#include "common.h"
 
 enum ss_core_cmd_type {
 	SS_CORE_ACT_RUN,
@@ -170,6 +171,10 @@ static void core_init(void *data)
 		_E("fail pipe control fd init");
 }
 
-const struct device_ops core_device_ops = {
-	.init = core_init,
+static const struct device_ops core_device_ops = {
+	.priority = DEVICE_PRIORITY_NORMAL,
+	.name     = "core",
+	.init     = core_init,
 };
+
+DEVICE_OPS_REGISTER(&core_device_ops)

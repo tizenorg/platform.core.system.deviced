@@ -50,6 +50,7 @@
 #include "core/device-notifier.h"
 #include "core/udev.h"
 #include "core/list.h"
+#include "core/common.h"
 
 #define USB_CON_PIDFILE			"/var/run/.system_server.pid"
 #define PM_STATE_LOG_FILE		"/var/log/pm_state.log"
@@ -1687,10 +1688,14 @@ static int display_status(void)
 }
 
 const struct device_ops display_device_ops = {
+	.priority = DEVICE_PRIORITY_HIGH,
+	.name     = "display",
 	.init = display_init,
 	.exit = display_exit,
 	.status = display_status,
 };
+
+DEVICE_OPS_REGISTER(&display_device_ops)
 
 /**
  * @}

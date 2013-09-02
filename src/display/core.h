@@ -107,6 +107,8 @@ int (*pm_init_extention) (void *data);		/**< extention init function */
 void (*pm_exit_extention) (void);		/**< extention exit function */
 int check_processes(enum state_t prohibit_state);
 
+extern const struct device_ops display_device_ops;
+
 /**
  * @}
  */

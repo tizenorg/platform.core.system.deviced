@@ -20,47 +20,32 @@
 #include <stdio.h>
 
 #include "log.h"
-#include "devices.h"
+#include "list.h"
 #include "common.h"
+#include "devices.h"
 
-static const struct device_ops *devices[] = {
-	/* The below devices have init dependency with other module */
-	&edbus_device_ops,
-	&display_device_ops,
-	/* The below devices don't have any init dependency */
-	&sysnoti_device_ops,
-	&noti_device_ops,
-	&control_device_ops,
-	&core_device_ops,
-	&signal_device_ops,
-	&predefine_device_ops,
-	&lowmem_device_ops,
-	&lowbat_device_ops,
-	&change_device_ops,
-	&power_device_ops,
-	&bs_device_ops,
-	&process_device_ops,
-	&time_device_ops,
-	&cpu_device_ops,
-	&usb_device_ops,
-	&ta_device_ops,
-	&pmon_device_ops,
-	&mmc_device_ops,
-	&haptic_device_ops,
-	&led_device_ops,
-	&vibrator_device_ops,
-	&notifier_device_ops,
-};
+static dd_list *dev_head;
+
+void add_device(const struct device_ops *dev)
+{
+	if (dev->priority == DEVICE_PRIORITY_HIGH)
+		DD_LIST_PREPEND(dev_head, dev);
+	else
+		DD_LIST_APPEND(dev_head, dev);
+}
+
+void remove_device(const struct device_ops *dev)
+{
+	DD_LIST_REMOVE(dev_head, dev);
+}
 
 void devices_init(void *data)
 {
-	int i;
-	int size;
+	dd_list *elem;
 	const struct device_ops *dev;
 
-	size = ARRAY_SIZE(devices);
-	for(i = 0; i < size; ++i) {
-		dev = devices[i];
+	DD_LIST_FOREACH(dev_head, elem, dev) {
+		_D("[%s] initialize", dev->name);
 		if (dev->init)
 			dev->init(data);
 	}
@@ -68,13 +53,11 @@ void devices_init(void *data)
 
 void devices_exit(void *data)
 {
-	int i;
-	int size;
+	dd_list *elem;
 	const struct device_ops *dev;
 
-	size = ARRAY_SIZE(devices);
-	for(i = 0; i < size; ++i) {
-		dev = devices[i];
+	DD_LIST_FOREACH(dev_head, elem, dev) {
+		_D("[%s] deinitialize", dev->name);
 		if (dev->exit)
 			dev->exit(data);
 	}

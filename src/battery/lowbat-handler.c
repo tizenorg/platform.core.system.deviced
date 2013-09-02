@@ -32,6 +32,7 @@
 #include "core/data.h"
 #include "core/devices.h"
 #include "core/device-handler.h"
+#include "core/common.h"
 #include "device-node.h"
 #include "display/setting.h"
 
@@ -498,6 +499,10 @@ static void lowbat_init(void *data)
 	vconf_notify_key_changed(VCONFKEY_PM_STATE, (void *)wakeup_cb, NULL);
 }
 
-const struct device_ops lowbat_device_ops = {
-	.init = lowbat_init,
+static const struct device_ops lowbat_device_ops = {
+	.priority = DEVICE_PRIORITY_NORMAL,
+	.name     = "lowbat",
+	.init     = lowbat_init,
 };
+
+DEVICE_OPS_REGISTER(&lowbat_device_ops)

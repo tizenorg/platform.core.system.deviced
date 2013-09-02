@@ -26,6 +26,7 @@
 #include "core/log.h"
 #include "core/common.h"
 #include "core/devices.h"
+#include "mmc/mmc-handler.h"
 
 static const struct control_device {
 	const int id;
@@ -78,7 +79,10 @@ static void control_init(void *data)
 	action_entry_add_internal(CONTROL_HANDLER_NAME, control_handler, NULL, NULL);
 }
 
-const struct device_ops control_device_ops = {
-	.init = control_init,
+static const struct device_ops control_device_ops = {
+	.priority = DEVICE_PRIORITY_NORMAL,
+	.name     = "control",
+	.init     = control_init,
 };
 
+DEVICE_OPS_REGISTER(&control_device_ops)

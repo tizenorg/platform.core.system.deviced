@@ -447,6 +447,10 @@ static void bs_init(void *data)
 	}
 }
 
-const struct device_ops bs_device_ops = {
-	.init = bs_init,
+static const struct device_ops bs_device_ops = {
+	.priority = DEVICE_PRIORITY_NORMAL,
+	.name     = "bs",
+	.init     = bs_init,
 };
+
+DEVICE_OPS_REGISTER(&bs_device_ops)

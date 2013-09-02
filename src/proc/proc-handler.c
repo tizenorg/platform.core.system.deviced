@@ -278,6 +278,10 @@ static void process_init(void *data)
 	action_entry_add_internal(PROCESS_GROUP_SET, set_process_group_action, NULL, NULL);
 }
 
-const struct device_ops process_device_ops = {
+static const struct device_ops process_device_ops = {
+	.priority = DEVICE_PRIORITY_NORMAL,
+	.name     = "process",
 	.init = process_init,
 };
+
+DEVICE_OPS_REGISTER(&process_device_ops)

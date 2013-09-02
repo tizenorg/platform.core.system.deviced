@@ -429,6 +429,10 @@ static void cpu_init(void *data)
 	vconf_notify_key_changed(VCONFKEY_SETAPPL_PWRSV_CUSTMODE_CPU, (void *)power_saving_cpu_cb, NULL);
 }
 
-const struct device_ops cpu_device_ops = {
-	.init = cpu_init,
+static const struct device_ops cpu_device_ops = {
+	.priority = DEVICE_PRIORITY_NORMAL,
+	.name     = "cpu",
+	.init     = cpu_init,
 };
+
+DEVICE_OPS_REGISTER(&cpu_device_ops)
