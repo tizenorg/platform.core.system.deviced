@@ -365,7 +365,7 @@ static void launch_syspopup(const char *str)
 	bundle_free(b);
 }
 
-static int mmc_check(char* path)
+static int mmc_check(const char* path)
 {
 	int ret = false;
 	struct mntent* mnt;
@@ -385,7 +385,7 @@ static int mmc_check(char* path)
 	return ret;
 }
 
-static int mmc_check_and_unmount(char *path)
+static int mmc_check_and_unmount(const char *path)
 {
 	int ret = 0;
 	if (mmc_check(path))
@@ -401,7 +401,7 @@ static int mmc_umount(int option)
 		return 0;
 
 	_I("Mounted, will be unmounted");
-	r = mmc_check_and_unmount(MMC_MOUNT_POINT);
+	r = mmc_check_and_unmount((const char*)MMC_MOUNT_POINT);
 	if (!r || option == UNMOUNT_NORMAL) {
 		_I("unmount mmc card, ret = %d, option = %d", r, option);
 		return r;
@@ -416,7 +416,7 @@ static int mmc_umount(int option)
 	usleep(500000);
 
 	while (--retry) {
-		r = mmc_check_and_unmount(MMC_MOUNT_POINT);
+		r = mmc_check_and_unmount((const char *)MMC_MOUNT_POINT);
 		if (!r)
 			break;
 		usleep(500000);
