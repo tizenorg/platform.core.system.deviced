@@ -20,23 +20,11 @@
 #ifndef __LOG_H__
 #define __LOG_H__
 
-#ifndef FEATURE_DEVICED_DLOG
-#define FEATURE_DEVICED_DLOG
+#ifdef ENABLE_DEVICED_DLOG
+#define ENABLE_DLOG
 #endif
 
-#ifdef FEATURE_DEVICED_DLOG
 #define LOG_TAG "DEVICED"
-#include <dlog.h>
-#define _D(fmt, arg...) \
-	do { SLOGD(fmt, ##arg); } while(0)
-#define _I(fmt, arg...) \
-	do { SLOGI(fmt, ##arg); } while(0)
-#define _E(fmt, arg...) \
-	do { SLOGE(fmt, ##arg); } while(0)
-#else
-#define _D(fmt, arg...)	do{} while(0)
-#define _I(fmt, arg...)	do{} while(0)
-#define _E(fmt, arg...)	do{} while(0)
-#endif
+#include "libdeviced/log-macro.h"
 
 #endif
