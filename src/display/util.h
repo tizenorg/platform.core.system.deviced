@@ -29,25 +29,16 @@
  * @{
  */
 
-#ifndef FEATURE_POWER_MANAGER_DLOG
-#define FEATURE_POWER_MANAGER_DLOG
+#ifdef ENABLE_DEVICED_DLOG
+#define ENABLE_DLOG
 #endif
 
-#ifdef FEATURE_POWER_MANAGER_DLOG
-#define LOG_TAG	"POWER_MANAGER"
-#include <dlog.h>
-#define _D(fmt, arg...) \
-	do { SLOGD(fmt, ##arg); } while(0)
-#define _I(fmt, arg...) \
-	do { SLOGI(fmt, ##arg); } while(0)
-#define _E(fmt, arg...) \
-	do { SLOGE(fmt, ##arg); } while(0)
-#else
-#  include <syslog.h>
-#define _D(fmt, arg...) pm_log(LOG_INFO, fmt, ## arg)
-#define _I(fmt, arg...) pm_log(LOG_INFO, fmt, ## arg)
-#define _E(fmt, arg...) pm_log(LOG_ERR, fmt, ## arg)
+#ifdef LOG_TAG
+#undef LOG_TAG
 #endif
+
+#define LOG_TAG	"POWER_MANAGER"
+#include "libdeviced/log-macro.h"
 
 #define SEC_TO_MSEC(x)	((x)*1000)
 #define MSEC_TO_SEC(x)	(double(x)/1000)
