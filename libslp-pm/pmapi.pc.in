@@ -1,0 +1,13 @@
+# Package Information for pkg-config
+
+prefix=@PREFIX@
+exec_prefix=@EXEC_PREFIX@
+libdir=@LIBDIR@
+includedir=@INCLUDEDIR@
+
+Name: libpmapi
+Description: power manager library
+Version: @VERSION@
+Requires:
+Libs: -L${libdir} -lpmapi
+Cflags: -I${includedir}

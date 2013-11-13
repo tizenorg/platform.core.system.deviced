@@ -1,0 +1,3 @@
+/unit/utc_SystemFW_pm_change_state_func
+/unit/utc_SystemFW_pm_lock_state_func
+/unit/utc_SystemFW_pm_unlock_state_func

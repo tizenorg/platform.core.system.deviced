@@ -1,0 +1,10 @@
+[Unit]
+Description=Booting Done
+After=default.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/dbus-send --type=signal --system /Org/Tizen/System/DeviceD/Core org.tizen.system.deviced.core.BootingDone
+
+[Install]
+WantedBy=graphical.target

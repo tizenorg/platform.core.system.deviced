@@ -1,0 +1,61 @@
+CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
+PROJECT(devman C)
+
+INCLUDE(FindPkgConfig)
+pkg_check_modules(rpkgs REQUIRED
+		vconf
+		dlog
+		heynoti
+		device-node)
+ADD_DEFINITIONS(${rpkgs_CFLAGS})
+
+SET(CMAKE_ALLOW_LOOSE_LOOP_CONSTRAINTS true)
+
+SET(SRCS
+	src/device_haptic.c
+	src/if_legacy.c
+	src/devman_internal.c)
+
+SET(HEADERS
+	include/SLP_devman_PG.h
+	include/devman.h
+	include/devman_managed.h
+	include/devman_image.h
+	include/devman_haptic.h
+	include/devman_haptic_ext.h
+	include/devman_haptic_ext_core.h)
+
+SET(INC_DIR include)
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/${INC_DIR})
+
+SET(PREFIX ${CMAKE_INSTALL_PREFIX})
+SET(EXEC_PREFIX "${PREFIX}/bin")
+SET(INCLUDEDIR "${PREFIX}/include/${PROJECT_NAME}")
+SET(LIBDIR "\${prefix}/lib")
+SET(DATADIR "${PREFIX}/share/devman")
+SET(VERSION 0.1)
+
+SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} -fvisibility=hidden")
+SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} -g")
+
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${EXTRA_CFLAGS}")
+
+ADD_LIBRARY(${PROJECT_NAME} SHARED ${SRCS} ${TARGET_SRCS})
+ADD_DEPENDENCIES(${PROJECT_NAME} ${DEVICED_NAME})
+TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${rpkgs_LDFLAGS} -L${CMAKE_BINARY_DIR} -ldeviced)
+SET_TARGET_PROPERTIES(${PROJECT_NAME} PROPERTIES SOVERSION ${VERSION})
+
+ADD_EXECUTABLE(display_wd src/display_wd.c)
+TARGET_LINK_LIBRARIES(display_wd ${pkgs_LDFLAGS} ${PROJECT_NAME})
+INSTALL(TARGETS display_wd DESTINATION bin)
+
+CONFIGURE_FILE(${PROJECT_NAME}.pc.in ${PROJECT_NAME}.pc @ONLY)
+CONFIGURE_FILE(${PROJECT_NAME}_haptic.pc.in ${PROJECT_NAME}_haptic.pc @ONLY)
+
+INSTALL(TARGETS ${PROJECT_NAME} DESTINATION lib COMPONENT RuntimeLibraries)
+INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.pc DESTINATION lib/pkgconfig)
+INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}_haptic.pc DESTINATION lib/pkgconfig)
+
+FOREACH(hfile ${HEADERS})
+	INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/${hfile} DESTINATION include/${PROJECT_NAME})
+ENDFOREACH(hfile)

@@ -1,0 +1,8 @@
+/unit/utc_SystemFW_system_conf_is_vip_func
+/unit/utc_SystemFW_system_conf_set_permanent_bypid_func
+/unit/utc_SystemFW_system_conf_set_permanent_func
+/unit/utc_SystemFW_system_get_apppath_func
+/unit/utc_SystemFW_system_get_cmdline_name_func
+/unit/utc_SystemFW_system_get_pid_func
+/unit/utc_SystemFW_system_set_datetime_func
+

@@ -1,0 +1,13 @@
+# Package Information for pkg-config
+
+prefix=@PREFIX@
+exec_prefix=@EXEC_PREFIX@
+libdir=@LIBDIR@
+includedir=/usr/include/deviced
+
+Name: deviced library
+Description: Tizen platform device control library
+Version: @VERSION@
+Requires:
+Libs: -L${libdir} -ldeviced
+Cflags: -I${includedir}

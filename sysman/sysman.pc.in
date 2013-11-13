@@ -1,0 +1,15 @@
+# Package Information for pkg-config
+
+prefix=@PREFIX@
+exec_prefix=@EXEC_PREFIX@
+libdir=@LIBDIR@
+includedir=@INCLUDEDIR@
+
+Name: libsysman
+Description: system manager interface library
+Version: @VERSION@
+Requires: 
+Libs: -L${libdir} -lsysman
+Cflags: -I${includedir}
+
+

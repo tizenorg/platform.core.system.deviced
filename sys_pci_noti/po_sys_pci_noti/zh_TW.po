@@ -1,0 +1,6 @@
+msgid "IDS_COM_POP_KEYBOARD_CONNECTED_ABB2"
+msgstr "鍵盤已連接"
+
+msgid "IDS_COM_POP_KEYBOARD_DISCONNECTED_ABB2"
+msgstr "鍵盤已中斷連接"
+

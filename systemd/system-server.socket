@@ -1,0 +1,10 @@
+[Unit]
+Description=System server socket
+
+[Socket]
+ListenStream=/tmp/sn
+SocketMode=0777
+PassCredentials=yes
+SmackLabelIPIn=*
+SmackLabelIPOut=@
+Accept=false

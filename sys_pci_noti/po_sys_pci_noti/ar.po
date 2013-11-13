@@ -1,0 +1,6 @@
+msgid "IDS_COM_POP_KEYBOARD_CONNECTED_ABB2"
+msgstr "تم توصيل لوحة المفاتيح"
+
+msgid "IDS_COM_POP_KEYBOARD_DISCONNECTED_ABB2"
+msgstr "تم فصل لوحة المفاتيح"
+
