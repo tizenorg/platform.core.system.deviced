@@ -287,6 +287,7 @@ systemctl daemon-reload
 %{_bindir}/mmc-smack-label
 %{_bindir}/device-daemon
 %{_bindir}/fsck_msdosfs
+%{_bindir}/deviced-auto-test
 %{_unitdir}/multi-user.target.wants/deviced.service
 %{_unitdir}/graphical.target.wants/regpmon.service
 %{_unitdir}/sockets.target.wants/deviced.service
