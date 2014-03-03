@@ -37,6 +37,7 @@ BuildRequires:  pkgconfig(sensor)
 BuildRequires:	gettext
 BuildRequires:  pkgconfig(libsystemd-daemon)
 BuildRequires:  pkgconfig(capi-base-common)
+BuildRequires:  systemd
 %{?systemd_requires}
 Requires(preun): /usr/bin/systemctl
 Requires(post): /usr/bin/systemctl
@@ -183,15 +184,14 @@ make %{?jobs:-j%jobs}
 rm -rf %{buildroot}
 %make_install
 
-mkdir -p %{buildroot}%{_libdir}/systemd/system/multi-user.target.wants
-mkdir -p %{buildroot}%{_libdir}/systemd/system/sockets.target.wants
-ln -s ../system-server.service %{buildroot}%{_libdir}/systemd/system/multi-user.target.wants/system-server.service
-ln -s ../system-server.service %{buildroot}%{_libdir}/systemd/system/sockets.target.wants/system-server.socket
-install -m 0644 %{SOURCE8} %{buildroot}%{_libdir}/systemd/system/regpmon.service
-ln -s ../regpmon.service %{buildroot}%{_libdir}/systemd/system/multi-user.target.wants/regpmon.service
-mkdir -p %{buildroot}%{_libdir}/systemd/system/graphical.target.wants
-install -m 0644 %{SOURCE9} %{buildroot}%{_libdir}/systemd/system/zbooting-done.service
-ln -s ../zbooting-done.service %{buildroot}%{_libdir}/systemd/system/graphical.target.wants/zbooting-done.service
+%install_service multi-user.target.wants system-server.service
+%install_service sockets.target.wants system-server.service
+
+%install_service graphical.target.wants regpmon.service
+install -m 0644 %{SOURCE8} %{buildroot}%{_unitdir}/regpmon.service
+
+%install_service graphical.target.wants zbooting-done.service
+install -m 0644 %{SOURCE9} %{buildroot}%{_unitdir}/zbooting-done.service
 
 %post
 #memory type vconf key init
@@ -282,14 +282,14 @@ systemctl daemon-reload
 %{_bindir}/mmc-smack-label
 %{_bindir}/device-daemon
 %{_bindir}/fsck_msdosfs
-%{_libdir}/systemd/system/multi-user.target.wants/system-server.service
-%{_libdir}/systemd/system/sockets.target.wants/system-server.socket
-%{_libdir}/systemd/system/system-server.service
-%{_libdir}/systemd/system/system-server.socket
-%{_libdir}/systemd/system/multi-user.target.wants/regpmon.service
-%{_libdir}/systemd/system/regpmon.service
-%{_libdir}/systemd/system/graphical.target.wants/zbooting-done.service
-%{_libdir}/systemd/system/zbooting-done.service
+%{_unitdir}/multi-user.target.wants/system-server.service
+%{_unitdir}/graphical.target.wants/regpmon.service
+%{_unitdir}/sockets.target.wants/system-server.service
+%{_unitdir}/system-server.service
+%{_unitdir}/system-server.socket
+%{_unitdir}/regpmon.service
+%{_unitdir}/graphical.target.wants/zbooting-done.service
+%{_unitdir}/zbooting-done.service
 %{_datadir}/system-server/sys_pci_noti/res/locale/*/LC_MESSAGES/*.mo
 %config %{_sysconfdir}/dbus-1/system.d/system-server.conf
 %{_datadir}/license/fsck_msdosfs
