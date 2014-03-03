@@ -18,6 +18,7 @@
 
 
 #include <stdio.h>
+#include <tzplatform_config.h>
 #include <stdbool.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -60,7 +61,7 @@
 #endif
 static const char default_rtc0[] = "/dev/rtc0";
 static const char default_rtc1[] = "/dev/rtc1";
-static const char default_localtime[] = "/opt/etc/localtime";
+static const char default_localtime[18];
 
 static const time_t default_time = 2147483645; // max(32bit) -3sec
 static Ecore_Fd_Handler *tfdh = NULL; // tfd change noti
@@ -84,6 +85,7 @@ int handle_timezone(char *str)
 	struct stat sts;
 	time_t now;
 	struct tm *ts;
+	strcpy(default_localtime, tzplatform_mkpath(TZ_SYS_ETC, "localtime"));
 	const char *sympath = default_localtime;
 
 	if (str == NULL)

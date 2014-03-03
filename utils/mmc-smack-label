@@ -1,6 +1,7 @@
 #!/bin/bash
+source /etc/tizen-platform.conf
 MOUNT_DIRECTORY=$1
-find $MOUNT_DIRECTORY -type d | xargs chsmack -a 'system::ext_storage' -t
-find $MOUNT_DIRECTORY -type f | xargs chsmack -a 'system::ext_storage'
+find $MOUNT_DIRECTORY -type d | xargs chsmack -a 'System::Shared' -t
+find $MOUNT_DIRECTORY -type f | xargs chsmack -a 'System::Shared'
 find $MOUNT_DIRECTORY -type f | xargs chmod -x
-find $MOUNT_DIRECTORY | xargs chown app:app
+find $MOUNT_DIRECTORY | xargs chown $TZ_USER_NAME:$TZ_SYS_USER_GROUP

@@ -37,11 +37,12 @@
 #include "core/device-handler.h"
 #include "core/common.h"
 #include "core/devices.h"
+#include <tzplatform_config.h>
 
 #define BUF_LEN             20
 
 #define SMACKFS_MOUNT_OPT		"smackfsroot=*,smackfsdef=*"
-#define MMC_MOUNT_POINT		"/opt/storage/sdcard"
+#define MMC_MOUNT_POINT		tzplatform_mkpath(TZ_SYS_STORAGE,"sdcard")
 
 struct mmc_list {
 struct mmc_list *prev, *next;
