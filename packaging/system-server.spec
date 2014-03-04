@@ -37,7 +37,6 @@ BuildRequires:  pkgconfig(sensor)
 BuildRequires:	gettext
 BuildRequires:  pkgconfig(libsystemd-daemon)
 BuildRequires:  pkgconfig(capi-base-common)
-BuildRequires:  systemd
 %{?systemd_requires}
 Requires(preun): /usr/bin/systemctl
 Requires(post): /usr/bin/systemctl
