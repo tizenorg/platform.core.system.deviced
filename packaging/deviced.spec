@@ -253,14 +253,14 @@ heynotitool set device_pci_keyboard_remove
 
 
 systemctl daemon-reload
-if [ $1 == 1 ]; then
+if [ "$1" == "1" ]; then
     systemctl restart deviced.service
     systemctl restart regpmon.service
 	systemctl restart zbooting-done.service
 fi
 
 %preun
-if [ $1 == 0 ]; then
+if [ "$1" == "0" ]; then
     systemctl stop deviced.service
     systemctl stop regpmon.service
 	systemctl stop zbooting-done.service
