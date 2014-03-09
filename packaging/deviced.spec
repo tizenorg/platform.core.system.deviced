@@ -198,6 +198,10 @@ install -m 0644 %{SOURCE8} %{buildroot}%{_unitdir}/regpmon.service
 %install_service graphical.target.wants zbooting-done.service
 install -m 0644 %{SOURCE9} %{buildroot}%{_unitdir}/zbooting-done.service
 
+%if 0%{?simulator}
+rm -f %{buildroot}%{_bindir}/restart
+%endif
+
 %post
 #memory type vconf key init
 vconftool set -t int memory/sysman/usbhost_status -1 -i
@@ -272,9 +276,7 @@ systemctl daemon-reload
 %files -n deviced
 %manifest deviced.manifest
 %{_bindir}/deviced
-%if 0%{?simulator}
-%exclude %{_bindir}/restart
-%else
+%if %{undefined simulator}
 %{_bindir}/restart
 %endif
 %{_bindir}/movi_format.sh
