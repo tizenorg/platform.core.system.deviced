@@ -16,7 +16,7 @@ FOREACH(pofile ${POFILES})
 			DEPENDS ${absPofile}
 	)
 	INSTALL(FILES ${moFile}
-			DESTINATION share/system-server/sys_pci_noti/res/locale/${lang}/LC_MESSAGES RENAME ${PROJECT_NAME}.mo)
+			DESTINATION share/deviced/sys_pci_noti/res/locale/${lang}/LC_MESSAGES RENAME ${PROJECT_NAME}.mo)
 	SET(moFiles ${moFiles} ${moFile})
 ENDFOREACH(pofile)
 

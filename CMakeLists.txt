@@ -1,13 +1,22 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
-PROJECT(system_server C)
+PROJECT(deviced C)
 
+########################################################
+# Build options:
+########################################################
+IF("${ARCH}" STREQUAL "emulator")
+	OPTION(USE_EMULATOR "Use Emulator" ON)
+ELSEIF("${ARCH}" STREQUAL "arm")
+	OPTION(USE_ARM "Use Arm" ON)
+ENDIF()
+
+########################################################
+# Deviced CMakeLists.txt
+########################################################
 SET(PREFIX ${CMAKE_INSTALL_PREFIX})
 SET(EXEC_PREFIX "${PREFIX}/bin")
-SET(LIBDIR "\${prefix}/lib")
+SET(LIBDIR "${PREFIX}/lib")
 SET(INCLUDEDIR "${PREFIX}/include/${PROJECT_NAME}")
-
-# deviced
-SET(DEVICED_NAME deviced)
 SET(VERSION 0.1.0)
 
 SET(SRCS
@@ -39,13 +48,14 @@ SET(SRCS
 	src/usb/usb-handler.c
 	src/vibrator/vibrator.c
 )
+
 FIND_PROGRAM(UNAME NAMES uname)
 EXEC_PROGRAM("${UNAME}" ARGS "-m" OUTPUT_VARIABLE "ARCH")
-IF("${ARCH}" STREQUAL "emulated")
+IF(USE_EMULATOR)
 SET(SRCS ${SRCS}
 	src/mmc/ext4.c
 	)
-ENDIF("${ARCH}" STREQUAL "emulated")
+ENDIF(USE_EMULATOR)
 
 SET(SRCS ${SRCS}
 	src/display/util.c
@@ -68,34 +78,9 @@ SET(SRCS ${SRCS}
 SET(SRCS ${SRCS}
 	src/haptic/haptic.c)
 
-# libdeviced
-SET(DEVICED_SRCS
-	src/shared/battery.c
-	src/shared/control.c
-	src/shared/dbus.c
-	src/shared/deviced-conf.c
-	src/shared/deviced-noti.c
-	src/shared/deviced-util.c
-	src/shared/display.c
-	src/shared/haptic.c
-	src/shared/led.c
-)
-
-SET(DEVICED_HEADERS
-	src/deviced/dd-battery.h
-	src/deviced/dd-control.h
-	src/deviced/dd-deviced.h
-	src/deviced/dd-deviced-managed.h
-	src/deviced/dd-display.h
-	src/deviced/dd-haptic.h
-	src/deviced/dd-led.h
-	src/deviced/haptic-module.h
-	src/deviced/haptic-plugin-intf.h
-)
-
-INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/sysman ${CMAKE_CURRENT_SOURCE_DIR}/src)
-
-# libdeviced
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/sysman)
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/src)
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/src/deviced)
 
 SET(MOVINAND_FORMAT scripts/movi_format.sh)
@@ -131,56 +116,45 @@ ENDFOREACH(flag)
 
 SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} -fvisibility=hidden")
 SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} -g -fno-omit-frame-pointer -finstrument-functions")
-
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${EXTRA_CFLAGS}")
-SET(PREFIX ${CMAKE_INSTALL_PREFIX})
 
 ADD_DEFINITIONS("-DPREFIX=\"${CMAKE_INSTALL_PREFIX}\"")
 ADD_DEFINITIONS("-DFACTORYFS=\"$ENV{FACTORYFS}\"")
-
 ADD_DEFINITIONS("-DENABLE_KEY_FILTER")
 ADD_DEFINITIONS("-DENABLE_X_LCD_ONOFF")
 ADD_DEFINITIONS("-DENABLE_DLOG_OUT")
 ADD_DEFINITIONS("-DENABLE_PM_LOG")
-
-IF( $ENV{ARCH} MATCHES "arm" )
+IF(USE_ARM)
 	ADD_DEFINITIONS("-DTARGET")
 ENDIF()
 ADD_DEFINITIONS("-DDEBUG -DENABLE_DLOG_OUT")
-
-
-CONFIGURE_FILE(device-daemon.in device-daemon @ONLY)
-
-# libdeviced
-ADD_LIBRARY(${DEVICED_NAME} SHARED ${DEVICED_SRCS})
-TARGET_LINK_LIBRARIES(${DEVICED_NAME} ${pkgs_LDFLAGS})
-SET_TARGET_PROPERTIES(${DEVICED_NAME} PROPERTIES VERSION ${VERSION})
-INSTALL(TARGETS ${DEVICED_NAME} DESTINATION lib COMPONENT RuntimeLibraries)
-
-FOREACH(hfile ${DEVICED_HEADERS})
-	INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/${hfile} DESTINATION include/${DEVICED_NAME})
-ENDFOREACH(hfile)
-
-CONFIGURE_FILE(${DEVICED_NAME}.pc.in ${DEVICED_NAME}.pc @ONLY)
-INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/${DEVICED_NAME}.pc DESTINATION lib/pkgconfig)
 
 ADD_EXECUTABLE(${PROJECT_NAME} ${SRCS})
 TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${pkgs_LDFLAGS} "-ldl" "-lm" "-ludev")
 INSTALL(TARGETS ${PROJECT_NAME} DESTINATION bin)
 
+INSTALL(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/deviced/ DESTINATION include/${PROJECT_NAME}
+		FILES_MATCHING
+		PATTERN "*.h")
+
+CONFIGURE_FILE(device-daemon.in device-daemon @ONLY)
+CONFIGURE_FILE(${PROJECT_NAME}.pc.in ${PROJECT_NAME}.pc @ONLY)
+INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.pc DESTINATION lib/pkgconfig)
+
 INSTALL(FILES ${MOVINAND_FORMAT} DESTINATION bin)
 INSTALL(PROGRAMS ${CMAKE_BINARY_DIR}/device-daemon DESTINATION bin)
-INSTALL(FILES system-server.conf DESTINATION /etc/dbus-1/system.d)
+INSTALL(FILES deviced.conf DESTINATION /etc/dbus-1/system.d)
 INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/utils/mmc-smack-label DESTINATION bin)
-INSTALL(FILES ${CMAKE_SOURCE_DIR}/packaging/${DEVICED_NAME}.rule DESTINATION /etc/smack/accesses2.d)
+INSTALL(FILES ${CMAKE_SOURCE_DIR}/packaging/${PROJECT_NAME}.rule DESTINATION /etc/smack/accesses2.d)
 INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/utils/set_pmon DESTINATION bin)
 INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/utils/regpmon DESTINATION bin)
 INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/utils/pmon DESTINATION bin)
 
-INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/systemd/system-server.service DESTINATION lib/systemd/system)
-INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/systemd/system-server.socket  DESTINATION lib/systemd/system)
+INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/systemd/deviced.service DESTINATION lib/systemd/system)
+INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/systemd/deviced.socket  DESTINATION lib/systemd/system)
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/fsck-msdos/LICENSE DESTINATION share/license RENAME fsck_msdosfs)
 
+ADD_SUBDIRECTORY(src/libdeviced)
 ADD_SUBDIRECTORY(restarter)
 ADD_SUBDIRECTORY(sys_event)
 ADD_SUBDIRECTORY(pm_event)
