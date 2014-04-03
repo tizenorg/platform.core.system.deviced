@@ -3,8 +3,8 @@ Name:       system-server
 Summary:    System server
 Version:    2.0.0
 Release:    1
-Group:      Framework/system
-License:    Apache License, Version 2.0
+Group:      System/Service
+License:    Apache-2.0
 Source0:    system-server-%{version}.tar.gz
 Source1:    system-server.manifest
 Source2:    deviced.manifest
@@ -43,56 +43,52 @@ Requires(postun): /usr/bin/systemctl
 system server
 
 %package system-server
-Summary:    system-server daemon
-Group:      main
+Summary:    System-server daemon
+Group:      System/Service
 Requires:   %{name} = %{version}-%{release}
 
 %description system-server
 system server daemon.
 
 %package -n sysman
-Summary:    sysman library
-License:    LGPL
-Group:      main
+Summary:    Sysman library
+License:    Apache-2.0
+Group:      System/Libraries
 Requires:   %{name} = %{version}-%{release}
-#Provides:   sysman
 
 %description -n sysman
 sysman library.
 
 %package -n sysman-devel
-Summary:    sysman devel library
-License:    LGPL
-Group:      main
+Summary:    Sysman devel library
+License:    Apache-2.0
+Group:      System/Development
 Requires:   %{name} = %{version}-%{release}
-#Provides:   sysman-devel
 
 %description -n sysman-devel
 sysman devel library.
 
 %package -n sysman-internal-devel
-Summary:    sysman internal devel library
-License:    LGPL
-Group:      main
+Summary:    Sysman internal devel library
+License:    Apache-2.0
+Group:      System/Development
 Requires:   %{name} = %{version}-%{release}
-#Provides:   sysman-internal-devel
 
 %description -n sysman-internal-devel
 sysman internal devel library.
 
 %package -n libslp-pm
-Summary:    SLP power manager client
-Group:      main
+Summary:    Power manager client
+Group:      System/Libraries
 Requires:   %{name} = %{version}-%{release}
 
 %description -n libslp-pm
 power-manager library.
 
 %package -n libslp-pm-devel
-Summary:    SLP power manager client (devel)
-Group:      main
-Requires:   %{name} = %{version}-%{release}
-#Requires:   libslp-pm
+Summary:    Power manager client (devel)
+Group:      System/Development
+Requires:   libslp-pm = %{version}-%{release}
 
 %description -n libslp-pm-devel
 power-manager devel library.
@@ -146,14 +142,14 @@ Haptic Device manager library for device control (devel)
 
 %package -n libdeviced
 Summary:    Deviced library
-Group:      Development/Libraries
+Group:      System/Libraries
 
 %description -n libdeviced
 Deviced library for device control
 
 %package -n libdeviced-devel
 Summary:    Deviced library for (devel)
-Group:      Development/Libraries
+Group:      System/Development
 Requires:   libdeviced = %{version}-%{release}
 
 %description -n libdeviced-devel
@@ -257,7 +253,6 @@ fi
 %postun
 systemctl daemon-reload
 
-
 %files -n system-server
 %manifest system-server.manifest
 %{_bindir}/system_server
@@ -296,6 +291,12 @@ systemctl daemon-reload
 %{_bindir}/regpmon
 %{_bindir}/set_pmon
 
+%post -n sysman
+/sbin/ldconfig
+
+%postun -n sysman
+/sbin/ldconfig
+
 %files -n sysman-devel
 %defattr(-,root,root,-)
 %{_includedir}/sysman/sysman.h
@@ -313,6 +314,12 @@ systemctl daemon-reload
 %manifest libslp-pm.manifest
 %{_libdir}/libpmapi.so.*
 
+%post -n libslp-pm
+/sbin/ldconfig
+
+%postun -n libslp-pm
+/sbin/ldconfig
+
 %files -n libslp-pm-devel
 %defattr(-,root,root,-)
 %{_includedir}/pmapi/pmapi.h
@@ -321,16 +328,35 @@ systemctl daemon-reload
 %{_libdir}/pkgconfig/pmapi.pc
 %{_libdir}/libpmapi.so
 
+%post -n libslp-pm-devel
+/sbin/ldconfig
+
+%postun -n libslp-pm-devel
+/sbin/ldconfig
+
 %files -n libhaptic
 %defattr(-,root,root,-)
 %{_libdir}/libhaptic.so.*
 %manifest haptic.manifest
+
+%post -n libhaptic
+/sbin/ldconfig
+
+%postun -n libhaptic
+/sbin/ldconfig
+
 
 %files -n libhaptic-devel
 %defattr(-,root,root,-)
 %{_includedir}/haptic/haptic.h
 %{_libdir}/libhaptic.so
 %{_libdir}/pkgconfig/haptic.pc
+
+%post -n libhaptic-devel
+/sbin/ldconfig
+
+%postun -n libhaptic-devel
+/sbin/ldconfig
 
 %files -n libhaptic-plugin-devel
 %defattr(-,root,root,-)
@@ -344,6 +370,13 @@ systemctl daemon-reload
 %{_libdir}/libdevman.so.*
 %manifest devman.manifest
 
+
+%post -n libdevman
+/sbin/ldconfig
+
+%postun -n libdevman
+/sbin/ldconfig
+
 %files -n libdevman-devel
 %{_includedir}/devman/devman.h
 %{_includedir}/devman/devman_image.h
@@ -352,6 +385,12 @@ systemctl daemon-reload
 %{_includedir}/devman/SLP_devman_PG.h
 %{_libdir}/pkgconfig/devman.pc
 %{_libdir}/libdevman.so
+
+%post -n libdevman-devel
+/sbin/ldconfig
+
+%postun -n libdevman-devel
+/sbin/ldconfig
 
 %files -n libdevman-haptic-devel
 %{_includedir}/devman/devman_haptic_ext.h
@@ -362,6 +401,12 @@ systemctl daemon-reload
 %defattr(-,root,root,-)
 %{_libdir}/libdeviced.so.*
 %manifest deviced.manifest
+
+%post -n libdeviced
+/sbin/ldconfig
+
+%postun -n libdeviced
+/sbin/ldconfig
 
 %files -n libdeviced-devel
 %defattr(-,root,root,-)
@@ -376,3 +421,9 @@ systemctl daemon-reload
 %{_includedir}/deviced/haptic-plugin-intf.h
 %{_libdir}/libdeviced.so
 %{_libdir}/pkgconfig/deviced.pc
+
+%post -n libdeviced-devel
+/sbin/ldconfig
+
+%postun -n libdeviced-devel
+/sbin/ldconfig
