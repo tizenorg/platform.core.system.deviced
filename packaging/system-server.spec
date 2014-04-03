@@ -1,8 +1,10 @@
+%bcond_with x
+
 #sbs-git:slp/pkgs/s/system-server system-server 0.1.51 56e16bca39f96d6c8aed9ed3df2fea9b393801be
 Name:       system-server
 Summary:    System server
 Version:    2.0.0
-Release:    1
+Release:    0
 Group:      System/Service
 License:    Apache-2.0
 Source0:    system-server-%{version}.tar.gz
@@ -23,7 +25,9 @@ BuildRequires:  pkgconfig(tapi)
 BuildRequires:  pkgconfig(edbus)
 BuildRequires:  pkgconfig(dlog)
 BuildRequires:  pkgconfig(syspopup-caller)
+%if %{with x}
 BuildRequires:  pkgconfig(x11)
+%endif
 BuildRequires:  pkgconfig(notification)
 BuildRequires:  pkgconfig(usbutils)
 BuildRequires:  pkgconfig(udev)
@@ -157,7 +161,14 @@ Deviced library for device control (devel)
 
 %prep
 %setup -q
-cmake . -DCMAKE_INSTALL_PREFIX=%{_prefix}
+cmake . \
+	-DCMAKE_INSTALL_PREFIX=%{_prefix} \
+%if %{with x}
+	-DX11_SUPPORT=On \
+%else
+	-DX11_SUPPORT=Off \
+%endif
+	#eol
 
 %build
 cp %{SOURCE1} .
