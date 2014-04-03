@@ -1,15 +1,14 @@
 %bcond_with x
 
-#sbs-git:slp/pkgs/s/system-server system-server 0.1.51 56e16bca39f96d6c8aed9ed3df2fea9b393801be
-Name:       system-server
-Summary:    System server
-Version:    2.0.0
+Name:       deviced
+Summary:    Deviced
+Version:    1.0.0
 Release:    0
 Group:      System/Service
 License:    Apache-2.0
-Source0:    system-server-%{version}.tar.gz
-Source1:    system-server.manifest
-Source2:    deviced.manifest
+Source0:    %{name}-%{version}.tar.gz
+Source1:    deviced.manifest
+Source2:    libdeviced.manifest
 Source3:    sysman.manifest
 Source4:    libslp-pm.manifest
 Source5:    haptic.manifest
@@ -44,15 +43,30 @@ Requires(post): /usr/bin/vconftool
 Requires(postun): /usr/bin/systemctl
 
 %description
-system server
+deviced
 
-%package system-server
-Summary:    System-server daemon
+%package deviced
+Summary:    Deviced daemon
 Group:      System/Service
 Requires:   %{name} = %{version}-%{release}
 
-%description system-server
-system server daemon.
+%description deviced
+Device daemon.
+
+%package -n libdeviced
+Summary:    Deviced library
+Group:      System/Libraries
+
+%description -n libdeviced
+Deviced library for device control
+
+%package -n libdeviced-devel
+Summary:    Deviced library for (devel)
+Group:      System/Development
+Requires:   libdeviced = %{version}-%{release}
+
+%description -n libdeviced-devel
+Deviced library for device control (devel)
 
 %package -n sysman
 Summary:    Sysman library
@@ -144,25 +158,17 @@ Requires:   libdevman-devel = %{version}-%{release}
 %description -n libdevman-haptic-devel
 Haptic Device manager library for device control (devel)
 
-%package -n libdeviced
-Summary:    Deviced library
-Group:      System/Libraries
-
-%description -n libdeviced
-Deviced library for device control
-
-%package -n libdeviced-devel
-Summary:    Deviced library for (devel)
-Group:      System/Development
-Requires:   libdeviced = %{version}-%{release}
-
-%description -n libdeviced-devel
-Deviced library for device control (devel)
-
 %prep
 %setup -q
+%ifarch %{arm}
+%define ARCH arm
+%else
+%define ARCH emulator
+%endif
+
 cmake . \
 	-DCMAKE_INSTALL_PREFIX=%{_prefix} \
+	-DARCH=%{ARCH} \
 %if %{with x}
 	-DX11_SUPPORT=On \
 %else
@@ -183,8 +189,8 @@ make %{?jobs:-j%jobs}
 rm -rf %{buildroot}
 %make_install
 
-%install_service multi-user.target.wants system-server.service
-%install_service sockets.target.wants system-server.service
+%install_service multi-user.target.wants deviced.service
+%install_service sockets.target.wants deviced.service
 
 %install_service graphical.target.wants regpmon.service
 install -m 0644 %{SOURCE8} %{buildroot}%{_unitdir}/regpmon.service
@@ -248,14 +254,14 @@ heynotitool set device_pci_keyboard_remove
 
 systemctl daemon-reload
 if [ $1 == 1 ]; then
-    systemctl restart system-server.service
+    systemctl restart deviced.service
     systemctl restart regpmon.service
 	systemctl restart zbooting-done.service
 fi
 
 %preun
 if [ $1 == 0 ]; then
-    systemctl stop system-server.service
+    systemctl stop deviced.service
     systemctl stop regpmon.service
 	systemctl stop zbooting-done.service
 fi
@@ -263,9 +269,9 @@ fi
 %postun
 systemctl daemon-reload
 
-%files -n system-server
-%manifest system-server.manifest
-%{_bindir}/system_server
+%files -n deviced
+%manifest deviced.manifest
+%{_bindir}/deviced
 %if 0%{?simulator}
 %exclude %{_bindir}/restart
 %else
@@ -281,18 +287,41 @@ systemctl daemon-reload
 %{_bindir}/mmc-smack-label
 %{_bindir}/device-daemon
 %{_bindir}/fsck_msdosfs
-%{_unitdir}/multi-user.target.wants/system-server.service
+%{_unitdir}/multi-user.target.wants/deviced.service
 %{_unitdir}/graphical.target.wants/regpmon.service
-%{_unitdir}/sockets.target.wants/system-server.service
-%{_unitdir}/system-server.service
-%{_unitdir}/system-server.socket
+%{_unitdir}/sockets.target.wants/deviced.service
+%{_unitdir}/deviced.service
+%{_unitdir}/deviced.socket
 %{_unitdir}/regpmon.service
 %{_unitdir}/graphical.target.wants/zbooting-done.service
 %{_unitdir}/zbooting-done.service
-%{_datadir}/system-server/sys_pci_noti/res/locale/*/LC_MESSAGES/*.mo
-%config %{_sysconfdir}/dbus-1/system.d/system-server.conf
+%{_datadir}/deviced/sys_pci_noti/res/locale/*/LC_MESSAGES/*.mo
+%config %{_sysconfdir}/dbus-1/system.d/deviced.conf
 %{_datadir}/license/fsck_msdosfs
 %{_sysconfdir}/smack/accesses2.d/deviced.rule
+
+%files -n libdeviced
+%defattr(-,root,root,-)
+%{_libdir}/libdeviced.so.*
+%manifest deviced.manifest
+
+%post -n libdeviced
+/sbin/ldconfig
+
+%postun -n libdeviced
+/sbin/ldconfig
+
+%files -n libdeviced-devel
+%defattr(-,root,root,-)
+%{_includedir}/deviced/*.h
+%{_libdir}/libdeviced.so
+%{_libdir}/pkgconfig/deviced.pc
+
+%post -n libdeviced-devel
+/sbin/ldconfig
+
+%postun -n libdeviced-devel
+/sbin/ldconfig
 
 %files -n sysman
 %manifest sysman.manifest
@@ -406,34 +435,3 @@ systemctl daemon-reload
 %{_includedir}/devman/devman_haptic_ext.h
 %{_includedir}/devman/devman_haptic_ext_core.h
 %{_libdir}/pkgconfig/devman_haptic.pc
-
-%files -n libdeviced
-%defattr(-,root,root,-)
-%{_libdir}/libdeviced.so.*
-%manifest deviced.manifest
-
-%post -n libdeviced
-/sbin/ldconfig
-
-%postun -n libdeviced
-/sbin/ldconfig
-
-%files -n libdeviced-devel
-%defattr(-,root,root,-)
-%{_includedir}/deviced/dd-battery.h
-%{_includedir}/deviced/dd-control.h
-%{_includedir}/deviced/dd-deviced.h
-%{_includedir}/deviced/dd-deviced-managed.h
-%{_includedir}/deviced/dd-display.h
-%{_includedir}/deviced/dd-haptic.h
-%{_includedir}/deviced/dd-led.h
-%{_includedir}/deviced/haptic-module.h
-%{_includedir}/deviced/haptic-plugin-intf.h
-%{_libdir}/libdeviced.so
-%{_libdir}/pkgconfig/deviced.pc
-
-%post -n libdeviced-devel
-/sbin/ldconfig
-
-%postun -n libdeviced-devel
-/sbin/ldconfig
