@@ -301,7 +301,6 @@ systemctl daemon-reload
 %{_datadir}/deviced/sys_pci_noti/res/locale/*/LC_MESSAGES/*.mo
 %config %{_sysconfdir}/dbus-1/system.d/deviced.conf
 %{_datadir}/license/fsck_msdosfs
-%{_sysconfdir}/smack/accesses2.d/deviced.rule
 
 %files -n libdeviced
 %defattr(-,root,root,-)
