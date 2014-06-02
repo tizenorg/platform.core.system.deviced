@@ -49,6 +49,10 @@ SET(SRCS
 	src/vibrator/vibrator.c
 )
 
+SET(SRCS ${SRCS}
+	src/apps/apps.c
+)
+
 FIND_PROGRAM(UNAME NAMES uname)
 EXEC_PROGRAM("${UNAME}" ARGS "-m" OUTPUT_VARIABLE "ARCH")
 IF(USE_EMULATOR)
