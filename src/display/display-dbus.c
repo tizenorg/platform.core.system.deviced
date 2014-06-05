@@ -533,7 +533,7 @@ static DBusMessage *e_dbus_setautobrightnessmin(E_DBus_Object *obj, DBusMessage 
 	DBusMessage *reply;
 	int val, ret;
 	pid_t pid;
-	char *sender;
+	const char *sender;
 
 	sender = dbus_message_get_sender(msg);
         if (!sender) {

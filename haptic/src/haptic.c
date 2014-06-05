@@ -569,8 +569,7 @@ int haptic_create_effect(unsigned char *vibe_buffer,
                          haptic_effect_element_s *elem_arr,
                          int max_elemcnt)
 {
-	int ret;
-	int i;
+	int ret, i, level;
 
 	if (__handle_cnt == 0) {
 		HAPTIC_ERROR("Not initialized");
@@ -604,8 +603,8 @@ int haptic_create_effect(unsigned char *vibe_buffer,
 
 	for (i = 0; i < max_elemcnt; i++) {
 		if (elem_arr[i].haptic_level == HAPTIC_FEEDBACK_AUTO) {
-			vconf_get_int(VCONFKEY_SETAPPL_TOUCH_FEEDBACK_VIBRATION_LEVEL_INT, &elem_arr[i].haptic_level);
-            elem_arr[i].haptic_level = elem_arr[i].haptic_level*20;
+			vconf_get_int(VCONFKEY_SETAPPL_TOUCH_FEEDBACK_VIBRATION_LEVEL_INT, &level);
+            elem_arr[i].haptic_level = level*20;
 		}
 	}
 

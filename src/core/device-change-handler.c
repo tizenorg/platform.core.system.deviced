@@ -761,7 +761,7 @@ static Eina_Bool uevent_control_cb(void *data, Ecore_Fd_Handler *fd_handler)
 
 	env_name = udev_device_get_subsystem(dev);
 	if (strncmp(env_name, INPUT_SUBSYSTEM, strlen(INPUT_SUBSYSTEM)) == 0) {
-		char *devpath = udev_device_get_devpath(dev);
+		devpath = udev_device_get_devpath(dev);
 		/* check new input device */
 		if (!fnmatch(INPUT_PATH, devpath, 0)) {
 			action = udev_device_get_action(dev);

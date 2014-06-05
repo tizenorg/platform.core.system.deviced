@@ -120,7 +120,7 @@ static void poweroff_send_broadcast(int status)
 	arr[0] = str_status;
 
 	broadcast_edbus_signal(DEVICED_PATH_POWEROFF, DEVICED_INTERFACE_POWEROFF,
-			SIGNAL_POWEROFF_STATE, "i", arr);
+			SIGNAL_POWEROFF_STATE, 'i', arr);
 }
 
 static void poweroff_control_cb(keynode_t *in_key, struct ss_main_data *ad)

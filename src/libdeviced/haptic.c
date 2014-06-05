@@ -505,7 +505,7 @@ API int haptic_vibrate_buffers_with_detail(haptic_device_h device_handle,
 	arr[0] = str_handle;
 	bytes.size = size;
 	bytes.data = vibe_buffer;
-	arr[2] = &bytes;
+	arr[2] = (char *)&bytes;
 	snprintf(str_iteration, sizeof(str_iteration), "%d", iteration);
 	arr[3] = str_iteration;
 	snprintf(str_feedback, sizeof(str_feedback), "%d", feedback);
@@ -677,7 +677,7 @@ API int haptic_create_effect(unsigned char *vibe_buffer,
 	arr[0] = str_bufsize;
 	bytes.size = sizeof(haptic_effect_element_s)*max_elemcnt;
 	bytes.data = (unsigned char*)elem_arr;
-	arr[2] = &bytes;
+	arr[2] = (char *)&bytes;
 	snprintf(str_elemcnt, sizeof(str_elemcnt), "%d", max_elemcnt);
 	arr[3] = str_elemcnt;
 
@@ -809,7 +809,7 @@ API int haptic_get_buffers_duration(haptic_device_h device_handle, const unsigne
 	arr[0] = str_handle;
 	bytes.size = size;
 	bytes.data = vibe_buffer;
-	arr[2] = &bytes;
+	arr[2] = (char *)&bytes;
 
 	/* request to deviced to open haptic device */
 	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
@@ -865,10 +865,10 @@ API int haptic_save_led(const unsigned char *vibe_buffer, int max_bufsize, const
 		return HAPTIC_ERROR_FILE_EXISTS;
 	}
 
-	arr[0] = vibe_buffer;
+	arr[0] = (char *)vibe_buffer;
 	snprintf(str_bufsize, sizeof(str_bufsize), "%d", max_bufsize);
 	arr[1] = str_bufsize;
-	arr[2] = file_path;
+	arr[2] = (char *)file_path;
 
 	/* request to deviced to open haptic device */
 	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,

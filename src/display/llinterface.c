@@ -191,7 +191,7 @@ static void *_system_suspend_cb(void *data)
 {
 	_I("enter system suspend");
 	if (pmsys && pmsys->sys_power_state)
-		return pmsys->sys_power_state(pmsys, POWER_STATE_SUSPEND);
+		return (void *)pmsys->sys_power_state(pmsys, POWER_STATE_SUSPEND);
 	return 0;
 }
 

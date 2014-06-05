@@ -1299,6 +1299,7 @@ static void check_seed_status(void)
 	int lock_state = -1;
 	int power_saving_stat = -1;
 	int power_saving_display_stat = -1;
+	Ecore_Timer *timeout = NULL;
 
 	/* Charging check */
 	if ((get_charging_status(&tmp) == 0) && (tmp > 0)) {
@@ -1331,7 +1332,7 @@ static void check_seed_status(void)
 	if ((get_usb_status(&tmp) == 0) && (tmp > 0)) {
 		tmp = readpid(USB_CON_PIDFILE);
 		if (tmp != -1) {
-			add_node(S_SLEEP, tmp, -1, 0);
+			add_node(S_SLEEP, tmp, timeout, 0);
 		}
 	}
 
@@ -1388,6 +1389,7 @@ static int input_action(char* input_act, char* input_path)
 	Eina_List *list_node = NULL;
 	Eina_List *l = NULL;
 	Eina_List *l_next = NULL;
+	Ecore_Timer *timeout = NULL;
 	indev *data = NULL;
 	PmLockNode *tmp = NULL;
 
@@ -1421,7 +1423,7 @@ static int input_action(char* input_act, char* input_path)
 	} else if (!strcmp("lock", input_act)) {
 		if (!strcmp("lcdoff", input_path)) {
 			tmp = find_node(S_SLEEP, 1);
-			if (!tmp && add_node(S_SLEEP, 1, -1, 0) != NULL)
+			if (!tmp && add_node(S_SLEEP, 1, timeout, 0) != NULL)
 				_I("lock LCD OFF from pm_event");
 		}
 		ret = 0;
