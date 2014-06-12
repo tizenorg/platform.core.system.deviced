@@ -837,7 +837,7 @@ static int changed_device(int argc, char **argv)
 	}
 
 	if (strncmp(argv[0], USB_NAME, USB_NAME_LEN) == 0)
-		usb_chgdet_cb((void *)state);
+		usb_chgdet_cb(state);
 	else if (strncmp(argv[0], EARJACK_NAME, EARJACK_NAME_LEN) == 0)
 		earjack_chgdet_cb((void *)state);
 	else if (strncmp(argv[0], EARKEY_NAME, EARKEY_NAME_LEN) == 0)
@@ -849,7 +849,7 @@ static int changed_device(int argc, char **argv)
 	else if (strncmp(argv[0], KEYBOARD_NAME, KEYBOARD_NAME_LEN) == 0)
 		keyboard_chgdet_cb((void *)state);
 	else if (strncmp(argv[0], POWER_SUBSYSTEM, POWER_SUPPLY_NAME_LEN) == 0)
-		power_supply((void *)state);
+		power_supply(state);
 
 	return 0;
 }
