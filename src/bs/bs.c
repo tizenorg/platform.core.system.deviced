@@ -35,6 +35,9 @@
 #include "core/devices.h"
 #include <tzplatform_config.h>
 
+#define PREDEF_DUMP_LOG         "dump_log"
+#define PREDEF_DELETE_DUMP      "delete_dump"
+
 #define CRASH_WORKER_MAX	3
 #define CRASH_PID_MAX 7
 #define CRASH_MODE_MAX 2

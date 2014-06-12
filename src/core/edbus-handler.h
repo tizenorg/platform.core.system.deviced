@@ -74,6 +74,22 @@
 #define DEVICED_PATH_POWEROFF		OBJECT_PATH"/PowerOff"
 #define DEVICED_INTERFACE_POWEROFF	INTERFACE_NAME".PowerOff"
 
+/*
+ * Led service
+ *   play/stop led
+ *   operations about led
+ */
+#define DEVICED_PATH_LED               OBJECT_PATH"/Led"
+#define DEVICED_INTERFACE_LED          INTERFACE_NAME".Led"
+
+/*
+ * Power service
+ *   set resetkey disable
+ *   operations about power
+ */
+#define DEVICED_PATH_POWER             OBJECT_PATH"/Power"
+#define DEVICED_INTERFACE_POWER                INTERFACE_NAME".power"
+
 int register_edbus_signal_handler(const char *path, const char *interface,
 		const char *name, E_DBus_Signal_Cb cb);
 E_DBus_Interface *get_edbus_interface(const char *path);
