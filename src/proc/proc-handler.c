@@ -131,20 +131,6 @@ int set_oomadj_action(int argc, char **argv)
 	return 0;
 }
 
-static int update_backgrd_app_oomadj(pid_t pid, int new_oomadj)
-{
-	FILE* fp;
-
-	fp = open_proc_oom_adj_file(pid, "w");
-	if (fp == NULL)
-		return -1;
-
-	fprintf(fp, "%d", new_oomadj);
-	fclose(fp);
-
-	return 0;
-}
-
 int set_active_action(int argc, char **argv)
 {
 	int pid = -1;
