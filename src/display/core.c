@@ -51,12 +51,13 @@
 #include "core/udev.h"
 #include "core/list.h"
 #include "core/common.h"
+#include <tzplatform_config.h>
 
 #define USB_CON_PIDFILE			"/var/run/.system_server.pid"
 #define PM_STATE_LOG_FILE		"/var/log/pm_state.log"
 #define PM_WAKEUP_NOTI_NAME		"system_wakeup"
 #define PM_EVENT_NOTI_NAME		"pm_event"
-#define PM_EVENT_NOTI_PATH		"/opt/share/noti/"PM_EVENT_NOTI_NAME
+#define PM_EVENT_NOTI_PATH		tzplatform_mkpath(TZ_SYS_SHARE,"noti/"PM_EVENT_NOTI_NAME)
 
 /**
  * @addtogroup POWER_MANAGER

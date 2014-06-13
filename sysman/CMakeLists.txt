@@ -16,7 +16,7 @@ SET(VERSION "${VERSION_MAJOR}.2.0")
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 
 INCLUDE(FindPkgConfig)
-pkg_check_modules(pkgs REQUIRED vconf dlog)
+pkg_check_modules(pkgs REQUIRED vconf dlog libtzplatform-config)
 
 FOREACH(flag ${pkgs_CFLAGS})
 	SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} ${flag}")

@@ -1,9 +1,9 @@
 #!/bin/sh
-
+source /etc/tizen-platform.conf
 # Don't regist processes on hibernation capturing sequence
-if [ -e /opt/etc/.hib_capturing ] ; then
+if [ -e $TZ_SYS_ETC/.hib_capturing ] ; then
 	exit 0
-elif [ -e /opt/etc/.hib_capturing_firstboot ]; then
+elif [ -e $TZ_SYS_ETC/.hib_capturing_firstboot ]; then
 	exit 0
 fi
 
