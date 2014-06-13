@@ -37,6 +37,7 @@
 #include "core/common.h"
 #include "core/devices.h"
 #include "mmc-handler.h"
+#include <tzplatform_config.h>
 
 #define VCONFKEY_INTERNAL_PRIVATE_MMC_ID	"db/private/sysman/mmc_device_id"
 #define VCONFKEY_SYSMAN_MMC_INIT	-1
@@ -45,7 +46,7 @@
 #define PREDEF_UNMOUNT_MMC		"unmountmmc"
 #define PREDEF_FORMAT_MMC		"formatmmc"
 
-#define MMC_PARENT_PATH	"/opt/storage"
+#define MMC_PARENT_PATH	tzplatform_getenv(TZ_SYS_STORAGE)
 #define MMC_DEV			"/dev/mmcblk"
 
 #define SMACKFS_MAGIC	0x43415d53

@@ -7,7 +7,10 @@ SET(EXEC_PREFIX "\${prefix}")
 SET(LIBDIR "\${prefix}/lib")
 SET(INCLUDEDIR "\${prefix}/include")
 SET(VERSION 0.1.9)
+
 INCLUDE(FindPkgConfig)
+pkg_check_modules(deep_pkgs REQUIRED libtzplatform-config)
+
 FOREACH(flag ${deep_pkgs_CFLAGS})
 	SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} ${flag}")
 ENDFOREACH(flag)

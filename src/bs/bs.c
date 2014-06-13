@@ -33,6 +33,7 @@
 #include "core/log.h"
 #include "core/launch.h"
 #include "core/devices.h"
+#include <tzplatform_config.h>
 
 #define CRASH_WORKER_MAX	3
 #define CRASH_PID_MAX 7
@@ -49,14 +50,14 @@
 #define CRASH_PROCESSNAME_MAX NAME_MAX
 #define CRASH_EXEPATH_MAX NAME_MAX
 #define CRASH_ARG_MAX (CRASH_PROCESSNAME_MAX + CRASH_EXEPATH_MAX + CRASH_TIME_MAX + CRASH_PID_MAX + CRASH_MODE_MAX + CRASH_VERIFY_MAX)
-#define CRASH_NOTI_DIR		"/opt/share/crash"
+#define CRASH_NOTI_DIR		tzplatform_mkpath(TZ_SYS_SHARE, "crash")
 #define CRASH_NOTI_FILE		"curbs.log"
-#define CRASH_NOTI_PATH CRASH_NOTI_DIR"/"CRASH_NOTI_FILE
-#define CRASH_COREDUMP_PATH		"/opt/usr/share/crash/core"
-#define CRASH_DUMP_PATH		"/opt/usr/share/crash/dump"
-#define CRASH_INFO_PATH		"/opt/share/crash/info"
+#define CRASH_NOTI_PATH tzplatform_mkpath(TZ_SYS_SHARE, "crash/"CRASH_NOTI_FILE)
+#define CRASH_COREDUMP_PATH		tzplatform_mkpath(TZ_USER_SHARE, "crash/core")
+#define CRASH_DUMP_PATH		tzplatform_mkpath(TZ_USER_SHARE, "crash/dump")
+#define CRASH_INFO_PATH		tzplatform_mkpath(TZ_SYS_SHARE, "crash/info")
 #define CRASH_WORKER_PATH	"/usr/bin/crash-worker"
-#define CRASH_POPUP_PATH	"/usr/apps/org.tizen.crash-popup/bin/crash-popup"
+#define CRASH_POPUP_PATH	tzplatform_mkpath(TZ_SYS_RO_APP, "org.tizen.crash-popup/bin/crash-popup")
 
 static int noti_fd;
 static int add_noti(void);

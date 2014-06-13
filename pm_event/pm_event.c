@@ -20,8 +20,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <limits.h>
+#include <tzplatform_config.h>
 
-#define PM_EVENT_NOTI_PATH	"/opt/share/noti/pm_event"
+#define PM_EVENT_NOTI_PATH	tzplatform_mkpath(TZ_SYS_SHARE, "noti/pm_event")
 #define PM_EVENT_CMD_LENGTH		50
 
 int main(int argc, char *argv[])
