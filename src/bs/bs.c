@@ -384,7 +384,7 @@ static Ecore_File_Monitor_Cb __crash_file_cb(void *data, Ecore_File_Monitor *em,
 	return NULL;
 }
 
-static int _get_file_count(char *path)
+static int _get_file_count(const char *path)
 {
 	DIR *dir;
 	struct dirent *dp;
