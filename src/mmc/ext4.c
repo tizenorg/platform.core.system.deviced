@@ -43,7 +43,9 @@ static int mmc_popup_pid;
 
 static int mmc_check_smack(void)
 {
-	system(FS_EXT4_SMACK_LABEL);
+	char cmd[NAME_MAX];
+	snprintf(cmd, sizeof(cmd), "mmc-smack-label %s", MMC_MOUNT_POINT);
+	system(cmd);
 	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_MOUNTED);
 	vconf_set_int(VCONFKEY_SYSMAN_MMC_MOUNT, VCONFKEY_SYSMAN_MMC_MOUNT_COMPLETED);
 	if (mmc_popup_pid > 0) {
