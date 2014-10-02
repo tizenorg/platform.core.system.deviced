@@ -193,7 +193,7 @@ rm -rf %{buildroot}
 %make_install
 
 %install_service multi-user.target.wants deviced.service
-%install_service sockets.target.wants deviced.service
+%install_service sockets.target.wants deviced.socket
 
 %install_service graphical.target.wants regpmon.service
 install -m 0644 %{SOURCE8} %{buildroot}%{_unitdir}/regpmon.service
@@ -297,7 +297,7 @@ systemctl daemon-reload
 %{_bindir}/deviced-auto-test
 %{_unitdir}/multi-user.target.wants/deviced.service
 %{_unitdir}/graphical.target.wants/regpmon.service
-%{_unitdir}/sockets.target.wants/deviced.service
+%{_unitdir}/sockets.target.wants/deviced.socket
 %{_unitdir}/deviced.service
 %{_unitdir}/deviced.socket
 %{_unitdir}/regpmon.service
