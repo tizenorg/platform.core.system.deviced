@@ -1,10 +1,10 @@
 %bcond_with x
 
 Name:       deviced
-Summary:    Deviced
+Summary:    deviced
 Version:    1.0.0
-Release:    0
-Group:      System/Service
+Release:    1
+Group:      Framework/system
 License:    Apache-2.0
 Source0:    %{name}-%{version}.tar.gz
 Source1:    deviced.manifest
@@ -13,8 +13,7 @@ Source3:    sysman.manifest
 Source4:    libslp-pm.manifest
 Source5:    haptic.manifest
 Source6:    devman.manifest
-Source8:    regpmon.service
-Source9:    zbooting-done.service
+
 BuildRequires:  cmake
 BuildRequires:  libattr-devel
 BuildRequires:  pkgconfig(ecore)
@@ -48,23 +47,23 @@ Requires(postun): /usr/bin/systemctl
 deviced
 
 %package deviced
-Summary:    Deviced daemon
-Group:      System/Service
+Summary:    deviced daemon
+Group:      main
 Requires:   %{name} = %{version}-%{release}
 
 %description deviced
-Device daemon.
+deviced daemon.
 
 %package -n libdeviced
 Summary:    Deviced library
-Group:      System/Libraries
+Group:      Development/Libraries
 
 %description -n libdeviced
 Deviced library for device control
 
 %package -n libdeviced-devel
 Summary:    Deviced library for (devel)
-Group:      System/Development
+Group:      Development/Libraries
 Requires:   libdeviced = %{version}-%{release}
 
 %description -n libdeviced-devel
@@ -168,15 +167,14 @@ Haptic Device manager library for device control (devel)
 %define ARCH emulator
 %endif
 
+%if %{with x}
+export CFLAGS+=" -DX11_SUPPORT"
+%endif
+
 cmake . \
 	-DTZ_SYS_ETC=%TZ_SYS_ETC \
 	-DCMAKE_INSTALL_PREFIX=%{_prefix} \
 	-DARCH=%{ARCH} \
-%if %{with x}
-	-DX11_SUPPORT=On \
-%else
-	-DX11_SUPPORT=Off \
-%endif
 	#eol
 
 %build
@@ -194,12 +192,8 @@ rm -rf %{buildroot}
 
 %install_service multi-user.target.wants deviced.service
 %install_service sockets.target.wants deviced.socket
-
-%install_service graphical.target.wants regpmon.service
-install -m 0644 %{SOURCE8} %{buildroot}%{_unitdir}/regpmon.service
-
 %install_service graphical.target.wants zbooting-done.service
-install -m 0644 %{SOURCE9} %{buildroot}%{_unitdir}/zbooting-done.service
+%install_service graphical.target.wants devicectl-stop@.service
 
 %if 0%{?simulator}
 rm -f %{buildroot}%{_bindir}/restart
@@ -231,9 +225,7 @@ vconftool set -t int memory/sysman/power_off 0 -g $users_gid -i -f
 vconftool set -t int memory/sysman/battery_level_status -1 -i
 vconftool set -t string memory/private/sysman/added_storage_uevent "" -i
 vconftool set -t string memory/private/sysman/removed_storage_uevent "" -g $users_gid -i
-
 vconftool set -t int memory/sysman/hdmi 0 -i
-
 vconftool set -t int memory/sysman/stime_changed 0 -i
 
 #db type vconf key init
@@ -278,45 +270,62 @@ fi
 %postun
 systemctl daemon-reload
 
+%post -n libdeviced -p /sbin/ldconfig
+
+%postun -n libdeviced -p /sbin/ldconfig
+
+%post -n sysman -p /sbin/ldconfig
+
+%postun -n sysman -p /sbin/ldconfig
+
+%post -n libslp-pm -p /sbin/ldconfig
+
+%postun -n libslp-pm -p /sbin/ldconfig
+
+%post -n libhaptic -p /sbin/ldconfig
+
+%postun -n libhaptic -p /sbin/ldconfig
+
+%post -n libdevman -p /sbin/ldconfig
+
+%postun -n libdevman -p /sbin/ldconfig
+
 %files -n deviced
-%manifest deviced.manifest
+%manifest %{name}.manifest
+%license LICENSE.Apache-2.0
+%config %{_sysconfdir}/dbus-1/system.d/deviced.conf
+%{_bindir}/deviced-pre.sh
 %{_bindir}/deviced
 %if %{undefined simulator}
 %{_bindir}/restart
 %endif
 %{_bindir}/movi_format.sh
+%{_bindir}/mmc-smack-label
+%{_bindir}/fsck_msdosfs
+%{_datadir}/license/fsck_msdosfs
 %{_bindir}/sys_event
 %{_bindir}/pm_event
 %{_bindir}/regpmon
 %{_bindir}/set_pmon
 %{_bindir}/pmon
 %{_bindir}/sys_pci_noti
-%{_bindir}/mmc-smack-label
-%{_bindir}/device-daemon
-%{_bindir}/fsck_msdosfs
 %{_bindir}/deviced-auto-test
 %{_unitdir}/multi-user.target.wants/deviced.service
-%{_unitdir}/graphical.target.wants/regpmon.service
 %{_unitdir}/sockets.target.wants/deviced.socket
+%{_unitdir}/graphical.target.wants/zbooting-done.service
+%{_unitdir}/graphical.target.wants/devicectl-stop@.service
 %{_unitdir}/deviced.service
 %{_unitdir}/deviced.socket
-%{_unitdir}/regpmon.service
-%{_unitdir}/graphical.target.wants/zbooting-done.service
+%{_unitdir}/deviced-pre.service
 %{_unitdir}/zbooting-done.service
+%{_unitdir}/devicectl-start@.service
+%{_unitdir}/devicectl-stop@.service
 %{_datadir}/deviced/sys_pci_noti/res/locale/*/LC_MESSAGES/*.mo
-%config %{_sysconfdir}/dbus-1/system.d/deviced.conf
-%{_datadir}/license/fsck_msdosfs
 
 %files -n libdeviced
 %defattr(-,root,root,-)
 %{_libdir}/libdeviced.so.*
 %manifest deviced.manifest
-
-%post -n libdeviced
-/sbin/ldconfig
-
-%postun -n libdeviced
-/sbin/ldconfig
 
 %files -n libdeviced-devel
 %defattr(-,root,root,-)
@@ -324,24 +333,10 @@ systemctl daemon-reload
 %{_libdir}/libdeviced.so
 %{_libdir}/pkgconfig/deviced.pc
 
-%post -n libdeviced-devel
-/sbin/ldconfig
-
-%postun -n libdeviced-devel
-/sbin/ldconfig
-
 %files -n sysman
 %manifest sysman.manifest
 %defattr(-,root,root,-)
 %{_libdir}/libsysman.so.*
-%{_bindir}/regpmon
-%{_bindir}/set_pmon
-
-%post -n sysman
-/sbin/ldconfig
-
-%postun -n sysman
-/sbin/ldconfig
 
 %files -n sysman-devel
 %defattr(-,root,root,-)
@@ -360,12 +355,6 @@ systemctl daemon-reload
 %manifest libslp-pm.manifest
 %{_libdir}/libpmapi.so.*
 
-%post -n libslp-pm
-/sbin/ldconfig
-
-%postun -n libslp-pm
-/sbin/ldconfig
-
 %files -n libslp-pm-devel
 %defattr(-,root,root,-)
 %{_includedir}/pmapi/pmapi.h
@@ -374,35 +363,16 @@ systemctl daemon-reload
 %{_libdir}/pkgconfig/pmapi.pc
 %{_libdir}/libpmapi.so
 
-%post -n libslp-pm-devel
-/sbin/ldconfig
-
-%postun -n libslp-pm-devel
-/sbin/ldconfig
-
 %files -n libhaptic
 %defattr(-,root,root,-)
 %{_libdir}/libhaptic.so.*
 %manifest haptic.manifest
-
-%post -n libhaptic
-/sbin/ldconfig
-
-%postun -n libhaptic
-/sbin/ldconfig
-
 
 %files -n libhaptic-devel
 %defattr(-,root,root,-)
 %{_includedir}/haptic/haptic.h
 %{_libdir}/libhaptic.so
 %{_libdir}/pkgconfig/haptic.pc
-
-%post -n libhaptic-devel
-/sbin/ldconfig
-
-%postun -n libhaptic-devel
-/sbin/ldconfig
 
 %files -n libhaptic-plugin-devel
 %defattr(-,root,root,-)
@@ -416,13 +386,6 @@ systemctl daemon-reload
 %{_libdir}/libdevman.so.*
 %manifest devman.manifest
 
-
-%post -n libdevman
-/sbin/ldconfig
-
-%postun -n libdevman
-/sbin/ldconfig
-
 %files -n libdevman-devel
 %{_includedir}/devman/devman.h
 %{_includedir}/devman/devman_image.h
@@ -431,12 +394,6 @@ systemctl daemon-reload
 %{_includedir}/devman/SLP_devman_PG.h
 %{_libdir}/pkgconfig/devman.pc
 %{_libdir}/libdevman.so
-
-%post -n libdevman-devel
-/sbin/ldconfig
-
-%postun -n libdevman-devel
-/sbin/ldconfig
 
 %files -n libdevman-haptic-devel
 %{_includedir}/devman/devman_haptic_ext.h

@@ -1,0 +1,8 @@
+[Unit]
+Description=prepare device daemon
+DefaultDependencies=no
+Before=deviced.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/deviced-pre.sh
