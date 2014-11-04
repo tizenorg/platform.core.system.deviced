@@ -1,16 +1,14 @@
 [Unit]
-Description=Start the system server service
-After=vconf-setup.service
+Description=System device daemon
+After=deviced-pre.service
+Requires=deviced-pre.service
 
 [Service]
-# set DISPLAY for usb_setting launching
-Type=forking
-Environment=DISPLAY=:0
-ExecStartPre=/etc/init.d/device-daemon stop
-ExecStart=/usr/bin/device-daemon
-ExecStop=/etc/init.d/device-daemon stop
-TimeoutStopSec=2
-NotifyAccess=all
+EnvironmentFile=/run/deviced/deviced_env
+ExecStart=/usr/bin/deviced
+Restart=always
+RestartSec=0
+KillSignal=SIGUSR1
 
 [Install]
 WantedBy=multi-user.target
