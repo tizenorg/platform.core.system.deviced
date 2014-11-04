@@ -1,0 +1,11 @@
+# subject rule
+deviced sys-assert::core rwxat
+deviced system::media rwxat
+deviced system::vconf rwxat
+deviced system::vconf_setting rw
+deviced com.samsung.setting::private r
+deviced system::vconf_system rw
+deviced testmode::vconf r
+deviced starter::vconf r
+# object rule
+pulseaudio deviced rw

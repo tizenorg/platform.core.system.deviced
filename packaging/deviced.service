@@ -1,0 +1,14 @@
+[Unit]
+Description=System device daemon
+After=deviced-pre.service
+Requires=deviced-pre.service
+
+[Service]
+EnvironmentFile=/run/deviced/deviced_env
+ExecStart=/usr/bin/deviced
+Restart=always
+RestartSec=0
+KillSignal=SIGUSR1
+
+[Install]
+WantedBy=multi-user.target
