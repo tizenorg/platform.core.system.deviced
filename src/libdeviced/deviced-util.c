@@ -19,12 +19,10 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <signal.h>
 #include <dirent.h>
 #include <ctype.h>
 #include <string.h>
@@ -32,7 +30,6 @@
 #include <errno.h>
 #include <poll.h>
 
-#include <vconf.h>
 #include "log.h"
 #include "dd-deviced.h"
 #include "deviced-priv.h"
@@ -44,6 +41,7 @@ API int deviced_get_pid(const char *execpath)
 	int pid = -1, fd;
 	char buf[BUFF_MAX];
 	char buf2[BUFF_MAX];
+	int ret;
 
 	dp = opendir("/proc");
 	if (!dp) {
@@ -61,11 +59,14 @@ API int deviced_get_pid(const char *execpath)
 		fd = open(buf, O_RDONLY);
 		if (fd < 0)
 			continue;
-		if (read(fd, buf2, BUFF_MAX) < 0) {
-			close(fd);
-			continue;
-		}
+
+		ret = read(fd, buf2, BUFF_MAX);
 		close(fd);
+
+		if (ret < 0 || ret >=BUFF_MAX)
+			continue;
+
+		buf2[ret] = '\0';
 
 		if (!strcmp(buf2, execpath)) {
 			closedir(dp);
@@ -84,11 +85,16 @@ API int deviced_get_cmdline_name(pid_t pid, char *cmdline, size_t cmdline_size)
 	char buf[PATH_MAX + 1];
 	char *filename;
 
+	if (cmdline == NULL) {
+		errno = EINVAL;
+		return -EINVAL;
+	}
+
 	snprintf(buf, sizeof(buf), "/proc/%d/cmdline", pid);
 	fd = open(buf, O_RDONLY);
 	if (fd < 0) {
 		errno = ESRCH;
-		return -1;
+		return -ESRCH;
 	}
 
 	ret = read(fd, buf, PATH_MAX);
@@ -103,7 +109,7 @@ API int deviced_get_cmdline_name(pid_t pid, char *cmdline, size_t cmdline_size)
 
 	if (cmdline_size < strlen(filename) + 1) {
 		errno = EOVERFLOW;
-		return -1;
+		return -EOVERFLOW;
 	}
 
 	strncpy(cmdline, filename, cmdline_size - 1);

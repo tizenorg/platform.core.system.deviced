@@ -25,9 +25,17 @@ extern "C" {
 #endif
 
 /**
- * @file        haptic.h
- * @ingroup     DEVICED_LIBRARY
- * @brief       This file provides for control of haptic
+ * @file        dd-haptic.h
+ * @defgroup    CAPI_SYSTEM_DEVICED_HAPTIC_MODULE Haptic
+ * @ingroup     CAPI_SYSTEM_DEVICED
+ * @brief       This file provides the API for control of haptic
+ * @section CAPI_SYSTEM_DEVICED_HAPTI_MODULE_HEADER Required Header
+ *   \#include <dd-haptic.h>
+ */
+
+/**
+ * @addtogroup CAPI_SYSTEM_DEVICED_HAPTIC_MODULE
+ * @{
  */
 
 /**
@@ -76,6 +84,13 @@ typedef enum
 } haptic_feedback_e;
 
 /**
+ * @brief Enumerations of unlimited duration for the Haptic API.
+ */
+typedef enum {
+	HAPTIC_DURATION_UNLIMITED = 0x7FFFFFFF,
+} haptic_duration_e;
+
+/**
  * @brief Enumerations of iteration count for the Haptic API.
  */
 typedef enum
@@ -111,7 +126,7 @@ typedef enum
  *
  * @remarks The index HAPTIC_DEVICE_ALL is reserved meaning for all vibrators at a time.
  *
- * @param[out] vibrator_number A number of vibrators
+ * @param[in] device_number A number of vibrators
  *
  * @return 0 on success, otherwise a negative error value.
  * @retval #HAPTIC_ERROR_NONE                	 Successful
@@ -356,62 +371,6 @@ int haptic_vibrate_buffer_with_detail(haptic_device_h device_handle,
  * @param[in] device_handle 	The device handle from haptic_open()
  * @param[in] vibe_buffer         	Pointer to the vibration pattern
  * @param[in] size                	Size to the vibration pattern
- * @param[out] effect_handle	[DEPRECATED] Pointer to the variable that will receive a handle to the playing effect
- *
- * @return 0 on success, otherwise a negative error value.
- * @retval #HAPTIC_ERROR_NONE                	Successful
- * @retval #HAPTIC_ERROR_INVALID_PARAMETER   	Invalid parameter
- * @retval #HAPTIC_ERROR_NOT_INITIALIZED     	Not initialized
- * @retval #HAPTIC_ERROR_OPERATION_FAILED    	Operation failed
- * @retval #HAPTIC_ERROR_NOT_SUPPORTED_DEVICE	Not supported device
- *
- * @see haptic_vibrate_buffer_with_detail()
- * @see haptic_vibrate_monotone()
- * @see haptic_vibrate_file()
- * @see haptic_get_count()
- */
-int haptic_vibrate_buffers(haptic_device_h device_handle,
-							const unsigned char *vibe_buffer,
-							int size,
-							haptic_effect_h *effect_handle);
-
-/**
- * @brief Vibrates a predefined rhythmic haptic-vibration pattern buffer.
- * @details
- * This function can be used to play a haptic-vibration pattern buffer.
- *
- * @remark
- * If you don't use th api regarding effect_handle, you can pass in a NULL value to last parameter.
- *
- * @param[in] device_handle 	The device handle from haptic_open()
- * @param[in] vibe_buffer     	Pointer to the vibration pattern
- * @param[in] size              Size to the vibration pattern
- * @param[in] iteration     	The number of times to repeat the effect
- * @param[in] feedback      	The amount of the intensity variation
- * @param[in] priority      	The priority from HAPTIC_PRIORITY_MIN to HAPTIC_PRIORITY_HIGH
- * @param[out] effect_handle	[DEPRECATED] Pointer to the variable that will receive a handle to the playing effect
- *
- * @return 0 on success, otherwise a negative error value.
- * @retval #HAPTIC_ERROR_NONE                	Successful
- * @retval #HAPTIC_ERROR_INVALID_PARAMETER   	Invalid parameter
- * @retval #HAPTIC_ERROR_NOT_INITIALIZED     	Not initialized
- * @retval #HAPTIC_ERROR_OPERATION_FAILED    	Operation failed
- * @retval #HAPTIC_ERROR_NOT_SUPPORTED_DEVICE	Not supported device
- *
- * @see haptic_vibrate_buffer()
- * @see haptic_vibrate_monotone_with_detail()
- * @see haptic_vibrate_file_with_detail()
- * @see haptic_get_count()
- */
-int haptic_vibrate_buffers_with_detail(haptic_device_h device_handle,
-                                      const unsigned char *vibe_buffer,
-									  int size,
-                                      haptic_iteration_e iteration,
-                                      haptic_feedback_e feedback,
-                                      haptic_priority_e priority,
-                                      haptic_effect_h *effect_handle);
-
-/**
  * @param[out] effect_handle	Pointer to the variable that will receive a handle to the playing effect
  *
  * @return 0 on success, otherwise a negative error value.
@@ -545,8 +504,8 @@ int haptic_get_effect_state(haptic_device_h device_handle, haptic_effect_h effec
  *      effect element for haptic.
  */
 typedef struct {
-	int haptic_duration;			/**< Duration of the effect element in millisecond */
-	haptic_feedback_e haptic_level;	/**< Level of the effect element (0 ~ 100) */
+	int haptic_duration;    /**< Start time of the effect element in millisecond */
+	int haptic_level;       /**< Duration of the effect element in millisecond */
 } haptic_effect_element_s;
 
 /**
@@ -649,7 +608,7 @@ int haptic_get_buffer_duration(haptic_device_h device_handle, const unsigned cha
  * @param[in] device_handle 	The device handle from haptic_open()
  * @param[in] vibe_buffer 		Pointer to the vibration pattern buffer
  * @param[in] size 	          	Size to the vibration pattern buffer
- * @param[out] duration   		The pointer to the duration time value
+ * @param[out] buffer_duration   		The pointer to the duration time value
  *
  * @return 0 on success, otherwise a negative error value.
  * @retval #HAPTIC_ERROR_NONE                	Successful
@@ -684,6 +643,10 @@ int haptic_get_buffers_duration(haptic_device_h device_handle, const unsigned ch
  * @see haptic_save_effect()
  */
 int haptic_save_led(const unsigned char *vibe_buffer, int max_bufsize, const char *file_path);
+
+/**
+ * @} end of CAPI_SYSTEM_DEVICED_HAPTIC_MODULE
+ */
 
 #ifdef __cplusplus
 }

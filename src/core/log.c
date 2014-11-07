@@ -16,6 +16,8 @@
  * limitations under the License.
  */
 
+#include <stdio.h>
+#include "log.h"
 
 #ifdef DEBUG
 void __cyg_profile_func_enter(void *, void *)

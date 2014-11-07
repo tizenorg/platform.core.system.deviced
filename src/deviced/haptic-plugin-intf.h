@@ -22,7 +22,7 @@
 
 #include "haptic-module.h"
 
-struct haptic_ops {
+struct haptic_plugin_ops {
 	int (*get_device_count) (int*);
 	int (*open_device) (int, int*);
 	int (*close_device) (int);
@@ -35,6 +35,6 @@ struct haptic_ops {
 	int (*convert_binary) (const unsigned char*, int, const char*);
 };
 
-const struct haptic_ops *get_haptic_plugin_interface();
+const struct haptic_plugin_ops *get_haptic_plugin_interface();
 
 #endif	/* __HAPTIC_PLUGIN_INTF_H__ */

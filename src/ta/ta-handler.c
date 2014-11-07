@@ -21,12 +21,30 @@
 #include <device-node.h>
 
 #include "core/log.h"
-#include "core/data.h"
 #include "core/devices.h"
 #include "display/poll.h"
 #include "core/common.h"
 
 #define RETRY	3
+
+enum ta_connect_status{
+	TA_OFFLINE = 0,
+	TA_ONLINE = 1,
+};
+
+static int __check_insuspend_charging(void)
+{
+	int val, ret;
+
+	ret = device_get_property(DEVICE_TYPE_POWER, PROP_POWER_INSUSPEND_CHARGING_SUPPORT, &val);
+	if (ret != 0)
+		val = 0;
+	if (val == 0)
+		ret = pm_lock_internal(INTERNAL_LOCK_TA, LCD_OFF, STAY_CUR_STATE, 0);
+	else
+		ret = 0;
+	return ret;
+}
 
 static void ta_init(void *data)
 {
@@ -34,25 +52,20 @@ static void ta_init(void *data)
 	int ret;
 
 	if (device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_TA_ONLINE, &val) != 0)
-		return;
+		val = -EINVAL;
 
-	if (val == 1) {
+	if (val == TA_ONLINE) {
 		vconf_set_int(VCONFKEY_SYSMAN_CHARGER_STATUS,
 				VCONFKEY_SYSMAN_CHARGER_CONNECTED);
 		while (i < RETRY
-			   &&  pm_lock_internal(getpid(), LCD_OFF, STAY_CUR_STATE,
-						0) == -1) {
+			   && __check_insuspend_charging() == -1) {
 			i++;
 			sleep(1);
 		}
-	} else if (val == 0) {
+	} else if (val == TA_OFFLINE) {
 		vconf_set_int(VCONFKEY_SYSMAN_CHARGER_STATUS,
 				VCONFKEY_SYSMAN_CHARGER_DISCONNECTED);
 	}
-	ret = device_get_property(DEVICE_TYPE_POWER,
-		PROP_POWER_CHARGE_NOW, &val);
-	if (ret == 0)
-		vconf_set_int(VCONFKEY_SYSMAN_BATTERY_CHARGE_NOW, val);
 }
 
 static const struct device_ops ta_device_ops = {
