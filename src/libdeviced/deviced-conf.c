@@ -23,10 +23,13 @@
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <errno.h>
 
 #include "log.h"
 #include "deviced-priv.h"
 #include "dd-deviced.h"
+#include "dbus.h"
+#include "score-defines.h"
 
 #define PERMANENT_DIR		"/tmp/permanent"
 #define VIP_DIR			"/tmp/vip"
@@ -44,17 +47,49 @@ enum mp_entry_type {
 
 int util_oomadj_set(int pid, int oomadj_val)
 {
-	char buf1[255];
-	char buf2[255];
+	DBusError err;
+	DBusMessage *msg;
+	char *pa[4];
+	char buf1[SYSTEM_NOTI_MAXARG];
+	char buf2[SYSTEM_NOTI_MAXARG];
+	int ret, val;
 
 	snprintf(buf1, sizeof(buf1), "%d", pid);
 	snprintf(buf2, sizeof(buf2), "%d", oomadj_val);
-	return deviced_call_predef_action(OOMADJ_SET, 2, buf1, buf2);
+
+	pa[0] = OOMADJ_SET;
+	pa[1] = "2";
+	pa[2] = buf1;
+	pa[3] = buf2;
+
+	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
+			DEVICED_PATH_PROCESS, DEVICED_INTERFACE_PROCESS,
+			pa[0], "siss", pa);
+	if (!msg)
+		return -EBADMSG;
+
+	dbus_error_init(&err);
+
+	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &val, DBUS_TYPE_INVALID);
+	if (!ret) {
+		_E("no message : [%s:%s]", err.name, err.message);
+		val = -EBADMSG;
+	}
+
+	dbus_message_unref(msg);
+	dbus_error_free(&err);
+
+	_D("%s-%s : %d", DEVICED_INTERFACE_PROCESS, pa[0], val);
+	return val;
 }
 
-int util_process_group_set(const char* name, int pid)
+static int util_process_group_set(char* name, int pid)
 {
-	char buf[255];
+	DBusError err;
+	DBusMessage *msg;
+	char *pa[4];
+	char buf[SYSTEM_NOTI_MAXARG];
+	int ret, val;
 
 	if (strncmp(PROCESS_VIP, name, strlen(name)) != 0 &&
 	    strncmp(PROCESS_PERMANENT, name, strlen(name)) != 0) {
@@ -64,7 +99,31 @@ int util_process_group_set(const char* name, int pid)
 
 	snprintf(buf, sizeof(buf), "%d", pid);
 	_D("pid(%d) is inserted at vip", pid);
-	return deviced_call_predef_action(PROCESS_GROUP_SET, 2, buf, name);
+
+	pa[0] = PROCESS_GROUP_SET;
+	pa[1] = "2";
+	pa[2] = buf;
+	pa[3] = name;
+
+	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
+			DEVICED_PATH_PROCESS, DEVICED_INTERFACE_PROCESS,
+			pa[0], "siss", pa);
+	if (!msg)
+		return -EBADMSG;
+
+	dbus_error_init(&err);
+
+	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &val, DBUS_TYPE_INVALID);
+	if (!ret) {
+		_E("no message : [%s:%s]", err.name, err.message);
+		val = -EBADMSG;
+	}
+
+	dbus_message_unref(msg);
+	dbus_error_free(&err);
+
+	_D("%s-%s : %d", DEVICED_INTERFACE_PROCESS, pa[0], val);
+	return val;
 }
 
 API int deviced_conf_set_mempolicy_bypid(int pid, enum mem_policy mempol)
@@ -76,10 +135,10 @@ API int deviced_conf_set_mempolicy_bypid(int pid, enum mem_policy mempol)
 
 	switch (mempol) {
 	case OOM_LIKELY:
-		oomadj_val = 1;
+		oomadj_val = OOMADJ_BACKGRD_UNLOCKED;
 		break;
 	case OOM_IGNORE:
-		oomadj_val = -17;
+		oomadj_val = OOMADJ_SU;
 		break;
 	default:
 		return -1;
@@ -221,12 +280,12 @@ API int deviced_conf_set_permanent_bypid(int pid)
 	}
 
  MEMPOL_SET:
-	util_oomadj_set(pid, -17);
+	util_oomadj_set(pid, OOMADJ_SU);
 
 	return 0;
 }
 
-API int deviced_conf_set_permanent()
+API int deviced_conf_set_permanent(void)
 {
 	pid_t pid = getpid();
 	return deviced_conf_set_permanent_bypid(pid);

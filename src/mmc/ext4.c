@@ -16,10 +16,30 @@
  * limitations under the License.
  */
 
-#include "mmc-handler.h"
-#include "core/common.h"
 
-#define FS_EXT4_SMACK_LABEL "mmc-smack-label "MMC_MOUNT_POINT
+#include <stdio.h>
+#include <stdlib.h>
+#include <limits.h>
+#include <vconf.h>
+#include <signal.h>
+#include <fcntl.h>
+#include <string.h>
+#include <errno.h>
+
+#include "core/common.h"
+#include "core/devices.h"
+#include "core/log.h"
+#include "mmc-handler.h"
+
+#define FS_EXT4_NAME	"ext4"
+
+#define FS_EXT4_SMACK_LABEL "/usr/bin/mmc-smack-label"
+
+struct popup_data {
+	char *name;
+	char *key;
+	char *value;
+};
 
 static const char *ext4_arg[] = {
 	"/sbin/mkfs.ext4",
@@ -31,7 +51,7 @@ static const char *ext4_check_arg[] = {
 	"-f", "-y", NULL, NULL,
 };
 
-static struct fs_check fs_ext4_type = {
+static struct fs_check ext4_info = {
 	FS_TYPE_EXT4,
 	"ext4",
 	0x438,
@@ -41,13 +61,55 @@ static struct fs_check fs_ext4_type = {
 
 static int mmc_popup_pid;
 
-static int mmc_check_smack(void)
+static bool ext4_match(const char *devpath)
 {
-	char cmd[NAME_MAX];
-	snprintf(cmd, sizeof(cmd), "mmc-smack-label %s", MMC_MOUNT_POINT);
-	system(cmd);
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_MOUNTED);
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_MOUNT, VCONFKEY_SYSMAN_MMC_MOUNT_COMPLETED);
+	char buf[4];
+	int fd, r;
+
+	fd = open(devpath, O_RDONLY);
+	if (fd < 0) {
+		_E("failed to open fd(%s) : %s", devpath, strerror(errno));
+		return false;
+	}
+
+	/* check fs type with magic code */
+	r = lseek(fd, ext4_info.offset, SEEK_SET);
+	if (r < 0)
+		goto error;
+
+	r = read(fd, buf, 2);
+	if (r < 0)
+		goto error;
+
+	_I("mmc search magic : 0x%2x, 0x%2x", buf[0],buf[1]);
+	if (memcmp(buf, ext4_info.magic, ext4_info.magic_sz))
+		goto error;
+
+	close(fd);
+	_I("MMC type : %s", ext4_info.name);
+	return true;
+
+error:
+	close(fd);
+	_E("failed to match with ext4(%s)", devpath);
+	return false;
+}
+
+static int ext4_check(const char *devpath)
+{
+	int argc;
+	argc = ARRAY_SIZE(ext4_check_arg);
+	ext4_check_arg[argc - 2] = devpath;
+	return run_child(argc, ext4_check_arg);
+}
+
+static int mmc_check_smack(const char *mount_point)
+{
+	char buf[NAME_MAX] = {0,};
+
+	snprintf(buf, sizeof(buf), "%s", mount_point);
+	launch_evenif_exist(FS_EXT4_SMACK_LABEL, buf);
+
 	if (mmc_popup_pid > 0) {
 		_E("will be killed mmc-popup(%d)", mmc_popup_pid);
 		kill(mmc_popup_pid, SIGTERM);
@@ -57,91 +119,76 @@ static int mmc_check_smack(void)
 
 static int check_smack_popup(void)
 {
-	bundle *b = NULL;
 	int ret = -1;
 	int val = -1;
+	struct popup_data *params;
+	static const struct device_ops *apps = NULL;
 
-	b = bundle_create();
-	bundle_add(b, "_SYSPOPUP_CONTENT_", "checksmack");
 	ret = vconf_get_int(VCONFKEY_STARTER_SEQUENCE, &val);
 	if (val == 1 || ret != 0) {
-		if ((mmc_popup_pid = syspopup_launch("mmc-syspopup", b)) < 0) {
-			_E("popup launch failed\n");
-		}
-	}
-	bundle_free(b);
 
-	mmc_check_smack();
+		FIND_DEVICE_INT(apps, "apps");
+
+		params = malloc(sizeof(struct popup_data));
+		if (params == NULL) {
+			_E("Malloc failed");
+			return -1;
+		}
+		params->name = MMC_POPUP_NAME;
+		params->key = MMC_POPUP_APP_KEY;
+		params->value = MMC_POPUP_SMACK_VALUE;
+		apps->init(params);
+		free(params);
+	}
+
 	return 0;
 }
 
-static int ext4_init(void *data)
+static int ext4_mount(bool smack, const char *devpath, const char *mount_point)
 {
-	int fd, ret;
-	int argc;
-	char buf[BUF_LEN];
-	char *path = (char *)data;
+	int r, retry = RETRY_COUNT;
 
-	argc = ARRAY_SIZE(ext4_check_arg);
-	ext4_check_arg[argc - 2] = path;
+	do {
+		r = mount(devpath, mount_point, "ext4", 0, NULL);
+		if (!r) {
+			_I("Mounted mmc card [ext4]");
+			if (smack) {
+				check_smack_popup();
+				mmc_check_smack(mount_point);
+			}
+			return 0;
+		}
+		_I("mount fail : r = %d, err = %d", r, errno);
+		usleep(100000);
+	} while (r < 0 && errno == ENOENT && retry-- > 0);
 
-	if ((fd = open(path, O_RDONLY)) < 0) {
-		_E("can't open the '%s': %s", path, strerror(errno));
-		return -EINVAL;
-	}
-	/* check fs type with magic code */
-	ret = lseek(fd, fs_ext4_type.offset, SEEK_SET);
-	if (ret < 0) {
-		_E("fail to check offset of ext4");
-		goto out;
-	}
-	ret = read(fd, buf, 2);
-	_D("mmc search magic : 0x%2x, 0x%2x", buf[0],buf[1]);
-	if (!memcmp(buf, fs_ext4_type.magic, fs_ext4_type.magic_sz)) {
-		_D("mmc type : %s", fs_ext4_type.name);
-		close(fd);
-
-		return fs_ext4_type.type;
-	}
-out:
-	close(fd);
-	return -EINVAL;
+	return -errno;
 }
 
-static const char **ext4_check(void)
-{
-	return ext4_check_arg;
-}
-
-static int ext4_mount(int smack, void *data)
-{
-	_E("ext4_mount");
-	if (mount_fs((char *)data, "ext4", NULL) != 0)
-		return errno;
-	if (smack) {
-		if (check_smack_popup() != 0)
-			return -1;
-	}
-	return smack;
-}
-
-static const char **ext4_format(void *data)
+static int ext4_format(const char *devpath)
 {
 	int argc;
-	char *path = (char *)data;
 	argc = ARRAY_SIZE(ext4_arg);
-	ext4_arg[argc - 2] = path;
-	return ext4_arg;
+	ext4_arg[argc - 2] = devpath;
+	return run_child(argc, ext4_arg);
 }
 
-static const struct mmc_filesystem_ops ext4_ops = {
-	ext4_init,
-	ext4_check,
-	ext4_mount,
-	ext4_format,
+static const struct mmc_fs_ops ext4_ops = {
+	.type = FS_TYPE_EXT4,
+	.name = "ext4",
+	.match = ext4_match,
+	.check = ext4_check,
+	.mount = ext4_mount,
+	.format = ext4_format,
 };
 
-static void __CONSTRUCTOR__ ext4_register(void)
+static void __CONSTRUCTOR__ module_init(void)
 {
-	register_mmc_handler("ext4", ext4_ops);
+	add_fs(&ext4_ops);
 }
+/*
+static void __DESTRUCTOR__ module_exit(void)
+{
+	remove_fs(&ext4_ops);
+}
+*/

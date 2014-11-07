@@ -17,30 +17,90 @@
  */
 
 
-#ifndef __SS_DEVICE_HANDLER_H__
-#define __SS_DEVICE_HANDLER_H__
+#ifndef __DEVICE_HANDLER_H__
+#define __DEVICE_HANDLER_H__
 
-#include "data.h"
+#include "common.h"
 
 enum extcon_type {
 	EXTCON_TA = 0,
 	EXTCON_EARJACK,
 };
 
-#define CONNECTED(val) ((val) == 1)
+enum device_change_type {
+	DEVICE_CHANGE_ABNORMAL	= 0,
+	DEVICE_CHANGE_NORMAL	= 1,
+};
 
-/* MMC functions */
-int ss_mmc_inserted();
-int ss_mmc_removed();
+enum charge_full_type {
+	CHARGING_NOT_FULL	= 0,
+	CHARGING_FULL		= 1,
+};
+enum charge_now_type {
+	CHARGER_ABNORMAL	= -1,
+	CHARGER_DISCHARGING	= 0,
+	CHARGER_CHARGING	= 1,
+};
+enum health_type {
+	HEALTH_BAD		= 0,
+	HEALTH_GOOD		= 1,
+};
 
-/* USB Storage */
-int _ss_usb_storage_init(void);
+enum temp_type {
+	TEMP_LOW		= 0,
+	TEMP_HIGH		= 1,
+};
+
+enum present_type {
+	PRESENT_ABNORMAL	= 0,
+	PRESENT_NORMAL		= 1,
+};
+
+enum ovp_type {
+	OVP_NORMAL		= 0,
+	OVP_ABNORMAL		= 1,
+};
+
+enum battery_noti_type {
+	DEVICE_NOTI_BATT_CHARGE = 0,
+	DEVICE_NOTI_BATT_LOW,
+	DEVICE_NOTI_BATT_FULL,
+	DEVICE_NOTI_MAX,
+};
+
+enum battery_noti_status {
+	DEVICE_NOTI_OFF = 0,
+	DEVICE_NOTI_ON  = 1,
+};
+
+enum dock_type {
+	DOCK_NONE	= 0,
+	DOCK_SOUND	= 7,
+};
+
+struct battery_status {
+	int capacity;
+	int charge_full;
+	int charge_now;
+	int health;
+	int present;
+	int online;
+	int temp;
+	int ovp;
+};
+
+struct battery_status battery;
+
+#define CONNECTED(val) ((val) != 0)
 
 /* Battery functions */
-int ss_lowbat_is_charge_in_now();
-int ss_lowbat_set_charge_on(int onoff);
-Eina_Bool ss_lowbat_monitor(void *data);
+void lowbat_monitor(void *data);
 
 int extcon_set_count(int index);
 
-#endif /* __SS_DEVICE_HANDLER_H__ */
+int get_usb_state_direct(void);
+
+void sync_cradle_status(void);
+
+void internal_pm_change_state(unsigned int s_bits);
+#endif /* __DEVICE_HANDLER_H__ */

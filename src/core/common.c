@@ -23,6 +23,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <dirent.h>
@@ -31,10 +32,12 @@
 #include <stdarg.h>
 #include <errno.h>
 #include <poll.h>
+#include <mntent.h>
 #include "log.h"
 
 #define PERMANENT_DIR		"/tmp/permanent"
 #define VIP_DIR			"/tmp/vip"
+#define BUFF_MAX 255
 
 /**
  * Opens "/proc/$pid/oom_score_adj" file for w/r;
@@ -55,6 +58,7 @@ int get_exec_pid(const char *execpath)
 	DIR *dp;
 	struct dirent *dentry;
 	int pid = -1, fd;
+	int ret;
 	char buf[PATH_MAX];
 	char buf2[PATH_MAX];
 
@@ -74,11 +78,13 @@ int get_exec_pid(const char *execpath)
 		fd = open(buf, O_RDONLY);
 		if (fd < 0)
 			continue;
-		if (read(fd, buf2, PATH_MAX) < 0) {
-			close(fd);
-			continue;
-		}
+		ret = read(fd, buf2, PATH_MAX);
 		close(fd);
+
+		if (ret < 0 || ret >= PATH_MAX)
+			continue;
+
+		buf2[ret] = '\0';
 
 		if (!strcmp(buf2, execpath)) {
 			closedir(dp);
@@ -137,4 +143,218 @@ int is_vip(int pid)
 		return 1;
 	else
 		return 0;
+}
+
+static int remove_dir_internal(int fd)
+{
+	DIR *dir;
+	struct dirent *de;
+	int subfd, ret = 0;
+
+	dir = fdopendir(fd);
+	if (!dir)
+		return -1;
+	while ((de = readdir(dir))) {
+		if (de->d_type == DT_DIR) {
+			if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
+				continue;
+			subfd = openat(fd, de->d_name, O_RDONLY | O_DIRECTORY);
+			if (subfd < 0) {
+				_SE("Couldn't openat %s: %s\n", de->d_name, strerror(errno));
+				ret = -1;
+				continue;
+			}
+			if (remove_dir_internal(subfd)) {
+				ret = -1;
+			}
+			close(subfd);
+			if (unlinkat(fd, de->d_name, AT_REMOVEDIR) < 0) {
+				_SE("Couldn't unlinkat %s: %s\n", de->d_name, strerror(errno));
+				ret = -1;
+			}
+		} else {
+			if (unlinkat(fd, de->d_name, 0) < 0) {
+				_SE("Couldn't unlinkat %s: %s\n", de->d_name, strerror(errno));
+				ret = -1;
+			}
+		}
+	}
+	closedir(dir);
+	return ret;
+}
+
+int remove_dir(char *path, int del_dir)
+{
+	int fd, ret = 0;
+
+	if (!path)
+		return -1;
+	fd = open(path, O_RDONLY | O_NONBLOCK | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
+	if (fd < 0) {
+		_SE("Couldn't opendir %s: %s\n", path, strerror(errno));
+		return -errno;
+	}
+	ret = remove_dir_internal(fd);
+	close(fd);
+
+	if (del_dir) {
+		if (rmdir(path)) {
+			_SE("Couldn't rmdir %s: %s\n", path, strerror(errno));
+			ret = -1;
+		}
+	}
+	return ret;
+}
+
+/*
+ * Helper function
+ * - Read from sysfs entry
+ * - Write to sysfs entry
+ */
+int sys_check_node(char *path)
+{
+	int fd;
+
+	fd = open(path, O_RDONLY);
+	if (fd == -1)
+		return -1;
+
+	close(fd);
+	return 0;
+}
+
+static int sys_read_buf(char *file, char *buf)
+{
+	int fd;
+	int r;
+	int ret = 0;
+
+	fd = open(file, O_RDONLY);
+	if (fd == -1)
+		return -ENOENT;
+
+	r = read(fd, buf, BUFF_MAX);
+	if ((r >= 0) && (r < BUFF_MAX))
+		buf[r] = '\0';
+	else
+		ret = -EIO;
+
+	close(fd);
+
+	return ret;
+}
+
+static int sys_write_buf(char *file, char *buf)
+{
+	int fd;
+	int r;
+	int ret = 0;
+
+	fd = open(file, O_WRONLY);
+	if (fd == -1)
+		return -ENOENT;
+
+	r = write(fd, buf, strlen(buf));
+	if (r < 0)
+		ret = -EIO;
+
+	close(fd);
+
+	return ret;
+}
+
+int sys_get_int(char *fname, int *val)
+{
+	char buf[BUFF_MAX];
+	int ret = 0;
+
+	if (sys_read_buf(fname, buf) == 0) {
+		*val = atoi(buf);
+	} else {
+		*val = -1;
+		ret = -EIO;
+	}
+
+	return ret;
+}
+
+int sys_set_int(char *fname, int val)
+{
+	char buf[BUFF_MAX];
+	int ret = 0;
+
+	snprintf(buf, sizeof(buf), "%d", val);
+
+	if (sys_write_buf(fname, buf) != 0)
+		ret = -EIO;
+
+	return ret;
+}
+
+int sys_get_str(char *fname, char *str)
+{
+	char buf[BUFF_MAX] = {0};
+
+	if (sys_read_buf(fname, buf) == 0) {
+		strncpy(str, buf, strlen(buf));
+		return 0;
+	}
+
+	return -1;
+}
+
+int sys_set_str(char *fname, char *val)
+{
+	int r = -1;
+
+	if (val != NULL) {
+		if (sys_write_buf(fname, val) == 0)
+			r = 0;
+	}
+
+	return r;
+}
+
+int terminate_process(const char* partition, bool force)
+{
+	const char *argv[7] = {"/sbin/fuser", "-m", "-k", "-S", NULL, NULL, NULL};
+	int argc;
+
+	if (force)
+		argv[4] = "-SIGKILL";
+	else
+		argv[4] = "-SIGTERM";
+	argv[5] = partition;
+	argc = sizeof(argv) / sizeof(argv[0]);
+	return run_child(argc, argv);
+}
+
+int mount_check(const char* path)
+{
+	int ret = false;
+	struct mntent* mnt;
+	const char* table = "/etc/mtab";
+	FILE* fp;
+
+	fp = setmntent(table, "r");
+	if (!fp)
+		return ret;
+	while (mnt=getmntent(fp)) {
+		if (!strcmp(mnt->mnt_dir, path)) {
+			ret = true;
+			break;
+		}
+	}
+	endmntent(fp);
+	return ret;
+}
+
+void print_time(const char *prefix)
+{
+	struct timeval tv;
+	struct tm *tm;
+	gettimeofday(&tv, NULL);
+	tm = localtime(&(tv.tv_sec));
+	_D("%s --> %d:%02d:%02d %d",
+			prefix, tm->tm_hour, tm->tm_min, tm->tm_sec, tv.tv_usec);
 }

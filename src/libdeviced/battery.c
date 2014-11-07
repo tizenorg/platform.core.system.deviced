@@ -18,78 +18,41 @@
 
 
 #include <stdio.h>
-#include <vconf.h>
 #include <errno.h>
-#include <device-node.h>
 
 #include "log.h"
-#include "dd-battery.h"
+#include "dbus.h"
+#include "common.h"
+
+#define METHOD_GET_PERCENT		"GetPercent"
+#define METHOD_GET_PERCENT_RAW	"GetPercentRaw"
+#define METHOD_IS_FULL			"IsFull"
+#define METHOD_GET_HEALTH		"GetHealth"
 
 API int battery_get_percent(void)
 {
-	int val;
-	int r;
-
-	r = device_get_property(DEVICE_TYPE_POWER, PROP_POWER_CAPACITY, &val);
-	if (r < 0)
-		return r;
-
-	if (val < 0 || val > 100) {
-		_E("capacity value is wrong");
-		errno = EPERM;
-		return -1;
-	}
-
-	return val;
+	return dbus_method_sync(DEVICED_BUS_NAME,
+			DEVICED_PATH_BATTERY, DEVICED_INTERFACE_BATTERY,
+			METHOD_GET_PERCENT, NULL, NULL);
 }
 
 API int battery_get_percent_raw(void)
 {
-	int val;
-	int r;
-
-	r = device_get_property(DEVICE_TYPE_POWER, PROP_POWER_CAPACITY_RAW, &val);
-	if (r < 0)
-		return r;
-
-	if (val > 10000)
-		return 10000;
-
-	return val;
+	return dbus_method_sync(DEVICED_BUS_NAME,
+			DEVICED_PATH_BATTERY, DEVICED_INTERFACE_BATTERY,
+			METHOD_GET_PERCENT_RAW, NULL, NULL);
 }
 
 API int battery_is_full(void)
 {
-	int val;
-	int r;
-
-	r = device_get_property(DEVICE_TYPE_POWER, PROP_POWER_CHARGE_FULL, &val);
-	if (r < 0)
-		return r;
-
-	if (val != 0 && val != 1) {
-		_E("charge_full value is wrong");
-		errno = EPERM;
-		return -1;
-	}
-
-	return val;
+	return dbus_method_sync(DEVICED_BUS_NAME,
+			DEVICED_PATH_BATTERY, DEVICED_INTERFACE_BATTERY,
+			METHOD_IS_FULL, NULL, NULL);
 }
 
 API int battery_get_health(void)
 {
-	int val;
-	int r;
-
-	r = device_get_property(DEVICE_TYPE_POWER, PROP_POWER_HEALTH, &val);
-	if (r < 0)
-		return r;
-
-	if (val < BAT_UNKNOWN || val > BAT_COLD) {
-		_E("battery health value is wrong");
-		errno = EPERM;
-		return -1;
-	}
-
-	return val;
+	return dbus_method_sync(DEVICED_BUS_NAME,
+			DEVICED_PATH_BATTERY, DEVICED_INTERFACE_BATTERY,
+			METHOD_GET_HEALTH, NULL, NULL);
 }

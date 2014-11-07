@@ -4,22 +4,26 @@ PROJECT(libdeviced C)
 SET(LIBDEVICED_SRCS
 	battery.c
 	control.c
+	display.c
 	dbus.c
+	haptic.c
+	led.c
+	mmc.c
+	storage.c
+	usbhost.c
 	deviced-conf.c
 	deviced-noti.c
 	deviced-util.c
-	display.c
-	haptic.c
-	led.c
 )
 
-INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/src/deviced)
+INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/src/deviced ${CMAKE_SOURCE_DIR}/src/shared)
 
 INCLUDE(FindPkgConfig)
 pkg_check_modules(libpkgs REQUIRED
 	vconf
 	dlog
 	dbus-1
+	dbus-glib-1
 	edbus)
 
 FOREACH(flag ${libpkgs_CFLAGS})

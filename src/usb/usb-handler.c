@@ -22,7 +22,6 @@
 
 #include "core/log.h"
 #include "core/launch.h"
-#include "core/data.h"
 #include "core/devices.h"
 #include "display/poll.h"
 
@@ -43,7 +42,7 @@ static void usb_init(void *data)
 				i++;
 				sleep(1);
 			}
-			pid = ss_launch_if_noexist(USBCON_EXEC_PATH, NULL);
+			pid = launch_if_noexist(USBCON_EXEC_PATH, NULL);
 			if (pid < 0) {
 				_E("usb appl launching failed\n");
 				return;

@@ -17,13 +17,13 @@
  */
 
 
-#ifndef __SS_LAUNCH_H__
-#define __SS_LAUNCH_H__
+#ifndef __LAUNCH_H__
+#define __LAUNCH_H__
 
-#define SS_LAUNCH_NICE          0x0002
+#define LAUNCH_NICE          0x0002
 
-int ss_launch_if_noexist(const char *execpath, const char *arg, ...);
-int ss_launch_evenif_exist(const char *execpath, const char *arg, ...);
-int ss_launch_after_kill_if_exist(const char *execpath, const char *arg, ...);
+int launch_if_noexist(const char *execpath, const char *arg, ...);
+int launch_evenif_exist(const char *execpath, const char *arg, ...);
+int launch_after_kill_if_exist(const char *execpath, const char *arg, ...);
 
-#endif /* __SS_LAUNCH_H__ */
+#endif /* __LAUNCH_H__ */

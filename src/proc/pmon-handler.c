@@ -26,7 +26,6 @@
 
 #include "core/log.h"
 #include "core/launch.h"
-#include "core/data.h"
 #include "core/common.h"
 #include "core/devices.h"
 
@@ -34,7 +33,7 @@
 
 static Ecore_Fd_Handler *pmon_efd = NULL;
 
-static int __pmon_start(struct ss_main_data *ad);
+static int __pmon_start(void);
 static int __pmon_stop(int fd);
 static int replace_char(int size, char *t)
 {
@@ -50,6 +49,7 @@ static int replace_char(int size, char *t)
 static char *pmon_get_permanent_pname(int pid)
 {
 	int fd;
+	int ret;
 	char buf[PATH_MAX];
 	struct stat st;
 	char *cmdline = NULL;
@@ -76,9 +76,11 @@ static char *pmon_get_permanent_pname(int pid)
 	}
 	memset(cmdline, 0, st.st_size + 1);
 
-	read(fd, cmdline, st.st_size);
-	/* TODO - must change more smarter */
-	replace_char(st.st_size - 1, cmdline);
+	ret = read(fd, cmdline, st.st_size);
+	if (ret >= 0 && ret < st.st_size) {
+		/* TODO - must change more smarter */
+		replace_char(st.st_size - 1, cmdline);
+	}
 	close(fd);
 
 	return cmdline;
@@ -89,7 +91,7 @@ static void print_pmon_state(unsigned int dead_pid)
 	_D("[Process MON] %d killed", dead_pid);
 }
 
-static int pmon_process(int pid, void *ad)
+static int pmon_process(int pid)
 {
 	char *cmdline;
 	int new_pid;
@@ -108,7 +110,7 @@ static int pmon_process(int pid, void *ad)
 		cmdline = pmon_get_permanent_pname(pid);
 		if (cmdline != NULL) {
 			_I("[Process MON] %s relaunch", cmdline);
-			new_pid = ss_launch_evenif_exist(cmdline, "");
+			new_pid = launch_evenif_exist(cmdline, "");
 			free(cmdline);
 			if (new_pid > 0) {
 				/* TODO - set oom */
@@ -190,8 +192,10 @@ static unsigned int pmon_read(int fd)
 static Eina_Bool pmon_cb(void *data, Ecore_Fd_Handler * fd_handler)
 {
 	int fd;
-	struct ss_main_data *ad = (struct ss_main_data *)data;
 	int dead_pid;
+	char pid_str[PATH_MAX];
+	int ret;
+
 	if (!ecore_main_fd_handler_active_get(fd_handler, ECORE_FD_READ)) {
 		_E("ecore_main_fd_handler_active_get error , return");
 		goto out;
@@ -203,20 +207,25 @@ static Eina_Bool pmon_cb(void *data, Ecore_Fd_Handler * fd_handler)
 		_E("ecore_main_fd_handler_fd_get error , return");
 		goto out;
 	}
-	if (read(fd, &dead_pid, sizeof(dead_pid)) < 0) {
+
+	ret = read(fd, pid_str, PATH_MAX);
+
+	if (ret < 0 || ret >= PATH_MAX) {
 		__pmon_stop(fd);
 		_E("Reading DEAD_PID failed, restart ecore fd");
-		__pmon_start(ad);
+		__pmon_start();
 		goto out;
 	}
 
+	pid_str[ret] = '\0';
+	dead_pid = strtoul(pid_str, NULL, 10);
 	print_pmon_state(dead_pid);
-	pmon_process(dead_pid, ad);
+	pmon_process(dead_pid);
 out:
 	return EINA_TRUE;
 }
 
-static int __pmon_start(struct ss_main_data *ad)
+static int __pmon_start(void)
 {
 	int pmon_fd = -1;
 	char pmon_dev_node[PATH_MAX];
@@ -253,16 +262,14 @@ static int __pmon_stop(int fd)
 
 static void pmon_init(void *data)
 {
-	struct ss_main_data *ad = (struct ss_main_data*)data;
 	int ret = -1;
 
 	if (pmon_efd) {
 		ecore_main_fd_handler_del(pmon_efd);
 		pmon_efd = NULL;
 	}
-	if (__pmon_start(ad) == -1) {
+	if (__pmon_start() == -1) {
 		_E("fail pmon control fd init");
-		return;
 	}
 }
 

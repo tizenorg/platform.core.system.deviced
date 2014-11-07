@@ -1,0 +1,18 @@
+CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
+
+SET(SHARED_SRCS
+	dbus.c
+)
+
+INCLUDE(FindPkgConfig)
+pkg_check_modules(libshared REQUIRED
+	dlog
+	dbus-1)
+
+FOREACH(flag ${libshared_CFLAGS})
+	SET(SHARED_LIB_CFLAGS "${SHARED_LIB_CFLAGS} ${flag}")
+ENDFOREACH(flag)
+
+ADD_LIBRARY(shared STATIC ${SHARED_SRCS})
+TARGET_LINK_LIBRARIES(shared ${libshared_LDFLAGS})
+SET_TARGET_PROPERTIES(shared PROPERTIES COMPILE_FLAGS "-fPIC")

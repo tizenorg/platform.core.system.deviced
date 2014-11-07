@@ -20,23 +20,74 @@
 #ifndef __UDEV_H__
 #define __UDEV_H__
 
+#include <libudev.h>
+
+#define UDEV			"kernel"
+#define UDEV_SUBSYSTEM		"SUBSYSTEM"
+
+#define UDEV_ACTION		"ACTION"
+#define UDEV_CHANGE		"change"
+#define UDEV_ADD		"add"
+#define UDEV_REMOVE		"remove"
+
+#define UDEV_DEVPATH		"DEVPATH"
+
+#define UDEV_MONITOR_SIZE	(10*1024)
+#define UDEV_MONITOR_SIZE_LARGE (128*1024*1024)
+
+/* platform */
+#define PLATFORM_SUBSYSTEM	"platform"
+
 /* battery device */
-#define POWER_SUBSYSTEM         "power_supply"
+#define POWER_SUBSYSTEM		"power_supply"
+#define POWER_PATH			"/sys/class/power_supply/battery"
+#define POWER_SUPPLY_UEVENT POWER_PATH"/uevent"
+#define CAPACITY			"POWER_SUPPLY_CAPACITY"
+#define CHARGE_FULL			"POWER_SUPPLY_CHARGE_FULL"
+#define CHARGE_NOW			"POWER_SUPPLY_CHARGE_NOW"
+#define CHARGE_HEALTH		"POWER_SUPPLY_HEALTH"
+#define CHARGE_PRESENT		"POWER_SUPPLY_PRESENT"
+#define CHARGE_NAME			"POWER_SUPPLY_NAME"
+#define CHARGE_STATUS		"POWER_SUPPLY_STATUS"
+#define CHARGE_ONLINE		"POWER_SUPPLY_ONLINE"
 
 /* input device */
 #define INPUT_SUBSYSTEM		"input"
 #define INPUT_PATH			"*/input[0-9]*/event[0-9]*"
-#define ADD			"add"
-#define REMOVE			"remove"
 
 /* switch device */
 #define SWITCH_SUBSYSTEM	"switch"
 
-/* block device */
-#define BLOCK_SUBSYSTEM		"block"
-#define MMC_PATH			"*/mmcblk[0-9]"
-
 /* host device */
 #define HOST_SUBSYSTEM		"host_notify"
+
+/* power supply status */
+enum {
+	POWER_SUPPLY_STATUS_UNKNOWN = 0,
+	POWER_SUPPLY_STATUS_CHARGING,
+	POWER_SUPPLY_STATUS_DISCHARGING,
+	POWER_SUPPLY_STATUS_NOT_CHARGING,
+	POWER_SUPPLY_STATUS_FULL,
+};
+
+enum {
+	 POWER_SUPPLY_TYPE_UNKNOWN = 0,
+	 POWER_SUPPLY_TYPE_BATTERY,
+	 POWER_SUPPLY_TYPE_UPS,
+	 POWER_SUPPLY_TYPE_MAINS,
+	 POWER_SUPPLY_TYPE_USB,
+};
+
+struct uevent_handler {
+	char *subsystem;
+	void (*uevent_func)(struct udev_device *dev);
+	void *data;
+};
+
+int register_uevent_control(const struct uevent_handler *uh);
+void unregister_uevent_control(const struct uevent_handler *uh);
+int register_kernel_uevent_control(const struct uevent_handler *uh);
+void unregister_kernel_uevent_control(const struct uevent_handler *uh);
+
 
 #endif /* __UDEV_H__ */

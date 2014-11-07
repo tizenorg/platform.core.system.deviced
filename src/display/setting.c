@@ -22,22 +22,41 @@
 #include <errno.h>
 #include <stdbool.h>
 
+#include "core.h"
 #include "util.h"
 #include "setting.h"
-#include "conf.h"
+
+#define LCD_DIM_RATIO		0.3
+#define LCD_MAX_DIM_TIMEOUT	7000
+#define LCD_MIN_DIM_TIMEOUT	500
 
 static const char *setting_keys[SETTING_GET_END] = {
 	[SETTING_TO_NORMAL] = VCONFKEY_SETAPPL_LCD_TIMEOUT_NORMAL,
 	[SETTING_BRT_LEVEL] = VCONFKEY_SETAPPL_LCD_BRIGHTNESS,
 	[SETTING_LOCK_SCREEN] = VCONFKEY_IDLE_LOCK_STATE,
-	[SETTING_POWER_SAVING] = VCONFKEY_SETAPPL_PWRSV_SYSMODE_STATUS,
-	[SETTING_POWER_SAVING_DISPLAY] = VCONFKEY_SETAPPL_PWRSV_CUSTMODE_DISPLAY,
+	[SETTING_BOOT_POWER_ON_STATUS] = VCONFKEY_DEVICED_BOOT_POWER_ON_STATUS,
+	[SETTING_POWER_CUSTOM_BRIGHTNESS] = VCONFKEY_PM_CUSTOM_BRIGHTNESS_STATUS,
+	[SETTING_ACCESSIBILITY_TTS] = VCONFKEY_SETAPPL_ACCESSIBILITY_TTS,
 };
 
 static int lock_screen_state = VCONFKEY_IDLE_UNLOCK;
 static bool lock_screen_bg_state = false;
+static int force_lcdtimeout = 0;
+static int custom_on_timeout = 0;
+static int custom_normal_timeout = 0;
+static int custom_dim_timeout = 0;
 
 int (*update_pm_setting) (int key_idx, int val);
+
+int set_force_lcdtimeout(int timeout)
+{
+	if (timeout < 0)
+		return -EINVAL;
+
+	force_lcdtimeout = timeout;
+
+	return 0;
+}
 
 int get_lock_screen_state(void)
 {
@@ -92,47 +111,90 @@ int get_setting_brightness(int *level)
 	return vconf_get_int(VCONFKEY_SETAPPL_LCD_BRIGHTNESS, level);
 }
 
-int get_run_timeout(int *timeout)
+int get_dim_timeout(int *dim_timeout)
 {
-	int dim_timeout = -1, vconf_timeout = -1, ret;
-	get_dim_timeout(&dim_timeout);
+	int vconf_timeout, on_timeout, val, ret;
 
-	if(dim_timeout < 0) {
-		_E("Can not get dim timeout. set default 5 seconds");
-		dim_timeout = 5;
+	if (custom_dim_timeout > 0) {
+		*dim_timeout = custom_dim_timeout;
+		return 0;
 	}
 
 	ret = vconf_get_int(setting_keys[SETTING_TO_NORMAL], &vconf_timeout);
+	if (ret != 0) {
+		_E("Failed ro get setting timeout!");
+		vconf_timeout = DEFAULT_NORMAL_TIMEOUT;
+	}
 
-	if (ret < 0 || vconf_timeout <= 0)
-		ret = -ERANGE;
+	if (force_lcdtimeout > 0)
+		on_timeout = SEC_TO_MSEC(force_lcdtimeout);
 	else
-		*timeout = vconf_timeout - dim_timeout;
+		on_timeout = SEC_TO_MSEC(vconf_timeout);
 
-	return ret;
+	val = (double)on_timeout * LCD_DIM_RATIO;
+	if (val > LCD_MAX_DIM_TIMEOUT)
+		val = LCD_MAX_DIM_TIMEOUT;
 
-}
+	*dim_timeout = val;
 
-int get_dim_timeout(int *timeout)
-{
-	char buf[255];
-	/* TODO if needed */
-	*timeout = 5;		/* default timeout */
-	get_env("PM_TO_LCDDIM", buf, sizeof(buf));
-	_I("Get lcddim timeout [%s]", buf);
-	*timeout = atoi(buf);
 	return 0;
 }
 
-int get_off_timeout(int *timeout)
+int get_run_timeout(int *timeout)
 {
-	char buf[255];
-	/* TODO if needed */
-	*timeout = 5;		/* default timeout */
-	get_env("PM_TO_LCDOFF", buf, sizeof(buf));
-	_I("Get lcdoff timeout [%s]", buf);
-	*timeout = atoi(buf);
+	int dim_timeout = -1;
+	int vconf_timeout = -1;
+	int on_timeout;
+	int ret;
+
+	if (custom_normal_timeout > 0) {
+		*timeout = custom_normal_timeout;
+		return 0;
+	}
+
+	ret = vconf_get_int(setting_keys[SETTING_TO_NORMAL], &vconf_timeout);
+	if (ret != 0) {
+		_E("Failed ro get setting timeout!");
+		vconf_timeout = DEFAULT_NORMAL_TIMEOUT;
+	}
+
+	if (force_lcdtimeout > 0)
+		on_timeout = SEC_TO_MSEC(force_lcdtimeout);
+	else
+		on_timeout = SEC_TO_MSEC(vconf_timeout);
+
+	if (on_timeout < 0)
+		return -ERANGE;
+
+	if (on_timeout == 0) {
+		*timeout = on_timeout;
+		return 0;
+	}
+
+	get_dim_timeout(&dim_timeout);
+	*timeout = on_timeout - dim_timeout;
 	return 0;
+}
+
+int set_custom_lcdon_timeout(int timeout)
+{
+	int changed = (custom_on_timeout == timeout ? false : true);
+
+	custom_on_timeout = timeout;
+
+	if (timeout <= 0) {
+		custom_normal_timeout = 0;
+		custom_dim_timeout = 0;
+		return changed;
+	}
+
+	custom_dim_timeout = (double)timeout * LCD_DIM_RATIO;
+	custom_normal_timeout = timeout - custom_dim_timeout;
+
+	_I("custom normal(%d), dim(%d)", custom_normal_timeout,
+	    custom_dim_timeout);
+
+	return changed;
 }
 
 static int setting_cb(keynode_t *key_nodes, void *data)
@@ -146,8 +208,7 @@ static int setting_cb(keynode_t *key_nodes, void *data)
 	}
 	if (update_pm_setting != NULL) {
 		switch((int)data) {
-			case SETTING_POWER_SAVING:
-			case SETTING_POWER_SAVING_DISPLAY:
+			case SETTING_ACCESSIBILITY_TTS:
 				update_pm_setting((int)data, vconf_keynode_get_bool(tmp));
 				break;
 			default:

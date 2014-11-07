@@ -21,17 +21,15 @@
 #include <fcntl.h>
 #include <sys/reboot.h>
 
+#include "display/core.h"
 #include "log.h"
-#include "data.h"
+#include "common.h"
 #include "edbus-handler.h"
 #include "devices.h"
+#include "shared/dbus.h"
+#include "device-notifier.h"
 
-#define SS_PIDFILE_PATH		"/var/run/.system_server.pid"
-
-static void init_ad(struct ss_main_data *ad)
-{
-	memset(ad, 0x0, sizeof(struct ss_main_data));
-}
+#define PIDFILE_PATH		"/var/run/.deviced.pid"
 
 static void writepid(char *pidpath)
 {
@@ -46,7 +44,7 @@ static void writepid(char *pidpath)
 
 static void sig_quit(int signo)
 {
-	_E("received SIGTERM signal %d", signo);
+	_D("received SIGTERM signal %d", signo);
 }
 
 static void sig_usr1(int signo)
@@ -56,27 +54,31 @@ static void sig_usr1(int signo)
 	ecore_main_loop_quit();
 }
 
-static int system_main(int argc, char **argv)
+static int deviced_main(int argc, char **argv)
 {
-	struct ss_main_data ad;
+	int ret;
 
-	init_ad(&ad);
-	edbus_init(&ad);
-	devices_init(&ad);
+	edbus_init(NULL);
+	devices_init(NULL);
+	ret = check_systemd_active();
+	if (ret == TRUE) {
+		_I("notify relaunch");
+		device_notify(DEVICE_NOTIFIER_BOOTING_DONE, (void *)TRUE);
+	}
 	signal(SIGTERM, sig_quit);
 	signal(SIGUSR1, sig_usr1);
 
 	ecore_main_loop_begin();
 
-	devices_exit(&ad);
-	edbus_exit(&ad);
+	devices_exit(NULL);
+	edbus_exit(NULL);
 	ecore_shutdown();
 	return 0;
 }
 
 int main(int argc, char **argv)
 {
-	writepid(SS_PIDFILE_PATH);
+	writepid(PIDFILE_PATH);
 	ecore_init();
-	return system_main(argc, argv);
+	return deviced_main(argc, argv);
 }

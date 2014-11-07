@@ -24,7 +24,10 @@
 #define ENABLE_DLOG
 #endif
 
-#define LOG_TAG	"DEVICED"
-#include "libdeviced/log-macro.h"
+#ifdef LOG_TAG
+#undef LOG_TAG
+#endif
 
+#define LOG_TAG "DEVICED"
+#include "shared/log-macro.h"
 #endif

@@ -17,23 +17,24 @@
  */
 
 
-#ifndef __DD_DEVICED_MANAGED__
-#define __DD_DEVICED_MANAGED__
+#ifndef __DD_DEVICED_MANAGED_H__
+#define __DD_DEVICED_MANAGED_H__
 
 #include <sys/time.h>
+#include "dd-mmc.h"
 
 /**
  * @file        dd-deviced-managed.h
- * @ingroup     libdeviced Device Daemon library
- * @brief       This library provides APIs related with memory, performance, processes, and so on.
- * @author      SLP2.0
- * @date        2010-01-24
- * @version     0.1
  */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/**
+ * @addtogroup CAPI_SYSTEM_DEVICED
+ * @{
+ */
 
 /**
  * @fn int deviced_get_pid(const char *execpath)
@@ -49,93 +50,16 @@ int deviced_get_pid(const char *execpath);
  * @fn int deviced_set_datetime(time_t timet)
  * @brief This API is used to set date time.\n
  * 		Internally, this API call predefined action API. That is send a notify message. \n
- * @param[in] time_t type of time which you want to set.
+ * @param[in] timet type of time which you want to set.
  * @return pid when the program is running, -1 if param is less than 0 or when failed set datetime.
  */
 int deviced_set_datetime(time_t timet);
 
 /**
- * @brief This structure defines the data for receive result of mmc operations(mount/unmount/format)
+ * @}
  */
-struct mmc_contents {
-	void (*mmc_cb) (int result, void* data);/**< user callback function for receive result of mmc operations */
-	void* user_data;/**< input data for callback function's second-param(data) */
-};
-
-/**
- * @fn int deviced_request_mount_mmc(struct deviced_mmc_contents *mmc_data)
- * @brief This API is used to mount mmc.\n
- * 		Internally, this API call predefined action API. That is send a notify message. \n
- * 		and when mount operation is finished, cb of deviced_mmc_content struct is called with cb's param1(result). \n
- * 		means of param1 - 0(mount success) ,  -2(already mounted), non-zero except (-2) (mount fail) \n
- * 		[mount fail value] \n
- * 		1 : operation not permmitted \n
- * 		2 : no such file or directory \n
- * 		6 : no such device or address \n
- * 		12 : out of memory \n
- * 		13 : A component of a path was not searchable \n
- * 		14 : bad address \n
- * 		15 : block device is requested \n
- * 		16 : device or resource busy \n
- * 		19 : filesystemtype not configured in the kernel \n
- * 		20 : target, or a prefix of source, is not a directory \n
- * 		22 : point does not exist \n
- * 		24 : table of dummy devices is full \n
- * 		36 : requested name is too long \n
- * 		40 : Too many links encountered during pathname resolution. \n
- * 			Or, a move was attempted, while target is a descendant of source \n
- * @param[in] mmc_data for receive result of mount operation
- * @return  non-zero on success message sending, -1 if message sending is failed.
- */
-int deviced_request_mount_mmc(struct mmc_contents *mmc_data);
-
-/**
- * @fn int deviced_request_unmount_mmc(struct deviced_mmc_contents *mmc_data,int option)
- * @brief This API is used to unmount mmc.\n
- * 		Internally, this API call predefined action API. That is send a notify message. \n
- * 		and when unmount opeation is finished, cb of deviced_mmc_content struct is called with cb's param1(result). \n
- * 		means of param1 - 0(unmount success) , non-zero(unmount fail) \n
- * 		[unmount fail value] \n
- * 		1 : operation not permmitted \n
- * 		2 : no such file or directory \n
- * 		11 : try again \n
- * 		12 : out of memory \n
- * 		14 : bad address \n
- * 		16 : device or resource busy \n
- * 		22 : point does not exist \n
- * 		36 : requested name is too long \n
- * @param[in] mmc_data for receive result of unmount operation
- * @param[in] option is must be 1(just only support for force unmount)
- * @return  non-zero on success message sending, -1 if message sending is failed.
- */
-int deviced_request_unmount_mmc(struct mmc_contents *mmc_data, int option);
-
-/**
- * @fn int deviced_request_format_mmc(struct deviced_mmc_contents *mmc_data)
- * @brief This API is used to format mmc.\n
- * 		Internally, this API call predefined action API. That is send a notify message. \n
- * 		and when format opeation is finished, cb of deviced_mmc_content struct is called with cb's param1(result). \n
- * 		means of param1 - 0(format success) , -1(format fail)
- * @param[in] mmc_data for receive result of format operation
- * @return  non-zero on success message sending, -1 if message sending is failed.
- */
-int deviced_request_format_mmc(struct mmc_contents *mmc_data);
-
-/**
- * @fn int deviced_format_mmc(struct deviced_mmc_contents *mmc_data, int option)
- * @brief This API is used to format mmc.\n
- * 		Internally, this API call predefined action API. That is send a notify message. \n
- * 		and when format opeation is finished, cb of deviced_mmc_content struct is called with cb's param1(result). \n
- * 		means of param1 - 0(format success) , non-zero(format fail) \n
- *		[format fail value] \n
- *		22 : Invalid argument(EINVAL) \n
- * @param[in] mmc_data for receive result of format operation
- * @param[in] FMT_NORMAL is 0, FMT_FORCE is 1
- * @return  non-zero on success message sending, -1 if message sending is failed.
- */
-int deviced_format_mmc(struct mmc_contents *mmc_data, int option);
 
 #ifdef __cplusplus
 }
 #endif
-#endif /* __DD_DEVICED_MANAGED__ */
+#endif /* __DD_DEVICED_MANAGED_H__ */

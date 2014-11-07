@@ -1,13 +1,13 @@
 /*
  * deviced
  *
- * Copyright (c) 2012 - 2013 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2011 - 2013 Samsung Electronics Co., Ltd. All rights reserved.
  *
- * Licensed under the Apache License, Version 2.0 (the License);
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -36,13 +36,15 @@ enum {
 	SETTING_TO_NORMAL = SETTING_BEGIN,
 	SETTING_BRT_LEVEL,
 	SETTING_LOCK_SCREEN,
-	SETTING_POWER_SAVING,
-	SETTING_POWER_SAVING_DISPLAY,
+	SETTING_BOOT_POWER_ON_STATUS,
+	SETTING_POWER_CUSTOM_BRIGHTNESS,
+	SETTING_ACCESSIBILITY_TTS,
 	SETTING_GET_END,
 	SETTING_PM_STATE = SETTING_GET_END,
 	SETTING_LOW_BATT,
 	SETTING_CHARGING,
 	SETTING_POWEROFF,
+	SETTING_HALLIC_OPEN,
 	SETTING_LOCK_SCREEN_BG,
 	SETTING_END
 };
@@ -78,20 +80,10 @@ extern int get_run_timeout(int *timeout);
  * get LCD dim state timeout from environment variable.
  *
  * @internal
- * @param[out] timeout timeout variable pointer
- * @return 0 : success, -1 : error
+ * @param[out] dim_timeout timeout variable pointer
+ * @return 0 : success, negative value : error
  */
-extern int get_dim_timeout(int *timeout);
-
-/*
- * get LCD off state timeout from environment variable.
- *
- * @internal
- * @param[out] timeout timeout variable pointer
- * @return 0 : success, -1 : error
- */
-extern int get_off_timeout(int *timeout);
-
+extern int get_dim_timeout(int *dim_timeout);
 /*
  * get USB connection status from SLP-setting SLP_SETTING_USB_STATUS
  *

@@ -7,7 +7,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *	 http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,51 +18,129 @@
 
 
 #include <stdio.h>
-#include <vconf.h>
+#include <stdbool.h>
 #include <errno.h>
-#include <device-node.h>
 
 #include "log.h"
-#include "dd-deviced.h"
+#include "dbus.h"
+#include "common.h"
 
-#define PREDEF_LED			"led"
-
-enum {
-	SET_BRT = 0,
-};
+#define METHOD_GET_BRIGHTNESS		"GetBrightness"
+#define METHOD_GET_MAX_BRIGHTNESS	"GetMaxBrightness"
+#define METHOD_SET_BRIGHTNESS		"SetBrightness"
+#define METHOD_SET_IR_COMMAND		"SetIrCommand"
 
 API int led_get_brightness(void)
 {
-	int val;
-	int r;
+	DBusError err;
+	DBusMessage *msg;
+	int ret, ret_val;
 
-	r = device_get_property(DEVICE_TYPE_LED, PROP_LED_BRIGHTNESS, &val);
-	if (r < 0)
-		return r;
+	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
+			DEVICED_PATH_LED, DEVICED_INTERFACE_LED,
+			METHOD_GET_BRIGHTNESS, NULL, NULL);
+	if (!msg)
+		return -EBADMSG;
 
-	return val;
+	dbus_error_init(&err);
+
+	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
+	if (!ret) {
+		_E("no message : [%s:%s]", err.name, err.message);
+		dbus_error_free(&err);
+		ret_val = -EBADMSG;
+	}
+
+	dbus_message_unref(msg);
+	return ret_val;
 }
 
 API int led_get_max_brightness(void)
 {
-	int val;
-	int r;
+	DBusError err;
+	DBusMessage *msg;
+	int ret, ret_val;
 
-	r = device_get_property(DEVICE_TYPE_LED, PROP_LED_MAX_BRIGHTNESS, &val);
-	if (r < 0)
-		return r;
+	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
+			DEVICED_PATH_LED, DEVICED_INTERFACE_LED,
+			METHOD_GET_MAX_BRIGHTNESS, NULL, NULL);
+	if (!msg)
+		return -EBADMSG;
 
-	return val;
+	dbus_error_init(&err);
+
+	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
+	if (!ret) {
+		_E("no message : [%s:%s]", err.name, err.message);
+		dbus_error_free(&err);
+		ret_val = -EBADMSG;
+	}
+
+	dbus_message_unref(msg);
+	return ret_val;
 }
 
-API int led_set_brightness(int val)
+API int led_set_brightness_with_noti(int val, bool enable)
 {
-	char buf_pid[32];
-	char buf_prop[32];
+	DBusError err;
+	DBusMessage *msg;
+	char *arr[2];
 	char buf_val[32];
+	char buf_noti[32];
+	int ret, ret_val;
 
-	snprintf(buf_pid, sizeof(buf_pid), "%d", getpid());
-	snprintf(buf_prop, sizeof(buf_prop), "%d", SET_BRT);
 	snprintf(buf_val, sizeof(buf_val), "%d", val);
-	return deviced_call_predef_action(PREDEF_LED, 3, buf_pid, buf_prop, buf_val);
+	arr[0] = buf_val;
+	snprintf(buf_noti, sizeof(buf_noti), "%d", enable);
+	arr[1] = buf_noti;
+
+	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
+			DEVICED_PATH_LED, DEVICED_INTERFACE_LED,
+			METHOD_SET_BRIGHTNESS, "ii", arr);
+	if (!msg)
+		return -EBADMSG;
+
+	dbus_error_init(&err);
+
+	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
+	if (!ret) {
+		_E("no message : [%s:%s]", err.name, err.message);
+		dbus_error_free(&err);
+		ret_val = -EBADMSG;
+	}
+
+	dbus_message_unref(msg);
+	return ret_val;
+}
+
+API int led_set_ir_command(char *value)
+{
+	if (value == NULL) {
+		return -EINVAL;
+	}
+
+	DBusError err;
+	DBusMessage *msg;
+	char *arr[1];
+	int ret, ret_val;
+
+	arr[0] = value;
+
+	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
+			DEVICED_PATH_LED, DEVICED_INTERFACE_LED,
+			METHOD_SET_IR_COMMAND, "s", arr);
+	if (!msg)
+		return -EBADMSG;
+
+	dbus_error_init(&err);
+
+	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
+	if (!ret) {
+		_E("no message : [%s:%s]", err.name, err.message);
+		dbus_error_free(&err);
+		ret_val = -EBADMSG;
+	}
+
+	dbus_message_unref(msg);
+	return ret_val;
 }
