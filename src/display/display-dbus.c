@@ -28,26 +28,60 @@
 #include <Ecore.h>
 #include <device-node.h>
 
+#include "core/log.h"
 #include "util.h"
 #include "core.h"
 #include "core/common.h"
 #include "core/devices.h"
+#include "dd-display.h"
+#include "display-actor.h"
+
+#define TELEPHONY_PATH			"/org/tizen/telephony/SAMSUNG_QMI"
+#define TELEPHONY_INTERFACE_SIM		"org.tizen.telephony.Sim"
+#define SIGNAL_SIM_STATUS		"Status"
+#define SIM_CARD_NOT_PRESENT		(0x01)
+
+#define VCONFKEY_LCD_BRIGHTNESS_INIT "db/private/deviced/lcd_brightness_init"
+
+#define SIGNAL_HOMESCREEN		"HomeScreen"
+#define SIGNAL_EXTREME			"Extreme"
+#define SIGNAL_NOTEXTREME		"NotExtreme"
+
+#define BLIND_MASK(val)			((val) & 0xFFFF)
+#define BLIND_RED(val)			BLIND_MASK((val) >> 32)
+#define BLIND_GREEN(val)		BLIND_MASK((val) >> 16)
+#define BLIND_BLUE(val)			BLIND_MASK((val))
 
 #define DISPLAY_DIM_BRIGHTNESS  0
+#define DUMP_MODE_WATING_TIME   600000
 
-static DBusMessage *e_dbus_start(E_DBus_Object *obj, DBusMessage *msg)
+static DBusMessage *edbus_start(E_DBus_Object *obj, DBusMessage *msg)
 {
-	display_device_ops.init(NULL);
+	static const struct device_ops *display_device_ops = NULL;
+
+	if (!display_device_ops)
+		display_device_ops = find_device("display");
+	if (NOT_SUPPORT_OPS(display_device_ops))
+		return dbus_message_new_method_return(msg);
+
+	display_device_ops->start(CORE_LOGIC_MODE);
 	return dbus_message_new_method_return(msg);
 }
 
-static DBusMessage *e_dbus_stop(E_DBus_Object *obj, DBusMessage *msg)
+static DBusMessage *edbus_stop(E_DBus_Object *obj, DBusMessage *msg)
 {
-	display_device_ops.exit(NULL);
+	static const struct device_ops *display_device_ops = NULL;
+
+	if (!display_device_ops)
+		display_device_ops = find_device("display");
+	if (NOT_SUPPORT_OPS(display_device_ops))
+		return dbus_message_new_method_return(msg);
+
+	display_device_ops->stop(CORE_LOGIC_MODE);
 	return dbus_message_new_method_return(msg);
 }
 
-static DBusMessage *e_dbus_lockstate(E_DBus_Object *obj, DBusMessage *msg)
+static DBusMessage *edbus_lockstate(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusError err;
 	DBusMessageIter iter;
@@ -60,6 +94,7 @@ static DBusMessage *e_dbus_lockstate(E_DBus_Object *obj, DBusMessage *msg)
 	int state;
 	int flag;
 	int ret;
+	unsigned int caps;
 
 	dbus_error_init(&err);
 
@@ -107,6 +142,34 @@ static DBusMessage *e_dbus_lockstate(E_DBus_Object *obj, DBusMessage *msg)
 		flag = STAY_CUR_STATE;
 	}
 
+	if (!strcmp(option2_str, HOLDKEYBLOCK_STR))
+		flag |= HOLD_KEY_BLOCK;
+	else if (!strcmp(option2_str, STANDBYMODE_STR))
+		flag |= STANDBY_MODE;
+
+	if (flag & GOTO_STATE_NOW) {
+		caps = display_get_caps(DISPLAY_ACTOR_API);
+
+		if (!display_has_caps(caps, DISPLAY_CAPA_LCDON) &&
+		    state == LCD_NORMAL) {
+			_D("No lcdon capability!");
+			ret = -EPERM;
+			goto out;
+		}
+		if (!display_has_caps(caps, DISPLAY_CAPA_LCDOFF) &&
+		    state == LCD_OFF) {
+			_D("No lcdoff capability!");
+			ret = -EPERM;
+			goto out;
+		}
+	}
+
+	if (check_dimstay(state, flag) == true) {
+		_E("LCD state can not be changed to OFF state now!");
+		flag &= ~GOTO_STATE_NOW;
+		flag |= STAY_CUR_STATE;
+	}
+
 	ret = pm_lock_internal(pid, state, flag, timeout);
 out:
 	reply = dbus_message_new_method_return(msg);
@@ -116,7 +179,7 @@ out:
 	return reply;
 }
 
-static DBusMessage *e_dbus_unlockstate(E_DBus_Object *obj, DBusMessage *msg)
+static DBusMessage *edbus_unlockstate(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusError err;
 	DBusMessageIter iter;
@@ -183,7 +246,7 @@ out:
 	return reply;
 }
 
-static DBusMessage *e_dbus_changestate(E_DBus_Object *obj, DBusMessage *msg)
+static DBusMessage *edbus_changestate(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusError err;
 	DBusMessageIter iter;
@@ -192,6 +255,7 @@ static DBusMessage *e_dbus_changestate(E_DBus_Object *obj, DBusMessage *msg)
 	pid_t pid;
 	int state;
 	int ret;
+	unsigned int caps;
 
 	dbus_error_init(&err);
 
@@ -221,13 +285,39 @@ static DBusMessage *e_dbus_changestate(E_DBus_Object *obj, DBusMessage *msg)
 		state = LCD_DIM;
 	else if (!strcmp(state_str, PM_LCDOFF_STR))
 		state = LCD_OFF;
+	else if (!strcmp(state_str, PM_SUSPEND_STR))
+		state = SUSPEND;
 	else {
 		_E("%s state is invalid, dbus ignored!", state_str);
 		ret = -EINVAL;
 		goto out;
 	}
 
+	caps = display_get_caps(DISPLAY_ACTOR_API);
+
+	if (!display_has_caps(caps, DISPLAY_CAPA_LCDON) &&
+	    state == LCD_NORMAL) {
+		_D("No lcdon capability!");
+		ret = -EPERM;
+		goto out;
+	}
+	if (!display_has_caps(caps, DISPLAY_CAPA_LCDOFF) &&
+	    state == LCD_OFF) {
+		_D("No lcdoff capability!");
+		ret = -EPERM;
+		goto out;
+	}
+
+	if (check_dimstay(state, GOTO_STATE_NOW) == true) {
+		_E("LCD state can not be changed to OFF state!");
+		ret = -EBUSY;
+		goto out;
+	}
+
 	ret = pm_change_internal(pid, state);
+
+	if (!ret && state == LCD_OFF)
+		update_lcdoff_source(VCONFKEY_PM_LCDOFF_BY_TIMEOUT);
 out:
 	reply = dbus_message_new_method_return(msg);
 	dbus_message_iter_init_append(reply, &iter);
@@ -236,7 +326,7 @@ out:
 	return reply;
 }
 
-static DBusMessage *e_dbus_getdisplaycount(E_DBus_Object *obj, DBusMessage *msg)
+static DBusMessage *edbus_getdisplaycount(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
@@ -253,7 +343,42 @@ static DBusMessage *e_dbus_getdisplaycount(E_DBus_Object *obj, DBusMessage *msg)
 	return reply;
 }
 
-static DBusMessage *e_dbus_getbrightness(E_DBus_Object *obj, DBusMessage *msg)
+static DBusMessage *edbus_getmaxbrightness(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int cmd, brt, ret;
+
+	cmd = DISP_CMD(PROP_DISPLAY_MAX_BRIGHTNESS, DEFAULT_DISPLAY);
+	ret = device_get_property(DEVICE_TYPE_DISPLAY, cmd, &brt);
+	if (ret >= 0)
+		ret = brt;
+
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+	return reply;
+}
+
+static DBusMessage *edbus_setmaxbrightness(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int cmd, brt, ret;
+
+	dbus_message_iter_init(msg, &iter);
+	dbus_message_iter_get_basic(&iter, &brt);
+
+	cmd = DISP_CMD(PROP_DISPLAY_MAX_BRIGHTNESS, DEFAULT_DISPLAY);
+	ret = device_set_property(DEVICE_TYPE_DISPLAY, cmd, brt);
+
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+	return reply;
+}
+
+static DBusMessage *edbus_getbrightness(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
@@ -272,11 +397,19 @@ static DBusMessage *e_dbus_getbrightness(E_DBus_Object *obj, DBusMessage *msg)
 	return reply;
 }
 
-static DBusMessage *e_dbus_setbrightness(E_DBus_Object *obj, DBusMessage *msg)
+static DBusMessage *edbus_setbrightness(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
-	int cmd, brt, autobrt, ret;
+	int cmd, brt, autobrt, ret, caps;
+
+	caps = display_get_caps(DISPLAY_ACTOR_API);
+
+	if (!display_has_caps(caps, DISPLAY_CAPA_BRIGHTNESS)) {
+		_D("No brightness changing capability!");
+		ret = -EPERM;
+		goto error;
+	}
 
 	dbus_message_iter_init(msg, &iter);
 	dbus_message_iter_get_basic(&iter, &brt);
@@ -302,7 +435,6 @@ static DBusMessage *e_dbus_setbrightness(E_DBus_Object *obj, DBusMessage *msg)
 	ret = device_set_property(DEVICE_TYPE_DISPLAY, cmd, brt);
 	if (ret < 0)
 		goto error;
-
 	if (vconf_set_int(VCONFKEY_SETAPPL_LCD_BRIGHTNESS, brt) != 0)
 		_E("Failed to set VCONFKEY_SETAPPL_LCD_BRIGHTNESS value");
 
@@ -318,11 +450,19 @@ error:
 	return reply;
 }
 
-static DBusMessage *e_dbus_holdbrightness(E_DBus_Object *obj, DBusMessage *msg)
+static DBusMessage *edbus_holdbrightness(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
-	int cmd, brt, autobrt, ret;
+	int cmd, brt, autobrt, ret, caps;
+
+	caps = display_get_caps(DISPLAY_ACTOR_API);
+
+	if (!display_has_caps(caps, DISPLAY_CAPA_BRIGHTNESS)) {
+		_D("No brightness changing capability!");
+		ret = -EPERM;
+		goto error;
+	}
 
 	dbus_message_iter_init(msg, &iter);
 	dbus_message_iter_get_basic(&iter, &brt);
@@ -363,11 +503,11 @@ error:
 
 }
 
-static DBusMessage *e_dbus_releasebrightness(E_DBus_Object *obj, DBusMessage *msg)
+static DBusMessage *edbus_releasebrightness(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
-	int cmd, bat, charger, changed, setting, autobrt, ret = 0;
+	int cmd, bat, charger, changed, setting, brt, autobrt, ret = 0;
 
 	if (vconf_get_int(VCONFKEY_SYSMAN_BATTERY_STATUS_LOW, &bat) != 0) {
 		_E("Failed to get VCONFKEY_SYSMAN_BATTERY_STATUS_LOW value");
@@ -401,18 +541,27 @@ static DBusMessage *e_dbus_releasebrightness(E_DBus_Object *obj, DBusMessage *ms
 
 	vconf_set_int(VCONFKEY_PM_CUSTOM_BRIGHTNESS_STATUS, VCONFKEY_PM_CUSTOM_BRIGHTNESS_OFF);
 
+	cmd = DISP_CMD(PROP_DISPLAY_BRIGHTNESS, DEFAULT_DISPLAY);
+	ret = device_get_property(DEVICE_TYPE_DISPLAY, cmd, &brt);
+	if (ret < 0)
+		brt = ret;
+
 	// check dim state
-	if (bat <= VCONFKEY_SYSMAN_BAT_CRITICAL_LOW &&
-		charger == VCONFKEY_SYSMAN_CHARGER_DISCONNECTED && !changed) {
+	if (low_battery_state(bat) &&
+	    charger == VCONFKEY_SYSMAN_CHARGER_DISCONNECTED && !changed) {
 		_D("batt warning low : brightness is not changed!");
-		device_set_property(DEVICE_TYPE_DISPLAY, PROP_DISPLAY_BRIGHTNESS, 0);
+		if (brt != 0) {
+			device_set_property(DEVICE_TYPE_DISPLAY, PROP_DISPLAY_BRIGHTNESS, 0);
+		}
 		goto error;
 	}
 
 	if (autobrt == SETTING_BRIGHTNESS_AUTOMATIC_OFF) {
-		device_set_property(DEVICE_TYPE_DISPLAY, PROP_DISPLAY_BRIGHTNESS, setting);
-		if (vconf_set_int(VCONFKEY_PM_CURRENT_BRIGHTNESS, setting) != 0) {
-			_E("Failed to set VCONFKEY_PM_CURRENT_BRIGHTNESS value");
+		if (brt != setting) {
+			device_set_property(DEVICE_TYPE_DISPLAY, PROP_DISPLAY_BRIGHTNESS, setting);
+			if (vconf_set_int(VCONFKEY_PM_CURRENT_BRIGHTNESS, setting) != 0) {
+				_E("Failed to set VCONFKEY_PM_CURRENT_BRIGHTNESS value");
+			}
 		}
 	} else if (autobrt == SETTING_BRIGHTNESS_AUTOMATIC_PAUSE) {
 		_D("Auto brightness will be enable");
@@ -426,7 +575,7 @@ error:
 	return reply;
 }
 
-static DBusMessage *e_dbus_getaclstatus(E_DBus_Object *obj, DBusMessage *msg)
+static DBusMessage *edbus_getaclstatus(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
@@ -445,7 +594,7 @@ static DBusMessage *e_dbus_getaclstatus(E_DBus_Object *obj, DBusMessage *msg)
 	return reply;
 }
 
-static DBusMessage *e_dbus_setaclstatus(E_DBus_Object *ob, DBusMessage *msg)
+static DBusMessage *edbus_setaclstatus(E_DBus_Object *ob, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
@@ -465,23 +614,43 @@ static DBusMessage *e_dbus_setaclstatus(E_DBus_Object *ob, DBusMessage *msg)
 	return reply;
 }
 
-static DBusMessage *e_dbus_setframerate(E_DBus_Object *obj, DBusMessage *msg)
+static DBusMessage *edbus_setrefreshrate(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
-	int val, cmd, ret;
+	int app, val, cmd, ret, control;
 
-	ret = dbus_message_get_args(msg, NULL, DBUS_TYPE_INT32, &val, DBUS_TYPE_INVALID);
+	ret = dbus_message_get_args(msg, NULL,
+			DBUS_TYPE_INT32, &app,
+			DBUS_TYPE_INT32, &val, DBUS_TYPE_INVALID);
 	if (!ret) {
 		_I("there is no message");
 		ret = -EINVAL;
 		goto error;
 	}
 
-	_I("set frame rate %d", val);
+	if (app < 0 || app >= ARRAY_SIZE(display_conf.framerate_app) || val < 0) {
+		ret = -EINVAL;
+		goto error;
+	}
 
+	if (!display_conf.framerate_app[app]) {
+		_I("This case(%d) is not support in this target", app);
+		ret = -EPERM;
+		goto error;
+	}
+
+	control = display_conf.control_display;
+
+	if (control)
+		backlight_ops.off(NORMAL_MODE);
+
+	_D("app : %d, value : %d", app, val);
 	cmd = DISP_CMD(PROP_DISPLAY_FRAME_RATE, DEFAULT_DISPLAY);
 	ret = device_set_property(DEVICE_TYPE_DISPLAY, cmd, val);
+
+	if (control)
+		backlight_ops.on(NORMAL_MODE);
 
 error:
 	reply = dbus_message_new_method_return(msg);
@@ -490,44 +659,7 @@ error:
 	return reply;
 }
 
-static DBusMessage *e_dbus_getautobrightnessinterval(E_DBus_Object *obj, DBusMessage *msg)
-{
-	DBusMessageIter iter;
-	DBusMessage *reply;
-	int val;
-
-	val = get_autobrightness_interval();
-	_I("get autobrightness interval %d", val);
-
-	reply = dbus_message_new_method_return(msg);
-	dbus_message_iter_init_append(reply, &iter);
-	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &val);
-	return reply;
-}
-
-static DBusMessage *e_dbus_setautobrightnessinterval(E_DBus_Object *obj, DBusMessage *msg)
-{
-	DBusMessageIter iter;
-	DBusMessage *reply;
-	int rate, ret;
-
-	dbus_message_iter_init(msg, &iter);
-	dbus_message_iter_get_basic(&iter, &rate);
-
-	ret = set_autobrightness_interval(rate);
-	if (ret)
-		_E("fail to set autobrightness interval %d, %d", rate, ret);
-	else
-		_I("set autobrightness interval %d", rate);
-
-	reply = dbus_message_new_method_return(msg);
-	dbus_message_iter_init_append(reply, &iter);
-	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
-
-	return reply;
-}
-
-static DBusMessage *e_dbus_setautobrightnessmin(E_DBus_Object *obj, DBusMessage *msg)
+static DBusMessage *edbus_setautobrightnessmin(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
@@ -541,15 +673,22 @@ static DBusMessage *e_dbus_setautobrightnessmin(E_DBus_Object *obj, DBusMessage 
                 ret = -EINVAL;
 		goto error;
         }
+	if (!display_info.set_autobrightness_min) {
+		ret = -EIO;
+		goto error;
+	}
 	dbus_message_iter_init(msg, &iter);
 	dbus_message_iter_get_basic(&iter, &val);
 
 	pid = get_edbus_sender_pid(msg);
-	ret = set_autobrightness_min(val, sender);
+	ret = display_info.set_autobrightness_min(val, (char *)sender);
 	if (ret) {
-		_I("fail to set autobrightness min %d, %d by %d", val, ret, pid);
-	} else {
-		register_edbus_watch(msg);
+		_W("fail to set autobrightness min %d, %d by %d", val, ret, pid);
+		goto error;
+	}
+	if (display_info.reset_autobrightness_min) {
+		register_edbus_watch(msg, WATCH_DISPLAY_AUTOBRIGHTNESS_MIN,
+		    display_info.reset_autobrightness_min);
 		_I("set autobrightness min %d by %d", val, pid);
 	}
 error:
@@ -560,7 +699,44 @@ error:
 	return reply;
 }
 
-static DBusMessage *e_dbus_lockscreenbgon(E_DBus_Object *obj, DBusMessage *msg)
+static DBusMessage *edbus_setlcdtimeout(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int on, dim, holdkey_block, ret;
+	pid_t pid;
+	const char *sender;
+
+	sender = dbus_message_get_sender(msg);
+	if (!sender) {
+		_E("invalid sender name!");
+		ret = -EINVAL;
+		goto error;
+	}
+
+	ret = dbus_message_get_args(msg, NULL, DBUS_TYPE_INT32, &on,
+		    DBUS_TYPE_INT32, &dim, DBUS_TYPE_INT32, &holdkey_block,
+		    DBUS_TYPE_INVALID);
+
+	pid = get_edbus_sender_pid(msg);
+	ret = set_lcd_timeout(on, dim, holdkey_block, sender);
+	if (ret) {
+		_W("fail to set lcd timeout %d by %d", ret, pid);
+	} else {
+		register_edbus_watch(msg, WATCH_DISPLAY_LCD_TIMEOUT,
+		    reset_lcd_timeout);
+		_I("set lcd timeout on %d, dim %d, holdblock %d by %d",
+		    on, dim, holdkey_block, pid);
+	}
+error:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+
+	return reply;
+}
+
+static DBusMessage *edbus_lockscreenbgon(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
@@ -591,31 +767,369 @@ error:
 	return reply;
 }
 
+static DBusMessage *edbus_dumpmode(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int ret = 0;
+	char *on;
+
+	ret = dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &on,
+		    DBUS_TYPE_INVALID);
+
+	if (!ret) {
+		_E("fail to get dumpmode state %d", ret);
+		ret = -EINVAL;
+		goto error;
+	}
+
+	if (!strcmp(on, "on"))
+		pm_lock_internal(INTERNAL_LOCK_DUMPMODE, LCD_OFF,
+		    STAY_CUR_STATE, DUMP_MODE_WATING_TIME);
+	else if (!strcmp(on, "off"))
+		pm_unlock_internal(INTERNAL_LOCK_DUMPMODE, LCD_OFF,
+		    PM_SLEEP_MARGIN);
+	else
+		ret = -EINVAL;
+
+error:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+
+	return reply;
+}
+
+static DBusMessage *edbus_savelog(E_DBus_Object *obj, DBusMessage *msg)
+{
+	save_display_log();
+	return dbus_message_new_method_return(msg);
+}
+
+static DBusMessage *edbus_powerkeyignore(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int ret = 0;
+	int on;
+
+	ret = dbus_message_get_args(msg, NULL, DBUS_TYPE_INT32, &on,
+		    DBUS_TYPE_INVALID);
+
+	if (!ret) {
+		_E("fail to get powerkey ignore %d", ret);
+		ret = -EINVAL;
+		goto error;
+	}
+
+	if (CHECK_OPS(keyfilter_ops, set_powerkey_ignore))
+		keyfilter_ops->set_powerkey_ignore(on == 1 ? true : false);
+error:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+
+	return reply;
+}
+
+static DBusMessage *edbus_powerkeylcdoff(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int ret;
+
+	if (CHECK_OPS(keyfilter_ops, powerkey_lcdoff))
+		ret = keyfilter_ops->powerkey_lcdoff();
+	else
+		ret = -ENOSYS;
+
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+
+	return reply;
+}
+
+static DBusMessage *edbus_customlcdon(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int ret = 0;
+	int timeout;
+
+	ret = dbus_message_get_args(msg, NULL, DBUS_TYPE_INT32, &timeout,
+		    DBUS_TYPE_INVALID);
+
+	if (!ret) {
+		_E("fail to get custom lcd timeout %d", ret);
+		ret = -EINVAL;
+		goto error;
+	}
+
+	ret = custom_lcdon(timeout);
+
+error:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+
+	return reply;
+}
+
+static DBusMessage *edbus_staytouchscreenoff(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int ret = 0;
+	int val;
+
+	ret = dbus_message_get_args(msg, NULL, DBUS_TYPE_INT32, &val,
+		    DBUS_TYPE_INVALID);
+
+	if (!ret) {
+		_E("fail to get stay touchscreen off state %d", ret);
+		ret = -EINVAL;
+		goto error;
+	}
+
+	set_stay_touchscreen_off(val);
+error:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+
+	return reply;
+}
+
+static DBusMessage *edbus_lcdpaneloffmode(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int ret = 0;
+	int val;
+
+	ret = dbus_message_get_args(msg, NULL, DBUS_TYPE_INT32, &val,
+		    DBUS_TYPE_INVALID);
+
+	if (!ret) {
+		_E("fail to get lcd panel off mode %d", ret);
+		ret = -EINVAL;
+		goto error;
+	}
+
+	set_lcd_paneloff_mode(val);
+error:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+
+	return reply;
+}
+
+static DBusMessage *edbus_actorcontrol(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int ret = 0, val, actor;
+	char *op;
+
+	ret = dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &op,
+		    DBUS_TYPE_INT32, &actor, DBUS_TYPE_INT32, &val,
+		    DBUS_TYPE_INVALID);
+
+	if (!ret) {
+		_E("fail to update actor control %d", ret);
+		ret = -EINVAL;
+		goto error;
+	}
+
+	if (!strcmp(op, "set"))
+		ret = display_set_caps(actor, val);
+	else if (!strcmp(op, "reset"))
+		ret = display_reset_caps(actor, val);
+	else
+		ret = -EINVAL;
+
+error:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+
+	return reply;
+}
+
 static const struct edbus_method edbus_methods[] = {
-	{ "start",           NULL,  NULL, e_dbus_start },
-	{ "stop",            NULL,  NULL, e_dbus_stop },
-	{ "lockstate",     "sssi",   "i", e_dbus_lockstate },
-	{ "unlockstate",     "ss",   "i", e_dbus_unlockstate },
-	{ "changestate",      "s",   "i", e_dbus_changestate },
-	{ "getbrightness",   NULL,   "i", e_dbus_getbrightness },
-	{ "setbrightness",    "i",   "i", e_dbus_setbrightness },
-	{ "setframerate",     "i",   "i", e_dbus_setframerate },
-	{ "getautobrightnessinterval",  NULL,   "i", e_dbus_getautobrightnessinterval },
-	{ "setautobrightnessinterval",   "i",   "i", e_dbus_setautobrightnessinterval },
-	{ "setautobrightnessmin", "i", "i", e_dbus_setautobrightnessmin },
-	{ "LockScreenBgOn", "s", "i", e_dbus_lockscreenbgon },
-	{ "GetDisplayCount", NULL,   "i", e_dbus_getdisplaycount },
-	{ "GetBrightness",   NULL,   "i", e_dbus_getbrightness },
-	{ "SetBrightness",    "i",   "i", e_dbus_setbrightness },
-	{ "HoldBrightness",   "i",   "i", e_dbus_holdbrightness },
-	{ "ReleaseBrightness", NULL, "i", e_dbus_releasebrightness },
-	{ "GetAclStatus",    NULL,   "i", e_dbus_getaclstatus },
-	{ "SetAclStatus",    NULL,   "i", e_dbus_setaclstatus },
+	{ "start",           NULL,  NULL, edbus_start },
+	{ "stop",            NULL,  NULL, edbus_stop },
+	{ "lockstate",     "sssi",   "i", edbus_lockstate },
+	{ "unlockstate",     "ss",   "i", edbus_unlockstate },
+	{ "changestate",      "s",   "i", edbus_changestate },
+	{ "getbrightness",   NULL,   "i", edbus_getbrightness },	/* deprecated */
+	{ "setbrightness",    "i",   "i", edbus_setbrightness },	/* deprecated */
+	{ "setframerate",    "ii",   "i", edbus_setrefreshrate },	/* deprecated */
+	{ "setautobrightnessmin", "i", "i", edbus_setautobrightnessmin },
+	{ "setlcdtimeout",  "iii",   "i", edbus_setlcdtimeout },
+	{ "LockScreenBgOn",   "s",   "i", edbus_lockscreenbgon },
+	{ "GetDisplayCount", NULL,   "i", edbus_getdisplaycount },
+	{ "GetMaxBrightness",NULL,   "i", edbus_getmaxbrightness },
+	{ "SetMaxBrightness", "i",   "i", edbus_setmaxbrightness },
+	{ "GetBrightness",   NULL,   "i", edbus_getbrightness },
+	{ "SetBrightness",    "i",   "i", edbus_setbrightness },
+	{ "HoldBrightness",   "i",   "i", edbus_holdbrightness },
+	{ "ReleaseBrightness", NULL, "i", edbus_releasebrightness },
+	{ "GetAclStatus",    NULL,   "i", edbus_getaclstatus },
+	{ "SetAclStatus",    NULL,   "i", edbus_setaclstatus },
+	{ "SetRefreshRate",  "ii",   "i", edbus_setrefreshrate },
+	{ "Dumpmode",         "s",   "i", edbus_dumpmode },
+	{ "SaveLog",         NULL,  NULL, edbus_savelog },
+	{ "PowerKeyIgnore",   "i",  NULL, edbus_powerkeyignore },
+	{ "PowerKeyLCDOff",  NULL,   "i", edbus_powerkeylcdoff },
+	{ "CustomLCDOn",      "i",   "i", edbus_customlcdon },
+	{ "StayTouchScreenOff","i",  "i", edbus_staytouchscreenoff },
+	{ "LCDPanelOffMode",  "i",   "i", edbus_lcdpaneloffmode },
+	{ "ActorControl",   "sii",   "i", edbus_actorcontrol },
 	/* Add methods here */
+};
+
+static void sim_signal_handler(void *data, DBusMessage *msg)
+{
+	DBusError err;
+	int ret, val;
+	static int state = false;
+
+	if (!find_display_feature("auto-brightness")) {
+		_D("auto brightness is not supported!");
+		return;
+	}
+
+	if (state)
+		return;
+
+	ret = dbus_message_is_signal(msg, TELEPHONY_INTERFACE_SIM,
+	    SIGNAL_SIM_STATUS);
+	if (!ret) {
+		_E("there is no power off popup signal");
+		return;
+	}
+
+	ret = vconf_get_bool(VCONFKEY_LCD_BRIGHTNESS_INIT, &state);
+	if (ret < 0 || state)
+		return;
+
+	dbus_error_init(&err);
+
+	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &val,
+	    DBUS_TYPE_INVALID);
+	if (!ret) {
+		_E("no message : [%s:%s]", err.name, err.message);
+		dbus_error_free(&err);
+	}
+
+	if (val != SIM_CARD_NOT_PRESENT) {
+		/* change setting : autobrightness on */
+		state = true;
+		vconf_set_bool(VCONFKEY_LCD_BRIGHTNESS_INIT, state);
+		vconf_set_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT,
+		    SETTING_BRIGHTNESS_AUTOMATIC_ON);
+		vconf_set_int(VCONFKEY_SETAPPL_LCD_BRIGHTNESS,
+		    PM_DEFAULT_BRIGHTNESS);
+		_I("SIM card is inserted at first!");
+	}
+}
+
+static void extreme_signal_handler(void *data, DBusMessage *msg)
+{
+	int ret;
+
+	ret = dbus_message_is_signal(msg, POPUP_INTERFACE_LOWBAT,
+	    SIGNAL_EXTREME);
+	if (!ret) {
+		_E("there is no extreme signal");
+		return;
+	}
+
+	pm_status_flag &= ~BRTCH_FLAG;
+	backlight_ops.update();
+	_D("extreme mode : enter dim state!");
+	if (vconf_set_int(VCONFKEY_PM_KEY_IGNORE, TRUE) != 0)
+		_E("failed to set vconf status");
+}
+
+static void not_extreme_signal_handler(void *data, DBusMessage *msg)
+{
+	int ret;
+
+	ret = dbus_message_is_signal(msg, POPUP_INTERFACE_LOWBAT,
+	    SIGNAL_NOTEXTREME);
+	if (!ret) {
+		_E("there is no extreme signal");
+		return;
+	}
+
+	_D("release extreme mode");
+	if (vconf_set_int(VCONFKEY_PM_KEY_IGNORE, FALSE) != 0)
+		_E("failed to set vconf status");
+}
+
+/*
+ * Default capability
+ * api      := LCDON | LCDOFF | BRIGHTNESS
+ * gesture  := LCDON
+ */
+static struct display_actor_ops display_api_actor = {
+	.id	= DISPLAY_ACTOR_API,
+	.caps	= DISPLAY_CAPA_LCDON |
+		  DISPLAY_CAPA_LCDOFF |
+		  DISPLAY_CAPA_BRIGHTNESS,
+};
+
+static struct display_actor_ops display_gesture_actor = {
+	.id	= DISPLAY_ACTOR_GESTURE,
+	.caps	= DISPLAY_CAPA_LCDON,
 };
 
 int init_pm_dbus(void)
 {
-	return 	register_edbus_method(DEVICED_PATH_DISPLAY, edbus_methods, ARRAY_SIZE(edbus_methods));
+	int ret;
+
+	display_add_actor(&display_api_actor);
+	display_add_actor(&display_gesture_actor);
+
+	ret = register_edbus_method(DEVICED_PATH_DISPLAY,
+		    edbus_methods, ARRAY_SIZE(edbus_methods));
+	if (ret < 0) {
+		_E("Failed to register edbus method! %d", ret);
+		return ret;
+	}
+/*
+ * Auto-brightness feature has been implemented in wearable-device.
+ * But UX is not determined, then Block sim-check-logic temporary.
+ * This logic'll be re-enabled when UX concept related to sim is confirmed.
+ */
+/*
+	ret = register_edbus_signal_handler(TELEPHONY_PATH,
+		    TELEPHONY_INTERFACE_SIM, SIGNAL_SIM_STATUS,
+		    sim_signal_handler);
+	if (ret < 0 && ret != -EEXIST) {
+		_E("Failed to register signal handler! %d", ret);
+		return ret;
+	}
+*/
+
+	ret = register_edbus_signal_handler(POPUP_PATH_LOWBAT,
+		    POPUP_INTERFACE_LOWBAT, SIGNAL_EXTREME,
+		    extreme_signal_handler);
+	if (ret < 0 && ret != -EEXIST) {
+		_E("Failed to register signal handler! %d", ret);
+		return ret;
+	}
+	ret = register_edbus_signal_handler(POPUP_PATH_LOWBAT,
+		    POPUP_INTERFACE_LOWBAT, SIGNAL_NOTEXTREME,
+		    not_extreme_signal_handler);
+	if (ret < 0 && ret != -EEXIST) {
+		_E("Failed to register signal handler! %d", ret);
+		return ret;
+	}
+	return 0;
 }
 

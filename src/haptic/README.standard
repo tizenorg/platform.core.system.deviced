@@ -1,0 +1,13 @@
+Standard Force Feedback Information
+
+1. Max effect id is 16.
+   It depends on force feedback driver.
+
+2. Do not increase effect id in case of repeated requests before previous effect finishs.
+   Standard Force Feedback does not reset the effect id on ff_set_effect function.
+   If the effect id is reseted as -1,
+   effect id will be increased until removing the effect from device by ioctl(EVIOCRMFF).
+   In this case Standard Force Feedback can not remove the previous effect id.
+
+3. Do not support to mix each effect.
+   If the request is occurred on the same time, it plays effect as per the last request.

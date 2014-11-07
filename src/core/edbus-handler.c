@@ -17,8 +17,8 @@
  */
 
 
+#include <stdbool.h>
 #include "core/log.h"
-#include "core/data.h"
 #include "core/edbus-handler.h"
 #include "core/common.h"
 #include "core/device-notifier.h"
@@ -30,6 +30,9 @@
 	path='/org/freedesktop/DBus',interface='org.freedesktop.DBus',\
 	member='NameOwnerChanged',arg0='%s'"
 
+/* -1 is a default timeout value, it's converted to 25*1000 internally. */
+#define DBUS_REPLY_TIMEOUT	(-1)
+#define RETRY_MAX 5
 
 struct edbus_list{
 	char *signal_name;
@@ -44,15 +47,27 @@ static struct edbus_object {
 } edbus_objects[] = {
 	{ DEVICED_PATH_CORE   , DEVICED_INTERFACE_CORE   , NULL, NULL },
 	{ DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY, NULL, NULL },
+	{ DEVICED_PATH_POWER  , DEVICED_INTERFACE_POWER  , NULL, NULL },
 	{ DEVICED_PATH_STORAGE, DEVICED_INTERFACE_STORAGE, NULL, NULL },
 	{ DEVICED_PATH_HAPTIC , DEVICED_INTERFACE_HAPTIC , NULL, NULL },
-	{ DEVICED_PATH_SYSNOTI, DEVICED_INTERFACE_SYSNOTI, NULL, NULL },
 	{ DEVICED_PATH_LED    , DEVICED_INTERFACE_LED    , NULL, NULL },
+	{ DEVICED_PATH_MMC    , DEVICED_INTERFACE_MMC    , NULL, NULL },
+	{ DEVICED_PATH_PROCESS, DEVICED_INTERFACE_PROCESS, NULL, NULL },
+	{ DEVICED_PATH_KEY    , DEVICED_INTERFACE_KEY    , NULL, NULL },
+	{ DEVICED_PATH_CPU    , DEVICED_INTERFACE_CPU    , NULL, NULL },
+	{ DEVICED_PATH_SYSNOTI, DEVICED_INTERFACE_SYSNOTI, NULL, NULL },
+	{ DEVICED_PATH_USB    , DEVICED_INTERFACE_USB    , NULL, NULL },
+	{ DEVICED_PATH_USBHOST, DEVICED_INTERFACE_USBHOST, NULL, NULL },
+	{ DEVICED_PATH_EXTCON , DEVICED_INTERFACE_EXTCON , NULL, NULL },
+	{ DEVICED_PATH_BATTERY, DEVICED_INTERFACE_BATTERY, NULL, NULL },
+	{ DEVICED_PATH_GPIO, DEVICED_INTERFACE_GPIO, NULL, NULL},
+	{ DEVICED_PATH_HDMICEC, DEVICED_INTERFACE_HDMICEC, NULL, NULL},
 	/* Add new object & interface here*/
 };
 
-static Eina_List *edbus_handler_list;
-static Eina_List *edbus_watch_list;
+static dd_list *edbus_owner_list;
+static dd_list *edbus_handler_list;
+static dd_list *edbus_watch_list;
 static int edbus_init_val;
 static DBusConnection *conn;
 static E_DBus_Connection *edbus_conn;
@@ -160,30 +175,27 @@ pid_t get_edbus_sender_pid(DBusMessage *msg)
 
 static void unregister_edbus_signal_handle(void)
 {
-	Eina_List *tmp;
-	Eina_List *tmp_next;
+	dd_list *tmp;
 	struct edbus_list *entry;
 
-	EINA_LIST_FOREACH_SAFE(edbus_handler_list, tmp, tmp_next, entry) {
-		if (entry != NULL) {
-			e_dbus_signal_handler_del(edbus_conn, entry->handler);
-			edbus_handler_list = eina_list_remove(edbus_handler_list, entry);
-			free(entry->signal_name);
-			free(entry);
-		}
+	DD_LIST_FOREACH(edbus_handler_list, tmp, entry) {
+		e_dbus_signal_handler_del(edbus_conn, entry->handler);
+		DD_LIST_REMOVE(edbus_handler_list, entry);
+		free(entry->signal_name);
+		free(entry);
 	}
 }
 
 int register_edbus_signal_handler(const char *path, const char *interface,
 		const char *name, E_DBus_Signal_Cb cb)
 {
-	Eina_List *tmp;
+	dd_list *tmp;
 	struct edbus_list *entry;
 	E_DBus_Signal_Handler *handler;
 
-	EINA_LIST_FOREACH(edbus_handler_list, tmp, entry) {
-		if (entry != NULL && strncmp(entry->signal_name, name, strlen(name)) == 0)
-			return -1;
+	DD_LIST_FOREACH(edbus_handler_list, tmp, entry) {
+		if (strncmp(entry->signal_name, name, strlen(name)) == 0)
+			return -EEXIST;
 	}
 
 	handler = e_dbus_signal_handler_add(edbus_conn, NULL, path,
@@ -191,16 +203,14 @@ int register_edbus_signal_handler(const char *path, const char *interface,
 
 	if (!handler) {
 		_E("fail to add edbus handler");
-		return -1;
+		return -ENOMEM;
 	}
-
-	_E("add edbus service: %s", name);
 
 	entry = malloc(sizeof(struct edbus_list));
 
 	if (!entry) {
 		_E("Malloc failed");
-		return -1;
+		return -ENOMEM;
 	}
 
 	entry->signal_name = strndup(name, strlen(name));
@@ -208,39 +218,49 @@ int register_edbus_signal_handler(const char *path, const char *interface,
 	if (!entry->signal_name) {
 		_E("Malloc failed");
 		free(entry);
-		return -1;
+		return -ENOMEM;
 	}
 
 	entry->handler = handler;
-	edbus_handler_list = eina_list_prepend(edbus_handler_list, entry);
+	DD_LIST_PREPEND(edbus_handler_list, entry);
 	if (!edbus_handler_list) {
 		_E("eina_list_prepend failed");
 		free(entry->signal_name);
 		free(entry);
-		return -1;
+		return -ENOMEM;
 	}
 	return 0;
 }
 
 int broadcast_edbus_signal(const char *path, const char *interface,
-		const char *name, int type, void *value)
+		const char *name, const char *sig, char *param[])
 {
-	DBusMessage *signal;
+	DBusMessage *msg;
 	DBusMessageIter iter;
-	DBusMessageIter val;
-	char sig[2] = {type, '\0'};
+	int r;
 
-	signal = dbus_message_new_signal(path, interface, name);
-	if (!signal) {
+	msg = dbus_message_new_signal(path, interface, name);
+	if (!msg) {
 		_E("fail to allocate new %s.%s signal", interface, name);
-		return -1;
+		return -EPERM;
 	}
 
-	dbus_message_append_args(signal, type, value, DBUS_TYPE_INVALID);
+	dbus_message_iter_init_append(msg, &iter);
+	r = append_variant(&iter, sig, param);
+	if (r < 0) {
+		_E("append_variant error(%d)", r);
+		return -EPERM;
+	}
 
-	e_dbus_message_send(edbus_conn, signal, NULL, -1, NULL);
+	r = dbus_connection_send(conn, msg, NULL);
+	dbus_message_unref(msg);
 
-	dbus_message_unref(signal);
+	if (r != TRUE) {
+		_E("dbus_connection_send error(%s:%s-%s)",
+		    path, interface, name);
+		return -ECOMM;
+	}
+
 	return 0;
 }
 
@@ -250,8 +270,8 @@ static DBusHandlerResult message_filter(DBusConnection *connection,
 	char match[256];
 	int ret;
 	const char *iface, *member, *arg = NULL;
-	char *watch;
-	Eina_List *l;
+	struct watch *watch;
+	dd_list *n;
 
 	if (dbus_message_get_type(message) != DBUS_MESSAGE_TYPE_SIGNAL)
 		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
@@ -274,21 +294,23 @@ static DBusHandlerResult message_filter(DBusConnection *connection,
 
 	_D("Argument : %s", arg);
 
-	EINA_LIST_FOREACH(edbus_watch_list, l, watch) {
-		if (strcmp(arg, watch)) continue;
+	DD_LIST_FOREACH(edbus_watch_list, n, watch) {
+		if (strcmp(arg, watch->name)) continue;
 
-		/* notify 'process terminated' to device notifiers */
-		device_notify(DEVICE_NOTIFIER_PROCESS_TERMINATED, (void *)watch);
+		if (watch->func)
+			watch->func(watch->name, watch->id);
 
-		/* remove registered sender */
-		snprintf(match, sizeof(match), NAME_OWNER_MATCH, watch);
-		dbus_bus_remove_match(conn, match, NULL);
-		EINA_LIST_REMOVE(edbus_watch_list, watch);
+		DD_LIST_REMOVE(edbus_watch_list, watch);
+		free(watch->name);
 		free(watch);
-		break;
 	}
 
-	if (eina_list_count(edbus_watch_list) == 0) {
+	/* remove registered sender */
+	snprintf(match, sizeof(match), NAME_OWNER_MATCH, arg);
+	dbus_bus_remove_match(conn, match, NULL);
+
+
+	if (DD_LIST_LENGTH(edbus_watch_list) == 0) {
 		dbus_connection_remove_filter(conn, message_filter, NULL);
 		_I("remove message filter, no watcher!");
 	}
@@ -296,13 +318,14 @@ static DBusHandlerResult message_filter(DBusConnection *connection,
 	return DBUS_HANDLER_RESULT_HANDLED;
 }
 
-int register_edbus_watch(DBusMessage *msg)
+int register_edbus_watch(DBusMessage *msg, enum watch_id id, int (*func)(char *name, enum watch_id id))
 {
 	char match[256];
 	const char *sender;
-	char *watch;
-	Eina_List *l;
+	struct watch *watch;
+	dd_list *n;
 	int ret;
+	bool matched = false;
 
 	if (!msg) {
 		_E("invalid argument!");
@@ -315,38 +338,102 @@ int register_edbus_watch(DBusMessage *msg)
 		return -EINVAL;
 	}
 
-	/* check the sender is already registered */
-	EINA_LIST_FOREACH(edbus_watch_list, l, watch) {
-		if (strcmp(sender, watch)) continue;
+	/* check the sender&id is already registered */
+	DD_LIST_FOREACH(edbus_watch_list, n, watch) {
+		if (strcmp(sender, watch->name))
+			continue;
+		if (id != watch->id) {
+			matched = true;
+			continue;
+		}
 
-		_I("%s is already watched!", watch);
+		_I("%s(%d) is already watched!", watch->name, watch->id);
+
 		return 0;
 	}
 
-	watch = strndup(sender, strlen(sender));
-	if (!watch) {
-		_E("Malloc failed");
+        watch = malloc(sizeof(struct watch));
+        if (!watch) {
+                _E("Fail to malloc for watch!");
+                return -ENOMEM;
+        }
+
+	watch->id = id;
+	watch->func = func;
+	watch->name = strndup(sender, strlen(sender));
+
+	if (!watch->name) {
+		_E("Fail to malloc for watch name");
+		free(watch);
 		return -ENOMEM;
 	}
 
 	/* Add message filter */
-	if (eina_list_count(edbus_watch_list) == 0) {
+	if (DD_LIST_LENGTH(edbus_watch_list) == 0) {
 		ret = dbus_connection_add_filter(conn, message_filter, NULL, NULL);
 		if (!ret) {
 			_E("fail to add message filter!");
+			free(watch->name);
 			free(watch);
 			return -ENOMEM;
 		}
 		_I("success to add message filter!");
 	}
 
-	/* Add sender to watch list */
-	EINA_LIST_APPEND(edbus_watch_list, watch);
+	/* Add watch to watch list */
+	DD_LIST_APPEND(edbus_watch_list, watch);
 
-	snprintf(match, sizeof(match), NAME_OWNER_MATCH, watch);
-	dbus_bus_add_match(conn, match, NULL);
+	if (!matched) {
+		snprintf(match, sizeof(match), NAME_OWNER_MATCH, watch->name);
+		dbus_bus_add_match(conn, match, NULL);
+	}
 
-	_I("%s is watched by dbus!", watch);
+	_I("%s(%d) is watched by dbus!", watch->name, watch->id);
+
+	return 0;
+}
+
+int unregister_edbus_watch(DBusMessage *msg, enum watch_id id)
+{
+	char match[256];
+	const char *sender;
+	struct watch *watch;
+	dd_list *n;
+	bool matched = false;
+
+	if (!msg) {
+		_E("invalid argument!");
+		return -EINVAL;
+	}
+
+	sender = dbus_message_get_sender(msg);
+	if (!sender) {
+		_E("invalid sender!");
+		return -EINVAL;
+	}
+
+	DD_LIST_FOREACH(edbus_watch_list, n, watch) {
+		if (strcmp(sender, watch->name))
+			continue;
+
+		if (id != watch->id) {
+			matched = true;
+			continue;
+		}
+		DD_LIST_REMOVE(edbus_watch_list, watch);
+		free(watch->name);
+		free(watch);
+	}
+
+	/* remove match */
+	if (!matched) {
+                snprintf(match, sizeof(match), NAME_OWNER_MATCH, sender);
+                dbus_bus_remove_match(conn, match, NULL);
+
+		if (DD_LIST_LENGTH(edbus_watch_list) == 0)
+			dbus_connection_remove_filter(conn, message_filter,
+			    NULL);
+	}
 
 	return 0;
 }
@@ -354,16 +441,17 @@ int register_edbus_watch(DBusMessage *msg)
 static void unregister_edbus_watch_all(void)
 {
 	char match[256];
-	Eina_List *n, *next;
-	struct edbus_list *watch;
+	dd_list *n;
+	struct watch *watch;
 
-	if (eina_list_count(edbus_watch_list) > 0)
+	if (DD_LIST_LENGTH(edbus_watch_list) > 0)
 		dbus_connection_remove_filter(conn, message_filter, NULL);
 
-	EINA_LIST_FOREACH_SAFE(edbus_watch_list, n, next, watch) {
-		snprintf(match, sizeof(match), NAME_OWNER_MATCH, watch);
+	DD_LIST_FOREACH(edbus_watch_list, n, watch) {
+		snprintf(match, sizeof(match), NAME_OWNER_MATCH, watch->name);
 		dbus_bus_remove_match(conn, match, NULL);
-		EINA_LIST_REMOVE(edbus_watch_list, watch);
+		DD_LIST_REMOVE(edbus_watch_list, watch);
+		free(watch->name);
 		free(watch);
 	}
 }
@@ -383,10 +471,10 @@ int register_edbus_method(const char *path, const struct edbus_method *edbus_met
 
 	for (i = 0; i < size; i++) {
 		ret = e_dbus_interface_method_add(iface,
-				edbus_methods[i].member,
-				edbus_methods[i].signature,
-				edbus_methods[i].reply_signature,
-				edbus_methods[i].func);
+				    edbus_methods[i].member,
+				    edbus_methods[i].signature,
+				    edbus_methods[i].reply_signature,
+				    edbus_methods[i].func);
 		if (!ret) {
 			_E("fail to add method %s!", edbus_methods[i].member);
 			return -EINVAL;
@@ -396,58 +484,184 @@ int register_edbus_method(const char *path, const struct edbus_method *edbus_met
 	return 0;
 }
 
+static void request_name_cb(void *data, DBusMessage *msg, DBusError *error)
+{
+	DBusError err;
+	unsigned int val;
+	int r;
+
+	if (!msg) {
+		_D("invalid DBusMessage!");
+		return;
+	}
+
+	dbus_error_init(&err);
+	r = dbus_message_get_args(msg, &err, DBUS_TYPE_UINT32, &val, DBUS_TYPE_INVALID);
+	if (!r) {
+		_E("no message : [%s:%s]", err.name, err.message);
+		dbus_error_free(&err);
+		return;
+	}
+
+	_I("Request Name reply : %d", val);
+}
+
+static void check_owner_name(void)
+{
+	DBusError err;
+	DBusMessage *msg;
+	DBusMessageIter iter;
+	char *pa[1];
+	char exe_name[PATH_MAX];
+	char *entry;
+	dd_list *n;
+	int pid;
+
+	DD_LIST_FOREACH(edbus_owner_list, n, entry) {
+		pa[0] = entry;
+		msg = dbus_method_sync_with_reply(E_DBUS_FDO_BUS,
+			E_DBUS_FDO_PATH,
+			E_DBUS_FDO_INTERFACE,
+			"GetConnectionUnixProcessID", "s", pa);
+
+		if (!msg) {
+			_E("invalid DBusMessage!");
+			return;
+		}
+
+		dbus_error_init(&err);
+		dbus_message_iter_init(msg, &iter);
+
+		dbus_message_iter_get_basic(&iter, &pid);
+		if (get_cmdline_name(pid, exe_name, PATH_MAX) != 0)
+			goto out;
+		_I("%s(%d)", exe_name, pid);
+
+out:
+		dbus_message_unref(msg);
+		dbus_error_free(&err);
+	}
+}
+
+static void check_owner_list(void)
+{
+	DBusError err;
+	DBusMessage *msg;
+	DBusMessageIter array, iter, item, iter_val;
+	char *pa[1];
+	char *name;
+	char *entry;
+
+	pa[0] = DEVICED_BUS_NAME;
+	msg = dbus_method_sync_with_reply(E_DBUS_FDO_BUS,
+			E_DBUS_FDO_PATH,
+			E_DBUS_FDO_INTERFACE,
+			"ListQueuedOwners", "s", pa);
+
+	if (!msg) {
+		_E("invalid DBusMessage!");
+		return;
+	}
+
+	dbus_error_init(&err);
+	dbus_message_iter_init(msg, &array);
+
+	if (dbus_message_iter_get_arg_type(&array) != DBUS_TYPE_ARRAY)
+		goto out;
+	dbus_message_iter_recurse(&array, &item);
+	while (dbus_message_iter_get_arg_type(&item) == DBUS_TYPE_STRING) {
+		dbus_message_iter_get_basic(&item, &name);
+		entry = strndup(name, strlen(name));
+		DD_LIST_APPEND(edbus_owner_list, entry);
+		if (!edbus_owner_list) {
+			_E("append failed");
+			free(entry);
+			goto out;
+		}
+		dbus_message_iter_next(&item);
+	}
+
+out:
+	dbus_message_unref(msg);
+	dbus_error_free(&err);
+}
+
 void edbus_init(void *data)
 {
-	int retry = EDBUS_INIT_RETRY_COUNT;
-	int i, r;
+	DBusError error;
+	int retry = 0;
+	int i, ret;
 
-	while (--retry) {
+	dbus_threads_init_default();
+	dbus_error_init(&error);
+
+	do {
 		edbus_init_val = e_dbus_init();
 		if (edbus_init_val)
 			break;
-		if (!retry) {
+		if (retry == EDBUS_INIT_RETRY_COUNT) {
 			_E("fail to init edbus");
 			return;
 		}
-	}
+		retry++;
+	} while (retry <= EDBUS_INIT_RETRY_COUNT);
 
-	retry = EDBUS_INIT_RETRY_COUNT;
-	while (--retry) {
-		edbus_conn = e_dbus_bus_get(DBUS_BUS_SYSTEM);
+	retry = 0;
+	do {
+		conn = dbus_bus_get(DBUS_BUS_SYSTEM, &error);
+		if (conn)
+			break;
+		if (retry == EDBUS_INIT_RETRY_COUNT) {
+			_E("fail to get dbus");
+			goto out1;
+		}
+		retry++;
+	} while (retry <= EDBUS_INIT_RETRY_COUNT);
+
+	retry = 0;
+	do {
+		edbus_conn = e_dbus_connection_setup(conn);
 		if (edbus_conn)
 			break;
-		if (!retry) {
+		if (retry == EDBUS_INIT_RETRY_COUNT) {
 			_E("fail to get edbus");
-			goto err_dbus_shutdown;
+			goto out2;
 		}
-	}
+		retry++;
+	} while (retry <= EDBUS_INIT_RETRY_COUNT);
 
-	retry = EDBUS_INIT_RETRY_COUNT;
-	while (--retry) {
-		edbus_request_name = e_dbus_request_name(edbus_conn, BUS_NAME, 0, NULL, NULL);
+	retry = 0;
+	do {
+		edbus_request_name = e_dbus_request_name(edbus_conn, DEVICED_BUS_NAME,
+				DBUS_NAME_FLAG_REPLACE_EXISTING, request_name_cb, NULL);
 		if (edbus_request_name)
 			break;
-		if (!retry) {
+		if (retry == EDBUS_INIT_RETRY_COUNT) {
 			_E("fail to request edbus name");
-			goto err_dbus_close;
+			goto out3;
 		}
-	}
+		retry++;
+	} while (retry <= EDBUS_INIT_RETRY_COUNT);
 
 	for (i = 0; i < ARRAY_SIZE(edbus_objects); i++) {
-		r = register_edbus_interface(&edbus_objects[i]);
-		if (r < 0)
+		ret = register_edbus_interface(&edbus_objects[i]);
+		if (ret < 0) {
 			_E("fail to add obj & interface for %s",
 				    edbus_objects[i].interface);
-
-		_I("add new obj for %s", edbus_objects[i].interface);
+			return;
+		}
+		_D("add new obj for %s", edbus_objects[i].interface);
 	}
+	check_owner_list();
+	check_owner_name();
 	return;
 
-err_dbus_close:
+out3:
 	e_dbus_connection_close(edbus_conn);
-err_dbus_shutdown:
+out2:
+	dbus_connection_set_exit_on_disconnect(conn, FALSE);
+out1:
 	e_dbus_shutdown();
-	return;
 }
 
 void edbus_exit(void *data)

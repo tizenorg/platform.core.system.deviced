@@ -1,6 +1,0 @@
-msgid "IDS_COM_POP_KEYBOARD_CONNECTED_ABB2"
-msgstr "Tastatūra pievienota"
-
-msgid "IDS_COM_POP_KEYBOARD_DISCONNECTED_ABB2"
-msgstr "Tastatūra atvienota"
-

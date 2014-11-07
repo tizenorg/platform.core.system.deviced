@@ -21,7 +21,6 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <vconf.h>
-#include "core.h"
 #include "log.h"
 #include "edbus-handler.h"
 #include "display/poll.h"
@@ -36,6 +35,9 @@ static void sig_child_handler(int signo, siginfo_t *info, void *data)
 	pid_t pid;
 	int status;
 
+	if (!info || signo != SIGCHLD)
+		return;
+
 	pid = waitpid(info->si_pid, &status, 0);
 	if (pid == -1) {
 		_E("SIGCHLD received\n");
@@ -43,8 +45,6 @@ static void sig_child_handler(int signo, siginfo_t *info, void *data)
 	}
 
 	_D("sig child actend call - %d\n", info->si_pid);
-
-	ss_core_action_clear(info->si_pid);
 }
 
 static void sig_pipe_handler(int signo, siginfo_t *info, void *data)

@@ -1,6 +1,0 @@
-/unit/utc_SystemFW_haptic_open_func
-/unit/utc_SystemFW_haptic_close_func
-/unit/utc_SystemFW_haptic_play_monotone_func
-/unit/utc_SystemFW_haptic_play_file_func
-/unit/utc_SystemFW_haptic_stop_play_func
-/unit/utc_SystemFW_haptic_get_file_duration_func

@@ -21,77 +21,7 @@
 #define __EDBUS_HANDLE_H__
 
 #include <E_DBus.h>
-
-#define BUS_NAME		"org.tizen.system.deviced"
-#define OBJECT_PATH		"/Org/Tizen/System/DeviceD"
-#define INTERFACE_NAME		BUS_NAME
-
-/*
- * Core service
- *   get/set device status
- *   operations about device
- */
-#define DEVICED_PATH_CORE		OBJECT_PATH"/Core"
-#define DEVICED_INTERFACE_CORE		INTERFACE_NAME".core"
-
-/*
- * Display service
- *   start/stop display(pm)
- *   get/set brightness
- *   operations about display
- */
-#define DEVICED_PATH_DISPLAY		OBJECT_PATH"/Display"
-#define DEVICED_INTERFACE_DISPLAY	INTERFACE_NAME".display"
-
-/*
- * Storage service
- *   get storage size
- *   operatioins about storage
- */
-#define DEVICED_PATH_STORAGE		OBJECT_PATH"/Storage"
-#define DEVICED_INTERFACE_STORAGE	INTERFACE_NAME".storage"
-
-/*
- * Haptic service
- *   operatioins about haptic
- */
-#define DEVICED_PATH_HAPTIC		OBJECT_PATH"/Haptic"
-#define DEVICED_INTERFACE_HAPTIC	INTERFACE_NAME".haptic"
-
-/*
- * Lowmem service
- *   get critical low status
- *   operations about Lowmem
- */
-#define DEVICED_PATH_LOWMEM		OBJECT_PATH"/Lowmem"
-#define DEVICED_INTERFACE_LOWMEM	INTERFACE_NAME".lowmem"
-
-/*
- * Poweroff service
- *   get power off status
- *   operations about Poweroff
- */
-#define DEVICED_PATH_POWEROFF		OBJECT_PATH"/PowerOff"
-#define DEVICED_INTERFACE_POWEROFF	INTERFACE_NAME".PowerOff"
-
-/*
- * Led service
- *   play/stop led
- *   operations about led
- */
-#define DEVICED_PATH_LED               OBJECT_PATH"/Led"
-#define DEVICED_INTERFACE_LED          INTERFACE_NAME".Led"
-
-#define DEVICED_PATH_SYSNOTI           OBJECT_PATH"/SysNoti"
-#define DEVICED_INTERFACE_SYSNOTI      INTERFACE_NAME".SysNoti"
-
-/*
- * Power service
- *   set resetkey disable
- *   operations about power
- */
-#define DEVICED_PATH_POWER             OBJECT_PATH"/Power"
-#define DEVICED_INTERFACE_POWER                INTERFACE_NAME".power"
+#include "shared/dbus.h"
 
 struct edbus_method {
 	const char *member;
@@ -100,15 +30,30 @@ struct edbus_method {
 	E_DBus_Method_Cb func;
 };
 
+enum watch_id {
+	WATCH_DISPLAY_AUTOBRIGHTNESS_MIN,
+	WATCH_DISPLAY_LCD_TIMEOUT,
+	WATCH_DISPLAY_LOCK_STATE,
+	WATCH_DISPLAY_HOLD_BRIGHTNESS,
+};
+
+struct watch {
+	enum watch_id id;
+	char *name;
+	int (*func)(char *name, enum watch_id id);
+};
+
 int register_edbus_method(const char *path, const struct edbus_method *edbus_methods, int size);
 int register_edbus_signal_handler(const char *path, const char *interface,
 		const char *name, E_DBus_Signal_Cb cb);
 E_DBus_Interface *get_edbus_interface(const char *path);
 pid_t get_edbus_sender_pid(DBusMessage *msg);
 int broadcast_edbus_signal(const char *path, const char *interface,
-		const char *name, int type, void *value);
+		const char *name, const char *sig, char *param[]);
+int register_edbus_watch(DBusMessage *msg, enum watch_id id, int (*func)(char *name, enum watch_id id));
+int unregister_edbus_watch(DBusMessage *msg, enum watch_id id);
 
 void edbus_init(void *data);
 void edbus_exit(void *data);
 
-#endif /* __SS_EDBUS_HANDLE_H__ */
+#endif /* __EDBUS_HANDLE_H__ */

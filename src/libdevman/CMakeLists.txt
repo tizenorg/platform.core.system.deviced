@@ -5,7 +5,6 @@ INCLUDE(FindPkgConfig)
 pkg_check_modules(rpkgs REQUIRED
 		vconf
 		dlog
-		heynoti
 		device-node)
 ADD_DEFINITIONS(${rpkgs_CFLAGS})
 

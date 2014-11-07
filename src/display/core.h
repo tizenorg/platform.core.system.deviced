@@ -1,13 +1,13 @@
 /*
  * deviced
  *
- * Copyright (c) 2012 - 2013 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2011 - 2013 Samsung Electronics Co., Ltd. All rights reserved.
  *
- * Licensed under the Apache License, Version 2.0 (the License);
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,9 +25,8 @@
 #define __POWER_MANAGER_H__
 
 #include "poll.h"
-#include "llinterface.h"
+#include "device-interface.h"
 #include "setting.h"
-#include "conf.h"
 
 #define WITHOUT_STARTNOTI	0x1
 #define MASK_BIT 0x7		/* 111 */
@@ -39,10 +38,18 @@
 #define LOWBT_FLAG		0x00000100
 #define CHRGR_FLAG		0x00000200
 #define PWRSV_FLAG		0x00000400
+#define SMAST_FLAG		0x00001000
 #define BRTCH_FLAG		0x00002000
 #define PWROFF_FLAG		0x00004000
+#define DIMSTAY_FLAG		0x00008000
 
-#define TOLERANCE_SLOT		2
+#define DEFAULT_NORMAL_TIMEOUT	30000
+#define DEFAULT_DIM_TIMEOUT	5000
+#define DEFAULT_OFF_TIMEOUT	1000
+
+#define MASK32			0xffffffff
+
+#define CHECK_OPS(d, op) (d != NULL && d->op != NULL)
 
 #ifdef ENABLE_PM_LOG
 #define MAX_LOG_COUNT 250
@@ -99,16 +106,61 @@ struct state {
 	int timeout;
 } states[S_END];
 
+/*
+ * @brief Configuration structure
+ */
+struct display_config {
+	double lock_wait_time;
+	double longpress_interval;
+	double lightsensor_interval;
+	int lcdoff_timeout;
+	int brightness_change_step;
+	int lcd_always_on;
+	int framerate_app[4];
+	int control_display;
+	int powerkey_doublepress;
+	int alpm_on;
+	int accel_sensor_on;
+	int continuous_sampling;
+};
+
+/*
+ * Global variables
+ *   display_conf : configuration of display
+ */
+extern struct display_config display_conf;
+
+/*
+ * @brief Display Extension features
+ */
+struct display_function_info {
+	void (*update_auto_brightness)(bool);
+	int (*set_autobrightness_min)(int, char *);
+	int (*reset_autobrightness_min)(char *, enum watch_id);
+	int (*face_detection)(int, int, int);
+};
+
+extern struct display_function_info display_info;
+
+struct display_keyfilter_ops {
+	void (*init)(void);
+	void (*exit)(void);
+	int (*check)(int, char[], int);
+	void (*set_powerkey_ignore)(int);
+	int (*powerkey_lcdoff)(void);
+	void (*backlight_enable)(bool);
+};
+
+extern const struct display_keyfilter_ops *keyfilter_ops;
+
 /* If the bit in a condition variable is set,
  *  we cannot transit the state until clear this bit. */
 int trans_condition;
 pid_t idle_pid;
-int (*pm_init_extention) (void *data);		/**< extention init function */
-void (*pm_exit_extention) (void);		/**< extention exit function */
 int check_processes(enum state_t prohibit_state);
-
-extern const struct device_ops display_device_ops;
-
+extern struct state state[S_END];
+int reset_lcd_timeout(char *name, enum watch_id id);
+int check_lcdoff_lock_state(void);
 /**
  * @}
  */

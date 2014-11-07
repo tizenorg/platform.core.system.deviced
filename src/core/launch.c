@@ -35,7 +35,7 @@
 
 #define _S(str) ((str == NULL) ? "" : str)
 
-int ss_set_current_lang(void)
+static int set_current_lang(void)
 {
 	char *lang;
 	int ret;
@@ -202,7 +202,7 @@ int launch_app_cmd(const char *cmdline)
 	return launch_app_cmd_with_nice(cmdline, 0);
 }
 
-int ss_launch_if_noexist(const char *execpath, const char *arg, ...)
+int launch_if_noexist(const char *execpath, const char *arg, ...)
 {
 	char *buf;
 	int pid;
@@ -221,12 +221,12 @@ int ss_launch_if_noexist(const char *execpath, const char *arg, ...)
 	va_start(argptr, arg);
 	flag = va_arg(argptr, int);
 
-	if (flag & SS_LAUNCH_NICE)
+	if (flag & LAUNCH_NICE)
 		nice_value = va_arg(argptr, int);
 
 	va_end(argptr);
 
-	ss_set_current_lang();
+	set_current_lang();
 	arg = _S(arg);
 
 	buf_size = strlen(execpath) + strlen(arg) + 10;
@@ -247,7 +247,7 @@ int ss_launch_if_noexist(const char *execpath, const char *arg, ...)
 	return pid;
 }
 
-int ss_launch_evenif_exist(const char *execpath, const char *arg, ...)
+int launch_evenif_exist(const char *execpath, const char *arg, ...)
 {
 	char *buf;
 	int pid;
@@ -265,12 +265,12 @@ int ss_launch_evenif_exist(const char *execpath, const char *arg, ...)
 	va_start(argptr, arg);
 	flag = va_arg(argptr, int);
 
-	if (flag & SS_LAUNCH_NICE)
+	if (flag & LAUNCH_NICE)
 		nice_value = va_arg(argptr, int);
 
 	va_end(argptr);
 
-	ss_set_current_lang();
+	set_current_lang();
 
 	arg = _S(arg);
 
@@ -292,7 +292,7 @@ int ss_launch_evenif_exist(const char *execpath, const char *arg, ...)
 	return pid;
 }
 
-int ss_launch_after_kill_if_exist(const char *execpath, const char *arg, ...)
+int launch_after_kill_if_exist(const char *execpath, const char *arg, ...)
 {
 	char *buf;
 	int pid;
@@ -313,12 +313,12 @@ int ss_launch_after_kill_if_exist(const char *execpath, const char *arg, ...)
 	va_start(argptr, arg);
 	flag = va_arg(argptr, int);
 
-	if (flag & SS_LAUNCH_NICE)
+	if (flag & LAUNCH_NICE)
 		nice_value = va_arg(argptr, int);
 
 	va_end(argptr);
 
-	ss_set_current_lang();
+	set_current_lang();
 
 	arg = _S(arg);
 

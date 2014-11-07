@@ -31,13 +31,13 @@
 #include <fcntl.h>
 #include <sys/timerfd.h>
 
-#include "core/data.h"
-#include "core/queue.h"
 #include "core/log.h"
 #include "core/devices.h"
 #include "display/poll.h"
+#include "display/core.h"
 #include "core/edbus-handler.h"
 #include "core/common.h"
+#include "core/device-notifier.h"
 
 #define PREDEF_SET_DATETIME		"set_datetime"
 #define PREDEF_SET_TIMEZONE		"set_timezone"
@@ -60,6 +60,9 @@
 #ifndef TFD_NONBLOCK
 #define TFD_NONBLOCK	O_NONBLOCK
 #endif
+
+#define TIME_CHANGE_SIGNAL     "STimeChanged"
+
 static const char default_rtc0[] = "/dev/rtc0";
 static const char default_rtc1[] = "/dev/rtc1";
 
@@ -164,7 +167,7 @@ int set_datetime_action(int argc, char **argv)
 	if (argc < 1)
 		return -1;
 	if (vconf_get_int(VCONFKEY_PM_STATE, &ret) != 0)
-		_E("Fail to get vconf value for pm state");
+		_E("Fail to get vconf value for pm state\n");
 	if (ret == 1)
 		pm_state = 0x1;
 	else if (ret == 2)
@@ -172,9 +175,9 @@ int set_datetime_action(int argc, char **argv)
 	else
 		pm_state = 0x4;
 
-	pm_lock_internal(getpid(), pm_state, STAY_CUR_STATE, 0);
+	pm_lock_internal(INTERNAL_LOCK_TIME, pm_state, STAY_CUR_STATE, 0);
 	ret = handle_date(argv[0]);
-	pm_unlock_internal(getpid(), pm_state, STAY_CUR_STATE);
+	pm_unlock_internal(INTERNAL_LOCK_TIME, pm_state, STAY_CUR_STATE);
 	return ret;
 }
 
@@ -185,7 +188,7 @@ int set_timezone_action(int argc, char **argv)
 	if (argc < 1)
 		return -1;
 	if (vconf_get_int(VCONFKEY_PM_STATE, &ret) != 0)
-		_E("Fail to get vconf value for pm state");
+		_E("Fail to get vconf value for pm state\n");
 	if (ret == 1)
 		pm_state = 0x1;
 	else if (ret == 2)
@@ -193,10 +196,16 @@ int set_timezone_action(int argc, char **argv)
 	else
 		pm_state = 0x4;
 
-	pm_lock_internal(getpid(), pm_state, STAY_CUR_STATE, 0);
+	pm_lock_internal(INTERNAL_LOCK_TIME, pm_state, STAY_CUR_STATE, 0);
 	ret = handle_timezone(argv[0]);
-	pm_unlock_internal(getpid(), pm_state, STAY_CUR_STATE);
+	pm_unlock_internal(INTERNAL_LOCK_TIME, pm_state, STAY_CUR_STATE);
 	return ret;
+}
+
+static void time_changed_broadcast(void)
+{
+	broadcast_edbus_signal(DEVICED_PATH_TIME, DEVICED_INTERFACE_TIME,
+			TIME_CHANGE_SIGNAL, NULL, NULL);
 }
 
 static int timerfd_check_start(void)
@@ -257,6 +266,7 @@ static Eina_Bool tfd_cb(void *data, Ecore_Fd_Handler * fd_handler)
 	ret = read(tfd,&ticks,sizeof(ticks));
 	if (ret < 0 && errno == ECANCELED) {
 		vconf_set_int(VCONFKEY_SYSMAN_STIME, VCONFKEY_SYSMAN_STIME_CHANGED);
+		time_changed_broadcast();
 		timerfd_check_stop(tfd);
 		_D("NOTIFICATION here");
 		timerfd_check_start();
@@ -320,6 +330,33 @@ static const struct edbus_method edbus_methods[] = {
 
 };
 
+static int time_lcd_changed_cb(void *data)
+{
+	int lcd_state = (int)data;
+	int tfd = -1;
+
+	if (lcd_state < S_LCDOFF)
+		goto restart;
+
+	lcd_state = check_lcdoff_lock_state();
+	if (lcd_state || !tfdh)
+		goto out;
+	tfd = ecore_main_fd_handler_fd_get(tfdh);
+	if (tfd == -1)
+		goto out;
+
+	_D("stop tfd");
+	timerfd_check_stop(tfd);
+	goto out;
+restart:
+	if (tfdh)
+		return 0;
+	_D("restart tfd");
+	timerfd_check_start();
+out:
+	return 0;
+}
+
 static void time_init(void *data)
 {
 	int ret;
@@ -328,14 +365,10 @@ static void time_init(void *data)
 	if (ret < 0)
 		_E("fail to init edbus method(%d)", ret);
 
-	action_entry_add_internal(PREDEF_SET_DATETIME, set_datetime_action,
-				     NULL, NULL);
-	action_entry_add_internal(PREDEF_SET_TIMEZONE, set_timezone_action,
-				     NULL, NULL);
 	if (timerfd_check_start() == -1) {
 		_E("fail system time change detector init");
-		return;
 	}
+	register_notifier(DEVICE_NOTIFIER_LCD, time_lcd_changed_cb);
 }
 
 static const struct device_ops time_device_ops = {

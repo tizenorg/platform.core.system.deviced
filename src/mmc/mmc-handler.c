@@ -27,25 +27,24 @@
 #include <fcntl.h>
 #include <dirent.h>
 #include <sys/statfs.h>
-#include <bundle.h>
 #include <signal.h>
 #include <stdbool.h>
-#include <mntent.h>
+#include <pthread.h>
+#include <assert.h>
 #include <tzplatform_config.h>
 
 #include "core/log.h"
+#include "core/device-handler.h"
 #include "core/device-notifier.h"
 #include "core/common.h"
 #include "core/devices.h"
 #include "mmc-handler.h"
+#include "config.h"
 #include "core/edbus-handler.h"
+#include "core/list.h"
+#include "core/config-parser.h"
 
 #define VCONFKEY_INTERNAL_PRIVATE_MMC_ID	"db/private/sysman/mmc_device_id"
-#define VCONFKEY_SYSMAN_MMC_INIT	-1
-
-#define PREDEF_MOUNT_MMC		"mountmmc"
-#define PREDEF_UNMOUNT_MMC		"unmountmmc"
-#define PREDEF_FORMAT_MMC		"formatmmc"
 
 #define MMC_PARENT_PATH	tzplatform_getenv(TZ_SYS_STORAGE)
 #define MMC_DEV			"/dev/mmcblk"
@@ -57,37 +56,53 @@
 #define ST_RDONLY		0x0001
 #endif
 
-#define MMC_32GB_SIZE           61315072
-
+#define MMC_32GB_SIZE	61315072
+#define FORMAT_RETRY	3
 #define UNMOUNT_RETRY	5
 
-#define get_mmc_fs(ptr, type, member) \
-((type *)((char *)(ptr)-(unsigned long)(&((type *)0)->member)))
-
-#define mmc_fs_search(pos, head) \
-for (pos = (head)->next; pos != (head); \
-pos = pos->next)
-
-typedef enum {
-	FS_MOUNT_ERR = -1,
-	FS_MOUNT_FAIL = 0,
-	FS_MOUNT_SUCCESS = 1,
-} mmc_mount_type;
+#define SMACK_LABELING_TIME (0.5)
 
 enum unmount_operation {
-	UNMOUNT_NORMAL,
+	UNMOUNT_NORMAL = 0,
 	UNMOUNT_FORCE,
 };
 
-static int smack = 0;
-static int mmc_popup_pid = 0;
-static enum mmc_fs_type inserted_type;
+enum mmc_operation {
+	MMC_MOUNT = 0,
+	MMC_UNMOUNT,
+	MMC_FORMAT,
+	MMC_END,
+};
+
+static void *mount_start(void *arg);
+static void *unmount_start(void *arg);
+static void *format_start(void *arg);
+
+static const struct mmc_thread_func {
+	enum mmc_operation type;
+	void *(*func) (void*);
+} mmc_func[MMC_END] = {
+	[MMC_MOUNT] = {.type = MMC_MOUNT, .func = mount_start},
+	[MMC_UNMOUNT] = {.type = MMC_UNMOUNT, .func = unmount_start},
+	[MMC_FORMAT] = {.type = MMC_FORMAT, .func = format_start},
+};
+
+struct mmc_data {
+	int option;
+	char *devpath;
+};
+
+struct popup_data {
+	char *name;
+	char *key;
+	char *value;
+};
+
+static dd_list *fs_head;
+static char *mmc_curpath;
+static bool smack = false;
 static bool mmc_disabled = false;
-static char mmc_node[PATH_MAX];
-
-static struct mmc_filesystem_ops *mmc_filesystem;
-
-static struct mmc_list mmc_handler_list = { &(mmc_handler_list), &(mmc_handler_list)};
+static Ecore_Timer *smack_timer = NULL;
 
 static void __CONSTRUCTOR__ smack_check(void)
 {
@@ -99,49 +114,111 @@ static void __CONSTRUCTOR__ smack_check(void)
 	} while (ret < 0 && errno == EINTR);
 
 	if (ret == 0 && sfs.f_type == SMACKFS_MAGIC)
-		smack = 1;
+		smack = true;
 	_I("smackfs check %d", smack);
 }
 
-static void mmc_list_add(struct mmc_list *new, struct mmc_list *prev, struct mmc_list *next)
+void add_fs(const struct mmc_fs_ops *fs)
 {
-	next->prev = new;
-	new->next = next;
-	new->prev = prev;
-	prev->next = new;
+	DD_LIST_APPEND(fs_head, (void*)fs);
 }
 
-static void mmc_fs_add(struct mmc_list *new, struct mmc_list *head)
+void remove_fs(const struct mmc_fs_ops *fs)
 {
-	mmc_list_add(new, head->prev, head);
+	DD_LIST_REMOVE(fs_head, (void*)fs);
 }
 
-static int exec_process(const char **argv)
+const struct mmc_fs_ops *find_fs(enum mmc_fs_type type)
 {
-	int pid;
+	struct mmc_fs_ops *fs;
+	dd_list *elem;
+
+	DD_LIST_FOREACH(fs_head, elem, fs) {
+		if (fs->type == type)
+			return fs;
+	}
+	return NULL;
+}
+
+bool mmc_check_mounted(const char *mount_point)
+{
+	struct stat parent_stat, mount_stat;
+	char parent_path[PATH_MAX];
+
+	snprintf(parent_path, sizeof(parent_path), "%s", MMC_PARENT_PATH);
+
+	if (stat(mount_point, &mount_stat) != 0 || stat(parent_path, &parent_stat) != 0)
+		return false;
+
+	if (mount_stat.st_dev == parent_stat.st_dev)
+		return false;
+
+	return true;
+}
+
+static void launch_syspopup(char *str)
+{
+	struct popup_data *params;
+	static const struct device_ops *apps = NULL;
+
+	FIND_DEVICE_VOID(apps, "apps");
+
+	params = malloc(sizeof(struct popup_data));
+	if (params == NULL) {
+		_E("Malloc failed");
+		return;
+	}
+	params->name = MMC_POPUP_NAME;
+	params->key = POPUP_KEY_CONTENT;
+	params->value = strdup(str);
+	apps->init((void *)params);
+	free(params);
+}
+
+static int get_partition(const char *devpath, char *subpath)
+{
+	char path[NAME_MAX];
 	int i;
-	int r;
 
-	if (!argv)
-		return -1;
-
-	pid = fork();
-	if (pid == -1)
-		return -1;
-
-	if (!pid) {
-		for (i = 0; i < _NSIG; ++i)
-			signal(i, SIG_DFL);
-		r = execv(argv[0], (char **)argv);
-		if (r == -1) {
-			_E("execv() error");
-			exit(EXIT_FAILURE);
+	for (i = 1; i < 5; ++i) {
+		snprintf(path, sizeof(path), "%sp%d", devpath, i);
+		if (!access(path, R_OK)) {
+			strncpy(subpath, path, strlen(path));
+			return 0;
 		}
 	}
-	return pid;
+	return -ENODEV;
 }
 
-int get_mmcblk_num(void)
+static int create_partition(const char *devpath)
+{
+	int r;
+	char data[NAME_MAX];
+
+	snprintf(data, sizeof(data), "\"n\\n\\n\\n\\n\\nw\" | fdisk %s", devpath);
+
+	r = launch_evenif_exist("/usr/bin/printf", data);
+	if (WIFSIGNALED(r) && (WTERMSIG(r) == SIGINT || WTERMSIG(r) == SIGQUIT || WEXITSTATUS(r)))
+		return -1;
+
+	return 0;
+}
+
+static int mmc_check_and_unmount(const char *path)
+{
+	int ret = 0, retry = 0;
+	while (mount_check(path)) {
+		ret = umount(path);
+		if (ret < 0) {
+			retry++;
+			if (retry > UNMOUNT_RETRY)
+				return -errno;
+		}
+	}
+	return ret;
+}
+
+int get_block_number(void)
 {
 	DIR *dp;
 	struct dirent *dir;
@@ -178,8 +255,6 @@ int get_mmcblk_num(void)
 
 				fd = open(buf, O_RDONLY);
 				if (fd == -1) {
-					_E("%s open error: %s", buf,
-						      strerror(errno));
 					continue;
 				}
 				r = read(fd, buf, 10);
@@ -201,7 +276,7 @@ int get_mmcblk_num(void)
 
 					free(str_mmcblk_num);
 					closedir(dp);
-					_D("%d", mmcblk_num);
+					_I("%d", mmcblk_num);
 
 					snprintf(buf, 255, "/sys/block/%s/device/cid", dir->d_name);
 
@@ -241,289 +316,48 @@ int get_mmcblk_num(void)
 		}
 	}
 	closedir(dp);
-	_E("Failed to find mmc block number");
+	_E("failed to find mmc block number");
 	return -1;
 }
 
-static int mmc_check_fs_type(void)
+static int find_mmc_node(char devpath[])
 {
-	int ret;
-	struct mmc_filesystem_info *filesystem = NULL;
-	struct mmc_list *tmp;
-	inserted_type = FS_TYPE_NONE;
+	int num;
 
-	mmc_fs_search(tmp, &mmc_handler_list) {
-		filesystem = get_mmc_fs(tmp, struct mmc_filesystem_info, list);
-		ret = filesystem->fs_ops->init((void *)mmc_node);
-		if (ret == -EINVAL)
-			continue;
-		inserted_type = ret;
-		mmc_filesystem = filesystem->fs_ops;
-		return 0;
-	}
-	_D("set default file system");
-	mmc_fs_search(tmp, &mmc_handler_list) {
-		filesystem = get_mmc_fs(tmp, struct mmc_filesystem_info, list);
-		if (strcmp(filesystem->name, "vfat"))
-			continue;
-		inserted_type = FS_TYPE_FAT;
-		mmc_filesystem =  filesystem->fs_ops;
-		mmc_filesystem->init((void *)mmc_node);
-		return 0;
-	}
-	_E("fail to init mmc file system");
-	return -EINVAL;
-}
+	num = get_block_number();
+	if (num < 0)
+		return -ENODEV;
 
-static int get_format_type(void)
-{
-	unsigned int size;
-	struct mmc_list *tmp;
-	struct mmc_filesystem_info *filesystem = NULL;
-
-	if (mmc_check_fs_type())
-		return -EINVAL;
-
-	if (inserted_type == FS_TYPE_EXT4)
-		return 0;
-
-	_E("fail to init mmc file system");
-	return -EINVAL;
-}
-
-static int check_mount_state(void)
-{
-	struct stat parent_stat, mount_stat;
-	char parent_path[PATH_MAX];
-	char mount_path[PATH_MAX];
-
-	snprintf(parent_path, sizeof(parent_path), "%s", MMC_PARENT_PATH);
-	snprintf(mount_path, sizeof(mount_path), "%s", MMC_MOUNT_POINT);
-
-	if (stat(mount_path, &mount_stat) != 0 || stat(parent_path, &parent_stat) != 0) {
-		_I("state : UNMOUNT (get stat error)");
-		return 0;
-	}
-
-	if (mount_stat.st_dev == parent_stat.st_dev) {
-		_I("state : UNMOUNT");
-		return 0;
-	}
-
-	_I("state : MOUNT");
-	return 1;
-}
-
-static int create_partition(const char *dev_path)
-{
-	int r;
-
-	r = system("printf \"n\\n\\n\\n\\n\\nw\" | fdisk /dev/mmcblk1");
-	if (WIFSIGNALED(r) && (WTERMSIG(r) == SIGINT || WTERMSIG(r) == SIGQUIT || WEXITSTATUS(r)))
-		return -1;
+	snprintf(devpath, NAME_MAX, "%s%d", MMC_DEV, num);
 	return 0;
 }
 
-static int kill_app_accessing_mmc(void)
+static int get_mmc_size(const char *devpath)
 {
-	int pid;
-	const char *argv[4] = {"/sbin/fuser", "-mk", MMC_MOUNT_POINT, NULL};
-	char buf[256];
-	int retry = 10;
+	int fd, r;
+	unsigned long long ullbytes;
+	unsigned int nbytes;
 
-	pid = exec_process(argv);
-	if (pid < 0) {
-		_E("%s fail");
+	fd = open(devpath, O_RDONLY);
+	if (fd < 0) {
+		_E("open error");
 		return -EINVAL;
 	}
 
-	snprintf(buf, sizeof(buf), "%s%d", "/proc/", pid);
-	_D("child process : %s", buf);
-	while (--retry) {
-		usleep(100000);
-		_D("killing app....");
-		if (access(buf, R_OK) != 0)
-			break;
-	}
+	r = ioctl(fd, BLKGETSIZE64, &ullbytes);
+	close(fd);
 
-	return 0;
-}
-
-static void launch_syspopup(const char *str)
-{
-	bundle *b;
-	int ret;
-	b = bundle_create();
-	if (!b) {
-		_E("error bundle_create()");
-		return;
-	}
-	bundle_add(b, "_SYSPOPUP_CONTENT_", str);
-	ret = syspopup_launch("mmc-syspopup", b);
-	if (ret < 0)
-		_E("popup launch failed");
-	bundle_free(b);
-}
-
-static int mmc_check(const char* path)
-{
-	int ret = false;
-	struct mntent* mnt;
-	const char* table = "/etc/mtab";
-	FILE* fp;
-
-	fp = setmntent(table, "r");
-	if (!fp)
-		return ret;
-	while (mnt=getmntent(fp)) {
-		if (!strcmp(mnt->mnt_dir, path)) {
-			ret = true;
-			break;
-		}
-	}
-	endmntent(fp);
-	return ret;
-}
-
-static int mmc_check_and_unmount(const char *path)
-{
-	int ret = 0;
-	if (mmc_check(path))
-		ret = umount(path);
-	return ret;
-}
-
-static int mmc_umount(int option)
-{
-	int r, retry = UNMOUNT_RETRY;
-
-	if (!check_mount_state())
-		return 0;
-
-	_I("Mounted, will be unmounted");
-	r = mmc_check_and_unmount((const char*)MMC_MOUNT_POINT);
-	if (!r || option == UNMOUNT_NORMAL) {
-		_I("unmount mmc card, ret = %d, option = %d", r, option);
-		return r;
-	}
-
-	_I("Execute force unmount!");
-
-	/* it notify to other app who already access sdcard */
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_INSERTED_NOT_MOUNTED);
-
-	/* it takes some seconds til other app completely clean up */
-	usleep(500000);
-
-	while (--retry) {
-		r = mmc_check_and_unmount((const char *)MMC_MOUNT_POINT);
-		if (!r)
-			break;
-		usleep(500000);
-		_I("umount retry : %d", retry);
-		if (retry == UNMOUNT_RETRY -2)
-			kill_app_accessing_mmc();
-	}
-
-	return r;
-}
-
-static int mmc_format_exec(char *path)
-{
-	unsigned int size;
-	int mkfs_pid;
-	const char **argv;
-	char buf[NAME_MAX];
-	int r;
-
-	if (path == NULL) {
-		_E("Invalid parameter");
+	if (r < 0) {
+		_E("ioctl BLKGETSIZE64 error");
 		return -EINVAL;
 	}
 
-	if (get_format_type() != 0) {
-		_E("Invalid parameter");
-		return -EINVAL;
-	}
-
-	argv = mmc_filesystem->format((void *)path);
-
-	if (argv == NULL) {
-		_E("get_argument fail");
-		return -EINVAL;
-	}
-
-	mkfs_pid = exec_process(argv);
-	if (mkfs_pid < 0) {
-		_E("%s fail");
-		return -EINVAL;
-	}
-
-	snprintf(buf, sizeof(buf), "%s%d", "/proc/", mkfs_pid);
-	_D("child process : %s", buf);
-	while (1) {
-		sleep(1);
-		_D("formatting....");
-		if (access(buf, R_OK) != 0)
-			break;
-	}
-	return 0;
+	nbytes = ullbytes/512;
+	_I("block size(64) : %d", nbytes);
+	return nbytes;
 }
 
-static int mmc_format(int blknum)
-{
-	char dev_mmcblk[NAME_MAX];
-	char dev_mmcblkp[NAME_MAX];
-	int r;
-
-	snprintf(dev_mmcblk, sizeof(dev_mmcblk), "%s%d", MMC_DEV, blknum);
-	snprintf(dev_mmcblkp, sizeof(dev_mmcblkp), "%sp1", dev_mmcblk);
-
-	/* in case of no partition */
-	if (access(dev_mmcblkp, R_OK) < 0) {
-		_I("%s is not valid, create the primary partition", dev_mmcblkp);
-
-		/* format default dev partition */
-		r = mmc_format_exec(dev_mmcblk);
-		if (r != 0) {
-			_E("format_mmc(%s) fail", dev_mmcblk);
-			return r;
-		}
-
-		/* create partition */
-		r = create_partition(dev_mmcblk);
-		if (r != 0) {
-			_E("create_partition failed");
-			return r;
-		}
-	}
-
-	/* format first partition */
-	r = mmc_format_exec(dev_mmcblkp);
-	if (r != 0) {
-		_E("format_mmc fail");
-		return r;
-	}
-
-	return 0;
-}
-
-int mount_fs(char *path, const char *fs_name, const char *mount_data)
-{
-	int ret, retry = 0;
-
-	do {
-		if ((ret = mount(path, MMC_MOUNT_POINT, fs_name, 0, mount_data)) == 0) {
-			_I("Mounted mmc card %s", fs_name);
-			return 0;
-		}
-		usleep(100000);
-	} while (ret == -1 && errno == ENOENT && retry++ < 10);
-
-	return errno;
-}
-
-static int __ss_rw_mount(const char *szPath)
+static int rw_mount(const char *szPath)
 {
 	struct statvfs mount_stat;
 	if (!statvfs(szPath, &mount_stat)) {
@@ -533,370 +367,634 @@ static int __ss_rw_mount(const char *szPath)
 	return 0;
 }
 
-static int mmc_check_node(void)
+static Eina_Bool smack_timer_cb(void *data)
 {
-	int fd;
-	int blk_num;
-	int ret = 0;
+	if (smack_timer) {
+		ecore_timer_del(smack_timer);
+		smack_timer = NULL;
+	}
+	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_MOUNTED);
+	vconf_set_int(VCONFKEY_SYSMAN_MMC_MOUNT, VCONFKEY_SYSMAN_MMC_MOUNT_COMPLETED);
+	return EINA_FALSE;
+}
 
-	if (access(MMC_MOUNT_POINT, R_OK) != 0) {
-		if (mkdir(MMC_MOUNT_POINT, 0755) < 0) {
-			_E("Make Directory is failed");
-			return errno;
-		}
+void mmc_mount_done(void)
+{
+	smack_timer = ecore_timer_add(SMACK_LABELING_TIME,
+			smack_timer_cb, NULL);
+	if (smack_timer) {
+		_I("Wait to check");
+		return;
+	}
+	_E("Fail to add abnormal check timer");
+	smack_timer_cb(NULL);
+}
+
+static int mmc_mount(const char *devpath, const char *mount_point)
+{
+	struct mmc_fs_ops *fs;
+	dd_list *elem;
+	char path[NAME_MAX] = {0,};
+	int r;
+
+	/* mmc_disabled set by start/stop func. */
+	if (mmc_disabled)
+		return -EWOULDBLOCK;
+
+	if (!devpath)
+		return -ENODEV;
+
+	/* check partition */
+	r = get_partition(devpath, path);
+	if (!r)
+		devpath = path;
+
+	DD_LIST_FOREACH(fs_head, elem, fs) {
+		if (fs->match(devpath))
+			break;
 	}
 
-	blk_num = get_mmcblk_num();
-	if (blk_num  == -1) {
-		_E("fail to check mmc block");
-		return -1;
-	}
+	if (!fs)
+		return -EINVAL;
 
-	snprintf(mmc_node, sizeof(mmc_node), "%s%dp1", MMC_DEV, blk_num);
-	fd = open(mmc_node, O_RDONLY);
-	if (fd < 0) {
-		_E("can't open the '%s(%d)': %s",
-			mmc_node, sizeof(mmc_node), strerror(errno));
-		snprintf(mmc_node, sizeof(mmc_node), "%s%d", MMC_DEV, blk_num);
-		fd = open(mmc_node, O_RDONLY);
-		if (fd < 0) {
-			_E("can't open the '%s(%d)': %s",
-				mmc_node, sizeof(mmc_node), strerror(errno));
-			return -1;
-		}
-	}
-	close(fd);
+	_I("devpath : %s", devpath);
+	r = fs->check(devpath);
+	if (r < 0)
+		_E("failt to check devpath : %s", devpath);
+
+	r = fs->mount(smack, devpath, mount_point);
+	if (r < 0)
+		return r;
+
+	r = rw_mount(mount_point);
+	if (r < 0)
+		return -EROFS;
+
 	return 0;
 }
 
-static void mmc_check_fs(void)
+static void *mount_start(void *arg)
 {
-	const char **params;
-	char buf[NAME_MAX];
-	int pid;
-
-	if (!mmc_filesystem) {
-		_E("no inserted mmc");
-		return;
-	}
-	params = mmc_filesystem->check();
-
-	pid = exec_process(params);
-	if (pid < 0) {
-		_E("mmc checker failed");
-		return;
-	}
-
-	snprintf(buf, sizeof(buf), "%s%d", "/proc/", pid);
-	_D("child process : %s", buf);
-
-	while (1) {
-		_D("mmc checking ....");
-		if (access(buf, R_OK) != 0)
-			break;
-		sleep(1);
-	}
-}
-
-static int mmc_mount(void)
-{
+	struct mmc_data *data = (struct mmc_data*)arg;
+	char *devpath;
 	int r;
 
-	r = mmc_check_node();
-	if (r != 0) {
-		_E("fail to check mmc");
+	devpath = data->devpath;
+	if (!devpath) {
+		r = -EINVAL;
+		goto error;
+	}
+
+	/* clear previous filesystem */
+	mmc_check_and_unmount(MMC_MOUNT_POINT);
+
+	/* check mount point */
+	if (access(MMC_MOUNT_POINT, R_OK) != 0) {
+		if (mkdir(MMC_MOUNT_POINT, 0755) < 0) {
+			r = -errno;
+			goto error;
+		}
+	}
+
+	/* mount operation */
+	r = mmc_mount(devpath, MMC_MOUNT_POINT);
+	if (r == -EROFS)
+		launch_syspopup("mountrdonly");
+	/* Do not need to show error popup, if mmc is disabled */
+	else if (r == -EWOULDBLOCK)
+		goto error_without_popup;
+	else if (r < 0)
+		goto error;
+
+	mmc_set_config(MAX_RATIO);
+
+	free(devpath);
+	free(data);
+
+	/* give a transmutable attribute to mount_point */
+	r = setxattr(MMC_MOUNT_POINT, "security.SMACK64TRANSMUTE", "TRUE", strlen("TRUE"), 0);
+	if (r < 0)
+		_E("setxattr error : %s", strerror(errno));
+
+	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_MOUNTED);
+	vconf_set_int(VCONFKEY_SYSMAN_MMC_MOUNT, VCONFKEY_SYSMAN_MMC_MOUNT_COMPLETED);
+	return 0;
+
+error:
+	launch_syspopup("mounterr");
+
+error_without_popup:
+	vconf_set_int(VCONFKEY_SYSMAN_MMC_MOUNT, VCONFKEY_SYSMAN_MMC_MOUNT_FAILED);
+	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_INSERTED_NOT_MOUNTED);
+
+	free(devpath);
+	free(data);
+	_E("failed to mount device : %s", strerror(-r));
+	return (void *)r;
+}
+
+static int mmc_unmount(int option, const char *mount_point)
+{
+	int r, retry = 0;
+	int kill_op;
+
+	/* it must called before unmounting mmc */
+	r = mmc_check_and_unmount(mount_point);
+	if (!r)
+		return r;
+	if (option == UNMOUNT_NORMAL) {
+		_I("Failed to unmount with normal option : %s", strerror(-r));
 		return r;
 	}
 
-	if (mmc_check_fs_type())
-		goto mount_fail;
+	_I("Execute force unmount!");
+	/* Force Unmount Scenario */
+	while (1) {
+		switch (retry++) {
+		case 0:
+			/* At first, notify to other app who already access sdcard */
+			_I("Notify to other app who already access sdcard");
+			vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_INSERTED_NOT_MOUNTED);
+			break;
+		case 1:
+			/* Second, kill app with SIGTERM */
+			_I("Kill app with SIGTERM");
+			terminate_process(MMC_MOUNT_POINT, false);
+			break;
+		case 2:
+			/* Last time, kill app with SIGKILL */
+			_I("Kill app with SIGKILL");
+			terminate_process(MMC_MOUNT_POINT, true);
+			break;
+		default:
+			if (umount2(mount_point, MNT_DETACH) != 0) {
+				_I("Failed to unmount with lazy option : %s", strerror(errno));
+				return -errno;
+			}
+			return 0;
+		}
 
-	mmc_check_fs();
+		/* it takes some seconds til other app completely clean up */
+		usleep(500*1000);
 
-	r = mmc_filesystem->mount(smack, mmc_node);
+		r = mmc_check_and_unmount(mount_point);
+		if (!r)
+			break;
+	}
 
-	if (r == 0)
-		goto mount_complete;
-	else if (r == 1)
-		goto mount_wait;
-	else if (r == -1)
-		goto mount_fail;
+	return r;
+}
 
+static void *unmount_start(void *arg)
+{
+	struct mmc_data *data = (struct mmc_data*)arg;
+	int option, r;
+
+	option = data->option;
+
+	assert(option == UNMOUNT_NORMAL || option == UNMOUNT_FORCE);
+
+	r = mmc_unmount(option, MMC_MOUNT_POINT);
+	if (r < 0)
+		goto error;
+
+	free(data);
 	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_INSERTED_NOT_MOUNTED);
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_MOUNT, VCONFKEY_SYSMAN_MMC_MOUNT_FAILED);
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_ERR_STATUS, errno);
-	_E("Failed to mount mmc card");
-	return -1;
+	return 0;
 
-mount_complete:
-	r = __ss_rw_mount(MMC_MOUNT_POINT);
+error:
+	free(data);
+	_E("Failed to unmount device : %s", strerror(-r));
 	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_MOUNTED);
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_MOUNT, VCONFKEY_SYSMAN_MMC_MOUNT_COMPLETED);
-	if (r == -1)
-		return -1;
-	return 0;
-
-mount_fail:
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_REMOVED);
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_MOUNT, VCONFKEY_SYSMAN_MMC_MOUNT_FAILED);
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_ERR_STATUS, VCONFKEY_SYSMAN_MMC_EINVAL);
-	return -1;
-
-mount_wait:
-	_E("wait ext4 smack rule checking");
-	return 0;
+	return (void *)r;
 }
 
-int ss_mmc_inserted(void)
+static int format(const char *devpath)
 {
-	int mmc_status;
+	const struct mmc_fs_ops *fs = NULL;
+	dd_list *elem;
+	char path[NAME_MAX] = {0,};
+	int r, size, retry;
 
-	if (mmc_disabled) {
-		_I("mmc is blocked!");
-		vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_INSERTED_NOT_MOUNTED);
+	if (!devpath)
 		return -ENODEV;
+
+	/* check partition */
+	r = get_partition(devpath, path);
+	if (!r) {
+		/* if there is partition, find partition file system */
+		DD_LIST_FOREACH(fs_head, elem, fs) {
+			if (fs->match(path))
+				break;
+		}
+	} else {
+		/* if there isn't partition, create partition */
+		create_partition(devpath);
+		r = get_partition(devpath, path);
+		if (r < 0)
+			memcpy(path, devpath, strlen(devpath));
 	}
 
-	vconf_get_int(VCONFKEY_SYSMAN_MMC_STATUS, &mmc_status);
-	if (mmc_status == VCONFKEY_SYSMAN_MMC_MOUNTED) {
-		_I("Mmc is already mounted");
-		vconf_set_int(VCONFKEY_SYSMAN_MMC_MOUNT, VCONFKEY_SYSMAN_MMC_MOUNT_ALREADY);
-		return 0;
+	_I("format partition : %s", path);
+
+	if (!fs) {
+		/* find root file system */
+		DD_LIST_FOREACH(fs_head, elem, fs) {
+			if (fs->match(devpath))
+				break;
+		}
 	}
 
-	return mmc_mount();
+	if (!fs) {
+		/* cannot find root and partition file system,
+		   find suitable file system */
+		size = get_mmc_size(path);
+		fs = find_fs(FS_TYPE_VFAT);
+	}
+
+	if (!fs)
+		return -EINVAL;
+
+	for (retry = FORMAT_RETRY; retry > 0; --retry) {
+		fs->check(devpath);
+		_I("format path : %s", path);
+		r = fs->format(path);
+		if (!r)
+			break;
+	}
+	return r;
 }
 
-int ss_mmc_removed(void)
+static void *format_start(void *arg)
 {
-	int mmc_err = 0;
+	struct mmc_data *data = (struct mmc_data*)arg;
+	char *devpath;
+	int option, r, key = VCONFKEY_SYSMAN_MMC_MOUNTED;
+	bool format_ret = true;
 
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_REMOVED);
-	mmc_err = mmc_umount(UNMOUNT_NORMAL);
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_ERR_STATUS, mmc_err);
-	mmc_filesystem = NULL;
-	return 0;
-}
+	option = data->option;
+	devpath = data->devpath;
 
-static int ss_mmc_unmounted(int argc, char **argv)
-{
-	int option = -1;
-
-	if (argc < 1) {
-		_E("Option is wong");
-		return -1;
-	}
-
-	option = atoi(argv[0]);
-	if (option < 0) {
-		_E("Option is wong : %d", option);
-		return -1;
-	}
-
-	if (mmc_umount(UNMOUNT_FORCE) != 0) {
-		_E("Failed to unmount mmc card");
-		vconf_set_int(VCONFKEY_SYSMAN_MMC_UNMOUNT,
-			VCONFKEY_SYSMAN_MMC_UNMOUNT_FAILED);
-		vconf_set_int(VCONFKEY_SYSMAN_MMC_ERR_STATUS, errno);
-		return -1;
-
-	}
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS,
-		VCONFKEY_SYSMAN_MMC_INSERTED_NOT_MOUNTED);
-	vconf_set_int(VCONFKEY_SYSMAN_MMC_UNMOUNT,
-		VCONFKEY_SYSMAN_MMC_UNMOUNT_COMPLETED);
-	return 0;
-}
-
-static int ss_mmc_format(int argc, char **argv)
-{
-	int r;
-	int option;
-
-	if (argc < 1) {
-		_E("Option is wong");
-		r = -EINVAL;
-		goto error;
-	}
-
-	option = atoi(argv[0]);
-	if (option < 0) {
-		_E("Option is wong : %d", option);
-		r = -EINVAL;
-		goto error;
-	}
+	assert(devpath);
+	assert(option == UNMOUNT_NORMAL || option == UNMOUNT_FORCE);
 
 	_I("Format Start (option:%d)", option);
-	r = mmc_umount(option);
-	if (r != 0)
-		goto error;
+	r = mmc_unmount(option, MMC_MOUNT_POINT);
+	if (r < 0)
+		goto release_memory;
 
 	vconf_set_int(VCONFKEY_SYSMAN_MMC_FORMAT_PROGRESS, VCONFKEY_SYSMAN_MMC_FORMAT_PROGRESS_NOW);
-	r = mmc_format(get_mmcblk_num());
+	r = format(devpath);
 	vconf_set_int(VCONFKEY_SYSMAN_MMC_FORMAT_PROGRESS, VCONFKEY_SYSMAN_MMC_FORMAT_PROGRESS_NONE);
 	if (r != 0)
-		goto error;
+		format_ret = false;
 
-	r = mmc_mount();
-	if (r != 0)
+	mount_start(arg);
+	if (!format_ret)
 		goto error;
-
 	_I("Format Successful");
 	vconf_set_int(VCONFKEY_SYSMAN_MMC_FORMAT, VCONFKEY_SYSMAN_MMC_FORMAT_COMPLETED);
 	return 0;
 
+release_memory:
+	free(devpath);
+	free(data);
 error:
-	_E("Format Failed");
+	_E("Format Failed : %s", strerror(-r));
 	vconf_set_int(VCONFKEY_SYSMAN_MMC_FORMAT, VCONFKEY_SYSMAN_MMC_FORMAT_FAILED);
-	return r;
+	return (void*)r;
 }
 
-int register_mmc_handler(const char *name, const struct mmc_filesystem_ops filesystem_type)
+static int mmc_make_thread(int type, int option, const char *devpath)
 {
-	struct mmc_list *tmp;
-	struct mmc_filesystem_info *entry;
+	pthread_t th;
+	struct mmc_data *pdata;
+	int r;
 
-	entry = malloc(sizeof(struct mmc_filesystem_info));
+	if (type < 0 || type >= MMC_END)
+		return -EINVAL;
 
-	if (!entry) {
-		_E("Malloc failed");
-		return -1;
+	pdata = malloc(sizeof(struct mmc_data));
+	if (!pdata) {
+		_E("malloc failed");
+		return -errno;
 	}
 
-	entry->name = strndup(name, strlen(name));
-
-	if (!entry->name) {
-		_E("Malloc failed");
-		goto free_entry;
+	if (option >= 0)
+		pdata->option = option;
+	if (devpath)
+		pdata->devpath = strdup(devpath);
+	r = pthread_create(&th, NULL, mmc_func[type].func, pdata);
+	if (r != 0) {
+		_E("pthread create failed");
+		free(pdata->devpath);
+		free(pdata);
+		return -EPERM;
 	}
 
-	entry->fs_ops = malloc(sizeof(struct mmc_filesystem_ops));
-	if (!entry->fs_ops) {
-		_E("Malloc failed");
-		goto free_entry_with_name;
-	}
-
-	entry->fs_ops->init = filesystem_type.init;
-	entry->fs_ops->check = filesystem_type.check;
-	entry->fs_ops->mount = filesystem_type.mount;
-	entry->fs_ops->format = filesystem_type.format;
-
-	mmc_fs_add(&entry->list, &mmc_handler_list);
-
-	mmc_fs_search(tmp, &mmc_handler_list) {
-		entry = get_mmc_fs(tmp, struct mmc_filesystem_info, list);
-	}
+	pthread_detach(th);
 	return 0;
-
-	free_entry_with_name:
-	free(entry->name);
-
-	free_entry:
-	free(entry);
-
-	return -1;
 }
 
-static int ss_mmc_booting_done(void* data)
+static int mmc_inserted(const char *devpath)
 {
-	return ss_mmc_inserted();
+	int r;
+	_I("MMC inserted : %s", devpath);
+	mmc_curpath = strdup(devpath);
+	r = mmc_make_thread(MMC_MOUNT, -1, devpath);
+	if (r < 0)
+		return r;
+	return 0;
 }
 
-static DBusMessage *dbus_mmc_handler(E_DBus_Object *obj, DBusMessage *msg)
+static int mmc_removed(void)
 {
-	DBusError err;
+	_I("MMC removed");
+	/* unmount */
+	mmc_check_and_unmount((const char *)MMC_MOUNT_POINT);
+	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_REMOVED);
+	free(mmc_curpath);
+	mmc_curpath = NULL;
+	return 0;
+}
+
+static int mmc_changed_cb(void *data)
+{
+	char *devpath = (char*)data;
+
+	/* if MMC is inserted */
+	if (devpath)
+		return mmc_inserted(devpath);
+	else
+		return mmc_removed();
+}
+
+static int mmc_booting_done(void* data)
+{
+	char devpath[NAME_MAX] = {0,};
+	int r;
+
+	/* check mmc exists */
+	r = find_mmc_node(devpath);
+	if (r < 0)
+		return 0;
+
+	/* if MMC exists */
+	return mmc_inserted(devpath);
+}
+
+static DBusMessage *edbus_request_mount(E_DBus_Object *obj, DBusMessage *msg)
+{
 	DBusMessageIter iter;
 	DBusMessage *reply;
-	pid_t pid;
+	struct mmc_data *pdata;
 	int ret;
-	int argc;
-	char *type_str;
-	char *argv;
 
-	dbus_error_init(&err);
-
-	if (!dbus_message_get_args(msg, &err,
-		    DBUS_TYPE_STRING, &type_str,
-		    DBUS_TYPE_INT32, &argc,
-		    DBUS_TYPE_STRING, &argv, DBUS_TYPE_INVALID)) {
-		_E("there is no message");
-		ret = -EINVAL;
-		goto out;
+	if (!mmc_curpath) {
+		ret = -ENODEV;
+		goto error;
 	}
 
-	if (argc < 0) {
-		_E("message is invalid!");
-		ret = -EINVAL;
-		goto out;
+	pdata = malloc(sizeof(struct mmc_data));
+	if (!pdata) {
+		_E("malloc failed");
+		ret = -errno;
+		goto error;
 	}
 
-	pid = get_edbus_sender_pid(msg);
-	if (kill(pid, 0) == -1) {
-		_E("%d process does not exist, dbus ignored!", pid);
-		ret = -ESRCH;
-		goto out;
+	pdata->devpath = strdup(mmc_curpath);
+	if (!pdata->devpath) {
+		free(pdata);
+		ret = -errno;
+		goto error;
 	}
 
-	if (strncmp(type_str, PREDEF_MOUNT_MMC, strlen(PREDEF_MOUNT_MMC)) == 0)
-		ret = ss_mmc_inserted();
-	else if (strncmp(type_str, PREDEF_UNMOUNT_MMC, strlen(PREDEF_UNMOUNT_MMC)) == 0)
-		ret = ss_mmc_unmounted(argc, (char **)&argv);
-	else if (strncmp(type_str, PREDEF_FORMAT_MMC, strlen(PREDEF_FORMAT_MMC)) == 0)
-		ret = ss_mmc_format(argc, (char **)&argv);
-out:
+	ret = (int)mount_start(pdata);
+
+error:
 	reply = dbus_message_new_method_return(msg);
 	dbus_message_iter_init_append(reply, &iter);
 	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
-
 	return reply;
 }
 
+static DBusMessage *edbus_request_unmount(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int opt, ret;
+	char params[NAME_MAX];
+	struct mmc_data *pdata;
+
+	ret = dbus_message_get_args(msg, NULL,
+			DBUS_TYPE_INT32, &opt, DBUS_TYPE_INVALID);
+	if (!ret) {
+		_I("there is no message");
+		ret = -EBADMSG;
+		goto error;
+	}
+
+	pdata = malloc(sizeof(struct mmc_data));
+	if (!pdata) {
+		_E("malloc failed");
+		ret = -errno;
+		goto error;
+	}
+
+	pdata->option = opt;
+	ret = (int)unmount_start(pdata);
+
+error:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+	return reply;
+}
+
+static DBusMessage *edbus_request_format(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int opt, ret;
+	struct mmc_data *pdata;
+
+	ret = dbus_message_get_args(msg, NULL,
+			DBUS_TYPE_INT32, &opt, DBUS_TYPE_INVALID);
+	if (!ret) {
+		_I("there is no message");
+		ret = -EBADMSG;
+		goto error;
+	}
+
+	if (!mmc_curpath) {
+		ret = -ENODEV;
+		goto error;
+	}
+
+	pdata = malloc(sizeof(struct mmc_data));
+	if (!pdata) {
+		_E("malloc failed");
+		ret = -errno;
+		goto error;
+	}
+
+	pdata->option = opt;
+	pdata->devpath = strdup(mmc_curpath);
+	if (!pdata->devpath) {
+		free(pdata);
+		ret = -errno;
+		goto error;
+	}
+
+	ret = (int)format_start(pdata);
+
+error:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+	return reply;
+}
+
+static DBusMessage *edbus_request_insert(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	char *devpath;
+	int ret;
+
+	ret = dbus_message_get_args(msg, NULL,
+			DBUS_TYPE_STRING, &devpath, DBUS_TYPE_INVALID);
+	if (!ret) {
+		_I("there is no message");
+		ret = -EBADMSG;
+		goto error;
+	}
+
+	ret = mmc_inserted(devpath);
+
+error:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+	return reply;
+}
+
+static DBusMessage *edbus_request_remove(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int ret;
+
+	ret = mmc_removed();
+
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+	return reply;
+}
+
+static DBusMessage *edbus_change_status(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int opt, ret;
+	char params[NAME_MAX];
+	struct mmc_data *pdata;
+
+	ret = dbus_message_get_args(msg, NULL,
+			DBUS_TYPE_INT32, &opt, DBUS_TYPE_INVALID);
+	if (!ret) {
+		_I("there is no message");
+		ret = -EBADMSG;
+		goto error;
+	}
+	if (opt == VCONFKEY_SYSMAN_MMC_MOUNTED)
+		mmc_mount_done();
+error:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+	return reply;
+}
+
+int get_mmc_devpath(char devpath[])
+{
+	if (mmc_disabled)
+		return -EWOULDBLOCK;
+	if (!mmc_curpath)
+		return -ENODEV;
+	snprintf(devpath, NAME_MAX, "%s", mmc_curpath);
+	return 0;
+}
+
 static const struct edbus_method edbus_methods[] = {
-	{ PREDEF_MOUNT_MMC, "sis", "i", dbus_mmc_handler },
-	{ PREDEF_UNMOUNT_MMC, "sis", "i", dbus_mmc_handler },
-	{ PREDEF_FORMAT_MMC, "sis", "i", dbus_mmc_handler },
+	{ "RequestMount",         NULL, "i", edbus_request_mount },
+	{ "RequestUnmount",        "i", "i", edbus_request_unmount },
+	{ "RequestFormat",         "i", "i", edbus_request_format },
+	{ "RequestInsert",         "s", "i", edbus_request_insert },
+	{ "RequestRemove",        NULL, "i", edbus_request_remove },
+	{ "ChangeStatus",          "i", "i", edbus_change_status },
 };
+
+static int mmc_poweroff(void *data)
+{
+	mmc_uevent_stop();
+	return 0;
+}
 
 static void mmc_init(void *data)
 {
 	int ret;
 
-	ret = register_edbus_method(DEVICED_PATH_SYSNOTI, edbus_methods, ARRAY_SIZE(edbus_methods));
+	mmc_load_config();
+	ret = register_edbus_method(DEVICED_PATH_MMC, edbus_methods, ARRAY_SIZE(edbus_methods));
 	if (ret < 0)
-		 _E("fail to init edbus method(%d)", ret);
-	/* IPC between libdeviced and deviced, used by setting application */
-	action_entry_add_internal(PREDEF_MOUNT_MMC, ss_mmc_inserted, NULL, NULL);
-	action_entry_add_internal(PREDEF_UNMOUNT_MMC, ss_mmc_unmounted, NULL, NULL);
-	action_entry_add_internal(PREDEF_FORMAT_MMC, ss_mmc_format, NULL, NULL);
+		_E("fail to init edbus method(%d)", ret);
+
+	/* register mmc uevent control routine */
+	ret = mmc_uevent_start();
+	if (ret < 0)
+		_E("fail to mmc uevent start");
 
 	/* register notifier if mmc exist or not */
-	register_notifier(DEVICE_NOTIFIER_BOOTING_DONE, ss_mmc_booting_done);
-
-	/* mmc card mount */
-	mmc_mount();
+	register_notifier(DEVICE_NOTIFIER_POWEROFF, mmc_poweroff);
+	register_notifier(DEVICE_NOTIFIER_BOOTING_DONE, mmc_booting_done);
+	register_notifier(DEVICE_NOTIFIER_MMC, mmc_changed_cb);
 }
 
-static int mmc_start(void)
+static void mmc_exit(void *data)
+{
+	/* unregister notifier */
+	unregister_notifier(DEVICE_NOTIFIER_POWEROFF, mmc_poweroff);
+	unregister_notifier(DEVICE_NOTIFIER_MMC, mmc_changed_cb);
+	unregister_notifier(DEVICE_NOTIFIER_BOOTING_DONE, mmc_booting_done);
+
+	/* unregister mmc uevent control routine */
+	mmc_uevent_stop();
+}
+
+static int mmc_start(enum device_flags flags)
 {
 	mmc_disabled = false;
-	_D("start");
+	_I("start");
 	return 0;
 }
 
-static int mmc_stop(void)
+static int mmc_stop(enum device_flags flags)
 {
 	mmc_disabled = true;
 	vconf_set_int(VCONFKEY_SYSMAN_MMC_STATUS, VCONFKEY_SYSMAN_MMC_REMOVED);
-	_D("stop");
+	_I("stop");
 	return 0;
 }
 
 const struct device_ops mmc_device_ops = {
 	.priority = DEVICE_PRIORITY_NORMAL,
 	.name     = "mmc",
-	.init = mmc_init,
-	.start = mmc_start,
-	.stop = mmc_stop,
+	.init     = mmc_init,
+	.exit     = mmc_exit,
+	.start    = mmc_start,
+	.stop     = mmc_stop,
 };
 
 DEVICE_OPS_REGISTER(&mmc_device_ops)

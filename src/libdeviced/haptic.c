@@ -32,10 +32,7 @@
 #include "dbus.h"
 #include "haptic-plugin-intf.h"
 #include "dd-haptic.h"
-
-#ifndef API
-#define API __attribute__ ((visibility("default")))
-#endif
+#include "common.h"
 
 #define METHOD_OPEN_DEVICE			"OpenDevice"
 #define METHOD_CLOSE_DEVICE			"CloseDevice"
@@ -159,9 +156,7 @@ static haptic_feedback_e convert_setting_to_module_level(void)
 
 API int haptic_get_count(int *device_number)
 {
-	DBusError err;
-	DBusMessage *msg;
-	int ret, ret_val;
+	int ret;
 
 	/* check if pointer is valid */
 	if (device_number == NULL) {
@@ -170,35 +165,21 @@ API int haptic_get_count(int *device_number)
 	}
 
 	/* request to deviced to get haptic count */
-	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
+	ret = dbus_method_sync(DEVICED_BUS_NAME,
+			DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
 			METHOD_GET_COUNT, NULL, NULL);
-	if (!msg)
+	if (ret < 0)
 		return HAPTIC_ERROR_OPERATION_FAILED;
 
-	dbus_error_init(&err);
-
-	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
-	if (!ret) {
-		_E("no message : [%s:%s]", err.name, err.message);
-		ret = HAPTIC_ERROR_OPERATION_FAILED;
-	}
-
-	dbus_message_unref(msg);
-	dbus_error_free(&err);
-
-	_D("%s-%s : %d", DEVICED_INTERFACE_HAPTIC, METHOD_GET_COUNT, ret_val);
-
-	*device_number = ret_val;
-	return ret;
+	*device_number = ret;
+	return HAPTIC_ERROR_NONE;
 }
 
 API int haptic_open(haptic_device_e device_index, haptic_device_h *device_handle)
 {
-	DBusError err;
-	DBusMessage *msg;
 	char str_index[32];
 	char *arr[1];
-	int ret, ret_val;
+	int ret;
 
 	/* check if index is valid */
 	if (!(device_index == HAPTIC_DEVICE_0 || device_index == HAPTIC_DEVICE_1 ||
@@ -217,39 +198,25 @@ API int haptic_open(haptic_device_e device_index, haptic_device_h *device_handle
 	arr[0] = str_index;
 
 	/* request to deviced to open haptic device */
-	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
+	ret = dbus_method_sync(DEVICED_BUS_NAME,
+			DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
 			METHOD_OPEN_DEVICE, "i", arr);
-	if (!msg)
+	if (ret < 0)
 		return HAPTIC_ERROR_OPERATION_FAILED;
 
-	dbus_error_init(&err);
-
-	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
-	if (!ret) {
-		_E("no message : [%s:%s]", err.name, err.message);
-		ret = HAPTIC_ERROR_OPERATION_FAILED;
-	}
-
-	dbus_message_unref(msg);
-	dbus_error_free(&err);
-
-	_D("%s-%s : %d", DEVICED_INTERFACE_HAPTIC, METHOD_OPEN_DEVICE, ret_val);
-
-	*device_handle = (haptic_device_h)ret_val;
-	return 0;
+	*device_handle = (haptic_device_h)ret;
+	return HAPTIC_ERROR_NONE;
 }
 
 API int haptic_close(haptic_device_h device_handle)
 {
-	DBusError err;
-	DBusMessage *msg;
 	char str_handle[32];
 	char *arr[1];
-	int ret, ret_val;
+	int ret;
 
 	/* check if handle is valid */
-	if (device_handle < 0) {
-		_E("Invalid parameter : device_handle(%d)", device_handle);
+	if (device_handle == NULL) {
+		_E("Invalid parameter : device_handle(NULL)");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
@@ -257,25 +224,13 @@ API int haptic_close(haptic_device_h device_handle)
 	arr[0] = str_handle;
 
 	/* request to deviced to open haptic device */
-	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
+	ret = dbus_method_sync(DEVICED_BUS_NAME,
+			DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
 			METHOD_CLOSE_DEVICE, "u", arr);
-	if (!msg)
+	if (ret < 0)
 		return HAPTIC_ERROR_OPERATION_FAILED;
 
-	dbus_error_init(&err);
-
-	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
-	if (!ret) {
-		_E("no message : [%s:%s]", err.name, err.message);
-		ret = HAPTIC_ERROR_OPERATION_FAILED;
-	}
-
-	dbus_message_unref(msg);
-	dbus_error_free(&err);
-
-	_D("%s-%s : %d", DEVICED_INTERFACE_HAPTIC, METHOD_CLOSE_DEVICE, ret_val);
-
-	return 0;
+	return HAPTIC_ERROR_NONE;
 }
 
 API int haptic_vibrate_monotone(haptic_device_h device_handle, int duration, haptic_effect_h *effect_handle)
@@ -293,23 +248,21 @@ API int haptic_vibrate_monotone_with_detail(haptic_device_h device_handle,
                                         haptic_priority_e priority,
                                         haptic_effect_h *effect_handle)
 {
-	DBusError err;
-	DBusMessage *msg;
 	char str_handle[32];
 	char str_duration[32];
 	char str_feedback[32];
 	char str_priority[32];
 	char *arr[4];
-	int ret, ret_val;
+	int ret;
 
 	/* check if handle is valid */
-	if (device_handle < 0) {
-		_E("Invalid parameter : device_handle(%d)", device_handle);
+	if (device_handle == NULL) {
+		_E("Invalid parameter : device_handle(NULL)");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
 	/* check if passed arguments are valid */
-	if (duration < 0) {
+	if (duration < 0 && duration != HAPTIC_DURATION_UNLIMITED) {
 		_E("Invalid parameter : duration(%d)", duration);
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
@@ -338,28 +291,16 @@ API int haptic_vibrate_monotone_with_detail(haptic_device_h device_handle,
 	arr[3] = str_priority;
 
 	/* request to deviced to open haptic device */
-	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
+	ret = dbus_method_sync(DEVICED_BUS_NAME,
+			DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
 			METHOD_VIBRATE_MONOTONE, "uiii", arr);
-	if (!msg)
+	if (ret < 0)
 		return HAPTIC_ERROR_OPERATION_FAILED;
 
-	dbus_error_init(&err);
-
-	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
-	if (!ret) {
-		_E("no message : [%s:%s]", err.name, err.message);
-		ret = HAPTIC_ERROR_OPERATION_FAILED;
-	}
-
-	dbus_message_unref(msg);
-	dbus_error_free(&err);
-
-	_D("%s-%s : %d", DEVICED_INTERFACE_HAPTIC, METHOD_VIBRATE_MONOTONE, ret_val);
-
 	if (effect_handle != NULL)
-		*effect_handle = (haptic_effect_h)ret_val;
+		*effect_handle = (haptic_effect_h)ret;
 
-	return 0;
+	return HAPTIC_ERROR_NONE;
 }
 
 API int haptic_vibrate_file(haptic_device_h device_handle, const char *file_path, haptic_effect_h *effect_handle)
@@ -460,19 +401,17 @@ API int haptic_vibrate_buffers_with_detail(haptic_device_h device_handle,
                                       haptic_priority_e priority,
                                       haptic_effect_h *effect_handle)
 {
-	DBusError err;
-	DBusMessage *msg;
 	char str_handle[32];
 	char str_iteration[32];
 	char str_feedback[32];
 	char str_priority[32];
 	char *arr[6];
-	int ret, ret_val;
 	struct dbus_byte bytes;
+	int ret;
 
 	/* check if handle is valid */
-	if (device_handle < 0) {
-		_E("Invalid parameter : device_handle(%d)", device_handle);
+	if (device_handle == NULL) {
+		_E("Invalid parameter : device_handle(NULL)");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
@@ -505,7 +444,7 @@ API int haptic_vibrate_buffers_with_detail(haptic_device_h device_handle,
 	arr[0] = str_handle;
 	bytes.size = size;
 	bytes.data = vibe_buffer;
-	arr[2] = (char *)&bytes;
+	arr[2] = (char*)&bytes;
 	snprintf(str_iteration, sizeof(str_iteration), "%d", iteration);
 	arr[3] = str_iteration;
 	snprintf(str_feedback, sizeof(str_feedback), "%d", feedback);
@@ -514,28 +453,16 @@ API int haptic_vibrate_buffers_with_detail(haptic_device_h device_handle,
 	arr[5] = str_priority;
 
 	/* request to deviced to open haptic device */
-	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
+	ret = dbus_method_sync(DEVICED_BUS_NAME,
+			DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
 			METHOD_VIBRATE_BUFFER, "uayiii", arr);
-	if (!msg)
+	if (ret < 0)
 		return HAPTIC_ERROR_OPERATION_FAILED;
 
-	dbus_error_init(&err);
-
-	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
-	if (!ret) {
-		_E("no message : [%s:%s]", err.name, err.message);
-		ret = HAPTIC_ERROR_OPERATION_FAILED;
-	}
-
-	dbus_message_unref(msg);
-	dbus_error_free(&err);
-
-	_D("%s-%s : %d", DEVICED_INTERFACE_HAPTIC, METHOD_VIBRATE_BUFFER, ret_val);
-
 	if (effect_handle != NULL)
-		*effect_handle = (haptic_effect_h)ret_val;
+		*effect_handle = (haptic_effect_h)ret;
 
-	return 0;
+	return HAPTIC_ERROR_NONE;
 }
 
 API int haptic_stop_effect(haptic_device_h device_handle, haptic_effect_h effect_handle)
@@ -545,13 +472,12 @@ API int haptic_stop_effect(haptic_device_h device_handle, haptic_effect_h effect
 
 API int haptic_stop_all_effects(haptic_device_h device_handle)
 {
-	DBusError err;
-	DBusMessage *msg;
 	char str_handle[32];
 	char *arr[1];
-	int ret, ret_val;
+	int ret;
+
 	/* check if handle is valid */
-	if (device_handle < 0) {
+	if (device_handle == NULL) {
 		_E("Invalid parameter : device_handle(NULL)");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
@@ -560,45 +486,28 @@ API int haptic_stop_all_effects(haptic_device_h device_handle)
 	arr[0] = str_handle;
 
 	/* request to deviced to open haptic device */
-	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
+	ret = dbus_method_sync(DEVICED_BUS_NAME,
+			DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
 			METHOD_STOP_DEVICE, "u", arr);
-	if (!msg)
+	if (ret < 0)
 		return HAPTIC_ERROR_OPERATION_FAILED;
-	dbus_error_init(&err);
 
-	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
-	if (!ret) {
-		_E("no message : [%s:%s]", err.name, err.message);
-		ret = HAPTIC_ERROR_OPERATION_FAILED;
-	}
-
-	dbus_message_unref(msg);
-	dbus_error_free(&err);
-
-	_D("%s-%s : %d", DEVICED_INTERFACE_HAPTIC, METHOD_STOP_DEVICE, ret_val);
-
-	return 0;
+	return HAPTIC_ERROR_NONE;
 }
 
 API int haptic_get_effect_state(haptic_device_h device_handle, haptic_effect_h effect_handle, haptic_state_e *effect_state)
 {
-	DBusError err;
-	DBusMessage *msg;
 	char str_index[32];
 	char *arr[1];
-	int ret, ret_val;
+	int ret;
 
 	/* check if handle is valid */
-	if (device_handle < 0) {
-		_E("Invalid parameter : device_handle(%d)", device_handle);
+	if (device_handle == NULL) {
+		_E("Invalid parameter : device_handle(NULL)");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
-	if (effect_handle < 0) {
-		_E("Invalid parameter : effect_handle(%d)", effect_handle);
-		return HAPTIC_ERROR_INVALID_PARAMETER;
-	}
-
+	/* check if pointer is valid */
 	if (effect_state == NULL) {
 		_E("Invalid parameter : effect_state(NULL)");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
@@ -608,26 +517,14 @@ API int haptic_get_effect_state(haptic_device_h device_handle, haptic_effect_h e
 	arr[0] = str_index;
 
 	/* request to deviced to open haptic device */
-	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
+	ret = dbus_method_sync(DEVICED_BUS_NAME,
+			DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
 			METHOD_GET_STATE, "i", arr);
-	if (!msg)
+	if (ret < 0)
 		return HAPTIC_ERROR_OPERATION_FAILED;
 
-	dbus_error_init(&err);
-
-	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
-	if (!ret) {
-		_E("no message : [%s:%s]", err.name, err.message);
-		ret = HAPTIC_ERROR_OPERATION_FAILED;
-	}
-
-	dbus_message_unref(msg);
-	dbus_error_free(&err);
-
-	_D("%s-%s : %d", DEVICED_INTERFACE_HAPTIC, METHOD_GET_STATE, ret_val);
-
-	*effect_state = (haptic_state_e)ret_val;
-	return 0;
+	*effect_state = (haptic_state_e)ret;
+	return HAPTIC_ERROR_NONE;
 }
 
 API int haptic_create_effect(unsigned char *vibe_buffer,
@@ -637,11 +534,12 @@ API int haptic_create_effect(unsigned char *vibe_buffer,
 {
 	DBusError err;
 	DBusMessage *msg;
+	dbus_bool_t ret;
 	char str_bufsize[32];
 	char str_elemcnt[32];
 	char *arr[4];
 	char *data;
-	int i, temp, size, ret, ret_val;
+	int i, temp, size, ret_val;
 	struct dbus_byte bytes;
 
 	/* check if passed arguments are valid */
@@ -677,12 +575,13 @@ API int haptic_create_effect(unsigned char *vibe_buffer,
 	arr[0] = str_bufsize;
 	bytes.size = sizeof(haptic_effect_element_s)*max_elemcnt;
 	bytes.data = (unsigned char*)elem_arr;
-	arr[2] = (char *)&bytes;
+	arr[2] = (char*)&bytes;
 	snprintf(str_elemcnt, sizeof(str_elemcnt), "%d", max_elemcnt);
 	arr[3] = str_elemcnt;
 
 	/* request to deviced to open haptic device */
-	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
+	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
+			DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
 			METHOD_CREATE_EFFECT, "iayi", arr);
 	if (!msg)
 		return HAPTIC_ERROR_OPERATION_FAILED;
@@ -691,26 +590,28 @@ API int haptic_create_effect(unsigned char *vibe_buffer,
 
 	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE, &data, &size,
 			DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
-	if (!ret || ret_val < 0) {
+	if (!ret) {
 		_E("no message : [%s:%s]", err.name, err.message);
-		dbus_message_unref(msg);
 		dbus_error_free(&err);
-		return HAPTIC_ERROR_OPERATION_FAILED;
+		goto err;
+	}
+
+	if (ret_val < 0) {
+		_E("%s-%s failed : %d", DEVICED_INTERFACE_HAPTIC, METHOD_CREATE_EFFECT, ret_val);
+		goto err;
 	}
 
 	if (max_bufsize < size) {
 		_E("max_bufsize(%d) is smaller than effect buffer size(%d)", max_bufsize, size);
-		return HAPTIC_ERROR_INVALID_PARAMETER;
+		goto err;
 	}
 
 	memcpy(vibe_buffer, data, max_bufsize);
-
 	dbus_message_unref(msg);
-	dbus_error_free(&err);
-
-	_D("%s-%s : %d", DEVICED_INTERFACE_HAPTIC, METHOD_CREATE_EFFECT, ret_val);
-
-	return 0;
+	return HAPTIC_ERROR_NONE;
+err:
+	dbus_message_unref(msg);
+	return HAPTIC_ERROR_OPERATION_FAILED;
 }
 
 API int haptic_save_effect(const unsigned char *vibe_buffer,
@@ -781,16 +682,14 @@ API int haptic_get_buffer_duration(haptic_device_h device_handle, const unsigned
 
 API int haptic_get_buffers_duration(haptic_device_h device_handle, const unsigned char *vibe_buffer, int size, int *buffer_duration)
 {
-	DBusError err;
-	DBusMessage *msg;
 	char str_handle[32];
 	char *arr[3];
-	int ret, ret_val;
 	struct dbus_byte bytes;
+	int ret;
 
 	/* check if handle is valid */
-	if (device_handle < 0) {
-		_E("Invalid parameter : device_handle(%d)", device_handle);
+	if (device_handle == NULL) {
+		_E("Invalid parameter : device_handle(NULL)");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
@@ -809,39 +708,26 @@ API int haptic_get_buffers_duration(haptic_device_h device_handle, const unsigne
 	arr[0] = str_handle;
 	bytes.size = size;
 	bytes.data = vibe_buffer;
-	arr[2] = (char *)&bytes;
+	arr[2] = (char*)&bytes;
 
 	/* request to deviced to open haptic device */
-	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
+	ret = dbus_method_sync(DEVICED_BUS_NAME,
+			DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
 			METHOD_GET_DURATION, "uay", arr);
-	if (!msg)
+	if (ret < 0)
 		return HAPTIC_ERROR_OPERATION_FAILED;
 
-	dbus_error_init(&err);
-
-	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
-	if (!ret) {
-		_E("no message : [%s:%s]", err.name, err.message);
-		ret = HAPTIC_ERROR_OPERATION_FAILED;
-	}
-
-	dbus_message_unref(msg);
-	dbus_error_free(&err);
-
-	_D("%s-%s : %d", DEVICED_INTERFACE_HAPTIC, METHOD_GET_DURATION, ret_val);
-
-	*buffer_duration = ret_val;
-	return 0;
+	*buffer_duration = ret;
+	return HAPTIC_ERROR_NONE;
 }
 
 API int haptic_save_led(const unsigned char *vibe_buffer, int max_bufsize, const char *file_path)
 {
-	DBusError err;
-	DBusMessage *msg;
 	struct stat buf;
 	char str_bufsize[32];
 	char *arr[3];
-	int size, ret, ret_val;
+	struct dbus_byte bytes;
+	int ret;
 
 	/* check if passed arguments are valid */
 	if (vibe_buffer == NULL) {
@@ -865,29 +751,17 @@ API int haptic_save_led(const unsigned char *vibe_buffer, int max_bufsize, const
 		return HAPTIC_ERROR_FILE_EXISTS;
 	}
 
-	arr[0] = (char *)vibe_buffer;
-	snprintf(str_bufsize, sizeof(str_bufsize), "%d", max_bufsize);
-	arr[1] = str_bufsize;
-	arr[2] = (char *)file_path;
+	bytes.size = max_bufsize;
+	bytes.data = vibe_buffer;
+	arr[1] = (char*)&bytes;
+	arr[2] = (char*)file_path;
 
 	/* request to deviced to open haptic device */
-	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
-			METHOD_SAVE_BINARY, "sis", arr);
-	if (!msg)
+	ret = dbus_method_sync(DEVICED_BUS_NAME,
+			DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
+			METHOD_SAVE_BINARY, "ays", arr);
+	if (ret < 0)
 		return HAPTIC_ERROR_OPERATION_FAILED;
 
-	dbus_error_init(&err);
-
-	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
-	if (!ret) {
-		_E("no message : [%s:%s]", err.name, err.message);
-		ret = HAPTIC_ERROR_OPERATION_FAILED;
-	}
-
-	dbus_message_unref(msg);
-	dbus_error_free(&err);
-
-	_D("%s-%s : %d", DEVICED_INTERFACE_HAPTIC, METHOD_SAVE_BINARY, ret_val);
-
-	return 0;
+	return HAPTIC_ERROR_NONE;
 }
