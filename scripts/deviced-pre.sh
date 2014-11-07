@@ -31,24 +31,9 @@ for file in /sys/class/input/event*; do
         fi
 done
 
-for file in /sys/class/lcd/*; do
-        if [ -e $file ]; then
-		hbm_state=`/bin/cat ${file}/device/hbm`
-		if [ "$hbm_state" != 0 ]; then
-			HBM_NODE=${file}/device/hbm
-		fi
-		alpm_state=`/bin/cat ${file}/device/alpm`
-		if [ "$alpm_state" != 0 ]; then
-			ALPM_NODE=${file}/device/alpm
-		fi
-	fi
-done
-
 echo "PM_INPUT=$DEV_INPUT" >> $DEVICED_ENV_F
 echo "PM_TOUCHSCREEN=$DEV_TOUCHSCREEN" >> $DEVICED_ENV_F
 echo "PM_TOUCHKEY=$DEV_TOUCHKEY" >> $DEVICED_ENV_F
-echo "HBM_NODE=$HBM_NODE" >> $DEVICED_ENV_F
-echo "ALPM_NODE=$ALPM_NODE" >> $DEVICED_ENV_F
 echo "PM_TO_NORMAL=30000" >> $DEVICED_ENV_F
 echo "PM_TO_LCDDIM=5000" >> $DEVICED_ENV_F
 echo "PM_SYS_DIMBRT=0" >> $DEVICED_ENV_F

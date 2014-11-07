@@ -17,6 +17,7 @@
  */
 
 
+#include <stdbool.h>
 #include <stdlib.h>
 #include <fcntl.h>
 #include <dirent.h>
@@ -25,32 +26,28 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mount.h>
-#include <syspopup_caller.h>
-#include <aul.h>
-#include <bundle.h>
 #include <dirent.h>
-#include <libudev.h>
 #include <fnmatch.h>
 #include "dd-deviced.h"
-#include "queue.h"
 #include "log.h"
 #include "device-notifier.h"
 #include "device-handler.h"
 #include "device-node.h"
-#include "noti.h"
-#include "data.h"
-#include "predefine.h"
 #include "display/poll.h"
 #include "devices.h"
-#include "sys_pci_noti/sys_pci_noti.h"
 #include "udev.h"
 #include "common.h"
+#include "list.h"
 #include "proc/proc-handler.h"
+#include "edbus-handler.h"
+#include "devices.h"
+#include "power-supply.h"
+#include "display/setting.h"
+#include "display/core.h"
 
-#define PREDEF_USBCON			"usbcon"
-#define PREDEF_EARJACKCON		"earjack_predef_internal"
 #define PREDEF_DEVICE_CHANGED		"device_changed"
-#define PREDEF_BATTERY_CF_OPENED	"battery_cf_opened"
+#define PREDEF_POWER_CHANGED		POWER_SUBSYSTEM
+#define PREDEF_UDEV_CONTROL		UDEV
 
 #define TVOUT_X_BIN			"/usr/bin/xberc"
 #define TVOUT_FLAG			0x00000001
@@ -58,9 +55,10 @@
 #define MOVINAND_MOUNT_POINT		"/opt/media"
 #define BUFF_MAX		255
 #define SYS_CLASS_INPUT		"/sys/class/input"
-#define USBCON_EXEC_PATH	PREFIX"/bin/usb-server"
-#define DEFAULT_USB_INFO_PATH	"/tmp/usb_default"
-#define STORE_DEFAULT_USB_INFO	"usb-devices > "DEFAULT_USB_INFO_PATH
+
+#define USB_STATE_PLATFORM_PATH "/sys/devices/platform/jack/usb_online"
+#define USB_STATE_SWITCH_PATH "/sys/devices/virtual/switch/usb_cable/state"
+
 #define HDMI_NOT_SUPPORTED	(-1)
 #ifdef ENABLE_EDBUS_USE
 #include <E_DBus.h>
@@ -74,18 +72,6 @@ struct input_event {
 	int value;
 };
 
-typedef enum {
-    DEVICE_NOTI_BATT_CHARGE = 0,
-    DEVICE_NOTI_BATT_LOW,
-    DEVICE_NOTI_BATT_FULL,
-    DEVICE_NOTI_MAX,
-} cb_noti_type;
-
-typedef enum {
-    DEVICE_NOTI_OFF = 0,
-    DEVICE_NOTI_ON  = 1,
-} cb_noti_onoff_type;
-
 enum snd_jack_types {
 	SND_JACK_HEADPHONE = 0x0001,
 	SND_JACK_MICROPHONE = 0x0002,
@@ -98,40 +84,115 @@ enum snd_jack_types {
 
 #define CHANGE_ACTION		"change"
 #define ENV_FILTER		"CHGDET"
-#define USB_NAME                "usb"
-#define USB_NAME_LEN            3
+#define USB_NAME		"usb"
+#define USB_NAME_LEN		3
 
-#define CHARGER_NAME            "charger"
-#define CHARGER_NAME_LEN        7
+#define CHARGER_NAME 		"charger"
+#define CHARGER_NAME_LEN	7
 
-#define EARJACK_NAME            "earjack"
-#define EARJACK_NAME_LEN        7
+#define EARJACK_NAME 		"earjack"
+#define EARJACK_NAME_LEN	7
 
-#define EARKEY_NAME             "earkey"
-#define EARKEY_NAME_LEN         6
+#define EARKEY_NAME 		"earkey"
+#define EARKEY_NAME_LEN	6
 
-#define TVOUT_NAME              "tvout"
-#define TVOUT_NAME_LEN          5
+#define TVOUT_NAME 		"tvout"
+#define TVOUT_NAME_LEN		5
 
-#define HDMI_NAME               "hdmi"
-#define HDMI_NAME_LEN           4
+#define HDMI_NAME 		"hdmi"
+#define HDMI_NAME_LEN		4
 
-#define KEYBOARD_NAME           "keyboard"
-#define KEYBOARD_NAME_LEN       8
+#define HDCP_NAME 		"hdcp"
+#define HDCP_NAME_LEN		4
 
-#define POWER_SUPPLY_NAME_LEN  12
+#define HDMI_AUDIO_NAME 	"ch_hdmi_audio"
+#define HDMI_AUDIO_LEN		13
+
+#define CRADLE_NAME 		"cradle"
+#define CRADLE_NAME_LEN	6
+
+#define KEYBOARD_NAME 		"keyboard"
+#define KEYBOARD_NAME_LEN	8
+
+#define POWER_SUPPLY_NAME_LEN	12
+
+#define CHARGE_NAME_LEN	17
+#define BATTERY_NAME		"battery"
+#define BATTERY_NAME_LEN	7
+#define CHARGEFULL_NAME	"Full"
+#define CHARGEFULL_NAME_LEN	4
+#define CHARGENOW_NAME		"Charging"
+#define CHARGENOW_NAME_LEN	8
+#define DISCHARGE_NAME		"Discharging"
+#define DISCHARGE_NAME_LEN	11
+#define NOTCHARGE_NAME		"Not charging"
+#define NOTCHARGE_NAME_LEN	12
+#define OVERHEAT_NAME		"Overheat"
+#define OVERHEAT_NAME_LEN	8
+#define TEMPCOLD_NAME		"Cold"
+#define TEMPCOLD_NAME_LEN	4
+#define OVERVOLT_NAME		"Over voltage"
+#define OVERVOLT_NAME_LEN	12
 
 #define SWITCH_DEVICE_USB 	"usb_cable"
 
-#define ABNORMAL_POPUP_COUNTER	5
+#define METHOD_GET_HDMI		"GetHDMI"
+#define METHOD_GET_HDCP		"GetHDCP"
+#define METHOD_GET_HDMI_AUDIO	"GetHDMIAudio"
+#define SIGNAL_HDMI_STATE	"ChangedHDMI"
+#define SIGNAL_HDCP_STATE	"ChangedHDCP"
+#define SIGNAL_HDMI_AUDIO_STATE	"ChangedHDMIAudio"
+
+#define HDCP_HDMI_VALUE(HDCP, HDMI)	((HDCP << 1) | HDMI)
+
+#define METHOD_GET_CRADLE	"GetCradle"
+#define SIGNAL_CRADLE_STATE	"ChangedCradle"
+
+struct ticker_data {
+	char *name;
+	int type;
+};
+
+struct popup_data {
+	char *name;
+	char *key;
+	char *value;
+};
+
+struct siop_data {
+	int siop;
+	int rear;
+};
 
 static int ss_flags = 0;
 
 static int input_device_number;
 
-static struct udev_monitor *mon = NULL;
+/* Uevent */
 static struct udev *udev = NULL;
+/* Kernel Uevent */
+static struct udev_monitor *mon = NULL;
 static Ecore_Fd_Handler *ufdh = NULL;
+static int ufd = -1;
+static int hdmi_status = 0;
+
+enum udev_subsystem_type {
+	UDEV_INPUT,
+	UDEV_PLATFORM,
+	UDEV_POWER,
+	UDEV_SWITCH,
+};
+
+static const struct udev_subsystem {
+	const enum udev_subsystem_type type;
+	const char *str;
+	const char *devtype;
+} udev_subsystems[] = {
+	{ UDEV_INPUT,            INPUT_SUBSYSTEM, NULL },
+	{ UDEV_PLATFORM,         PLATFORM_SUBSYSTEM, NULL },
+	{ UDEV_POWER,		 POWER_SUBSYSTEM, NULL},
+	{ UDEV_SWITCH,		 SWITCH_SUBSYSTEM, NULL },
+};
 
 static struct extcon_device {
 	const enum extcon_type type;
@@ -143,57 +204,8 @@ static struct extcon_device {
 	{ EXTCON_EARJACK, "/csa/factory/earjack_count", 0, 0},
 };
 
-struct battery_status {
-	int capacity;
-	int charge_full;
-	int charge_now;
-	int health;
-	int present;
-};
-
-static struct battery_status battery;
-
-static Eina_Bool uevent_control_cb(void *data, Ecore_Fd_Handler *fd_handler);
 extern int battery_power_off_act(void *data);
 extern int battery_charge_err_act(void *data);
-static int check_lowbat_charge_device(int bInserted)
-{
-	static int bChargeDeviceInserted = 0;
-	int val = -1;
-	int bat_state = -1;
-	int ret = -1;
-	if (bInserted == 1) {
-		if (battery.charge_now == 1)
-			bChargeDeviceInserted = 1;
-		return 0;
-	} else if (bInserted == 0) {
-		if (battery.charge_now == 0 && bChargeDeviceInserted == 1) {
-			bChargeDeviceInserted = 0;
-			//low bat popup during charging device removing
-			if (vconf_get_int(VCONFKEY_SYSMAN_BATTERY_STATUS_LOW, &bat_state) == 0) {
-				if(bat_state < VCONFKEY_SYSMAN_BAT_NORMAL
-				|| bat_state == VCONFKEY_SYSMAN_BAT_REAL_POWER_OFF) {
-					bundle *b = NULL;
-					b = bundle_create();
-					if(bat_state == VCONFKEY_SYSMAN_BAT_REAL_POWER_OFF)
-						bundle_add(b,"_SYSPOPUP_CONTENT_", "poweroff");
-					else
-						bundle_add(b, "_SYSPOPUP_CONTENT_", "warning");
-					ret = syspopup_launch("lowbat-syspopup", b);
-					if (ret < 0) {
-						_E("popup lauch failed");
-					}
-					bundle_free(b);
-				}
-			} else {
-				_E("failed to get vconf key");
-				return -1;
-			}
-		}
-		return 0;
-	}
-	return -1;
-}
 
 int extcon_set_count(int index)
 {
@@ -287,30 +299,57 @@ static int extcon_count_init(void)
 	return ret;
 }
 
+int get_usb_state_direct(void)
+{
+	FILE *fp;
+	char str[2];
+	int state;
+	char *path;
+
+	if (access(USB_STATE_PLATFORM_PATH, F_OK) == 0)
+		path = USB_STATE_PLATFORM_PATH;
+	else if (access(USB_STATE_SWITCH_PATH, F_OK) == 0)
+		path = USB_STATE_SWITCH_PATH;
+	else {
+		_E("Cannot get direct path");
+		return -ENOENT;
+	}
+
+	fp = fopen(path, "r");
+	if (!fp) {
+		_E("Cannot open jack node");
+		return -ENOMEM;
+	}
+
+	if (!fgets(str, sizeof(str), fp)) {
+		_E("cannot get string from jack node");
+		fclose(fp);
+		return -ENOMEM;
+	}
+
+	fclose(fp);
+
+	return atoi(str);
+}
+
 static void usb_chgdet_cb(void *data)
 {
 	int val = -1;
 	int ret = 0;
 	char params[BUFF_MAX];
 
-	predefine_pm_change_state(LCD_NORMAL);
-
-	/* check charging now */
-	ss_lowbat_is_charge_in_now();
-	/* check current battery level */
-	ss_lowbat_monitor(NULL);
-	action_entry_call_internal(PREDEF_USBCON, 0);
-
 	if (data == NULL)
 		ret = device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_USB_ONLINE, &val);
 	else
 		val = *(int *)data;
 	if (ret == 0) {
+		if (val < 0)
+			val = get_usb_state_direct();
+
 		_I("jack - usb changed %d",val);
 		check_lowbat_charge_device(val);
 		if (val==1) {
-			snprintf(params, sizeof(params), "%d", DEVICE_NOTI_BATT_CHARGE);
-			ss_launch_if_noexist("/usr/bin/sys_device_noti", params);
+			battery_noti(DEVICE_NOTI_BATT_CHARGE, DEVICE_NOTI_ON);
 			_D("usb device notification");
 		}
 	} else {
@@ -318,75 +357,184 @@ static void usb_chgdet_cb(void *data)
 	}
 }
 
-static void __sync_usb_status(void)
+static int display_changed(void *data)
 {
-	int val = -1;
-	int status = -1;
-	if ((device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_USB_ONLINE, &val) != 0) ||
-	    vconf_get_int(VCONFKEY_SYSMAN_USB_STATUS,&status) != 0)
-		return;
-	if ((val == 1 && status == VCONFKEY_SYSMAN_USB_DISCONNECTED) ||
-	    (val == 0 && status == VCONFKEY_SYSMAN_USB_AVAILABLE))
-		action_entry_call_internal(PREDEF_USBCON, 0);
-}
+	enum state_t state = (enum state_t)data;
+	int ret, cradle = 0;
 
-static void ta_chgdet_cb(struct ss_main_data *ad)
-{
-	int val = -1;
-	int ret = -1;
-	int bat_state = VCONFKEY_SYSMAN_BAT_NORMAL;
-	char params[BUFF_MAX];
-
-	predefine_pm_change_state(LCD_NORMAL);
-
-	/* check charging now */
-	ss_lowbat_is_charge_in_now();
-	/* check current battery level */
-	ss_lowbat_monitor(NULL);
-
-	if (device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_TA_ONLINE, &val) == 0) {
-		_I("jack - ta changed %d",val);
-		check_lowbat_charge_device(val);
-		vconf_set_int(VCONFKEY_SYSMAN_CHARGER_STATUS, val);
-		if (val == 0) {
-			pm_unlock_internal(getpid(), LCD_OFF, STAY_CUR_STATE);
-		} else {
-			pm_lock_internal(getpid(), LCD_OFF, STAY_CUR_STATE, 0);
-			snprintf(params, sizeof(params), "%d", DEVICE_NOTI_BATT_CHARGE);
-			ss_launch_if_noexist("/usr/bin/sys_device_noti", params);
-			_D("ta device notification");
-			device_notify(DEVICE_NOTIFIER_TA, (void *)TRUE);
-		}
-		__sync_usb_status();
+	if (battery.charge_now == CHARGER_ABNORMAL && battery.health == HEALTH_BAD) {
+		pm_lock_internal(INTERNAL_LOCK_POPUP, LCD_DIM, STAY_CUR_STATE, 0);
+		return 0;
 	}
-	else
-		_E("failed to get ta status");
+
+	if (state != S_NORMAL)
+		return 0;
+
+	ret = vconf_get_int(VCONFKEY_SYSMAN_CRADLE_STATUS, &cradle);
+	if (ret >= 0 && cradle == DOCK_SOUND) {
+		pm_lock_internal(getpid(), LCD_DIM, STAY_CUR_STATE, 0);
+		_I("sound dock is connected! dim lock is on.");
+	}
+	if (hdmi_status) {
+		pm_lock_internal(getpid(), LCD_DIM, STAY_CUR_STATE, 0);
+		_I("hdmi is connected! dim lock is on.");
+	}
+	return 0;
 }
 
-static void earjack_chgdet_cb(struct ss_main_data *ad)
+static void cradle_send_broadcast(int status)
 {
-	_I("jack - earjack changed");
-	action_entry_call_internal(PREDEF_EARJACKCON, 0);
+	static int old = 0;
+	char *arr[1];
+	char str_status[32];
+
+	if (old == status)
+		return;
+
+	_I("broadcast cradle status %d", status);
+	old = status;
+	snprintf(str_status, sizeof(str_status), "%d", status);
+	arr[0] = str_status;
+
+	broadcast_edbus_signal(DEVICED_PATH_SYSNOTI, DEVICED_INTERFACE_SYSNOTI,
+			SIGNAL_CRADLE_STATE, "i", arr);
 }
 
-static void earkey_chgdet_cb(struct ss_main_data *ad)
+static int cradle_cb(void *data)
+{
+	static int old = 0;
+	int val = 0;
+	int ret = 0;
+
+	if (data == NULL)
+		return old;
+
+	val = *(int *)data;
+
+	if (old == val)
+		return old;
+
+	old = val;
+	cradle_send_broadcast(old);
+	return old;
+}
+
+static void cradle_chgdet_cb(void *data)
 {
 	int val;
-	_I("jack - earkey changed");
-	if (device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_EARKEY_ONLINE, &val) == 0)
-		vconf_set_int(VCONFKEY_SYSMAN_EARJACKKEY, val);
+	int ret = 0;
+
+	pm_change_internal(getpid(), LCD_NORMAL);
+
+	if (data)
+		val = *(int *)data;
+	else {
+		ret = device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_CRADLE_ONLINE, &val);
+		if (ret != 0) {
+			_E("failed to get status");
+			return;
+		}
+	}
+
+	_I("jack - cradle changed %d", val);
+	cradle_cb((void *)&val);
+	if (vconf_set_int(VCONFKEY_SYSMAN_CRADLE_STATUS, val) != 0) {
+		_E("failed to set vconf status");
+		return;
+	}
+
+	if (val == DOCK_SOUND)
+		pm_lock_internal(getpid(), LCD_DIM, STAY_CUR_STATE, 0);
+	else if (val == DOCK_NONE)
+		pm_unlock_internal(getpid(), LCD_DIM, PM_SLEEP_MARGIN);
 }
 
-static void tvout_chgdet_cb(struct ss_main_data *ad)
+void sync_cradle_status(void)
+{
+	int val;
+	int status;
+	if ((device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_CRADLE_ONLINE, &val) != 0) ||
+	    vconf_get_int(VCONFKEY_SYSMAN_CRADLE_STATUS, &status) != 0)
+		return;
+	if ((val != 0 && status == 0) || (val == 0 && status != 0))
+		cradle_chgdet_cb(NULL);
+}
+
+static void earkey_chgdet_cb(void *data)
+{
+	int val;
+	int ret = 0;
+
+	if (data)
+		val = *(int *)data;
+	else {
+		ret = device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_EARKEY_ONLINE, &val);
+		if (ret != 0) {
+			_E("failed to get status");
+			return;
+		}
+	}
+	_I("jack - earkey changed %d", val);
+	vconf_set_int(VCONFKEY_SYSMAN_EARJACKKEY, val);
+}
+
+static void tvout_chgdet_cb(void *data)
 {
 	_I("jack - tvout changed");
 	pm_change_internal(getpid(), LCD_NORMAL);
 }
 
-static void hdmi_chgdet_cb(struct ss_main_data *ad)
+static void hdcp_hdmi_send_broadcast(int status)
+{
+	static int old = 0;
+	char *arr[1];
+	char str_status[32];
+
+	if (old == status)
+		return;
+
+	_I("broadcast hdmi status %d", status);
+	old = status;
+	snprintf(str_status, sizeof(str_status), "%d", status);
+	arr[0] = str_status;
+
+	broadcast_edbus_signal(DEVICED_PATH_SYSNOTI, DEVICED_INTERFACE_SYSNOTI,
+			SIGNAL_HDMI_STATE, "i", arr);
+}
+
+static int hdcp_hdmi_cb(void *data)
+{
+	static int old = 0;
+	int val = 0;
+	int ret = 0;
+
+	if (data == NULL)
+		return old;
+
+	val = *(int *)data;
+	val = HDCP_HDMI_VALUE(val, hdmi_status);
+
+	if (old == val)
+		return old;
+
+	old = val;
+	hdcp_hdmi_send_broadcast(old);
+	return old;
+}
+
+static int hdmi_cec_execute(void *data)
+{
+	static const struct device_ops *ops = NULL;
+
+	FIND_DEVICE_INT(ops, "hdmi-cec");
+
+	return ops->execute(data);
+}
+
+static void hdmi_chgdet_cb(void *data)
 {
 	int val;
-	int ret = -1;
+	int ret = 0;
 
 	pm_change_internal(getpid(), LCD_NORMAL);
 	if (device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_HDMI_SUPPORT, &val) == 0) {
@@ -396,79 +544,119 @@ static void hdmi_chgdet_cb(struct ss_main_data *ad)
 			return;
 		}
 	}
-	if (device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_HDMI_ONLINE, &val) == 0) {
-		_I("jack - hdmi changed %d", val);
-		vconf_set_int(VCONFKEY_SYSMAN_HDMI,val);
-		if(val == 1)
-			pm_lock_internal(getpid(), LCD_NORMAL, GOTO_STATE_NOW, 0);
-		else
-			pm_unlock_internal(getpid(), LCD_NORMAL, PM_SLEEP_MARGIN);
-	} else {
-		_E("failed to get hdmi_online status");
-	}
-}
 
-static void keyboard_chgdet_cb(struct ss_main_data *ad)
-{
-	int val = -1;
-
-	if (device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_KEYBOARD_ONLINE, &val) == 0) {
-		_I("jack - keyboard changed %d", val);
-		if(val != 1)
-			val = 0;
-		vconf_set_int(VCONFKEY_SYSMAN_SLIDING_KEYBOARD, val);
-	} else {
-		vconf_set_int(VCONFKEY_SYSMAN_SLIDING_KEYBOARD, VCONFKEY_SYSMAN_SLIDING_KEYBOARD_NOT_SUPPORTED);
-	}
-}
-
-static void mmc_chgdet_cb(void *data)
-{
-	static int inserted;
-	int ret = -1;
-	int val = -1;
-
-	if (data == NULL) {
-		_I("mmc removed");
-		ss_mmc_removed();
-		inserted = 0;
-	} else {
-		_I("mmc added");
-		if (inserted)
+	if (data)
+		val = *(int *)data;
+	else {
+		ret = device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_HDMI_ONLINE, &val);
+		if (ret != 0) {
+			_E("failed to get status");
 			return;
-		inserted = 1;
-		ret = ss_mmc_inserted();
-		if (ret == -1) {
-			vconf_get_int(VCONFKEY_SYSMAN_MMC_MOUNT,&val);
-			if (val == VCONFKEY_SYSMAN_MMC_MOUNT_FAILED) {
-				bundle *b = NULL;
-				b = bundle_create();
-				if (b == NULL) {
-					_E("error bundle_create()");
-					return;
-				}
-				bundle_add(b, "_SYSPOPUP_CONTENT_", "mounterr");
-				ret = syspopup_launch("mmc-syspopup", b);
-				if (ret < 0) {
-					_E("popup launch failed");
-				}
-				bundle_free(b);
-			} else if (val == VCONFKEY_SYSMAN_MMC_MOUNT_COMPLETED) {
-				bundle *b = NULL;
-				b = bundle_create();
-				if (b == NULL) {
-					_E("error bundle_create()");
-					return;
-				}
-				bundle_add(b, "_SYSPOPUP_CONTENT_", "mountrdonly");
-				ret = syspopup_launch("mmc-syspopup", b);
-				if (ret < 0) {
-					_E("popup launch failed");
-				}
-				bundle_free(b);
-			}
 		}
 	}
+
+	_I("jack - hdmi changed %d", val);
+	vconf_set_int(VCONFKEY_SYSMAN_HDMI, val);
+	hdmi_status = val;
+	device_notify(DEVICE_NOTIFIER_HDMI, (void *)val);
+
+	if(val == 1) {
+		pm_lock_internal(INTERNAL_LOCK_HDMI, LCD_DIM, STAY_CUR_STATE, 0);
+	} else {
+		pm_unlock_internal(INTERNAL_LOCK_HDMI, LCD_DIM, PM_SLEEP_MARGIN);
+	}
+	hdmi_cec_execute((void *)val);
+}
+
+static void hdcp_send_broadcast(int status)
+{
+	static int old = 0;
+	char *arr[1];
+	char str_status[32];
+
+	if (old == status)
+		return;
+
+	_D("broadcast hdcp status %d", status);
+	old = status;
+	snprintf(str_status, sizeof(str_status), "%d", status);
+	arr[0] = str_status;
+
+	broadcast_edbus_signal(DEVICED_PATH_SYSNOTI, DEVICED_INTERFACE_SYSNOTI,
+			SIGNAL_HDCP_STATE, "i", arr);
+}
+
+static int hdcp_chgdet_cb(void *data)
+{
+	static int old = 0;
+	int val = 0;
+
+	if (data == NULL)
+		return old;
+
+	val = *(int *)data;
+	if (old == val)
+		return old;
+
+	old = val;
+	hdcp_send_broadcast(old);
+	return old;
+}
+
+static void hdmi_audio_send_broadcast(int status)
+{
+	static int old = 0;
+	char *arr[1];
+	char str_status[32];
+
+	if (old == status)
+		return;
+
+	_D("broadcast hdmi audio status %d", status);
+	old = status;
+	snprintf(str_status, sizeof(str_status), "%d", status);
+	arr[0] = str_status;
+
+	broadcast_edbus_signal(DEVICED_PATH_SYSNOTI, DEVICED_INTERFACE_SYSNOTI,
+			SIGNAL_HDMI_AUDIO_STATE, "i", arr);
+}
+
+static int hdmi_audio_chgdet_cb(void *data)
+{
+	static int old = 0;
+	int val = 0;
+
+	if (data == NULL)
+		return old;
+
+	val = *(int *)data;
+	if (old == val)
+		return old;
+
+	old = val;
+	hdmi_audio_send_broadcast(old);
+	return old;
+}
+
+static void keyboard_chgdet_cb(void *data)
+{
+	int val = -1;
+	int ret = 0;
+
+	if (data)
+		val = *(int *)data;
+	else {
+		ret = device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_KEYBOARD_ONLINE, &val);
+		if (ret != 0) {
+			_E("failed to get status");
+			vconf_set_int(VCONFKEY_SYSMAN_SLIDING_KEYBOARD, VCONFKEY_SYSMAN_SLIDING_KEYBOARD_NOT_SUPPORTED);
+			return;
+		}
+	}
+	_I("jack - keyboard changed %d", val);
+	if(val != 1)
+		val = 0;
+	vconf_set_int(VCONFKEY_SYSMAN_SLIDING_KEYBOARD, val);
 }
 
 static void ums_unmount_cb(void *data)
@@ -476,95 +664,11 @@ static void ums_unmount_cb(void *data)
 	umount(MOVINAND_MOUNT_POINT);
 }
 
-static int __check_abnormal_popup_launch(void)
-{
-	static int noti_count = 0;
-	if (noti_count >= ABNORMAL_POPUP_COUNTER) {
-		noti_count = 0;
-		return 0;
-	} else {
-		noti_count++;
-		return -EAGAIN;
-	}
-}
-
-static void charge_cb(struct ss_main_data *ad)
-{
-	int val = -1;
-	int charge_now = -1;
-	int capacity = -1;
-	int ret;
-	char params[BUFF_MAX];
-	static int bat_full_noti = 0;
-	static int present_status = 1;
-
-	ss_lowbat_monitor(NULL);
-
-	if (device_get_property(DEVICE_TYPE_POWER, PROP_POWER_CHARGE_NOW, &charge_now) != 0 ||
-	    device_get_property(DEVICE_TYPE_POWER, PROP_POWER_CAPACITY, &capacity) != 0)
-		_E("fail to get battery node value");
-	if (charge_now == 0 && capacity == 0) {
-		_I("target will be shut down");
-		battery_power_off_act(NULL);
-		return;
-	}
-
-	ret = device_get_property(DEVICE_TYPE_POWER, PROP_POWER_PRESENT, &val);
-	if (ret != 0)
-		_E("fail to get battery present value");
-	if (val == 0 && present_status == 1) {
-		present_status = 0;
-		_I("battery cf is opened");
-		if (charge_now)
-			action_entry_call_internal(PREDEF_BATTERY_CF_OPENED, 0);
-	}
-
-	if (val == 1 && present_status == 0) {
-		present_status = 1;
-		_I("battery cf is closed again");
-	}
-
-	if (device_get_property(DEVICE_TYPE_POWER, PROP_POWER_HEALTH, &val) == 0) {
-		if (val==BATTERY_OVERHEAT || val==BATTERY_COLD) {
-			_I("Battery health status is not good (%d)", val);
-
-			if (__check_abnormal_popup_launch() != 0)
-				return;
-
-			if (device_get_property(DEVICE_TYPE_POWER, PROP_POWER_CAPACITY, &val) == 0 && val <= 0)
-				battery_power_off_act(NULL);
-			else
-				battery_charge_err_act(NULL);
-			return;
-		}
-	} else {
-		_E("failed to get battery health status");
-	}
-	device_get_property(DEVICE_TYPE_POWER, PROP_POWER_CHARGE_FULL, &val);
-	if (val==0) {
-		if (bat_full_noti==1) {
-			snprintf(params, sizeof(params), "%d %d", DEVICE_NOTI_BATT_FULL, DEVICE_NOTI_OFF);
-			ss_launch_if_noexist("/usr/bin/sys_device_noti", params);
-		}
-		bat_full_noti = 0;
-	} else {
-		if (val==1 && bat_full_noti==0) {
-			bat_full_noti = 1;
-			_D("battery full noti");
-			snprintf(params, sizeof(params), "%d %d", DEVICE_NOTI_BATT_FULL, DEVICE_NOTI_ON);
-			ss_launch_if_noexist("/usr/bin/sys_device_noti", params);
-		}
-	}
-}
-
 #ifdef ENABLE_EDBUS_USE
 static void cb_xxxxx_signaled(void *data, DBusMessage * msg)
 {
 	char *args;
 	DBusError err;
-	struct ss_main_data *ad;
-
-	ad = data;
 
 	dbus_error_init(&err);
 	if (dbus_message_get_args
@@ -576,47 +680,269 @@ static void cb_xxxxx_signaled(void *data, DBusMessage * msg)
 }
 #endif				/* ENABLE_EDBUS_USE */
 
-static void usb_host_chgdet_cb(keynode_t *in_key, struct ss_main_data *ad)
+static void check_capacity_status(const char *env_value)
 {
-	int status;
-	int ret = vconf_get_int(VCONFKEY_SYSMAN_USB_HOST_STATUS, &status);
-	if (ret != 0) {
-		_E("vconf get failed(VCONFKEY_SYSMAN_USB_HOST_STATUS)");
-		return ;
-	}
+	if (env_value == NULL)
+		return;
+	battery.capacity = atoi(env_value);
+}
 
-	if(VCONFKEY_SYSMAN_USB_HOST_CONNECTED == status) {
-		int pid = ss_launch_if_noexist(USBCON_EXEC_PATH, NULL);
-		if (pid < 0) {
-			_E("usb-server launching failed");
-			return;
-		}
+static void check_charge_status(const char *env_value)
+{
+	if (env_value == NULL)
+		return;
+	if (strncmp(env_value, CHARGEFULL_NAME , CHARGEFULL_NAME_LEN) == 0) {
+		battery.charge_full = CHARGING_FULL;
+		battery.charge_now = CHARGER_DISCHARGING;
+	} else if (strncmp(env_value, CHARGENOW_NAME, CHARGENOW_NAME_LEN) == 0) {
+		battery.charge_full = CHARGING_NOT_FULL;
+		battery.charge_now = CHARGER_CHARGING;
+	} else if (strncmp(env_value, DISCHARGE_NAME, DISCHARGE_NAME_LEN) == 0) {
+		battery.charge_full = CHARGING_NOT_FULL;
+		battery.charge_now = CHARGER_DISCHARGING;
+	} else if (strncmp(env_value, NOTCHARGE_NAME, NOTCHARGE_NAME_LEN) == 0) {
+		battery.charge_full = CHARGING_NOT_FULL;
+		battery.charge_now = CHARGER_ABNORMAL;
+	} else {
+		battery.charge_full = CHARGING_NOT_FULL;
+		battery.charge_now = CHARGER_DISCHARGING;
 	}
 }
 
-static void usb_host_add_cb()
+static void check_health_status(const char *env_value)
 {
-	int status;
-	int ret = vconf_get_int(VCONFKEY_SYSMAN_USB_HOST_STATUS, &status);
-	if (ret != 0) {
-		_E("vconf get failed ()");
+	if (env_value == NULL) {
+		battery.health = HEALTH_GOOD;
+		battery.temp = TEMP_LOW;
+		battery.ovp = OVP_NORMAL;
 		return;
 	}
-
-	if (-1 == status) { /* '-1' means that USB host mode is not loaded yet */
-		_D("This usb device is connected defaultly");
-
-		ret = system(STORE_DEFAULT_USB_INFO);
-		_D("Return value of usb-devices: %d\n", ret);
-		if (0 != access(DEFAULT_USB_INFO_PATH, F_OK)) {
-			ret = system(STORE_DEFAULT_USB_INFO);
-			_D("Return value of usb-devices: %d\n", ret);
-		}
+	if (strncmp(env_value, OVERHEAT_NAME, OVERHEAT_NAME_LEN) == 0) {
+		battery.health = HEALTH_BAD;
+		battery.temp = TEMP_HIGH;
+		battery.ovp = OVP_NORMAL;
+	} else if (strncmp(env_value, TEMPCOLD_NAME, TEMPCOLD_NAME_LEN) == 0) {
+		battery.health = HEALTH_BAD;
+		battery.temp = TEMP_LOW;
+		battery.ovp = OVP_NORMAL;
+	} else if (strncmp(env_value, OVERVOLT_NAME, OVERVOLT_NAME_LEN) == 0) {
+		battery.health = HEALTH_GOOD;
+		battery.temp = TEMP_LOW;
+		battery.ovp = OVP_ABNORMAL;
+	} else {
+		battery.health = HEALTH_GOOD;
+		battery.temp = TEMP_LOW;
+		battery.ovp = OVP_NORMAL;
 	}
 }
 
-static int uevent_control_stop(int ufd)
+static void check_online_status(const char *env_value)
 {
+	if (env_value == NULL)
+		return;
+	battery.online = atoi(env_value);
+}
+
+static void check_present_status(const char *env_value)
+{
+	if (env_value == NULL) {
+		battery.present = PRESENT_NORMAL;
+		return;
+	}
+	battery.present = atoi(env_value);
+}
+
+static int earjack_execute(void *data)
+{
+	static const struct device_ops *ops = NULL;
+
+	FIND_DEVICE_INT(ops, "earjack");
+
+	return ops->execute(data);
+}
+
+static int siop_execute(const char *siop, const char *rear)
+{
+	static const struct device_ops *ops = NULL;
+	struct siop_data params;
+
+	FIND_DEVICE_INT(ops, PROC_OPS_NAME);
+
+	if (!siop)
+		params.siop = 0;
+	else
+		params.siop = atoi(siop);
+	if (!rear)
+		params.rear = 0;
+	else
+		params.rear = atoi(rear);
+	return ops->execute((void *)&params);
+}
+
+static int changed_device(const char *name, const char *value)
+{
+	int val = 0;
+	int *state = NULL;
+	int i;
+
+	if (!name)
+		goto out;
+
+	if (value) {
+		val = atoi(value);
+		state = &val;
+	}
+
+	if (strncmp(name, USB_NAME, USB_NAME_LEN) == 0)
+		usb_chgdet_cb((void *)state);
+	else if (strncmp(name, EARJACK_NAME, EARJACK_NAME_LEN) == 0)
+		earjack_execute((void *)state);
+	else if (strncmp(name, EARKEY_NAME, EARKEY_NAME_LEN) == 0)
+		earkey_chgdet_cb((void *)state);
+	else if (strncmp(name, TVOUT_NAME, TVOUT_NAME_LEN) == 0)
+		tvout_chgdet_cb((void *)state);
+	else if (strncmp(name, HDMI_NAME, HDMI_NAME_LEN) == 0)
+		hdmi_chgdet_cb((void *)state);
+	else if (strncmp(name, HDCP_NAME, HDCP_NAME_LEN) == 0) {
+		hdcp_chgdet_cb((void *)state);
+		hdcp_hdmi_cb((void *)state);
+	}
+	else if (strncmp(name, HDMI_AUDIO_NAME, HDMI_AUDIO_LEN) == 0)
+		hdmi_audio_chgdet_cb((void *)state);
+	else if (strncmp(name, CRADLE_NAME, CRADLE_NAME_LEN) == 0)
+		cradle_chgdet_cb((void *)state);
+	else if (strncmp(name, KEYBOARD_NAME, KEYBOARD_NAME_LEN) == 0)
+		keyboard_chgdet_cb((void *)state);
+	else if (strncmp(name, POWER_SUBSYSTEM, POWER_SUPPLY_NAME_LEN) == 0)
+		power_supply((void *)state);
+out:
+	return 0;
+}
+
+static int booting_done(void *data)
+{
+	static int done = 0;
+	int ret;
+	int val;
+
+	if (data == NULL)
+		return done;
+	done = (int)data;
+	if (done == 0)
+		return done;
+
+	_I("booting done");
+
+	power_supply_timer_stop();
+	power_supply_init(NULL);
+
+	/* set initial state for devices */
+	input_device_number = 0;
+	cradle_chgdet_cb(NULL);
+	keyboard_chgdet_cb(NULL);
+	hdmi_chgdet_cb(NULL);
+	return done;
+}
+
+static Eina_Bool uevent_kernel_control_cb(void *data, Ecore_Fd_Handler *fd_handler)
+{
+	struct udev_device *dev = NULL;
+	struct udev_list_entry *list_entry = NULL;
+	const char *subsystem = NULL;
+	const char *env_name = NULL;
+	const char *env_value = NULL;
+	const char *devpath;
+	const char *devnode;
+	const char *action;
+	int ret = -1;
+	int i, len;
+
+	if ((dev = udev_monitor_receive_device(mon)) == NULL)
+		return EINA_TRUE;
+
+	subsystem = udev_device_get_subsystem(dev);
+
+	for (i = 0; i < ARRAY_SIZE(udev_subsystems); i++) {
+		len = strlen(udev_subsystems[i].str);
+		if (!strncmp(subsystem, udev_subsystems[i].str, len))
+			break;
+	}
+
+	if (i >= ARRAY_SIZE(udev_subsystems))
+		goto out;
+
+	devpath = udev_device_get_devpath(dev);
+
+	switch (udev_subsystems[i].type) {
+	case UDEV_INPUT:
+		/* check new input device */
+		if (!fnmatch(INPUT_PATH, devpath, 0)) {
+			action = udev_device_get_action(dev);
+			devnode = udev_device_get_devnode(dev);
+			if (!strcmp(action, UDEV_ADD))
+				device_notify(DEVICE_NOTIFIER_INPUT_ADD, (void *)devnode);
+			else if (!strcmp(action, UDEV_REMOVE))
+				device_notify(DEVICE_NOTIFIER_INPUT_REMOVE, (void *)devnode);
+			goto out;
+		}
+		break;
+	case UDEV_SWITCH:
+		env_name = udev_device_get_property_value(dev, "SWITCH_NAME");
+		env_value = udev_device_get_property_value(dev, "SWITCH_STATE");
+		changed_device(env_name, env_value);
+		break;
+	case UDEV_PLATFORM:
+		env_value = udev_device_get_property_value(dev, ENV_FILTER);
+		if (!env_value)
+			break;
+		changed_device(env_value, NULL);
+		break;
+	case UDEV_POWER:
+		udev_list_entry_foreach(list_entry, udev_device_get_properties_list_entry(dev)) {
+			env_name = udev_list_entry_get_name(list_entry);
+			if (env_name == NULL)
+				continue;
+			if (strncmp(env_name, CHARGE_NAME, CHARGE_NAME_LEN) == 0) {
+				env_value = udev_list_entry_get_value(list_entry);
+				if (env_value == NULL)
+					continue;
+				if (strncmp(env_value, BATTERY_NAME, BATTERY_NAME_LEN) == 0) {
+					ret = 0;
+					break;
+				}
+			}
+		}
+		if (ret != 0)
+			goto out;
+		env_value = udev_device_get_property_value(dev, CHARGE_STATUS);
+		check_charge_status(env_value);
+		env_value = udev_device_get_property_value(dev, CHARGE_ONLINE);
+		check_online_status(env_value);
+		env_value = udev_device_get_property_value(dev, CHARGE_HEALTH);
+		check_health_status(env_value);
+		env_value = udev_device_get_property_value(dev, CHARGE_PRESENT);
+		check_present_status(env_value);
+		env_value = udev_device_get_property_value(dev, CAPACITY);
+		check_capacity_status(env_value);
+		ret = booting_done(NULL);
+		if (ret)
+			battery_noti(DEVICE_NOTI_BATT_CHARGE, DEVICE_NOTI_ON);
+		if (env_value)
+			changed_device(subsystem, env_value);
+		else
+			changed_device(subsystem, NULL);
+		break;
+	}
+
+out:
+	udev_device_unref(dev);
+	return EINA_TRUE;
+}
+
+static int uevent_kernel_control_stop(void)
+{
+	struct udev_device *dev = NULL;
+
 	if (ufdh) {
 		ecore_main_fd_handler_del(ufdh);
 		ufdh = NULL;
@@ -626,6 +952,11 @@ static int uevent_control_stop(int ufd)
 		ufd = -1;
 	}
 	if (mon) {
+		dev = udev_monitor_receive_device(mon);
+		if (dev) {
+			udev_device_unref(dev);
+			dev = NULL;
+		}
 		udev_monitor_unref(mon);
 		mon = NULL;
 	}
@@ -636,352 +967,362 @@ static int uevent_control_stop(int ufd)
 	return 0;
 }
 
-static int uevent_control_start(void)
+static int uevent_kernel_control_start(void)
 {
-	int ufd = -1;
+	int i, ret;
 
-	udev = udev_new();
+	if (udev && mon) {
+		_E("uevent control routine is alreay started");
+		return -EINVAL;
+	}
+
 	if (!udev) {
-		_E("error create udev");
-		return -EINVAL;
-	}
-
-	mon = udev_monitor_new_from_netlink(udev, "kernel");
-	if (mon == NULL) {
-		_E("error udev_monitor create");
-		uevent_control_stop(-1);
-		return -EINVAL;
-	}
-
-	if (udev_monitor_set_receive_buffer_size(mon, 1024) != 0) {
-		_E("fail to set receive buffer size");
-		return -EINVAL;
-	}
-
-	if (udev_monitor_filter_add_match_subsystem_devtype(mon, "platform", NULL) < 0 ||
-		udev_monitor_filter_add_match_subsystem_devtype(mon, "input", NULL) < 0) {
-		_E("error apply subsystem filter");
-		uevent_control_stop(-1);
-		return -1;
-	}
-
-	ufd = udev_monitor_get_fd(mon);
-	if (ufd == -1) {
-		_E("error udev_monitor_get_fd");
-		uevent_control_stop(ufd);
-		return -EINVAL;
-	}
-
-	ufdh = ecore_main_fd_handler_add(ufd, ECORE_FD_READ, uevent_control_cb, NULL, NULL, NULL);
-	if (!ufdh) {
-		_E("error ecore_main_fd_handler_add");
-		uevent_control_stop(ufd);
-		return -EINVAL;
-	}
-
-	if (udev_monitor_enable_receiving(mon) < 0) {
-		_E("error unable to subscribe to udev events");
-		uevent_control_stop(ufd);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-static void power_supply(void *data)
-{
-	static int old;
-	int ret;
-	char params[BUFF_MAX];
-	static int bat_full_noti = 0;
-	static int present_status = 1;
-
-	ss_lowbat_monitor(NULL);
-
-	if ((battery.charge_now == 1 || battery.charge_full == 1) &&
-	    old == VCONFKEY_SYSMAN_CHARGER_DISCONNECTED) {
-		old = VCONFKEY_SYSMAN_CHARGER_CONNECTED;
-		vconf_set_int(VCONFKEY_SYSMAN_CHARGER_STATUS, old);
-	} else if (battery.charge_now == 0 && battery.charge_full == 0 &&
-	    old == VCONFKEY_SYSMAN_CHARGER_CONNECTED) {
-		old = VCONFKEY_SYSMAN_CHARGER_DISCONNECTED;
-		vconf_set_int(VCONFKEY_SYSMAN_CHARGER_STATUS, old);
-	}
-
-	if (battery.charge_now == 0 && battery.capacity == 0) {
-		_I("target will be shut down");
-		battery_power_off_act(NULL);
-		return;
-	}
-
-	if (battery.present == 0 && present_status == 1) {
-		present_status = 0;
-		_I("battery cf is opened");
-		if (battery.charge_now)
-			action_entry_call_internal(PREDEF_BATTERY_CF_OPENED, 0);
-	}
-
-	if (battery.present == 1 && present_status == 0) {
-		present_status = 1;
-		_I("battery cf is closed again");
-	}
-	if (battery.health == 0) {
-		_I("Battery health status is not good");
-		if (__check_abnormal_popup_launch() != 0)
-			return;
-		if (battery.capacity <= 0)
-			battery_power_off_act(NULL);
-		else
-			battery_charge_err_act(NULL);
-		return;
-	}
-
-	if (battery.charge_full == 0) {
-		if (bat_full_noti==1) {
-			snprintf(params, sizeof(params), "%d %d", DEVICE_NOTI_BATT_FULL, DEVICE_NOTI_OFF);
-			ss_launch_if_noexist("/usr/bin/sys_device_noti", params);
-		}
-		bat_full_noti = 0;
-	} else {
-		if (battery.charge_full==1 && bat_full_noti==0) {
-			bat_full_noti = 1;
-			_D("battery full noti");
-			snprintf(params, sizeof(params), "%d %d", DEVICE_NOTI_BATT_FULL, DEVICE_NOTI_ON);
-			ss_launch_if_noexist("/usr/bin/sys_device_noti", params);
-		}
-	}
-
-}
-
-static Eina_Bool uevent_control_cb(void *data, Ecore_Fd_Handler *fd_handler)
-{
-	struct udev_device *dev = NULL;
-	struct udev_list_entry *list_entry = NULL;
-	const char *env_name = NULL;
-	const char *env_value = NULL;
-	const char *devpath;
-	const char *devnode;
-	const char *action;
-	int ufd = -1;
-	int ret = -1;
-	int i, len;
-
-	if (!ecore_main_fd_handler_active_get(fd_handler,ECORE_FD_READ))
-		goto out;
-	if ((ufd = ecore_main_fd_handler_fd_get(fd_handler)) == -1)
-		goto out;
-	if ((dev = udev_monitor_receive_device(mon)) == NULL)
-		goto out;
-
-	env_name = udev_device_get_subsystem(dev);
-	if (strncmp(env_name, INPUT_SUBSYSTEM, strlen(INPUT_SUBSYSTEM)) == 0) {
-		devpath = udev_device_get_devpath(dev);
-		/* check new input device */
-		if (!fnmatch(INPUT_PATH, devpath, 0)) {
-			action = udev_device_get_action(dev);
-			devnode = udev_device_get_devnode(dev);
-			if (!strcmp(action, ADD))
-				device_notify(DEVICE_NOTIFIER_INPUT_ADD, (void *)devnode);
-			else if (!strcmp(action, REMOVE))
-				device_notify(DEVICE_NOTIFIER_INPUT_REMOVE, (void *)devnode);
-			udev_device_unref(dev);
-			uevent_control_stop(ufd);
-			uevent_control_start();
-			return EINA_TRUE;
-		}
-	}
-
-	udev_list_entry_foreach(list_entry,udev_device_get_properties_list_entry(dev)) {
-		env_name = udev_list_entry_get_name(list_entry);
-		if (strncmp(env_name, ENV_FILTER, strlen(ENV_FILTER)) == 0) {
-			env_value = udev_list_entry_get_value(list_entry);
-			ret = 0;
-			break;
-		}
-	}
-
-	if (ret != 0) {
-		udev_device_unref(dev);
-		goto out;
-	}
-
-	_I("UEVENT DETECTED (%s)", env_value);
-	action_entry_call_internal(PREDEF_DEVICE_CHANGED,1,env_value);
-
-	udev_device_unref(dev);
-	uevent_control_stop(ufd);
-	uevent_control_start();
-out:
-	return EINA_TRUE;
-}
-
-static int changed_device(int argc, char **argv)
-{
-	int val = 0;
-	int *state = NULL;
-	int i;
-
-	for (i = 0 ; i < argc ; i++) {
-		if (argv[i] == NULL) {
-			_E("param is failed");
+		udev = udev_new();
+		if (!udev) {
+			_E("error create udev");
 			return -EINVAL;
 		}
 	}
 
-	if (argc == 2) {
-		if (argv[1] == NULL)
-			val = 0;
-		else
-			val = atoi(argv[1]);
-		state = &val;
+	mon = udev_monitor_new_from_netlink(udev, UDEV);
+	if (mon == NULL) {
+		_E("error udev_monitor create");
+		goto stop;
 	}
 
-	if (strncmp(argv[0], USB_NAME, USB_NAME_LEN) == 0)
-		usb_chgdet_cb(state);
-	else if (strncmp(argv[0], EARJACK_NAME, EARJACK_NAME_LEN) == 0)
-		earjack_chgdet_cb((void *)state);
-	else if (strncmp(argv[0], EARKEY_NAME, EARKEY_NAME_LEN) == 0)
-		earkey_chgdet_cb((void *)state);
-	else if (strncmp(argv[0], TVOUT_NAME, TVOUT_NAME_LEN) == 0)
-		tvout_chgdet_cb((void *)state);
-	else if (strncmp(argv[0], HDMI_NAME, HDMI_NAME_LEN) == 0)
-		hdmi_chgdet_cb((void *)state);
-	else if (strncmp(argv[0], KEYBOARD_NAME, KEYBOARD_NAME_LEN) == 0)
-		keyboard_chgdet_cb((void *)state);
-	else if (strncmp(argv[0], POWER_SUBSYSTEM, POWER_SUPPLY_NAME_LEN) == 0)
-		power_supply(state);
+	if (udev_monitor_set_receive_buffer_size(mon, UDEV_MONITOR_SIZE) != 0) {
+		_E("fail to set receive buffer size");
+		goto stop;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(udev_subsystems); i++) {
+		ret = udev_monitor_filter_add_match_subsystem_devtype(mon,
+			    udev_subsystems[i].str, udev_subsystems[i].devtype);
+		if (ret < 0) {
+			_E("error apply subsystem filter");
+			goto stop;
+		}
+	}
+
+	ret = udev_monitor_filter_update(mon);
+	if (ret < 0)
+		_E("error udev_monitor_filter_update");
+
+	ufd = udev_monitor_get_fd(mon);
+	if (ufd == -1) {
+		_E("error udev_monitor_get_fd");
+		goto stop;
+	}
+
+	ufdh = ecore_main_fd_handler_add(ufd, ECORE_FD_READ,
+			uevent_kernel_control_cb, NULL, NULL, NULL);
+	if (!ufdh) {
+		_E("error ecore_main_fd_handler_add");
+		goto stop;
+	}
+
+	if (udev_monitor_enable_receiving(mon) < 0) {
+		_E("error unable to subscribe to udev events");
+		goto stop;
+	}
+
+	return 0;
+stop:
+	uevent_kernel_control_stop();
+	return -EINVAL;
+
+}
+
+int uevent_udev_get_path(const char *subsystem, dd_list **list)
+{
+	struct udev_enumerate *enumerate = NULL;
+	struct udev_list_entry *devices, *dev_list_entry;
+	int ret;
+
+	if (!udev) {
+		udev = udev_new();
+		if (!udev) {
+			_E("error create udev");
+			return -EIO;
+		}
+	}
+
+	enumerate = udev_enumerate_new(udev);
+	if (!enumerate)
+		return -EIO;
+
+	ret = udev_enumerate_add_match_subsystem(enumerate, subsystem);
+	if (ret < 0)
+		return -EIO;
+
+	ret = udev_enumerate_scan_devices(enumerate);
+	if (ret < 0)
+		return -EIO;
+
+	devices = udev_enumerate_get_list_entry(enumerate);
+
+	udev_list_entry_foreach(dev_list_entry, devices) {
+		const char *path;
+		path = udev_list_entry_get_name(dev_list_entry);
+		_D("subsystem : %s, path : %s", subsystem, path);
+		DD_LIST_APPEND(*list, (void*)path);
+	}
 
 	return 0;
 }
 
-static int changed_dev_usb(int argc, char **argv)
+static DBusMessage *dbus_cradle_handler(E_DBus_Object *obj, DBusMessage *msg)
 {
-	int pid;
-	int val = -1;
-	int ret = -1;
-	int bat_state = VCONFKEY_SYSMAN_BAT_NORMAL;
-
-	if (device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_USB_ONLINE, &val) == 0) {
-		if (val == 0) {
-			vconf_set_int(VCONFKEY_SYSMAN_USB_STATUS,
-				      VCONFKEY_SYSMAN_USB_DISCONNECTED);
-			pm_unlock_internal(getpid(), LCD_OFF, STAY_CUR_STATE);
-			return 0;
-		}
-		if ( vconf_get_int(VCONFKEY_SYSMAN_USB_STATUS, &val) == 0 && val == VCONFKEY_SYSMAN_USB_AVAILABLE)
-			return 0;
-		vconf_set_int(VCONFKEY_SYSMAN_USB_STATUS,
-			      VCONFKEY_SYSMAN_USB_AVAILABLE);
-		pm_lock_internal(getpid(), LCD_OFF, STAY_CUR_STATE, 0);
-		pid = ss_launch_if_noexist(USBCON_EXEC_PATH, NULL);
-		if (pid < 0) {
-			_E("usb predefine action failed\n");
-			return -1;
-		}
-		return pid;
-	}
-	_E("failed to get usb status\n");
-	return -1;
-}
-
-static int changed_dev_earjack(int argc, char **argv)
-{
-	int val;
-
-	_E("earjack_normal predefine action");
-	if (device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_EARJACK_ONLINE, &val) == 0) {
-		if (CONNECTED(val))
-			extcon_set_count(EXTCON_EARJACK);
-		return vconf_set_int(VCONFKEY_SYSMAN_EARJACK, val);
-	}
-
-	return -1;
-}
-
-static int changed_battery_cf(int argc, char **argv)
-{
+	DBusMessageIter iter;
+	DBusMessage *reply;
 	int ret;
-	static int present_status = 1;
-	bundle *b;
 
-	b = bundle_create();
-	if (!b) {
-		_E("fail to create bundle");
-		return -EINVAL;
-	}
+	ret = cradle_cb(NULL);
+	_I("cradle %d", ret);
 
-	ret = bundle_add(b, "_SYSPOPUP_CONTENT_", "battdisconnect");
-	if (ret != 0) {
-		_E("fail to add bundle");
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+	return reply;
+}
+
+static DBusMessage *dbus_hdcp_hdmi_handler(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int ret;
+
+	ret = hdcp_hdmi_cb(NULL);
+	_I("hdmi %d", ret);
+
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+	return reply;
+}
+
+static DBusMessage *dbus_hdcp_handler(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int ret;
+
+	ret = hdcp_chgdet_cb(NULL);
+	_I("hdcp %d", ret);
+
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+	return reply;
+}
+
+static DBusMessage *dbus_hdmi_audio_handler(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int ret;
+
+	ret = hdmi_audio_chgdet_cb(NULL);
+	_I("hdmi audio %d", ret);
+
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+	return reply;
+}
+
+static DBusMessage *dbus_device_handler(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusError err;
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	pid_t pid;
+	int ret;
+	int argc;
+	char *type_str;
+	char *argv[2];
+
+	dbus_error_init(&err);
+
+	if (!dbus_message_get_args(msg, &err,
+		    DBUS_TYPE_STRING, &type_str,
+		    DBUS_TYPE_INT32, &argc,
+		    DBUS_TYPE_STRING, &argv[0],
+		    DBUS_TYPE_STRING, &argv[1], DBUS_TYPE_INVALID)) {
+		_E("there is no message");
+		ret = -EINVAL;
 		goto out;
 	}
 
-	ret = syspopup_launch("lowbat-syspopup", b);
-	if (ret < 0)
-		_E("popup launch failed");
+	if (argc < 0) {
+		_E("message is invalid!");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	pid = get_edbus_sender_pid(msg);
+	if (kill(pid, 0) == -1) {
+		_E("%d process does not exist, dbus ignored!", pid);
+		ret = -ESRCH;
+		goto out;
+	}
+
+	changed_device(argv[0], argv[1]);
 
 out:
-	bundle_free(b);
-	return ret;
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+
+	return reply;
 }
 
-static void pci_keyboard_add_cb(struct ss_main_data *ad)
+static DBusMessage *dbus_battery_handler(E_DBus_Object *obj, DBusMessage *msg)
 {
-	char params[BUFF_MAX];
-	_D("pci- keyboard inserted\n");
-	pm_change_internal(getpid(), LCD_NORMAL);
+	DBusError err;
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	pid_t pid;
+	int ret;
+	int argc;
+	char *type_str;
+	char *argv[5];
 
-	snprintf(params, sizeof(params), "%d", CB_NOTI_PCI_INSERTED);
-	ss_launch_if_noexist("/usr/bin/sys_pci_noti", params);
+	dbus_error_init(&err);
 
+	if (!dbus_message_get_args(msg, &err,
+		    DBUS_TYPE_STRING, &type_str,
+		    DBUS_TYPE_INT32, &argc,
+		    DBUS_TYPE_STRING, &argv[0],
+		    DBUS_TYPE_STRING, &argv[1],
+		    DBUS_TYPE_STRING, &argv[2],
+		    DBUS_TYPE_STRING, &argv[3],
+		    DBUS_TYPE_STRING, &argv[4], DBUS_TYPE_INVALID)) {
+		_E("there is no message");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (argc < 0) {
+		_E("message is invalid!");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	pid = get_edbus_sender_pid(msg);
+	if (kill(pid, 0) == -1) {
+		_E("%d process does not exist, dbus ignored!", pid);
+		ret = -ESRCH;
+		goto out;
+	}
+	check_capacity_status(argv[0]);
+	check_charge_status(argv[1]);
+	check_health_status(argv[2]);
+	check_online_status(argv[3]);
+	check_present_status(argv[4]);
+	_I("%d %d %d %d %d %d %d %d",
+		battery.capacity,
+		battery.charge_full,
+		battery.charge_now,
+		battery.health,
+		battery.online,
+		battery.ovp,
+		battery.present,
+		battery.temp);
+	battery_noti(DEVICE_NOTI_BATT_CHARGE, DEVICE_NOTI_ON);
+	changed_device(POWER_SUBSYSTEM, argv[0]);
+out:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+
+	return reply;
 }
-static void pci_keyboard_remove_cb(struct ss_main_data *ad)
-{
-	char params[BUFF_MAX];
-	_D("pci- keyboard removed\n");
-	pm_change_internal(getpid(), LCD_NORMAL);
 
-	snprintf(params, sizeof(params), "%d", CB_NOTI_PCI_REMOVED);
-	ss_launch_if_noexist("/usr/bin/sys_pci_noti", params);
+static DBusMessage *dbus_udev_handler(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusError err;
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	pid_t pid;
+	int ret;
+	int argc;
+	char *type_str;
+	char *argv;
+
+	dbus_error_init(&err);
+
+	if (!dbus_message_get_args(msg, &err,
+		    DBUS_TYPE_STRING, &type_str,
+		    DBUS_TYPE_INT32, &argc,
+		    DBUS_TYPE_STRING, &argv, DBUS_TYPE_INVALID)) {
+		_E("there is no message");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (argc < 0) {
+		_E("message is invalid!");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	pid = get_edbus_sender_pid(msg);
+	if (kill(pid, 0) == -1) {
+		_E("%d process does not exist, dbus ignored!", pid);
+		ret = -ESRCH;
+		goto out;
+	}
+
+	if (strncmp(argv, "start", strlen("start")) == 0) {
+		uevent_kernel_control_start();
+	} else if (strncmp(argv, "stop", strlen("stop")) == 0) {
+		uevent_kernel_control_stop();
+	}
+
+out:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+
+	return reply;
+}
+
+void internal_pm_change_state(unsigned int s_bits)
+{
+	pm_change_internal(getpid(), s_bits);
+}
+
+static const struct edbus_method edbus_methods[] = {
+	{ PREDEF_DEVICE_CHANGED, "siss",    "i", dbus_device_handler },
+	{ PREDEF_POWER_CHANGED,  "sisssss", "i", dbus_battery_handler },
+	{ PREDEF_UDEV_CONTROL,   "sis","i", dbus_udev_handler },
+	{ METHOD_GET_HDCP,       NULL, "i", dbus_hdcp_handler },
+	{ METHOD_GET_HDMI_AUDIO, NULL, "i", dbus_hdmi_audio_handler },
+	{ METHOD_GET_HDMI,       NULL, "i", dbus_hdcp_hdmi_handler },
+	{ METHOD_GET_CRADLE,     NULL, "i", dbus_cradle_handler },
+};
+
+static int device_change_poweroff(void *data)
+{
+	uevent_kernel_control_stop();
+	return 0;
 }
 
 static void device_change_init(void *data)
 {
+	int ret;
+
+	power_supply_timer_start();
 	if (extcon_count_init() != 0)
 		_E("fail to init extcon files");
-	action_entry_add_internal(PREDEF_USBCON, changed_dev_usb, NULL, NULL);
-	action_entry_add_internal(PREDEF_EARJACKCON, changed_dev_earjack, NULL, NULL);
-	action_entry_add_internal(PREDEF_BATTERY_CF_OPENED, changed_battery_cf, NULL, NULL);
-	action_entry_add_internal(PREDEF_DEVICE_CHANGED, changed_device, NULL, NULL);
+	register_notifier(DEVICE_NOTIFIER_POWEROFF, device_change_poweroff);
+	register_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
+	register_notifier(DEVICE_NOTIFIER_LCD, display_changed);
+	ret = register_edbus_method(DEVICED_PATH_SYSNOTI, edbus_methods, ARRAY_SIZE(edbus_methods));
+	if (ret < 0)
+		_E("fail to init edbus method(%d)", ret);
 
-	if (uevent_control_start() != 0) {
-		_E("fail uevent control init");
-		return;
-	}
-
-	/* for simple noti change cb */
-	ss_noti_add("device_usb_chgdet", (void *)usb_chgdet_cb, NULL);
-	ss_noti_add("device_ta_chgdet", (void *)ta_chgdet_cb, data);
-	ss_noti_add("device_earjack_chgdet", (void *)earjack_chgdet_cb, data);
-	ss_noti_add("device_earkey_chgdet", (void *)earkey_chgdet_cb, data);
-	ss_noti_add("device_tvout_chgdet", (void *)tvout_chgdet_cb, data);
-	ss_noti_add("device_hdmi_chgdet", (void *)hdmi_chgdet_cb, data);
-	ss_noti_add("device_keyboard_chgdet", (void *)keyboard_chgdet_cb, data);
-	ss_noti_add("device_usb_host_add", (void *)usb_host_add_cb, data);
-	ss_noti_add("mmcblk_add", (void *)mmc_chgdet_cb, (void *)1);
-	ss_noti_add("mmcblk_remove", (void *)mmc_chgdet_cb, NULL);
-	ss_noti_add("unmount_ums", (void *)ums_unmount_cb, NULL);
-	ss_noti_add("device_charge_chgdet", (void *)charge_cb, data);
-	ss_noti_add("device_pci_keyboard_add", (void *)pci_keyboard_add_cb, data);
-	ss_noti_add("device_pci_keyboard_remove", (void *)pci_keyboard_remove_cb, data);
-
-	if (vconf_notify_key_changed(VCONFKEY_SYSMAN_USB_HOST_STATUS,
-		(void *)usb_host_chgdet_cb, NULL) < 0) {
-		_E("vconf key notify failed(VCONFKEY_SYSMAN_USB_HOST_STATUS)");
-	}
-
-	/* check and set earjack init status */
-	changed_dev_earjack(0, NULL);
 	/* dbus noti change cb */
 #ifdef ENABLE_EDBUS_USE
 	e_dbus_init();
@@ -993,17 +1334,18 @@ static void device_change_init(void *data)
 				  "system.uevent.xxxxx",
 				  "Change", cb_xxxxx_signaled, data);
 #endif				/* ENABLE_EDBUS_USE */
-
-	/* set initial state for devices */
-	input_device_number = 0;
-	keyboard_chgdet_cb(NULL);
-	hdmi_chgdet_cb(NULL);
-	system(STORE_DEFAULT_USB_INFO);
+	if (uevent_kernel_control_start() != 0) {
+		_E("fail uevent control init");
+		return;
+	}
 }
 
 static void device_change_exit(void *data)
 {
 	int i;
+	unregister_notifier(DEVICE_NOTIFIER_POWEROFF, device_change_poweroff);
+	unregister_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
+	unregister_notifier(DEVICE_NOTIFIER_LCD, display_changed);
 	for (i = 0; i < ARRAY_SIZE(extcon_devices); i++) {
 		if (extcon_devices[i].fd <= 0)
 			continue;

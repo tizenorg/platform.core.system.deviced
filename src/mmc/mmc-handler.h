@@ -20,39 +20,31 @@
 #ifndef __MMC_HANDLER_H__
 #define __MMC_HANDLER_H__
 
-#include <stdlib.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <sys/mount.h>
-#include <sys/statvfs.h>
-#include <vconf.h>
-#include <fcntl.h>
-#include <dirent.h>
-#include <sys/statfs.h>
-#include <bundle.h>
-#include <signal.h>
 #include <stdbool.h>
-
-#include "core/log.h"
-#include "core/device-handler.h"
-#include "core/common.h"
-#include "core/devices.h"
 #include <tzplatform_config.h>
-
-#define BUF_LEN             20
 
 #define SMACKFS_MOUNT_OPT		"smackfsroot=*,smackfsdef=*"
 #define MMC_MOUNT_POINT		tzplatform_mkpath(TZ_SYS_STORAGE,"sdcard")
 
-struct mmc_list {
-struct mmc_list *prev, *next;
-};
+#define BUF_LEN		20
+#define RETRY_COUNT	10
+
+#define MMC_POPUP_NAME		"mmc-syspopup"
+#define MMC_POPUP_APP_KEY	"_APP_NAME_"
+#define MMC_POPUP_SMACK_VALUE	"checksmack"
 
 enum mmc_fs_type {
-	FS_TYPE_NONE,
-	FS_TYPE_FAT,
-	FS_TYPE_EXFAT,
+	FS_TYPE_VFAT = 0,
 	FS_TYPE_EXT4,
+};
+
+struct mmc_fs_ops {
+	enum mmc_fs_type type;
+	const char *name;
+	bool (*match) (const char *);
+	int (*check) (const char *);
+	int (*mount) (bool, const char *, const char *);
+	int (*format) (const char *);
 };
 
 struct fs_check {
@@ -63,22 +55,14 @@ struct fs_check {
 	char magic[4];
 };
 
-struct mmc_filesystem_ops {
-	int (*init) (void *data);
-	const char ** (*check) (void);
-	int (*mount) (int smack, void *data);
-	const char ** (*format) (void *data);
-};
+void add_fs(const struct mmc_fs_ops *fs);
+void remove_fs(const struct mmc_fs_ops *fs);
+int get_mmc_devpath(char devpath[]);
+bool mmc_check_mounted(const char *mount_point);
 
-struct mmc_filesystem_info {
-	char *name;
-	struct mmc_filesystem_ops *fs_ops;
-	struct mmc_list list;
-};
+int mmc_uevent_start(void);
+int mmc_uevent_stop(void);
+int get_block_number(void);
 
-int mount_fs(char *path, const char *fs_name, const char *mount_data);
-int register_mmc_handler(const char *name, struct mmc_filesystem_ops filesystem_type);
-
-extern const struct device_ops mmc_device_ops;
-
+void mmc_mount_done(void);
 #endif /* __MMC_HANDLER_H__ */

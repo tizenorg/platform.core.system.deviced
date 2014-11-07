@@ -22,7 +22,11 @@
 
 #include "core/edbus-handler.h"
 #include "core/common.h"
-#include "core/data.h"
+
+enum apps_enable_type{
+	APPS_DISABLE = 0,
+	APPS_ENABLE = 1,
+};
 
 #define APPS_OPS_REGISTER(dev)	\
 static void __CONSTRUCTOR__ module_init(void)	\

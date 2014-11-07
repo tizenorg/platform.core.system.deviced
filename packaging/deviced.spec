@@ -17,7 +17,6 @@ Source6:    devman.manifest
 BuildRequires:  cmake
 BuildRequires:  libattr-devel
 BuildRequires:  pkgconfig(ecore)
-BuildRequires:  pkgconfig(heynoti)
 BuildRequires:  pkgconfig(vconf)
 BuildRequires:  pkgconfig(tapi)
 BuildRequires:  pkgconfig(edbus)
@@ -26,8 +25,6 @@ BuildRequires:  pkgconfig(syspopup-caller)
 %if %{with x}
 BuildRequires:  pkgconfig(x11)
 %endif
-BuildRequires:  pkgconfig(notification)
-BuildRequires:  pkgconfig(usbutils)
 BuildRequires:  pkgconfig(udev)
 BuildRequires:  pkgconfig(device-node)
 BuildRequires:  pkgconfig(libsmack)
@@ -35,6 +32,7 @@ BuildRequires:  pkgconfig(sensor)
 BuildRequires:	gettext
 BuildRequires:  pkgconfig(libsystemd-daemon)
 BuildRequires:  pkgconfig(capi-base-common)
+BuildRequires:	pkgconfig(dbus-glib-1)
 BuildRequires:  pkgconfig(libtzplatform-config)
 
 %{?systemd_requires}
@@ -195,10 +193,6 @@ rm -rf %{buildroot}
 %install_service graphical.target.wants zbooting-done.service
 %install_service graphical.target.wants devicectl-stop@.service
 
-%if 0%{?simulator}
-rm -f %{buildroot}%{_bindir}/restart
-%endif
-
 %post
 #memory type vconf key init
 users_gid=$(getent group $TZ_SYS_USER_GROUP | cut -f3 -d':')
@@ -238,20 +232,6 @@ vconftool set -t int memory/pm/sip_status 0 -i -g $users_gid
 vconftool set -t int memory/pm/custom_brightness_status 0 -i -g $users_gid
 vconftool set -t bool memory/pm/brt_changed_lpm 0 -i
 vconftool set -t int memory/pm/current_brt 60 -i -g $users_gid
-
-heynotitool set system_wakeup
-heynotitool set pm_event
-
-heynotitool set power_off_start
-
-heynotitool set mmcblk_add
-heynotitool set mmcblk_remove
-heynotitool set device_charge_chgdet
-heynotitool set device_usb_host_add
-heynotitool set device_usb_host_remove
-heynotitool set device_pci_keyboard_add
-heynotitool set device_pci_keyboard_remove
-
 
 systemctl daemon-reload
 if [ "$1" == "1" ]; then
@@ -296,20 +276,16 @@ systemctl daemon-reload
 %config %{_sysconfdir}/dbus-1/system.d/deviced.conf
 %{_bindir}/deviced-pre.sh
 %{_bindir}/deviced
-%if %{undefined simulator}
-%{_bindir}/restart
-%endif
+%{_bindir}/devicectl
 %{_bindir}/movi_format.sh
 %{_bindir}/mmc-smack-label
 %{_bindir}/fsck_msdosfs
+%{_bindir}/newfs_msdos
 %{_datadir}/license/fsck_msdosfs
-%{_bindir}/sys_event
-%{_bindir}/pm_event
+%{_datadir}/license/newfs_msdos
 %{_bindir}/regpmon
 %{_bindir}/set_pmon
 %{_bindir}/pmon
-%{_bindir}/sys_pci_noti
-%{_bindir}/deviced-auto-test
 %{_unitdir}/multi-user.target.wants/deviced.service
 %{_unitdir}/sockets.target.wants/deviced.socket
 %{_unitdir}/graphical.target.wants/zbooting-done.service
@@ -320,7 +296,6 @@ systemctl daemon-reload
 %{_unitdir}/zbooting-done.service
 %{_unitdir}/devicectl-start@.service
 %{_unitdir}/devicectl-stop@.service
-%{_datadir}/deviced/sys_pci_noti/res/locale/*/LC_MESSAGES/*.mo
 
 %files -n libdeviced
 %defattr(-,root,root,-)

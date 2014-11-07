@@ -20,6 +20,7 @@
 #define __LIST_H__
 
 #include <Ecore.h>
+#include <stdio.h>
 
 #define EINA_LIST_APPEND(a, b) \
 	a = eina_list_append(a, b)
@@ -33,46 +34,80 @@
 #define EINA_LIST_FREE_LIST(a) \
 	a = eina_list_free(a)
 
+#define EINA_LIST_PROMOTE_LIST(a, b) \
+	a = eina_list_promote_list(a, b)
+
 #ifdef EINA_LIST
 typedef Eina_List dd_list;
-#define DD_LIST_PREPEND(a, b)   \
-	        a = eina_list_prepend(a, b)
-#define DD_LIST_APPEND(a, b)    \
-	        a = eina_list_append(a, b)
-#define DD_LIST_REMOVE(a, b)    \
-	        a = eina_list_remove(a, b)
-#define DD_LIST_LENGTH(a)               \
-	        eina_list_count(a)
-#define DD_LIST_NTH(a, b)                       \
-	        eina_list_nth(a, b)
+#define DD_LIST_PREPEND(a, b)	\
+	a = eina_list_prepend(a, b)
+#define DD_LIST_APPEND(a, b)	\
+	a = eina_list_append(a, b)
+#define DD_LIST_REMOVE(a, b)	\
+	a = eina_list_remove(a, b)
+#define DD_LIST_LENGTH(a)		\
+	eina_list_count(a)
+#define DD_LIST_NTH(a, b)			\
+	eina_list_nth(a, b)
 #define DD_LIST_FREE_LIST(a)    \
-	        a = eina_list_free(a)
-#define DD_LIST_FOREACH(head, elem, node)       \
-	        EINA_LIST_FOREACH(head, elem, node)
+	a = eina_list_free(a)
+#define DD_LIST_FOREACH(head, elem, node)	\
+	EINA_LIST_FOREACH(head, elem, node)
 #define DD_LIST_FOREACH_SAFE(head, elem, elem_next, node) \
-	        EINA_LIST_FOREACH_SAFE(head, elem, elem_next, node)
+	EINA_LIST_FOREACH_SAFE(head, elem, elem_next, node)
 
 #else
 #include <glib.h>
 typedef GList dd_list;
-#define DD_LIST_PREPEND(a, b)           \
-	        a = g_list_prepend(a, (gpointer)b)
-#define DD_LIST_APPEND(a, b)            \
-	        a = g_list_append(a, (gpointer)b)
-#define DD_LIST_REMOVE(a, b)            \
-	        a = g_list_remove(a, (gpointer)b)
-#define DD_LIST_LENGTH(a)                       \
-	        g_list_length(a)
-#define DD_LIST_NTH(a, b)                       \
-	        g_list_nth_data(a, b)
+
+/*
+   cover crash from corrupted double linked list under the glib 2.36.4
+   if glib version upper than 2.36.3, exchange it to g_list_remove
+*/
+static inline GList* g_list_check_remove(GList* list, gpointer data)
+{
+	GList *temp;
+	temp = list;
+	if (!temp)
+		goto out;
+	while (temp != NULL) {
+		if (temp->data != data)
+			temp = temp->next;
+		else {
+			if (temp->prev != NULL && temp->prev->next == temp)
+				temp->prev->next = temp->next;
+			if (temp->next != NULL && temp->next->prev == temp)
+				temp->next->prev = temp->prev;
+			if (temp == list)
+				list = list->next;
+			temp->prev = NULL;
+			temp->next = NULL;
+			g_list_free(list);
+			break;
+		}
+	}
+out:
+	return list;
+}
+
+#define DD_LIST_PREPEND(a, b)		\
+	a = g_list_prepend(a, (gpointer)b)
+#define DD_LIST_APPEND(a, b)		\
+	a = g_list_append(a, (gpointer)b)
+#define DD_LIST_REMOVE(a, b)		\
+	a = g_list_remove(a, (gpointer)b)
+#define DD_LIST_LENGTH(a)			\
+	g_list_length(a)
+#define DD_LIST_NTH(a, b)			\
+	g_list_nth_data(a, b)
 #define DD_LIST_FREE_LIST(a)        \
-	        g_list_free(a)
-#define DD_LIST_FOREACH(head, elem, node)       \
-	        for (elem = head, node = NULL; elem && ((node = elem->data) != NULL); elem = elem->next, node = NULL)
+	g_list_free(a)
+#define DD_LIST_FOREACH(head, elem, node)	\
+	for (elem = head, node = NULL; elem && ((node = elem->data) != NULL); elem = elem->next, node = NULL)
 #define DD_LIST_FOREACH_SAFE(head, elem, elem_next, node) \
-	        for (elem = head, elem_next = g_list_next(elem), node = NULL; \
-				                        elem && ((node = elem->data) != NULL); \
-				                        elem = elem_next, elem_next = g_list_next(elem), node = NULL)
+	for (elem = head, elem_next = g_list_next(elem), node = NULL; \
+			elem && ((node = elem->data) != NULL); \
+			elem = elem_next, elem_next = g_list_next(elem), node = NULL)
 
 #endif
 

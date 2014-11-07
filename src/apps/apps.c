@@ -43,6 +43,11 @@ static void apps_init(void *data)
 	static int initialized =0;
 
 	if (!initialized) {
+		DD_LIST_FOREACH(apps_head, elem, dev) {
+			_D("[%s] initialize", dev->name);
+			if (dev->init)
+				dev->init();
+		}
 		initialized = 1;
 		return;
 	}

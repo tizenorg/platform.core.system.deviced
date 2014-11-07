@@ -18,40 +18,26 @@
 
 
 #include <stdio.h>
-#include <string.h>
-#include <vconf.h>
 #include <errno.h>
-#include <device-node.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <unistd.h>
-#include <linux/limits.h>
 
 #include "log.h"
 #include "dbus.h"
+#include "common.h"
 #include "dd-display.h"
 
 #define DISPLAY_MAX_BRIGHTNESS  100
 #define DISPLAY_MIN_BRIGHTNESS  1
 #define DISPLAY_DIM_BRIGHTNESS  0
 
-#define SOCK_PATH			"/tmp/pm_sock"
-#define SHIFT_UNLOCK			4
-#define SHIFT_UNLOCK_PARAMETER		12
-#define SHIFT_CHANGE_STATE		8
-#define SHIFT_LOCK_FLAG			16
-#define SHIFT_CHANGE_TIMEOUT		20
-#define TIMEOUT_RESET_BIT		0x80
 #define HOLDKEY_BLOCK_BIT		0x1
 #define STANDBY_MODE_BIT		0x2
-#define CUSTOM_HOLDKEY_BIT		0x2
 
-#define METHOD_SET_FRAME_RATE		"setframerate"
+#define METHOD_SET_REFRESH_RATE	"SetRefreshRate"
 #define METHOD_LOCK_STATE		"lockstate"
 #define METHOD_UNLOCK_STATE		"unlockstate"
 #define METHOD_CHANGE_STATE		"changestate"
 #define METHOD_GET_DISPLAY_COUNT	"GetDisplayCount"
+#define METHOD_GET_MAX_BRIGHTNESS	"GetMaxBrightness"
 #define METHOD_GET_BRIGHTNESS	"GetBrightness"
 #define METHOD_SET_BRIGHTNESS	"SetBrightness"
 #define METHOD_HOLD_BRIGHTNESS	"HoldBrightness"
@@ -75,21 +61,14 @@
 #define STR_RESET_TIMER  "resettimer"
 #define STR_KEEP_TIMER   "keeptimer"
 
-struct disp_lock_msg {
-	pid_t pid;
-	unsigned int cond;
-	unsigned int timeout;
-	unsigned int timeout2;
-};
-
-
 API int display_get_count(void)
 {
 	DBusError err;
 	DBusMessage *msg;
 	int ret, ret_val;
 
-	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
+	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
+			DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
 			METHOD_GET_DISPLAY_COUNT, NULL, NULL);
 	if (!msg)
 		return -EBADMSG;
@@ -99,17 +78,26 @@ API int display_get_count(void)
 	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
 	if (!ret) {
 		_E("no message : [%s:%s]", err.name, err.message);
+		dbus_error_free(&err);
 		ret_val = -EBADMSG;
 	}
 
 	dbus_message_unref(msg);
-	dbus_error_free(&err);
 	return ret_val;
 }
 
 API int display_get_max_brightness(void)
 {
-	return DISPLAY_MAX_BRIGHTNESS;
+	int ret;
+
+	ret = dbus_method_sync(DEVICED_BUS_NAME,
+			DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
+			METHOD_GET_MAX_BRIGHTNESS, NULL, NULL);
+	if (ret < 0)
+		return DISPLAY_MAX_BRIGHTNESS;
+
+	_D("get max brightness : %d", ret);
+	return ret;
 }
 
 API int display_get_min_brightness(void)
@@ -123,7 +111,8 @@ API int display_get_brightness(void)
 	DBusMessage *msg;
 	int ret, ret_val;
 
-	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
+	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
+			DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
 			METHOD_GET_BRIGHTNESS, NULL, NULL);
 	if (!msg)
 		return -EBADMSG;
@@ -133,41 +122,33 @@ API int display_get_brightness(void)
 	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
 	if (!ret) {
 		_E("no message : [%s:%s]", err.name, err.message);
+		dbus_error_free(&err);
 		ret_val = -EBADMSG;
 	}
 
 	dbus_message_unref(msg);
-	dbus_error_free(&err);
 	return ret_val;
 }
 
 API int display_set_brightness_with_setting(int val)
 {
-	DBusError err;
-	DBusMessage *msg;
 	char str_val[32];
 	char *arr[1];
-	int ret, ret_val;
+	int ret;
+
+	if (val < 0 || val > 100)
+		return -EINVAL;
 
 	snprintf(str_val, sizeof(str_val), "%d", val);
 	arr[0] = str_val;
 
-	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
+	ret = dbus_method_async(DEVICED_BUS_NAME,
+			DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
 			METHOD_SET_BRIGHTNESS, "i", arr);
-	if (!msg)
-		return -EBADMSG;
+	if (ret < 0)
+		_E("no message : failed to setting");
 
-	dbus_error_init(&err);
-
-	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
-	if (!ret) {
-		_E("no message : [%s:%s]", err.name, err.message);
-		ret_val = -EBADMSG;
-	}
-
-	dbus_message_unref(msg);
-	dbus_error_free(&err);
-	return ret_val;
+	return ret;
 }
 
 API int display_set_brightness(int val)
@@ -181,7 +162,8 @@ API int display_set_brightness(int val)
 	snprintf(str_val, sizeof(str_val), "%d", val);
 	arr[0] = str_val;
 
-	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
+	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
+			DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
 			METHOD_HOLD_BRIGHTNESS, "i", arr);
 	if (!msg)
 		return -EBADMSG;
@@ -191,11 +173,11 @@ API int display_set_brightness(int val)
 	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
 	if (!ret) {
 		_E("no message : [%s:%s]", err.name, err.message);
+		dbus_error_free(&err);
 		ret_val = -EBADMSG;
 	}
 
 	dbus_message_unref(msg);
-	dbus_error_free(&err);
 	return ret_val;
 }
 
@@ -205,7 +187,8 @@ API int display_release_brightness(void)
 	DBusMessage *msg;
 	int ret, ret_val;
 
-	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
+	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
+			DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
 			METHOD_RELEASE_BRIGHTNESS, NULL, NULL);
 	if (!msg)
 		return -EBADMSG;
@@ -215,11 +198,11 @@ API int display_release_brightness(void)
 	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
 	if (!ret) {
 		_E("no message : [%s:%s]", err.name, err.message);
+		dbus_error_free(&err);
 		ret_val = -EBADMSG;
 	}
 
 	dbus_message_unref(msg);
-	dbus_error_free(&err);
 	return ret_val;
 }
 
@@ -229,7 +212,8 @@ API int display_get_acl_status(void)
 	DBusMessage *msg;
 	int ret, ret_val;
 
-	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
+	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
+			DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
 			METHOD_GET_ACL_STATUS, NULL, NULL);
 	if (!msg)
 		return -EBADMSG;
@@ -239,11 +223,11 @@ API int display_get_acl_status(void)
 	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
 	if (!ret) {
 		_E("no message : [%s:%s]", err.name, err.message);
+		dbus_error_free(&err);
 		ret_val = -EBADMSG;
 	}
 
 	dbus_message_unref(msg);
-	dbus_error_free(&err);
 	return ret_val;
 }
 
@@ -258,7 +242,8 @@ API int display_set_acl_status(int val)
 	snprintf(str_val, sizeof(str_val), "%d", val);
 	arr[0] = str_val;
 
-	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
+	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
+			DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
 			METHOD_SET_ACL_STATUS, "i", arr);
 	if (!msg)
 		return -EBADMSG;
@@ -268,41 +253,33 @@ API int display_set_acl_status(int val)
 	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
 	if (!ret) {
 		_E("no message : [%s:%s]", err.name, err.message);
+		dbus_error_free(&err);
 		ret_val = -EBADMSG;
 	}
 
 	dbus_message_unref(msg);
-	dbus_error_free(&err);
 	return ret_val;
+}
+
+API int display_set_refresh_rate(enum refresh_app app, int val)
+{
+	char str_app[32];
+	char str_val[32];
+	char *arr[2];
+
+	snprintf(str_app, sizeof(str_app), "%d", app);
+	arr[0] = str_app;
+	snprintf(str_val, sizeof(str_val), "%d", val);
+	arr[1] = str_val;
+
+	return dbus_method_sync(DEVICED_BUS_NAME,
+			DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
+			METHOD_SET_REFRESH_RATE, "ii", arr);
 }
 
 API int display_set_frame_rate(int val)
 {
-	DBusError err;
-	DBusMessage *msg;
-	char str_val[32];
-	char *arr[1];
-	int ret, ret_val;
-
-	snprintf(str_val, sizeof(str_val), "%d", val);
-	arr[0] = str_val;
-
-	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
-			METHOD_SET_FRAME_RATE, "i", arr);
-	if (!msg)
-		return -EBADMSG;
-
-	dbus_error_init(&err);
-
-	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
-	if (!ret) {
-		_E("no message : [%s:%s]", err.name, err.message);
-		ret_val = -EBADMSG;
-	}
-
-	dbus_message_unref(msg);
-	dbus_error_free(&err);
-	return ret_val;
+	return display_set_refresh_rate(REFRESH_SETTING, val);
 }
 
 static inline char *get_lcd_str(unsigned int val)
@@ -321,46 +298,69 @@ static inline char *get_lcd_str(unsigned int val)
 	}
 }
 
-API int display_change_state(unsigned int s_bits)
+static void display_change_cb(void *data, DBusMessage *msg, DBusError *unused)
 {
 	DBusError err;
-	DBusMessage *msg;
-	char *p, *pa[1];
 	int ret, val;
+
+	if (!msg)
+		return;
+
+	dbus_error_init(&err);
+	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &val, DBUS_TYPE_INVALID);
+	if (!ret) {
+		_E("no message [%s:%s]", err.name, err.message);
+		dbus_error_free(&err);
+		return;
+	}
+        _D("%s-%s : %d", DEVICED_INTERFACE_DISPLAY, METHOD_CHANGE_STATE, val);
+}
+
+API int display_change_state(unsigned int s_bits)
+{
+	char *p, *pa[1];
+	int ret;
 
 	p = get_lcd_str(s_bits);
 	if (!p)
 		return -EINVAL;
 	pa[0] = p;
 
-	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
-			METHOD_CHANGE_STATE, "s", pa);
+	ret = dbus_method_async_with_reply(DEVICED_BUS_NAME,
+			DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
+			METHOD_CHANGE_STATE, "s", pa, display_change_cb, -1, NULL);
+	if (ret < 0)
+		_E("no message : failed to change state");
+
+	_D("%s-%s : %d", DEVICED_INTERFACE_DISPLAY, METHOD_CHANGE_STATE, ret);
+
+	return ret;
+}
+
+static void display_lock_cb(void *data, DBusMessage *msg, DBusError *unused)
+{
+	DBusError err;
+	int ret, val;
+
 	if (!msg)
-		return -EBADMSG;
+		return;
 
 	dbus_error_init(&err);
-
 	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &val, DBUS_TYPE_INVALID);
 	if (!ret) {
-		_E("no message : [%s:%s]", err.name, err.message);
-		val = -EBADMSG;
+		_E("no message [%s:%s]", err.name, err.message);
+		dbus_error_free(&err);
+		return;
 	}
-
-	dbus_message_unref(msg);
-	dbus_error_free(&err);
-
-	_D("%s-%s : %d", DEVICED_INTERFACE_DISPLAY, METHOD_CHANGE_STATE, val);
-	return val;
+        _D("%s-%s : %d", DEVICED_INTERFACE_DISPLAY, METHOD_LOCK_STATE, val);
 }
 
 API int display_lock_state(unsigned int s_bits, unsigned int flag,
 		      unsigned int timeout)
 {
-	DBusError err;
-	DBusMessage *msg;
 	char *p, *pa[4];
 	char str_timeout[32];
-	int ret, val;
+	int ret;
 
 	p = get_lcd_str(s_bits);
 	if (!p)
@@ -376,6 +376,8 @@ API int display_lock_state(unsigned int s_bits, unsigned int flag,
 
 	if (flag & HOLD_KEY_BLOCK)
 		p = STR_HOLDKEYBLOCK;
+	else if (flag & STANDBY_MODE)
+		p = STR_STANDBYMODE;
 	else
 		p = STR_NULL;
 	pa[2] = p;
@@ -383,31 +385,39 @@ API int display_lock_state(unsigned int s_bits, unsigned int flag,
 	snprintf(str_timeout, sizeof(str_timeout), "%d", timeout);
 	pa[3] = str_timeout;
 
-	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
-			METHOD_LOCK_STATE, "sssi", pa);
+	ret = dbus_method_async_with_reply(DEVICED_BUS_NAME,
+			DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
+			METHOD_LOCK_STATE, "sssi", pa, display_lock_cb, -1, NULL);
+	if (ret < 0)
+		_E("no message : failed to lock state");
+
+	_D("%s-%s : %d", DEVICED_INTERFACE_DISPLAY, METHOD_LOCK_STATE, ret);
+
+	return ret;
+}
+
+static void display_unlock_cb(void *data, DBusMessage *msg, DBusError *unused)
+{
+	DBusError err;
+	int ret, val;
+
 	if (!msg)
-		return -EBADMSG;
+		return;
 
 	dbus_error_init(&err);
-
 	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &val, DBUS_TYPE_INVALID);
 	if (!ret) {
-		_E("no message : [%s:%s]", err.name, err.message);
-		val = -EBADMSG;
+		_E("no message [%s:%s]", err.name, err.message);
+		dbus_error_free(&err);
+		return;
 	}
-	dbus_message_unref(msg);
-	dbus_error_free(&err);
-
-	_D("%s-%s : %d", DEVICED_INTERFACE_DISPLAY, METHOD_LOCK_STATE, val);
-	return val;
+        _D("%s-%s : %d", DEVICED_INTERFACE_DISPLAY, METHOD_UNLOCK_STATE, val);
 }
 
 API int display_unlock_state(unsigned int s_bits, unsigned int flag)
 {
-	DBusError err;
-	DBusMessage *msg;
 	char *p, *pa[2];
-	int ret, val;
+	int ret;
 
 	p = get_lcd_str(s_bits);
 	if (!p)
@@ -429,68 +439,19 @@ API int display_unlock_state(unsigned int s_bits, unsigned int flag)
 	}
 	pa[1] = p;
 
-	msg = deviced_dbus_method_sync(BUS_NAME, DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
-			METHOD_UNLOCK_STATE, "ss", pa);
-	if (!msg)
-		return -EBADMSG;
+	ret = dbus_method_async_with_reply(DEVICED_BUS_NAME,
+			DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
+			METHOD_UNLOCK_STATE, "ss", pa, display_unlock_cb, -1, NULL);
+	if (ret < 0)
+		_E("no message : failed to unlock state");
 
-	dbus_error_init(&err);
+	_D("%s-%s : %d", DEVICED_INTERFACE_DISPLAY, METHOD_UNLOCK_STATE, ret);
 
-	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &val, DBUS_TYPE_INVALID);
-	if (!ret) {
-		_E("no message : [%s:%s]", err.name, err.message);
-		val = -EBADMSG;
-	}
-
-	dbus_message_unref(msg);
-	dbus_error_free(&err);
-
-	_D("%s-%s : %d", DEVICED_INTERFACE_DISPLAY, METHOD_UNLOCK_STATE, val);
-	return val;
-}
-
-static int send_msg(unsigned int s_bits, unsigned int timeout, unsigned int timeout2)
-{
-	int rc = 0;
-	int sock;
-	struct disp_lock_msg p;
-	struct sockaddr_un remote;
-
-	p.pid = getpid();
-	p.cond = s_bits;
-	p.timeout = timeout;
-	p.timeout2 = timeout2;
-
-	sock = socket(AF_UNIX, SOCK_DGRAM, 0);
-	if (sock == -1) {
-		_E("pm socket() failed: %s", strerror(errno));
-		return sock;
-	}
-
-	remote.sun_family = AF_UNIX;
-	if(strlen(SOCK_PATH) >= sizeof(remote.sun_path)) {
-		_E("socket path is vey long");
-		close(sock);
-		return -ENAMETOOLONG;
-	}
-	strncpy(remote.sun_path, SOCK_PATH, sizeof(remote.sun_path));
-
-	rc = sendto(sock, (void *)&p, sizeof(p), 0, (struct sockaddr *)&remote,
-		    sizeof(struct sockaddr_un));
-	if (rc == -1)
-		_E("pm socket sendto() failed: %s", strerror(errno));
-
-	close(sock);
-	return (rc > 0 ? 0 : rc);
+	return ret;
 }
 
 API void display_set_timeout(unsigned int normal, unsigned int dim, unsigned int lock)
 {
-	unsigned int s_bits = CUSTOM_TIMEOUT;
-
-	if (lock == HOLD_KEY_BLOCK)
-		s_bits += CUSTOM_HOLDKEY_BIT;
-
-	s_bits = (s_bits << SHIFT_CHANGE_TIMEOUT);
-	send_msg(s_bits, normal, dim);
+	return;
 }
+

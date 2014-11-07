@@ -51,6 +51,13 @@ typedef enum
 } haptic_module_feedback;
 
 /**
+ * @brief Enumerations of unlimited duration for the Haptic Module API.
+ */
+typedef enum {
+	HAPTIC_MODULE_DURATION_UNLIMITED = 0x7FFFFFFF,
+} haptic_module_duration;
+
+/**
  * @brief Enumerations of iteration count for the Haptic Module API.
  */
 typedef enum
@@ -81,8 +88,8 @@ typedef enum
  *      effect element for haptic module.
  */
 typedef struct {
-	int haptic_duration; /**< Duration of the effect element in millisecond */
-	int haptic_level;	 /**< Level of the effect element (0 ~ 100) */
+    int haptic_duration;           /**< Start time of the effect element in millisecond */
+    int haptic_level;        /**< Duration of the effect element in millisecond */
 } haptic_module_effect_element;
 
 #endif  /* __HAPTIC_MODULE_H__ */

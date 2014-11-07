@@ -38,16 +38,21 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <Ecore.h>
-
+#include <core/devices.h>
+#include <core/device-handler.h>
 #include "util.h"
 #include "core.h"
 #include "poll.h"
-#include "core/devices.h"
 
 #define SHIFT_UNLOCK                    4
 #define SHIFT_UNLOCK_PARAMETER          12
 #define SHIFT_CHANGE_STATE              8
 #define SHIFT_CHANGE_TIMEOUT            20
+#define LOCK_FLAG_SHIFT                 16
+#define __HOLDKEY_BLOCK_BIT              0x1
+#define __STANDBY_MODE_BIT               0x2
+#define HOLDKEY_BLOCK_BIT               (__HOLDKEY_BLOCK_BIT << LOCK_FLAG_SHIFT)
+#define STANDBY_MODE_BIT                (__STANDBY_MODE_BIT << LOCK_FLAG_SHIFT)
 
 #define DEV_PATH_DLM	":"
 
@@ -55,19 +60,18 @@ PMMsg recv_data;
 int (*g_pm_callback) (int, PMMsg *);
 
 #ifdef ENABLE_KEY_FILTER
-extern int check_key_filter(int length, char buf[]);
-#  define CHECK_KEY_FILTER(a, b) do {\
-							if (check_key_filter(a, b) != 0)\
-								return EINA_TRUE;\
-							} while (0);
-
+extern int check_key_filter(int length, char buf[], int fd);
+#  define CHECK_KEY_FILTER(a, b, c) \
+	do { \
+		if (CHECK_OPS(keyfilter_ops, check) && \
+		    keyfilter_ops->check(a, b, c) != 0) \
+			return EINA_TRUE;\
+	} while (0);
 #else
-#  define CHECK_KEY_FILTER(a, b)
+#  define CHECK_KEY_FILTER(a, b, c)
 #endif
 
 #define DEFAULT_DEV_PATH "/dev/event1:/dev/event0"
-
-static int sockfd;
 
 static Eina_Bool pm_handler(void *data, Ecore_Fd_Handler *fd_handler)
 {
@@ -76,8 +80,11 @@ static Eina_Bool pm_handler(void *data, Ecore_Fd_Handler *fd_handler)
 
 	int fd = (int)data;
 	int ret;
+	static const struct device_ops *display_device_ops = NULL;
 
-	if (device_get_status(&display_device_ops) != DEVICE_OPS_STATUS_START) {
+	FIND_DEVICE_INT(display_device_ops, "display");
+
+	if (device_get_status(display_device_ops) != DEVICE_OPS_STATUS_START) {
 		_E("display is not started!");
 		return EINA_FALSE;
 	}
@@ -87,7 +94,7 @@ static Eina_Bool pm_handler(void *data, Ecore_Fd_Handler *fd_handler)
 	}
 
 	ret = read(fd, buf, sizeof(buf));
-	CHECK_KEY_FILTER(ret, buf);
+	CHECK_KEY_FILTER(ret, buf, fd);
 	(*g_pm_callback) (INPUT_POLL_EVENT, NULL);
 
 	return EINA_TRUE;
@@ -111,7 +118,7 @@ int init_pm_poll(int (*pm_callback) (int, PMMsg *))
 		_I("Getting input device path from environment: %s",
 		       pm_input_env);
 		/* Add 2 bytes for following strncat() */
-		dev_paths_size =  strlen(pm_input_env) + 1;
+		dev_paths_size =  strlen(pm_input_env) + 2;
 		dev_paths = (char *)malloc(dev_paths_size);
 		if (!dev_paths) {
 			_E("Fail to malloc for dev path");
@@ -120,7 +127,7 @@ int init_pm_poll(int (*pm_callback) (int, PMMsg *))
 		snprintf(dev_paths, dev_paths_size, "%s", pm_input_env);
 	} else {
 		/* Add 2 bytes for following strncat() */
-		dev_paths_size = strlen(DEFAULT_DEV_PATH) + 1;
+		dev_paths_size = strlen(DEFAULT_DEV_PATH) + 2;
 		dev_paths = (char *)malloc(dev_paths_size);
 		if (!dev_paths) {
 			_E("Fail to malloc for dev path");
@@ -131,12 +138,12 @@ int init_pm_poll(int (*pm_callback) (int, PMMsg *))
 
 	/* add the UNIX domain socket file path */
 	strncat(dev_paths, DEV_PATH_DLM, strlen(DEV_PATH_DLM));
-	dev_paths[dev_paths_size - 1] = '\0';
 
 	path_tok = strtok_r(dev_paths, DEV_PATH_DLM, &save_ptr);
 	if (path_tok == NULL) {
 		_E("Device Path Tokeninzing Failed");
-		goto err_devpaths;
+		free(dev_paths);
+		return -1;
 	}
 
 	do {
@@ -149,7 +156,7 @@ int init_pm_poll(int (*pm_callback) (int, PMMsg *))
 
 		if (fd == -1) {
 			_E("Cannot open the file: %s", path_tok);
-			goto err_devpaths;
+			goto out1;
 		}
 
 		fd_handler = ecore_main_fd_handler_add(fd,
@@ -157,27 +164,30 @@ int init_pm_poll(int (*pm_callback) (int, PMMsg *))
 				    pm_handler, (void *)fd, NULL, NULL);
 		if (fd_handler == NULL) {
 			_E("Failed ecore_main_handler_add() in init_pm_poll()");
-			goto err_fd;
+			goto out2;
 		}
 
 		new_dev = (indev *)malloc(sizeof(indev));
+
 		if (!new_dev) {
 			_E("Fail to malloc for new_dev %s", path);
-			goto err_fdhandler;
+			goto out3;
 		}
 
 		memset(new_dev, 0, sizeof(indev));
+
 		len = strlen(path) + 1;
 		new_path = (char*) malloc(len);
 		if (!new_path) {
 			_E("Fail to malloc for dev_path %s", path);
-			goto err_dev;
+			goto out4;
 		}
 
 		strncpy(new_path, path, len);
 		new_dev->dev_path = new_path;
 		new_dev->fd = fd;
 		new_dev->dev_fd = fd_handler;
+		new_dev->pre_install = true;
 		indev_list = eina_list_append(indev_list, new_dev);
 
 	} while ((path_tok = strtok_r(NULL, DEV_PATH_DLM, &save_ptr)));
@@ -185,15 +195,16 @@ int init_pm_poll(int (*pm_callback) (int, PMMsg *))
 	free(dev_paths);
 	return 0;
 
-err_dev:
+out4:
 	free(new_dev);
-err_fdhandler:
+out3:
 	ecore_main_fd_handler_del(fd_handler);
-err_fd:
+out2:
 	close(fd);
-err_devpaths:
+out1:
 	free(dev_paths);
-	return -1;
+
+	return -ENOMEM;
 }
 
 int exit_pm_poll(void)
@@ -274,12 +285,44 @@ int init_pm_poll_input(int (*pm_callback)(int , PMMsg * ), const char *path)
 	new_dev->dev_path = dev_path;
 	new_dev->fd = fd;
 	new_dev->dev_fd = fd_handler;
+	new_dev->pre_install = false;
 
 	_I("pm_poll for BT input device file(path: %s, fd: %d",
 		    new_dev->dev_path, new_dev->fd);
 	indev_list = eina_list_append(indev_list, new_dev);
 
 	return 0;
+}
+
+int check_pre_install(int fd)
+{
+	indev *data = NULL;
+	Eina_List *l = NULL;
+	Eina_List *l_next = NULL;
+
+	EINA_LIST_FOREACH_SAFE(indev_list, l, l_next, data)
+		if(fd == data->fd) {
+			return data->pre_install;
+		}
+
+	return -ENODEV;
+}
+
+int check_dimstay(int next_state, int flag)
+{
+	if (next_state != LCD_OFF)
+		return false;
+
+	if (!(flag & GOTO_STATE_NOW))
+		return false;
+
+	if (!(pm_status_flag & DIMSTAY_FLAG))
+		return false;
+
+	if (check_abnormal_popup() != HEALTH_BAD)
+		return false;
+
+	return true;
 }
 
 int pm_lock_internal(pid_t pid, int s_bits, int flag, int timeout)
@@ -298,6 +341,12 @@ int pm_lock_internal(pid_t pid, int s_bits, int flag, int timeout)
 	if (flag & GOTO_STATE_NOW)
 		/* if the flag is true, go to the locking state directly */
 		s_bits = s_bits | (s_bits << SHIFT_CHANGE_STATE);
+
+	if (flag & HOLD_KEY_BLOCK)
+		s_bits = s_bits | HOLDKEY_BLOCK_BIT;
+
+	if (flag & STANDBY_MODE)
+		s_bits = s_bits | STANDBY_MODE_BIT;
 
 	recv_data.pid = pid;
 	recv_data.cond = s_bits;
@@ -342,6 +391,7 @@ int pm_change_internal(pid_t pid, int s_bits)
 	case LCD_NORMAL:
 	case LCD_DIM:
 	case LCD_OFF:
+	case SUSPEND:
 		break;
 	default:
 		return -1;
@@ -355,65 +405,3 @@ int pm_change_internal(pid_t pid, int s_bits)
 	return 0;
 }
 
-void lcd_control_edbus_signal_handler(void *data, DBusMessage *msg)
-{
-	DBusError err;
-	int pid = -1;
-	char *lock_str = NULL;
-	char *state_str = NULL;
-	int state = -1;
-	int timeout = -1;
-
-	if (dbus_message_is_signal(msg, INTERFACE_NAME, SIGNAL_NAME_LCD_CONTROL) == 0) {
-		_E("there is no lcd control signal");
-		return;
-	}
-
-	dbus_error_init(&err);
-
-	if (dbus_message_get_args(msg, &err,
-		    DBUS_TYPE_INT32, &pid,
-		    DBUS_TYPE_STRING, &lock_str,
-		    DBUS_TYPE_STRING, &state_str,
-		    DBUS_TYPE_INT32, &timeout, DBUS_TYPE_INVALID) == 0) {
-		_E("there is no message");
-		return;
-	}
-
-	if (pid == -1 || !lock_str || !state_str) {
-		_E("message is invalid!!");
-		return;
-	}
-
-	if (kill(pid, 0) == -1) {
-		_E("%d process does not exist, dbus ignored!", pid);
-		return;
-	}
-
-	if (!strcmp(state_str, PM_LCDON_STR))
-		state = LCD_NORMAL;
-	else if (!strcmp(state_str, PM_LCDDIM_STR))
-		state = LCD_DIM;
-	else if (!strcmp(state_str, PM_LCDOFF_STR))
-		state = LCD_OFF;
-	else {
-		_E("%d process does not exist, dbus ignored!", pid);
-		return;
-	}
-
-	if (!strcmp(lock_str, PM_LOCK_STR)) {
-		if (timeout < 0) {
-			_E("pm_lock timeout is invalid! %d", timeout);
-			return;
-		}
-		pm_lock_internal(pid, state, STAY_CUR_STATE, timeout);
-	} else if (!strcmp(lock_str, PM_UNLOCK_STR)) {
-		pm_unlock_internal(pid, state, PM_SLEEP_MARGIN);
-	} else if (!strcmp(lock_str, PM_CHANGE_STR)) {
-		pm_change_internal(pid, state);
-	} else {
-		_E("%s process does not exist, dbus ignored!", pid);
-		return;
-	}
-	_I("dbus call success from %d\n", pid);
-}

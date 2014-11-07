@@ -16,14 +16,24 @@
  * limitations under the License.
  */
 
-#include "mmc-handler.h"
+
+#include <stdio.h>
+#include <limits.h>
+#include <fcntl.h>
+#include <string.h>
+#include <errno.h>
+
 #include "core/common.h"
+#include "core/log.h"
+#include "mmc-handler.h"
+
+#define FS_VFAT_NAME	"mkdosfs"
 
 #define FS_VFAT_MOUNT_OPT  "uid=0,gid=0,dmask=0000,fmask=0111,iocharset=iso8859-1,utf8,shortname=mixed"
 
 static const char *vfat_arg[] = {
-	"/sbin/mkfs.vfat",
-	NULL, NULL,
+	"/usr/bin/newfs_msdos",
+	"-F", "32", "-O", "tizen", "-c", "8", NULL, NULL,
 };
 
 static const char *vfat_check_arg[] = {
@@ -31,82 +41,111 @@ static const char *vfat_check_arg[] = {
 	"-pf", NULL, NULL,
 };
 
-static struct fs_check fs_vfat_type = {
-	FS_TYPE_FAT,
+static struct fs_check vfat_info = {
+	FS_TYPE_VFAT,
 	"vfat",
 	0x1fe,
 	2,
-	{0x55, 0xaa},
+	{0x55, 0xAA},
 };
 
-static int vfat_init(void *data)
+static int vfat_check(const char *devpath)
 {
-	int fd, ret, argc;
-	char buf[BUF_LEN];
-	char *path = (char *)data;
+	int argc, r, pass = 0;
 
 	argc = ARRAY_SIZE(vfat_check_arg);
-	vfat_check_arg[argc - 2] = path;
+	vfat_check_arg[argc - 2] = devpath;
 
-	if ((fd = open(path, O_RDONLY)) < 0) {
-		_E("can't open the '%s': %s", path, strerror(errno));
-		return -EINVAL;
-	}
-	/* check fs type with magic code */
-	ret = lseek(fd, fs_vfat_type.offset, SEEK_SET);
-	if (ret < 0) {
-		_E("fail to check offset of vfat");
-		goto out;
-	}
-	ret = read(fd, buf, 2);
-	_D("mmc search magic : 0x%2x, 0x%2x", buf[0],buf[1]);
-	if (!memcmp(buf, fs_vfat_type.magic, fs_vfat_type.magic_sz)) {
-		_D("mmc type : %s", fs_vfat_type.name);
-		close(fd);
-		return fs_vfat_type.type;
-	}
-out:
-	close(fd);
-	return -EINVAL;
+	do {
+		r = run_child(argc, vfat_check_arg);
+
+		switch (r) {
+		case 0:
+			_I("filesystem check completed OK");
+			return 0;
+		case 2:
+			_I("file system check failed (not a FAT filesystem)");
+			errno = ENODATA;
+			return -1;
+		case 4:
+			if (pass++ <= 2) {
+				_I("filesystem modified - rechecking (pass : %d)", pass);
+				continue;
+			}
+			_I("failing check after rechecks, but file system modified");
+			return 0;
+		default:
+			_I("filesystem check failed (unknown exit code %d)", r);
+			errno = EIO;
+			return -1;
+		}
+	} while (1);
+
+	return 0;
 }
 
-static const char ** vfat_check(void)
+static bool vfat_match(const char *devpath)
 {
-	return vfat_check_arg;
+	int r;
+
+	r = vfat_check(devpath);
+	if (r < 0) {
+		_E("failed to match with vfat(%s)", devpath);
+		return false;
+	}
+
+	_I("MMC type : %s", vfat_info.name);
+	return true;
 }
 
-static int vfat_mount(int smack, void *data)
+static int vfat_mount(bool smack, const char *devpath, const char *mount_point)
 {
 	char options[NAME_MAX];
+	int r, retry = RETRY_COUNT;
 
-	_E("vfat_mount");
 	if (smack)
 		snprintf(options, sizeof(options), "%s,%s", FS_VFAT_MOUNT_OPT, SMACKFS_MOUNT_OPT);
 	else
 		snprintf(options, sizeof(options), "%s", FS_VFAT_MOUNT_OPT);
-	if (mount_fs((char *)data, "vfat", options) != 0)
-		return -1;
-	return 0;
+
+	do {
+		r = mount(devpath, mount_point, "vfat", 0, options);
+		if (!r) {
+			_I("Mounted mmc card [vfat]");
+			return 0;
+		}
+		_I("mount fail : r = %d, err = %d", r, errno);
+		usleep(100000);
+	} while (r < 0 && errno == ENOENT && retry-- > 0);
+
+	return -errno;
 }
 
-static const char **vfat_format(void *data)
+static int vfat_format(const char *devpath)
 {
 	int argc;
-	char *path = (char *)data;
 	argc = ARRAY_SIZE(vfat_arg);
-	vfat_arg[argc - 2] = path;
-	return vfat_arg;
+	vfat_arg[argc - 2] = devpath;
+	return run_child(argc, vfat_arg);
 }
 
-static const struct mmc_filesystem_ops vfat_ops = {
-	vfat_init,
-	vfat_check,
-	vfat_mount,
-	vfat_format,
+static const struct mmc_fs_ops vfat_ops = {
+	.type = FS_TYPE_VFAT,
+	.name = "vfat",
+	.match = vfat_match,
+	.check = vfat_check,
+	.mount = vfat_mount,
+	.format = vfat_format,
 };
 
-static void __CONSTRUCTOR__ vfat_register(void)
+static void __CONSTRUCTOR__ module_init(void)
 {
-	register_mmc_handler("vfat", vfat_ops);
+	add_fs(&vfat_ops);
 }
-
+/*
+static void __DESTRUCTOR__ module_exit(void)
+{
+	_I("module exit");
+	remove_fs(&vfat_ops);
+}
+*/

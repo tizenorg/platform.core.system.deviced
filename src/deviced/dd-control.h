@@ -28,22 +28,73 @@ extern "C" {
 
 /**
  * @file        dd-control.h
- * @ingroup     DEVICED_LIBRARY
- * @brief       This file provides to enable/disable devices
+ * @defgroup    CAPI_SYSTEM_DEVICED_CONTROL_MODULE Control
+ * @ingroup     CAPI_SYSTEM_DEVICED
+ * @brief       This file provides the API to enable/disable devices
+ * @section CAPI_SYSTEM_DEVICED_CONTROL_MODULE_HEADER Required Header
+ *   \#include <dd-control.h>
  */
 
-#define CONTROL_HANDLER_NAME		"control"
+/**
+ * @addtogroup CAPI_SYSTEM_DEVICED_CONTROL_MODULE
+ * @{
+ */
 
+/**
+ * @par Description
+ * Control Device type
+ */
 enum control_device_type {
-	/* Add device define here  */
+/* Add device define here  */
 	DEVICE_CONTROL_MMC,
+	DEVICE_CONTROL_USBCLIENT,
 	DEVICE_CONTROL_MAX,
 };
 
-/*
- * Add new function to control in library.
+/**
+ * @par Description:
+ *  This API is used to enable/disable mmc device.\n
+ * @param[in] enable enable/disable mmc device
+ * @return 0 on success, -1 if failed
+ * @par Example
+ * @code
+ *  ...
+ *  if( deviced_mmc_control(1) < 0 )
+ *      printf("Enable mmc device failed\n");
+ *  ...
+ * @endcode
  */
 int deviced_mmc_control(bool enable);
+
+/**
+ * @par Description:
+ *  This API is used to enable/disable usb device.\n
+ * @param[in] enable enable/disable usb device
+ * @return 0 on success, -1 if failed
+ * @par Example
+ * @code
+ *  ...
+ *  if( deviced_usb_control(1) < 0 )
+ *      printf("Enable usb device failed\n");
+ *  ...
+ * @endcode
+ */
+int deviced_usb_control(bool enable);
+
+/* Only USB-manager will use the api */
+/**
+ * @par Description:
+ * @return
+ * @par Example
+ * @code
+ * @endcode
+ * @todo describe function
+ */
+int deviced_get_usb_control(void);
+
+/**
+ * @} // end of CAPI_SYSTEM_DEVICED_CONTROL_MODULE
+ */
 
 #ifdef __cplusplus
 }
