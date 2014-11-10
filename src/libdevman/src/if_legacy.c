@@ -16,15 +16,16 @@
  */
 
 
-#include <vconf.h>
-#include <errno.h>
-#include <device-node.h>
 #include <dd-display.h>
 #include <dd-battery.h>
 #include <dd-led.h>
 
 #include "devman.h"
 #include "devlog.h"
+
+#ifndef API
+#define API __attribute__ ((visibility("default")))
+#endif
 
 API int device_get_battery_pct(void)
 {
