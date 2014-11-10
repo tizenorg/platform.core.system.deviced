@@ -236,14 +236,12 @@ vconftool set -t int memory/pm/current_brt 60 -i -g $users_gid
 systemctl daemon-reload
 if [ "$1" == "1" ]; then
     systemctl restart deviced.service
-    systemctl restart regpmon.service
 	systemctl restart zbooting-done.service
 fi
 
 %preun
 if [ "$1" == "0" ]; then
     systemctl stop deviced.service
-    systemctl stop regpmon.service
 	systemctl stop zbooting-done.service
 fi
 
@@ -283,7 +281,6 @@ systemctl daemon-reload
 %{_bindir}/newfs_msdos
 %{_datadir}/license/fsck_msdosfs
 %{_datadir}/license/newfs_msdos
-%{_bindir}/regpmon
 %{_bindir}/set_pmon
 %{_bindir}/pmon
 %{_unitdir}/multi-user.target.wants/deviced.service
