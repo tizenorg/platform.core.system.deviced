@@ -1,5 +1,0 @@
-#!/bin/sh
-
-# clean up vip process history
-rm -f /tmp/vip/*
-
