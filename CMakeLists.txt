@@ -35,14 +35,16 @@ SET(SRCS
 	src/core/main.c
 	src/core/sig-handler.c
 	src/gpio/gpio.c
-	src/gpio/buzzer.c
-	src/gpio/hall.c
-	src/gpio/sim.c
 	src/power/power-handler.c
 	src/proc/cpu-info.c
 	src/proc/proc-handler.c
 	src/time/time-handler.c
 )
+
+IF(TIZEN_BUZZER)
+SET(SRCS ${SRCS}
+	src/gpio/buzzer.c)
+ENDIF(TIZEN_BUZZER)
 
 IF(TIZEN_BATTERY)
 SET(SRCS ${SRCS}
@@ -61,6 +63,11 @@ SET(SRCS ${SRCS}
    )
 ENDIF(TIZEN_EXTCON)
 
+IF(TIZEN_HALL)
+SET(SRCS ${SRCS}
+	src/gpio/hall.c)
+ENDIF(TIZEN_HALL)
+
 IF(TIZEN_SDCARD)
 SET(SRCS ${SRCS}
 	src/mmc/config.c
@@ -74,6 +81,11 @@ SET(SRCS ${SRCS}
 	)
 ENDIF(USE_EMULATOR)
 ENDIF(TIZEN_SDCARD)
+
+IF(TIZEN_SIM)
+SET(SRCS ${SRCS}
+	src/gpio/sim.c)
+ENDIF(TIZEN_SIM)
 
 IF(TIZEN_DISPLAY)
 SET(SRCS ${SRCS}
