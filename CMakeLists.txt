@@ -22,11 +22,9 @@ SET(CONFDIR "/etc/${PROJECT_NAME}")
 SET(VERSION 0.1.0)
 
 SET(SRCS
-	src/battery/battery-time.c
-	src/battery/config.c
-	src/battery/lowbat-handler.c
 	src/core/common.c
 	src/core/config-parser.c
+	src/control/control.c
 	src/core/device-change-handler.c
 	src/core/device-notifier.c
 	src/core/devices.c
@@ -37,40 +35,47 @@ SET(SRCS
 	src/core/main.c
 	src/core/power-supply.c
 	src/core/sig-handler.c
-	src/earjack/earjack.c
-	src/proc/cpu-info.c
-	src/proc/proc-handler.c
-	src/ta/ta-handler.c
-	src/time/time-handler.c
-	src/usb/usb-handler.c
-)
-
-SET(SRCS ${SRCS}
 	src/gpio/gpio.c
 	src/gpio/buzzer.c
 	src/gpio/hall.c
 	src/gpio/sim.c
-)
-
-SET(SRCS ${SRCS}
 	src/power/power-handler.c
+	src/proc/cpu-info.c
+	src/proc/proc-handler.c
+	src/time/time-handler.c
 )
 
+IF(TIZEN_BATTERY)
+SET(SRCS ${SRCS}
+	src/battery/battery-time.c
+	src/battery/config.c
+	src/battery/lowbat-handler.c
+   )
+ENDIF(TIZEN_BATTERY)
+
+IF(TIZEN_EXTCON)
+SET(SRCS ${SRCS}
+	src/earjack/earjack.c
+	src/ta/ta-handler.c
+	src/usb/usb-handler.c
+   )
+ENDIF(TIZEN_EXTCON)
+
+IF(TIZEN_SDCARD)
 SET(SRCS ${SRCS}
 	src/mmc/config.c
 	src/mmc/mmc-handler.c
 	src/mmc/uevent.c
 	src/mmc/vfat.c
 )
-
-FIND_PROGRAM(UNAME NAMES uname)
-EXEC_PROGRAM("${UNAME}" ARGS "-m" OUTPUT_VARIABLE "ARCH")
 IF(USE_EMULATOR)
 SET(SRCS ${SRCS}
 	src/mmc/ext4.c
 	)
 ENDIF(USE_EMULATOR)
+ENDIF(TIZEN_SDCARD)
 
+IF(TIZEN_DISPLAY)
 SET(SRCS ${SRCS}
 	src/display/auto-brightness.c
 	src/display/brightness.c
@@ -84,21 +89,23 @@ SET(SRCS ${SRCS}
 	src/display/poll.c
 	src/display/setting.c
 )
+ENDIF(TIZEN_DISPLAY)
 
+IF(TIZEN_CAMERA_LED)
 SET(SRCS ${SRCS}
 	src/led/ir.c
 	src/led/noti.c
 	src/led/torch.c
 )
+ENDIF(TIZEN_CAMERA_LED)
 
-SET(SRCS ${SRCS}
-	src/control/control.c)
-
+IF(TIZEN_VIBRATOR)
 SET(SRCS ${SRCS}
 	src/haptic/haptic.c
 	src/haptic/external.c
 	src/haptic/standard.c
 	src/haptic/emulator.c)
+ENDIF(TIZEN_VIBRATOR)
 
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -139,7 +146,9 @@ ADD_DEFINITIONS("-DPREFIX=\"${CMAKE_INSTALL_PREFIX}\"")
 ADD_DEFINITIONS("-DFACTORYFS=\"$ENV{FACTORYFS}\"")
 ADD_DEFINITIONS("-DLIBDIR=\"${LIBDIR}\"")
 ADD_DEFINITIONS("-DENABLE_KEY_FILTER")
+IF(X11_SUPPORT)
 ADD_DEFINITIONS("-DENABLE_X_LCD_ONOFF")
+ENDIF(X11_SUPPORT)
 ADD_DEFINITIONS("-DENABLE_DEVICED_DLOG")
 ADD_DEFINITIONS("-DENABLE_LIBDEVICED_DLOG")
 ADD_DEFINITIONS("-DENABLE_PM_LOG")
@@ -165,8 +174,10 @@ INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.pc DESTINATION lib/pkg
 INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/scripts/deviced-pre.sh DESTINATION bin)
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/scripts/deviced.conf DESTINATION /etc/dbus-1/system.d)
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/scripts/movi_format.sh DESTINATION bin)
-INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/scripts/mmc-smack-label DESTINATION bin)
-INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/fsck-msdos/LICENSE DESTINATION share/license RENAME fsck_msdosfs)
+IF(TIZEN_SDCARD)
+	INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/scripts/mmc-smack-label DESTINATION bin)
+	INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/fsck-msdos/LICENSE DESTINATION share/license RENAME fsck_msdosfs)
+ENDIF(TIZEN_SDCARD)
 
 INSTALL(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/systemd/ DESTINATION lib/systemd/system
 		FILES_MATCHING
@@ -175,8 +186,10 @@ INSTALL(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/systemd/ DESTINATION lib/systemd/s
 
 ADD_SUBDIRECTORY(src)
 ADD_SUBDIRECTORY(src/libdeviced)
-ADD_SUBDIRECTORY(src/fsck-msdos)
-ADD_SUBDIRECTORY(src/newfs-msdos)
+IF(TIZEN_SDCARD)
+	ADD_SUBDIRECTORY(src/fsck-msdos)
+	ADD_SUBDIRECTORY(src/newfs-msdos)
+ENDIF(TIZEN_SDCARD)
 ADD_SUBDIRECTORY(src/devicectl)
 ADD_SUBDIRECTORY(src/libsysman)
 ADD_SUBDIRECTORY(src/libslp-pm)
