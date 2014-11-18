@@ -1,4 +1,15 @@
+
+#These options are ACTIVATED by default.
+%bcond_without battery
+%bcond_without display
+%bcond_without extcon
+
+#These options are DEACTIVATED by default.
 %bcond_with x
+%bcond_with camera_led
+%bcond_with sdcard
+%bcond_with usb
+%bcond_with vibrator
 
 Name:       deviced
 Summary:    deviced
@@ -173,6 +184,27 @@ cmake . \
 	-DTZ_SYS_ETC=%TZ_SYS_ETC \
 	-DCMAKE_INSTALL_PREFIX=%{_prefix} \
 	-DARCH=%{ARCH} \
+%if %{with battery}
+	-DTIZEN_BATTERY:BOOL=ON \
+%endif
+%if %{with camera_led}
+	-DTIZEN_CAMERA_LED:BOOL=ON \
+%endif
+%if %{with display}
+	-DTIZEN_DISPLAY:BOOL=ON \
+%endif
+%if %{with extcon}
+	-DTIZEN_EXTCON:BOOL=ON \
+%endif
+%if %{with sdcard}
+	-DTIZEN_SDCARD:BOOL=ON \
+%endif
+%if %{with usb}
+	-DTIZEN_USB:BOOL=ON \
+%endif
+%if %{with vibrator}
+	-DTIZEN_VIBRATOR:BOOL=ON \
+%endif
 	#eol
 
 %build
@@ -276,11 +308,13 @@ systemctl daemon-reload
 %{_bindir}/deviced
 %{_bindir}/devicectl
 %{_bindir}/movi_format.sh
+%if %{with sdcard}
 %{_bindir}/mmc-smack-label
 %{_bindir}/fsck_msdosfs
 %{_bindir}/newfs_msdos
 %{_datadir}/license/fsck_msdosfs
 %{_datadir}/license/newfs_msdos
+%endif
 %{_unitdir}/multi-user.target.wants/deviced.service
 %{_unitdir}/sockets.target.wants/deviced.socket
 %{_unitdir}/graphical.target.wants/zbooting-done.service
