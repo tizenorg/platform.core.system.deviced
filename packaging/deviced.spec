@@ -5,9 +5,12 @@
 #These options are DEACTIVATED by default.
 %bcond_with x
 %bcond_with battery
+%bcond_with buzzer
 %bcond_with camera_led
 %bcond_with extcon
+%bcond_with hall
 %bcond_with sdcard
+%bcond_with sim
 %bcond_with usb
 %bcond_with vibrator
 
@@ -187,6 +190,9 @@ export CFLAGS+=" -DX11_SUPPORT"
 %if %{with battery}
 	-DTIZEN_BATTERY:BOOL=ON \
 %endif
+%if %{with buzzer}
+	-DTIZEN_BUZZER:BOOL=ON \
+%endif
 %if %{with camera_led}
 	-DTIZEN_CAMERA_LED:BOOL=ON \
 %endif
@@ -196,8 +202,14 @@ export CFLAGS+=" -DX11_SUPPORT"
 %if %{with extcon}
 	-DTIZEN_EXTCON:BOOL=ON \
 %endif
+%if %{with hall}
+	-DTIZEN_HALL:BOOL=ON \
+%endif
 %if %{with sdcard}
 	-DTIZEN_SDCARD:BOOL=ON \
+%endif
+%if %{with sim}
+	-DTIZEN_SIM:BOOL=ON \
 %endif
 %if %{with usb}
 	-DTIZEN_USB:BOOL=ON \
