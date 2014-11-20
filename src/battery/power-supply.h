@@ -20,6 +20,68 @@
 #ifndef __POWER_SUPPLY_H__
 #define __POWER_SUPPLY_H__
 
+enum device_change_type {
+	DEVICE_CHANGE_ABNORMAL	= 0,
+	DEVICE_CHANGE_NORMAL	= 1,
+};
+
+enum charge_full_type {
+	CHARGING_NOT_FULL	= 0,
+	CHARGING_FULL		= 1,
+};
+enum charge_now_type {
+	CHARGER_ABNORMAL	= -1,
+	CHARGER_DISCHARGING	= 0,
+	CHARGER_CHARGING	= 1,
+};
+enum health_type {
+	HEALTH_BAD		= 0,
+	HEALTH_GOOD		= 1,
+};
+
+enum temp_type {
+	TEMP_LOW		= 0,
+	TEMP_HIGH		= 1,
+};
+
+enum present_type {
+	PRESENT_ABNORMAL	= 0,
+	PRESENT_NORMAL		= 1,
+};
+
+enum ovp_type {
+	OVP_NORMAL		= 0,
+	OVP_ABNORMAL		= 1,
+};
+
+enum battery_noti_type {
+	DEVICE_NOTI_BATT_CHARGE = 0,
+	DEVICE_NOTI_BATT_LOW,
+	DEVICE_NOTI_BATT_FULL,
+	DEVICE_NOTI_MAX,
+};
+
+enum battery_noti_status {
+	DEVICE_NOTI_OFF = 0,
+	DEVICE_NOTI_ON  = 1,
+};
+
+struct battery_status {
+	int capacity;
+	int charge_full;
+	int charge_now;
+	int health;
+	int present;
+	int online;
+	int temp;
+	int ovp;
+};
+
+extern struct battery_status battery;
+
+/* Battery functions */
+void lowbat_monitor(void *data);
+
 #define CHARGER_STATUS_SIGNAL      "ChargerStatus"
 #define CHARGE_NOW_SIGNAL          "ChargeNow"
 #define CHARGE_LEVEL_SIGNAL        "BatteryStatusLow"
@@ -28,11 +90,7 @@
 #define CHARGE_HEALTH_SIGNAL       "GetHealth"
 #define CHARGE_FULL_SIGNAL         "IsFull"
 
-int check_abnormal_popup(void);
-int check_lowbat_charge_device(int bInserted);
-void power_supply(void *data);
 int power_supply_init(void *data);
-void power_supply_status_init(void);
 void power_supply_timer_start(void);
 void power_supply_timer_stop(void);
 void power_supply_broadcast(char *sig, int status);

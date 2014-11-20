@@ -36,7 +36,7 @@
 #include "display/setting.h"
 #include "display/poll.h"
 #include "core/edbus-handler.h"
-#include "core/power-supply.h"
+#include "power-supply.h"
 #include "power/power-handler.h"
 
 #define CHARGE_POWERSAVE_FREQ_ACT	"charge_powersave_freq_act"
@@ -162,20 +162,6 @@ static int power_execute(void)
 	FIND_DEVICE_INT(ops, POWER_OPS_NAME);
 
 	return ops->execute(INTERNAL_PWROFF);
-}
-
-static int booting_done(void *data)
-{
-	static int done = 0;
-
-	if (data == NULL)
-		goto out;
-	done = (int)data;
-	if (!done)
-		goto out;
-	_I("booting done");
-out:
-	return done;
 }
 
 static int lowbat_popup(char *option)
@@ -573,6 +559,23 @@ static int check_power_save_mode(void)
 	return ret;
 }
 
+static int booting_done(void *data)
+{
+	static int done = 0;
+
+	if (data == NULL)
+		goto out;
+	done = (int)data;
+	if (!done)
+		goto out;
+	_I("booting done");
+
+	power_supply_timer_stop();
+	power_supply_init(NULL);
+out:
+	return done;
+}
+
 static int lowbat_monitor_init(void *data)
 {
 	int status = 1;
@@ -588,10 +591,23 @@ static int lowbat_monitor_init(void *data)
 	return 0;
 }
 
+static int display_changed(void *data)
+{
+	if (battery.charge_now == CHARGER_ABNORMAL &&
+	    battery.health == HEALTH_BAD)
+		pm_lock_internal(INTERNAL_LOCK_POPUP, LCD_DIM, STAY_CUR_STATE, 0);
+
+	return 0;
+}
+
 static void lowbat_init(void *data)
 {
+	/* process check battery timer until booting done */
+	power_supply_timer_start();
+
 	register_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
 	register_notifier(DEVICE_NOTIFIER_POWER_SUPPLY, lowbat_monitor_init);
+	register_notifier(DEVICE_NOTIFIER_LCD, display_changed);
 }
 
 static void lowbat_exit(void *data)
@@ -600,6 +616,10 @@ static void lowbat_exit(void *data)
 
 	lowbat_initialized(&status);
 	unregister_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
+	unregister_notifier(DEVICE_NOTIFIER_LCD, display_changed);
+
+	/* exit power supply */
+	power_supply_exit(NULL);
 }
 
 static const struct device_ops lowbat_device_ops = {

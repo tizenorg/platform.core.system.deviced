@@ -41,7 +41,6 @@
 #include "proc/proc-handler.h"
 #include "edbus-handler.h"
 #include "devices.h"
-#include "power-supply.h"
 #include "display/setting.h"
 #include "display/core.h"
 
@@ -114,26 +113,6 @@ enum snd_jack_types {
 #define KEYBOARD_NAME 		"keyboard"
 #define KEYBOARD_NAME_LEN	8
 
-#define POWER_SUPPLY_NAME_LEN	12
-
-#define CHARGE_NAME_LEN	17
-#define BATTERY_NAME		"battery"
-#define BATTERY_NAME_LEN	7
-#define CHARGEFULL_NAME	"Full"
-#define CHARGEFULL_NAME_LEN	4
-#define CHARGENOW_NAME		"Charging"
-#define CHARGENOW_NAME_LEN	8
-#define DISCHARGE_NAME		"Discharging"
-#define DISCHARGE_NAME_LEN	11
-#define NOTCHARGE_NAME		"Not charging"
-#define NOTCHARGE_NAME_LEN	12
-#define OVERHEAT_NAME		"Overheat"
-#define OVERHEAT_NAME_LEN	8
-#define TEMPCOLD_NAME		"Cold"
-#define TEMPCOLD_NAME_LEN	4
-#define OVERVOLT_NAME		"Over voltage"
-#define OVERVOLT_NAME_LEN	12
-
 #define SWITCH_DEVICE_USB 	"usb_cable"
 
 #define METHOD_GET_HDMI		"GetHDMI"
@@ -179,7 +158,6 @@ static int hdmi_status = 0;
 enum udev_subsystem_type {
 	UDEV_INPUT,
 	UDEV_PLATFORM,
-	UDEV_POWER,
 	UDEV_SWITCH,
 };
 
@@ -190,9 +168,10 @@ static const struct udev_subsystem {
 } udev_subsystems[] = {
 	{ UDEV_INPUT,            INPUT_SUBSYSTEM, NULL },
 	{ UDEV_PLATFORM,         PLATFORM_SUBSYSTEM, NULL },
-	{ UDEV_POWER,		 POWER_SUBSYSTEM, NULL},
 	{ UDEV_SWITCH,		 SWITCH_SUBSYSTEM, NULL },
 };
+
+static dd_list *udev_event_list;
 
 static struct extcon_device {
 	const enum extcon_type type;
@@ -203,9 +182,6 @@ static struct extcon_device {
 	{ EXTCON_TA, "/csa/factory/batt_cable_count", 0, 0},
 	{ EXTCON_EARJACK, "/csa/factory/earjack_count", 0, 0},
 };
-
-extern int battery_power_off_act(void *data);
-extern int battery_charge_err_act(void *data);
 
 int extcon_set_count(int index)
 {
@@ -347,11 +323,6 @@ static void usb_chgdet_cb(void *data)
 			val = get_usb_state_direct();
 
 		_I("jack - usb changed %d",val);
-		check_lowbat_charge_device(val);
-		if (val==1) {
-			battery_noti(DEVICE_NOTI_BATT_CHARGE, DEVICE_NOTI_ON);
-			_D("usb device notification");
-		}
 	} else {
 		_E("fail to get usb_online status");
 	}
@@ -361,11 +332,6 @@ static int display_changed(void *data)
 {
 	enum state_t state = (enum state_t)data;
 	int ret, cradle = 0;
-
-	if (battery.charge_now == CHARGER_ABNORMAL && battery.health == HEALTH_BAD) {
-		pm_lock_internal(INTERNAL_LOCK_POPUP, LCD_DIM, STAY_CUR_STATE, 0);
-		return 0;
-	}
 
 	if (state != S_NORMAL)
 		return 0;
@@ -680,78 +646,6 @@ static void cb_xxxxx_signaled(void *data, DBusMessage * msg)
 }
 #endif				/* ENABLE_EDBUS_USE */
 
-static void check_capacity_status(const char *env_value)
-{
-	if (env_value == NULL)
-		return;
-	battery.capacity = atoi(env_value);
-}
-
-static void check_charge_status(const char *env_value)
-{
-	if (env_value == NULL)
-		return;
-	if (strncmp(env_value, CHARGEFULL_NAME , CHARGEFULL_NAME_LEN) == 0) {
-		battery.charge_full = CHARGING_FULL;
-		battery.charge_now = CHARGER_DISCHARGING;
-	} else if (strncmp(env_value, CHARGENOW_NAME, CHARGENOW_NAME_LEN) == 0) {
-		battery.charge_full = CHARGING_NOT_FULL;
-		battery.charge_now = CHARGER_CHARGING;
-	} else if (strncmp(env_value, DISCHARGE_NAME, DISCHARGE_NAME_LEN) == 0) {
-		battery.charge_full = CHARGING_NOT_FULL;
-		battery.charge_now = CHARGER_DISCHARGING;
-	} else if (strncmp(env_value, NOTCHARGE_NAME, NOTCHARGE_NAME_LEN) == 0) {
-		battery.charge_full = CHARGING_NOT_FULL;
-		battery.charge_now = CHARGER_ABNORMAL;
-	} else {
-		battery.charge_full = CHARGING_NOT_FULL;
-		battery.charge_now = CHARGER_DISCHARGING;
-	}
-}
-
-static void check_health_status(const char *env_value)
-{
-	if (env_value == NULL) {
-		battery.health = HEALTH_GOOD;
-		battery.temp = TEMP_LOW;
-		battery.ovp = OVP_NORMAL;
-		return;
-	}
-	if (strncmp(env_value, OVERHEAT_NAME, OVERHEAT_NAME_LEN) == 0) {
-		battery.health = HEALTH_BAD;
-		battery.temp = TEMP_HIGH;
-		battery.ovp = OVP_NORMAL;
-	} else if (strncmp(env_value, TEMPCOLD_NAME, TEMPCOLD_NAME_LEN) == 0) {
-		battery.health = HEALTH_BAD;
-		battery.temp = TEMP_LOW;
-		battery.ovp = OVP_NORMAL;
-	} else if (strncmp(env_value, OVERVOLT_NAME, OVERVOLT_NAME_LEN) == 0) {
-		battery.health = HEALTH_GOOD;
-		battery.temp = TEMP_LOW;
-		battery.ovp = OVP_ABNORMAL;
-	} else {
-		battery.health = HEALTH_GOOD;
-		battery.temp = TEMP_LOW;
-		battery.ovp = OVP_NORMAL;
-	}
-}
-
-static void check_online_status(const char *env_value)
-{
-	if (env_value == NULL)
-		return;
-	battery.online = atoi(env_value);
-}
-
-static void check_present_status(const char *env_value)
-{
-	if (env_value == NULL) {
-		battery.present = PRESENT_NORMAL;
-		return;
-	}
-	battery.present = atoi(env_value);
-}
-
 static int earjack_execute(void *data)
 {
 	static const struct device_ops *ops = NULL;
@@ -813,8 +707,6 @@ static int changed_device(const char *name, const char *value)
 		cradle_chgdet_cb((void *)state);
 	else if (strncmp(name, KEYBOARD_NAME, KEYBOARD_NAME_LEN) == 0)
 		keyboard_chgdet_cb((void *)state);
-	else if (strncmp(name, POWER_SUBSYSTEM, POWER_SUPPLY_NAME_LEN) == 0)
-		power_supply((void *)state);
 out:
 	return 0;
 }
@@ -833,9 +725,6 @@ static int booting_done(void *data)
 
 	_I("booting done");
 
-	power_supply_timer_stop();
-	power_supply_init(NULL);
-
 	/* set initial state for devices */
 	input_device_number = 0;
 	cradle_chgdet_cb(NULL);
@@ -848,6 +737,8 @@ static Eina_Bool uevent_kernel_control_cb(void *data, Ecore_Fd_Handler *fd_handl
 {
 	struct udev_device *dev = NULL;
 	struct udev_list_entry *list_entry = NULL;
+	struct uevent_handler *l;
+	dd_list *elem;
 	const char *subsystem = NULL;
 	const char *env_name = NULL;
 	const char *env_value = NULL;
@@ -897,44 +788,16 @@ static Eina_Bool uevent_kernel_control_cb(void *data, Ecore_Fd_Handler *fd_handl
 			break;
 		changed_device(env_value, NULL);
 		break;
-	case UDEV_POWER:
-		udev_list_entry_foreach(list_entry, udev_device_get_properties_list_entry(dev)) {
-			env_name = udev_list_entry_get_name(list_entry);
-			if (env_name == NULL)
-				continue;
-			if (strncmp(env_name, CHARGE_NAME, CHARGE_NAME_LEN) == 0) {
-				env_value = udev_list_entry_get_value(list_entry);
-				if (env_value == NULL)
-					continue;
-				if (strncmp(env_value, BATTERY_NAME, BATTERY_NAME_LEN) == 0) {
-					ret = 0;
-					break;
-				}
-			}
-		}
-		if (ret != 0)
-			goto out;
-		env_value = udev_device_get_property_value(dev, CHARGE_STATUS);
-		check_charge_status(env_value);
-		env_value = udev_device_get_property_value(dev, CHARGE_ONLINE);
-		check_online_status(env_value);
-		env_value = udev_device_get_property_value(dev, CHARGE_HEALTH);
-		check_health_status(env_value);
-		env_value = udev_device_get_property_value(dev, CHARGE_PRESENT);
-		check_present_status(env_value);
-		env_value = udev_device_get_property_value(dev, CAPACITY);
-		check_capacity_status(env_value);
-		ret = booting_done(NULL);
-		if (ret)
-			battery_noti(DEVICE_NOTI_BATT_CHARGE, DEVICE_NOTI_ON);
-		if (env_value)
-			changed_device(subsystem, env_value);
-		else
-			changed_device(subsystem, NULL);
-		break;
 	}
 
 out:
+
+	DD_LIST_FOREACH(udev_event_list, elem, l) {
+		if (!strncmp(subsystem, l->subsystem, strlen(subsystem)) &&
+		    l->uevent_func)
+			l->uevent_func(dev);
+	}
+
 	udev_device_unref(dev);
 	return EINA_TRUE;
 }
@@ -969,6 +832,8 @@ static int uevent_kernel_control_stop(void)
 
 static int uevent_kernel_control_start(void)
 {
+	struct uevent_handler *l;
+	dd_list *elem;
 	int i, ret;
 
 	if (udev && mon) {
@@ -1004,6 +869,15 @@ static int uevent_kernel_control_start(void)
 		}
 	}
 
+	DD_LIST_FOREACH(udev_event_list, elem, l) {
+		ret = udev_monitor_filter_add_match_subsystem_devtype(mon,
+				l->subsystem, NULL);
+		if (ret < 0) {
+			_E("error apply subsystem filter");
+			goto stop;
+		}
+	}
+
 	ret = udev_monitor_filter_update(mon);
 	if (ret < 0)
 		_E("error udev_monitor_filter_update");
@@ -1031,6 +905,63 @@ stop:
 	uevent_kernel_control_stop();
 	return -EINVAL;
 
+}
+
+int register_kernel_uevent_control(const struct uevent_handler *uh)
+{
+	struct uevent_handler *l;
+	dd_list *elem;
+	int r;
+	bool matched = false;
+
+	if (!uh)
+		return -EINVAL;
+
+	/* if udev is not initialized, it just will be added list */
+	if (!udev || !mon)
+		goto add_list;
+
+	/* check if the same subsystem is already added */
+	DD_LIST_FOREACH(udev_event_list, elem, l) {
+		if (!strncmp(l->subsystem, uh->subsystem, strlen(l->subsystem))) {
+			matched = true;
+			break;
+		}
+	}
+
+	/* the first request to add subsystem */
+	if (!matched) {
+		r = udev_monitor_filter_add_match_subsystem_devtype(mon,
+				uh->subsystem, NULL);
+		if (r < 0) {
+			_E("fail to add %s subsystem : %d", uh->subsystem, r);
+			return -EPERM;
+		}
+	}
+
+	r = udev_monitor_filter_update(mon);
+	if (r < 0)
+		_E("fail to update udev monitor filter : %d", r);
+
+add_list:
+	DD_LIST_APPEND(udev_event_list, uh);
+	return 0;
+}
+
+int unregister_kernel_uevent_control(const struct uevent_handler *uh)
+{
+	struct uevent_handler *l;
+	dd_list *n, *next;
+
+	DD_LIST_FOREACH_SAFE(udev_event_list, n, next, l) {
+		if (!strncmp(l->subsystem, uh->subsystem, strlen(l->subsystem)) &&
+		    l->uevent_func == uh->uevent_func) {
+			DD_LIST_REMOVE(udev_event_list, l);
+			return 0;
+		}
+	}
+
+	return -ENOENT;
 }
 
 int uevent_udev_get_path(const char *subsystem, dd_list **list)
@@ -1177,68 +1108,6 @@ out:
 	return reply;
 }
 
-static DBusMessage *dbus_battery_handler(E_DBus_Object *obj, DBusMessage *msg)
-{
-	DBusError err;
-	DBusMessageIter iter;
-	DBusMessage *reply;
-	pid_t pid;
-	int ret;
-	int argc;
-	char *type_str;
-	char *argv[5];
-
-	dbus_error_init(&err);
-
-	if (!dbus_message_get_args(msg, &err,
-		    DBUS_TYPE_STRING, &type_str,
-		    DBUS_TYPE_INT32, &argc,
-		    DBUS_TYPE_STRING, &argv[0],
-		    DBUS_TYPE_STRING, &argv[1],
-		    DBUS_TYPE_STRING, &argv[2],
-		    DBUS_TYPE_STRING, &argv[3],
-		    DBUS_TYPE_STRING, &argv[4], DBUS_TYPE_INVALID)) {
-		_E("there is no message");
-		ret = -EINVAL;
-		goto out;
-	}
-
-	if (argc < 0) {
-		_E("message is invalid!");
-		ret = -EINVAL;
-		goto out;
-	}
-
-	pid = get_edbus_sender_pid(msg);
-	if (kill(pid, 0) == -1) {
-		_E("%d process does not exist, dbus ignored!", pid);
-		ret = -ESRCH;
-		goto out;
-	}
-	check_capacity_status(argv[0]);
-	check_charge_status(argv[1]);
-	check_health_status(argv[2]);
-	check_online_status(argv[3]);
-	check_present_status(argv[4]);
-	_I("%d %d %d %d %d %d %d %d",
-		battery.capacity,
-		battery.charge_full,
-		battery.charge_now,
-		battery.health,
-		battery.online,
-		battery.ovp,
-		battery.present,
-		battery.temp);
-	battery_noti(DEVICE_NOTI_BATT_CHARGE, DEVICE_NOTI_ON);
-	changed_device(POWER_SUBSYSTEM, argv[0]);
-out:
-	reply = dbus_message_new_method_return(msg);
-	dbus_message_iter_init_append(reply, &iter);
-	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
-
-	return reply;
-}
-
 static DBusMessage *dbus_udev_handler(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusError err;
@@ -1295,7 +1164,6 @@ void internal_pm_change_state(unsigned int s_bits)
 
 static const struct edbus_method edbus_methods[] = {
 	{ PREDEF_DEVICE_CHANGED, "siss",    "i", dbus_device_handler },
-	{ PREDEF_POWER_CHANGED,  "sisssss", "i", dbus_battery_handler },
 	{ PREDEF_UDEV_CONTROL,   "sis","i", dbus_udev_handler },
 	{ METHOD_GET_HDCP,       NULL, "i", dbus_hdcp_handler },
 	{ METHOD_GET_HDMI_AUDIO, NULL, "i", dbus_hdmi_audio_handler },
@@ -1313,7 +1181,6 @@ static void device_change_init(void *data)
 {
 	int ret;
 
-	power_supply_timer_start();
 	if (extcon_count_init() != 0)
 		_E("fail to init extcon files");
 	register_notifier(DEVICE_NOTIFIER_POWEROFF, device_change_poweroff);

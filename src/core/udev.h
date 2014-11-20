@@ -84,10 +84,7 @@ struct uevent_handler {
 	void *data;
 };
 
-int register_uevent_control(const struct uevent_handler *uh);
-void unregister_uevent_control(const struct uevent_handler *uh);
 int register_kernel_uevent_control(const struct uevent_handler *uh);
-void unregister_kernel_uevent_control(const struct uevent_handler *uh);
-
+int unregister_kernel_uevent_control(const struct uevent_handler *uh);
 
 #endif /* __UDEV_H__ */
