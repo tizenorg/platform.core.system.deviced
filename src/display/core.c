@@ -1437,14 +1437,6 @@ int check_lcdoff_direct(void)
 	if (pm_cur_state != S_LCDDIM)
 		return false;
 
-	/*
-	 * goto lcd dim state when battery health is bad
-	 * and abnormal popup shows
-	 */
-	if ((pm_status_flag & DIMSTAY_FLAG) &&
-	    (check_abnormal_popup() == HEALTH_BAD))
-		return false;
-
 	if (standby_mode)
 		return false;
 
@@ -2231,22 +2223,6 @@ static int booting_done(void *data)
 	return 0;
 }
 
-static int battery_health_changed(void *data)
-{
-	int health = (int)data;
-
-	if (health == HEALTH_GOOD) {
-		_D("battery health good");
-		pm_status_flag &= ~DIMSTAY_FLAG;
-
-	} else if (health == HEALTH_BAD) {
-		_D("battery health bad");
-		pm_status_flag |= DIMSTAY_FLAG;
-	}
-
-	return 0;
-}
-
 static int display_load_config(struct parse_result *result, void *user_data)
 {
 	struct display_config *c = user_data;
@@ -2331,7 +2307,6 @@ static void display_init(void *data)
 	register_notifier(DEVICE_NOTIFIER_INPUT_REMOVE, input_device_remove);
 	register_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
 	register_notifier(DEVICE_NOTIFIER_HDMI, hdmi_changed);
-	register_notifier(DEVICE_NOTIFIER_BATTERY_HEALTH, battery_health_changed);
 
 	for (i = INIT_SETTING; i < INIT_END; i++) {
 		switch (i) {
@@ -2428,8 +2403,6 @@ static void display_exit(void *data)
 			unregister_notifier(DEVICE_NOTIFIER_BOOTING_DONE,
 			    booting_done);
 			unregister_notifier(DEVICE_NOTIFIER_HDMI, hdmi_changed);
-			unregister_notifier(DEVICE_NOTIFIER_BATTERY_HEALTH,
-			    battery_health_changed);
 
 			exit_pm_poll();
 			break;

@@ -1,10 +1,10 @@
 
 #These options are ACTIVATED by default.
-%bcond_without battery
 %bcond_without display
 
 #These options are DEACTIVATED by default.
 %bcond_with x
+%bcond_with battery
 %bcond_with camera_led
 %bcond_with extcon
 %bcond_with sdcard

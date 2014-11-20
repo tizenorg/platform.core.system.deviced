@@ -33,7 +33,6 @@ SET(SRCS
 	src/core/launch.c
 	src/core/log.c
 	src/core/main.c
-	src/core/power-supply.c
 	src/core/sig-handler.c
 	src/gpio/gpio.c
 	src/gpio/buzzer.c
@@ -50,6 +49,7 @@ SET(SRCS ${SRCS}
 	src/battery/battery-time.c
 	src/battery/config.c
 	src/battery/lowbat-handler.c
+	src/battery/power-supply.c
    )
 ENDIF(TIZEN_BATTERY)
 
