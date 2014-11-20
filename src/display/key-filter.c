@@ -784,24 +784,11 @@ static int hardkey_lcd_changed_cb(void *data)
 	int lcd_state = (int)data;
 
 	if (lcd_state == S_NORMAL
-	    && battery.temp == TEMP_HIGH
 	    && hardkey_duration == KEYBACKLIGHT_TIME_ALWAYS_ON) {
 		turnon_hardkey_backlight();
 		return 0;
 	}
 
-	/* when lcd state is dim and battery is over temp,
-	   hardkey led should turn off */
-	if (lcd_state == S_LCDDIM && battery.health == HEALTH_BAD) {
-		/* release existing timer */
-		if (hardkey_timeout_id > 0) {
-			ecore_timer_del(hardkey_timeout_id);
-			hardkey_timeout_id = NULL;
-		}
-
-		/* turn off hardkey backlight */
-		turnoff_hardkey_backlight();
-	}
 	return 0;
 }
 
