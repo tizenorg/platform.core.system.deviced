@@ -319,9 +319,6 @@ int check_dimstay(int next_state, int flag)
 	if (!(pm_status_flag & DIMSTAY_FLAG))
 		return false;
 
-	if (check_abnormal_popup() != HEALTH_BAD)
-		return false;
-
 	return true;
 }
 
