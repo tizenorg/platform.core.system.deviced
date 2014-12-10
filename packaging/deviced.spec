@@ -121,29 +121,6 @@ Requires:   libslp-pm = %{version}-%{release}
 %description -n libslp-pm-devel
 power-manager devel library.
 
-%package -n libhaptic
-Summary:    Haptic library
-Group:      Development/Libraries
-Requires:   %{name} = %{version}-%{release}
-
-%description -n libhaptic
-Haptic library for device control
-
-%package -n libhaptic-devel
-Summary:    Haptic library for (devel)
-Group:      Development/Libraries
-Requires:   libhaptic = %{version}-%{release}
-
-%description -n libhaptic-devel
-Haptic library for device control (devel)
-
-%package -n libhaptic-plugin-devel
-Summary:    Haptic plugin library for (devel)
-Group:      Development/Libraries
-
-%description -n libhaptic-plugin-devel
-Haptic plugin library for device control (devel)
-
 %package -n libdevman
 Summary:    Device manager library
 Group:      Development/Libraries
@@ -292,10 +269,6 @@ systemctl daemon-reload
 
 %postun -n libslp-pm -p /sbin/ldconfig
 
-%post -n libhaptic -p /sbin/ldconfig
-
-%postun -n libhaptic -p /sbin/ldconfig
-
 %post -n libdevman -p /sbin/ldconfig
 
 %postun -n libdevman -p /sbin/ldconfig
@@ -366,24 +339,6 @@ systemctl daemon-reload
 %{_includedir}/pmapi/SLP_pm_PG.h
 %{_libdir}/pkgconfig/pmapi.pc
 %{_libdir}/libpmapi.so
-
-%files -n libhaptic
-%defattr(-,root,root,-)
-%{_libdir}/libhaptic.so.*
-%manifest haptic.manifest
-
-%files -n libhaptic-devel
-%defattr(-,root,root,-)
-%{_includedir}/haptic/haptic.h
-%{_libdir}/libhaptic.so
-%{_libdir}/pkgconfig/haptic.pc
-
-%files -n libhaptic-plugin-devel
-%defattr(-,root,root,-)
-%{_includedir}/haptic/haptic_module.h
-%{_includedir}/haptic/haptic_plugin_intf.h
-%{_includedir}/haptic/SLP_haptic_PG.h
-%{_libdir}/pkgconfig/haptic-plugin.pc
 
 %files -n libdevman
 %{_bindir}/display_wd
