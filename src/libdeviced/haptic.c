@@ -215,8 +215,8 @@ API int haptic_close(haptic_device_h device_handle)
 	int ret;
 
 	/* check if handle is valid */
-	if (device_handle == NULL) {
-		_E("Invalid parameter : device_handle(NULL)");
+	if (device_handle < 0) {
+		_E("Invalid parameter : device_handle(0)");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
@@ -256,8 +256,8 @@ API int haptic_vibrate_monotone_with_detail(haptic_device_h device_handle,
 	int ret;
 
 	/* check if handle is valid */
-	if (device_handle == NULL) {
-		_E("Invalid parameter : device_handle(NULL)");
+	if (device_handle < 0) {
+		_E("Invalid parameter : device_handle(0)");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
@@ -297,7 +297,7 @@ API int haptic_vibrate_monotone_with_detail(haptic_device_h device_handle,
 	if (ret < 0)
 		return HAPTIC_ERROR_OPERATION_FAILED;
 
-	if (effect_handle != NULL)
+	if (effect_handle >= 0)
 		*effect_handle = (haptic_effect_h)ret;
 
 	return HAPTIC_ERROR_NONE;
@@ -410,8 +410,8 @@ API int haptic_vibrate_buffers_with_detail(haptic_device_h device_handle,
 	int ret;
 
 	/* check if handle is valid */
-	if (device_handle == NULL) {
-		_E("Invalid parameter : device_handle(NULL)");
+	if (device_handle < 0) {
+		_E("Invalid parameter : device_handle(0)");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
@@ -459,7 +459,7 @@ API int haptic_vibrate_buffers_with_detail(haptic_device_h device_handle,
 	if (ret < 0)
 		return HAPTIC_ERROR_OPERATION_FAILED;
 
-	if (effect_handle != NULL)
+	if (effect_handle >= 0)
 		*effect_handle = (haptic_effect_h)ret;
 
 	return HAPTIC_ERROR_NONE;
@@ -477,8 +477,8 @@ API int haptic_stop_all_effects(haptic_device_h device_handle)
 	int ret;
 
 	/* check if handle is valid */
-	if (device_handle == NULL) {
-		_E("Invalid parameter : device_handle(NULL)");
+	if (device_handle < 0) {
+		_E("Invalid parameter : device_handle(0)");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
@@ -502,8 +502,8 @@ API int haptic_get_effect_state(haptic_device_h device_handle, haptic_effect_h e
 	int ret;
 
 	/* check if handle is valid */
-	if (device_handle == NULL) {
-		_E("Invalid parameter : device_handle(NULL)");
+	if (device_handle < 0) {
+		_E("Invalid parameter : device_handle(0)");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
@@ -688,8 +688,8 @@ API int haptic_get_buffers_duration(haptic_device_h device_handle, const unsigne
 	int ret;
 
 	/* check if handle is valid */
-	if (device_handle == NULL) {
-		_E("Invalid parameter : device_handle(NULL)");
+	if (device_handle < 0) {
+		_E("Invalid parameter : device_handle(0)");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 

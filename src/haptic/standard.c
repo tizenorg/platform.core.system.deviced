@@ -48,6 +48,7 @@
 
 
 struct ff_info {
+	unsigned int id;
 	Ecore_Timer *timer;
 	struct ff_effect effect;
 };
@@ -252,6 +253,29 @@ static int ff_stop(int fd, struct ff_effect *effect)
 	return 0;
 }
 
+static int create_unique_id(void)
+{
+	static int i = 0;
+	return i++;		/* TODO: overflow */
+}
+
+static struct ff_info *get_element_from_list(int id)
+{
+	dd_list *elem;
+	struct ff_info *info;
+
+	if (id < 0)
+		return NULL;
+
+	/* find matched element */
+	DD_LIST_FOREACH(ff_list, elem, info) {
+		if (info->id == id)
+			return info;
+	}
+
+	return NULL;
+}
+
 /* START: Haptic Module APIs */
 static int get_device_count(int *count)
 {
@@ -289,25 +313,26 @@ static int open_device(int device_index, int *device_handle)
 		return -errno;
 	}
 
+	/* create unique id */
+	info->id = create_unique_id();
+
 	/* initialize ff_effect structure */
 	ff_init_effect(&info->effect);
 
 	/* add info to local list */
 	DD_LIST_APPEND(ff_list, info);
 
-	*device_handle = (int)info;
+	*device_handle = info->id;
 	return 0;
 }
 
 static int close_device(int device_handle)
 {
-	struct ff_info *info = (struct ff_info*)device_handle;
+	struct ff_info *info;
 	int r, n;
 
+	info = get_element_from_list(device_handle);
 	if (!info)
-		return -EINVAL;
-
-	if (!check_valid_handle(info))
 		return -EINVAL;
 
 	/* stop vibration */
@@ -339,13 +364,11 @@ static int close_device(int device_handle)
 
 static int vibrate_monotone(int device_handle, int duration, int feedback, int priority, int *effect_handle)
 {
-	struct ff_info *info = (struct ff_info*)device_handle;
+	struct ff_info *info;
 	int ret;
 
+	info = get_element_from_list(device_handle);
 	if (!info)
-		return -EINVAL;
-
-	if (!check_valid_handle(info))
 		return -EINVAL;
 
 	/* Zero(0) is the infinitely vibration value */
@@ -396,13 +419,11 @@ static int vibrate_buffer(int device_handle, const unsigned char *vibe_buffer, i
 
 static int stop_device(int device_handle)
 {
-	struct ff_info *info = (struct ff_info*)device_handle;
+	struct ff_info *info;
 	int r;
 
+	info = get_element_from_list(device_handle);
 	if (!info)
-		return -EINVAL;
-
-	if (!check_valid_handle(info))
 		return -EINVAL;
 
 	/* stop effect */

@@ -41,12 +41,12 @@ extern "C" {
 /**
  * @brief The handle of haptic device
  */
-typedef void* haptic_device_h;
+typedef int haptic_device_h;
 
 /**
  * @brief The handle of haptic effect
  */
-typedef void* haptic_effect_h;
+typedef int haptic_effect_h;
 
 /**
  * @brief Enumerations of device id for the Haptic API.
