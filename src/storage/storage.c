@@ -366,7 +366,7 @@ static int booting_done(void *data)
 	static int done = 0;
 
 	if (data != NULL) {
-		done = (int)data;
+		done = *(int*)data;
 		if (done)
 			_I("booting done");
 		if (__memnoti_fd_init() == -1)

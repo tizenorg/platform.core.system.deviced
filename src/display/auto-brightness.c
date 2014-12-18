@@ -659,8 +659,12 @@ static int reset_autobrightness_min(char *name, enum watch_id id)
 
 static int lcd_changed_cb(void *data)
 {
-	int lcd_state = (int)data;
+	int lcd_state;
 
+	if (!data)
+		return 0;
+
+	lcd_state = *(int*)data;
 	if (lcd_state == S_LCDOFF && alc_timeout_id > 0) {
 		ecore_timer_del(alc_timeout_id);
 		alc_timeout_id = NULL;

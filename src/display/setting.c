@@ -200,19 +200,24 @@ int set_custom_lcdon_timeout(int timeout)
 static int setting_cb(keynode_t *key_nodes, void *data)
 {
 	keynode_t *tmp = key_nodes;
+	int index;
 
-	if ((int)data > SETTING_END) {
+	if (!data)
+		return -EINVAL;
+
+	index = (int)((long)data);
+	if (index > SETTING_END) {
 		_E("Unknown setting key: %s, idx=%d",
-		       vconf_keynode_get_name(tmp), (int)data);
+		       vconf_keynode_get_name(tmp), index);
 		return -1;
 	}
 	if (update_pm_setting != NULL) {
-		switch((int)data) {
+		switch(index) {
 			case SETTING_ACCESSIBILITY_TTS:
-				update_pm_setting((int)data, vconf_keynode_get_bool(tmp));
+				update_pm_setting(index, vconf_keynode_get_bool(tmp));
 				break;
 			default:
-				update_pm_setting((int)data, vconf_keynode_get_int(tmp));
+				update_pm_setting(index, vconf_keynode_get_int(tmp));
 				break;
 		}
 	}
@@ -229,7 +234,7 @@ int init_setting(int (*func) (int key_idx, int val))
 
 	for (i = SETTING_BEGIN; i < SETTING_GET_END; i++) {
 		vconf_notify_key_changed(setting_keys[i], (void *)setting_cb,
-					 (void *)i);
+					 (void *)((long)i));
 	}
 
 	return 0;

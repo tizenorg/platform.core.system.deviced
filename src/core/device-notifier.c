@@ -121,7 +121,7 @@ static int booting_done(void *data)
 	if (data == NULL)
 		goto out;
 
-	done = (int)data;
+	done = *(int*)data;
 	if (late_init_timer == NULL)
 		return done;
 	late_init_stop();
@@ -138,7 +138,7 @@ static Eina_Bool late_init_timer_cb(void *data)
 	if (done)
 		return EINA_FALSE;
 	_I("late booting done");
-	device_notify(DEVICE_NOTIFIER_BOOTING_DONE, (void *)TRUE);
+	device_notify(DEVICE_NOTIFIER_BOOTING_DONE, &done);
 	return EINA_FALSE;
 }
 
