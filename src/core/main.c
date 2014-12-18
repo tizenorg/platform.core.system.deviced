@@ -63,7 +63,7 @@ static int deviced_main(int argc, char **argv)
 	ret = check_systemd_active();
 	if (ret == TRUE) {
 		_I("notify relaunch");
-		device_notify(DEVICE_NOTIFIER_BOOTING_DONE, (void *)TRUE);
+		device_notify(DEVICE_NOTIFIER_BOOTING_DONE, &ret);
 	}
 	signal(SIGTERM, sig_quit);
 	signal(SIGUSR1, sig_usr1);

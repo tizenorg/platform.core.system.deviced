@@ -175,8 +175,12 @@ int control_brightness_key(int action)
 
 static int lcd_changed_cb(void *data)
 {
-	int lcd_state = (int)data;
+	int lcd_state;
 
+	if (!data)
+		return 0;
+
+	lcd_state = *(int*)data;
 	if (lcd_state == S_LCDOFF && popup_pid > 0) {
 		if (popup_timer)
 			ecore_timer_del(popup_timer);

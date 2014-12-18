@@ -781,8 +781,12 @@ static void hardkey_duration_cb(keynode_t *key, void *data)
 
 static int hardkey_lcd_changed_cb(void *data)
 {
-	int lcd_state = (int)data;
+	int lcd_state;
 
+	if (!data)
+		return 0;
+
+	lcd_state = *(int*)data;
 	if (lcd_state == S_NORMAL
 	    && hardkey_duration == KEYBACKLIGHT_TIME_ALWAYS_ON) {
 		turnon_hardkey_backlight();

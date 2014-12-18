@@ -508,8 +508,13 @@ static Eina_Bool del_dim_cond(void *data)
 {
 	PmLockNode *tmp = NULL;
 	char pname[PATH_MAX];
-	pid_t pid = (pid_t)data;
+	pid_t pid;
 
+	if (!data)
+		return EINA_FALSE;
+
+	/* A passed data is a pid_t type data, not a 64bit data. */
+	pid = (pid_t)((intptr_t)data);
 	_I("delete prohibit dim condition by timeout (%d)", pid);
 
 	tmp = find_node(S_LCDDIM, pid);
@@ -527,8 +532,13 @@ static Eina_Bool del_off_cond(void *data)
 {
 	PmLockNode *tmp = NULL;
 	char pname[PATH_MAX];
-	pid_t pid = (pid_t)data;
+	pid_t pid;
 
+	if (!data)
+		return EINA_FALSE;
+
+	/* A passed data is a pid_t type data, not a 64bit data. */
+	pid = (pid_t)((intptr_t)data);
 	_I("delete prohibit off condition by timeout (%d)", pid);
 
 	tmp = find_node(S_LCDOFF, pid);
@@ -546,8 +556,13 @@ static Eina_Bool del_sleep_cond(void *data)
 {
 	PmLockNode *tmp = NULL;
 	char pname[PATH_MAX];
-	pid_t pid = (pid_t)data;
+	pid_t pid;
 
+	if (!data)
+		return EINA_FALSE;
+
+	/* A passed data is a pid_t type data, not a 64bit data. */
+	pid = (pid_t)((intptr_t)data);
 	_I("delete prohibit sleep condition by timeout (%d)", pid);
 
 	tmp = find_node(S_SLEEP, pid);
@@ -558,7 +573,7 @@ static Eina_Bool del_sleep_cond(void *data)
 	if (!timeout_src_id)
 		states[pm_cur_state].trans(EVENT_TIMEOUT);
 
-	set_process_active(EINA_FALSE, (pid_t)data);
+	set_process_active(EINA_FALSE, pid);
 
 	return EINA_FALSE;
 }
@@ -880,15 +895,15 @@ static void set_standby_mode(pid_t pid, int enable)
 {
 	Eina_List *l = NULL;
 	Eina_List *l_next = NULL;
-	int *data = 0;
+	void *data;
 
 	if (enable) {
 		EINA_LIST_FOREACH(standby_mode_list, l, data)
-			if (pid == (int) data) {
+			if (pid == (pid_t)((intptr_t)data)) {
 				_E("%d already acquired standby mode", pid);
 				return;
 			}
-		EINA_LIST_APPEND(standby_mode_list, (void *)pid);
+		EINA_LIST_APPEND(standby_mode_list, (void *)((intptr_t)pid));
 		_I("%d acquire standby mode", pid);
 		if (standby_mode)
 			return;
@@ -901,7 +916,7 @@ static void set_standby_mode(pid_t pid, int enable)
 		if (!standby_mode)
 			return;
 		EINA_LIST_FOREACH_SAFE(standby_mode_list, l, l_next, data)
-			if (pid == (int) data) {
+			if (pid == (pid_t)((intptr_t)data)) {
 				standby_mode_list = eina_list_remove_list(
 						    standby_mode_list, l);
 				_I("%d release standby mode", pid);
@@ -971,9 +986,14 @@ static int proc_condition(PMMsg *data)
 
 	if (val & MASK_DIM) {
 		if (data->timeout > 0) {
+			/*
+			 * To pass a pid_t data through the timer infrastructure
+			 * without memory allocation, a pid_t data becomes typecast
+			 * to intptr_t and void *(64bit) type.
+			 */
 			cond_timeout_id =
 			    ecore_timer_add(MSEC_TO_SEC(data->timeout),
-				    (Ecore_Task_Cb)del_dim_cond, (void*)pid);
+				    (Ecore_Task_Cb)del_dim_cond, (void*)((intptr_t)pid));
 		}
 		holdkey_block = GET_HOLDKEY_BLOCK_STATE(val);
 		tmp = find_node(S_LCDDIM, pid);
@@ -997,9 +1017,14 @@ static int proc_condition(PMMsg *data)
 	}
 	if (val & MASK_OFF) {
 		if (data->timeout > 0) {
+			/*
+			 * To pass a pid_t data through the timer infrastructure
+			 * without memory allocation, a pid_t data becomes typecast
+			 * to intptr_t and void *(64bit) type.
+			 */
 			cond_timeout_id =
 			    ecore_timer_add(MSEC_TO_SEC(data->timeout),
-				    (Ecore_Task_Cb)del_off_cond, (void*)pid);
+				    (Ecore_Task_Cb)del_off_cond, (void*)((intptr_t)pid));
 		}
 		holdkey_block = GET_HOLDKEY_BLOCK_STATE(val);
 		tmp = find_node(S_LCDOFF, pid);
@@ -1031,9 +1056,14 @@ static int proc_condition(PMMsg *data)
 			proc_change_state(S_LCDOFF <<
 			    (SHIFT_CHANGE_STATE + S_LCDOFF), getpid());
 		if (data->timeout > 0) {
+			/*
+			 * To pass a pid_t data through the timer infrastructure
+			 * without memory allocation, a pid_t data becomes typecast
+			 * to intptr_t and void *(64bit) type.
+			 */
 			cond_timeout_id =
 			    ecore_timer_add(MSEC_TO_SEC(data->timeout),
-				    (Ecore_Task_Cb)del_sleep_cond, (void*)pid);
+				    (Ecore_Task_Cb)del_sleep_cond, (void*)((intptr_t)pid));
 		}
 		if (GET_STANDBY_MODE_STATE(val))
 			set_standby_mode(pid, true);
@@ -1312,7 +1342,7 @@ void print_info(int fd)
 	char buf[255];
 	int i = 1, ret;
 	Eina_List *l = NULL;
-	int *data = 0;
+	void *data;
 	char pname[PATH_MAX];
 
 	if (fd < 0)
@@ -1363,7 +1393,7 @@ void print_info(int fd)
 		write(fd, buf, strlen(buf));
 
 		EINA_LIST_FOREACH(standby_mode_list, l, data) {
-			get_pname((pid_t)data, pname);
+			get_pname((pid_t)((intptr_t)data), pname);
 			snprintf(buf, sizeof(buf),
 			    "  standby mode acquired by pid %d"
 			    " - process %s\n", data, pname);
@@ -1628,7 +1658,7 @@ static int default_action(int timeout)
 	if (pm_cur_state != pm_old_state && pm_cur_state != S_SLEEP) {
 		if (power_ops.get_power_lock_support())
 			power_ops.power_lock();
-		device_notify(DEVICE_NOTIFIER_LCD, (void *)pm_cur_state);
+		device_notify(DEVICE_NOTIFIER_LCD, &pm_cur_state);
 	}
 
 	if (pm_old_state == S_NORMAL && pm_cur_state != S_NORMAL) {
@@ -2168,15 +2198,20 @@ int get_hdmi_state(void)
 
 static int hdmi_changed(void *data)
 {
-	hdmi_state = (int)data;
+	if (data)
+		hdmi_state = *(int*)data;
 
 	return 0;
 }
 
 static int hall_ic_open(void *data)
 {
-	int open = (int)data;
+	int open;
 
+	if (!data)
+		return -EINVAL;
+
+	open = *(int*)data;
 	update_pm_setting(SETTING_HALLIC_OPEN, open);
 
 	if (display_info.update_auto_brightness)
@@ -2213,12 +2248,13 @@ static int booting_done(void *data)
 {
 	static bool done = false;
 
-	if (done)
-		return 0;
-
-	_I("booting done, unlock LCD_OFF");
-	pm_unlock_internal(INTERNAL_LOCK_BOOTING, LCD_OFF, PM_SLEEP_MARGIN);
-	done = true;
+	if (data != NULL) {
+		done = *(int*)data;
+		if (done)
+			return 0;
+		_I("booting done, unlock LCD_OFF");
+		pm_unlock_internal(INTERNAL_LOCK_BOOTING, LCD_OFF, PM_SLEEP_MARGIN);
+	}
 
 	return 0;
 }

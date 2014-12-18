@@ -332,9 +332,13 @@ static const struct edbus_method edbus_methods[] = {
 
 static int time_lcd_changed_cb(void *data)
 {
-	int lcd_state = (int)data;
+	int lcd_state;
 	int tfd = -1;
 
+	if (!data)
+		return 0;
+
+	lcd_state = *(int*)data;
 	if (lcd_state < S_LCDOFF)
 		goto restart;
 
