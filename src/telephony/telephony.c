@@ -57,7 +57,7 @@ static void telephony_powerdown_ap(TapiHandle *handle, const char *noti_id, void
 
 static void telephony_restart_ap(TapiHandle *handle, const char *noti_id, void *data, void *user_data)
 {
-	restart_ap((void *)reboot_opt);
+	restart_ap(reboot_opt);
 }
 
 static Eina_Bool telephony_restart_ap_by_force(void *data)

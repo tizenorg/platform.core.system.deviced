@@ -729,7 +729,7 @@ static int proc_booting_done(void *data)
 
 	if (data == NULL)
 		goto out;
-	done = (int)data;
+	done = *(int*)data;
 	if (vconf_notify_key_changed(VCONFKEY_PM_STATE, (void *)siop_mode_lcd, NULL) < 0)
 		_E("Vconf notify key chaneged failed: KEY(%s)", VCONFKEY_PM_STATE);
 	siop_mode_lcd(NULL, NULL);

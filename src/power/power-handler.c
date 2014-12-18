@@ -207,7 +207,7 @@ static int power_reboot(int type)
 		ret = telephony_exit(POWER_REBOOT);
 
 	if (ret < 0) {
-		restart_ap((void *)type);
+		restart_ap(type);
 		return 0;
 	}
 	return ret;
@@ -273,7 +273,7 @@ static int booting_done(void *data)
 	if (data == NULL)
 		goto out;
 
-	done = (int)data;
+	done = *(int*)data;
 	telephony_init();
 out:
 	return done;
@@ -292,7 +292,7 @@ static void booting_done_edbus_signal_handler(void *data, DBusMessage *msg)
 		return;
 
 	_I("signal booting done");
-	device_notify(DEVICE_NOTIFIER_BOOTING_DONE, (void *)TRUE);
+	device_notify(DEVICE_NOTIFIER_BOOTING_DONE, &done);
 }
 
 static void poweroff_send_broadcast(int status)
@@ -353,14 +353,14 @@ static void poweroff_control_cb(keynode_t *in_key, void *data)
 
 	switch (val) {
 	case VCONFKEY_SYSMAN_POWER_OFF_DIRECT:
-		device_notify(DEVICE_NOTIFIER_POWEROFF, (void *)val);
+		device_notify(DEVICE_NOTIFIER_POWEROFF, &val);
 		poweroff();
 		break;
 	case VCONFKEY_SYSMAN_POWER_OFF_POPUP:
 		pwroff_popup();
 		break;
 	case VCONFKEY_SYSMAN_POWER_OFF_RESTART:
-		device_notify(DEVICE_NOTIFIER_POWEROFF, (void *)val);
+		device_notify(DEVICE_NOTIFIER_POWEROFF, &val);
 		power_reboot(recovery);
 		break;
 	}
@@ -515,11 +515,11 @@ void powerdown_ap(void *data)
 	reboot(RB_POWER_OFF);
 }
 
-void restart_ap(void *data)
+void restart_ap(int data)
 {
-	_I("Restart %d", (int)data);
+	_I("Restart %d", data);
 	powerdown();
-	restart_by_mode((int)data);
+	restart_by_mode(data);
 }
 
 static const struct edbus_method edbus_methods[] = {
