@@ -330,9 +330,13 @@ static void usb_chgdet_cb(void *data)
 
 static int display_changed(void *data)
 {
-	enum state_t state = (enum state_t)data;
+	enum state_t state;
 	int ret, cradle = 0;
 
+	if (!data)
+		return 0;
+
+	state = *(int*)data;
 	if (state != S_NORMAL)
 		return 0;
 
@@ -524,14 +528,14 @@ static void hdmi_chgdet_cb(void *data)
 	_I("jack - hdmi changed %d", val);
 	vconf_set_int(VCONFKEY_SYSMAN_HDMI, val);
 	hdmi_status = val;
-	device_notify(DEVICE_NOTIFIER_HDMI, (void *)val);
+	device_notify(DEVICE_NOTIFIER_HDMI, &val);
 
 	if(val == 1) {
 		pm_lock_internal(INTERNAL_LOCK_HDMI, LCD_DIM, STAY_CUR_STATE, 0);
 	} else {
 		pm_unlock_internal(INTERNAL_LOCK_HDMI, LCD_DIM, PM_SLEEP_MARGIN);
 	}
-	hdmi_cec_execute((void *)val);
+	hdmi_cec_execute(&val);
 }
 
 static void hdcp_send_broadcast(int status)
@@ -719,7 +723,7 @@ static int booting_done(void *data)
 
 	if (data == NULL)
 		return done;
-	done = (int)data;
+	done = *(int*)data;
 	if (done == 0)
 		return done;
 

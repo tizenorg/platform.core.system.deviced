@@ -39,7 +39,7 @@
 #define SYSTEMD_STOP_POWER_RESTART_FOTA         7
 
 #ifndef SYSTEMD_SHUTDOWN
-void restart_ap(void *data);
+void restart_ap(int data);
 void powerdown_ap(void *data);
 #endif
 

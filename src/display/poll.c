@@ -77,10 +77,12 @@ static Eina_Bool pm_handler(void *data, Ecore_Fd_Handler *fd_handler)
 {
 	char buf[1024];
 	struct sockaddr_un clientaddr;
-
-	int fd = (int)data;
+	int fd;
 	int ret;
 	static const struct device_ops *display_device_ops = NULL;
+
+	if (!data)
+		return EINA_FALSE;
 
 	FIND_DEVICE_INT(display_device_ops, "display");
 
@@ -93,6 +95,8 @@ static Eina_Bool pm_handler(void *data, Ecore_Fd_Handler *fd_handler)
 		return EINA_FALSE;
 	}
 
+	/* A passed data is a fd type data, not a 64bit data. */
+	fd = (int)((long)data);
 	ret = read(fd, buf, sizeof(buf));
 	CHECK_KEY_FILTER(ret, buf, fd);
 	(*g_pm_callback) (INPUT_POLL_EVENT, NULL);
@@ -159,9 +163,14 @@ int init_pm_poll(int (*pm_callback) (int, PMMsg *))
 			goto out1;
 		}
 
+		/*
+		 * To pass a fd data through the fd hander infrastructure
+		 * without memory allocation, a fd data becomes typecast
+		 * to long and void *(64bit) type.
+		 */
 		fd_handler = ecore_main_fd_handler_add(fd,
 				    ECORE_FD_READ|ECORE_FD_ERROR,
-				    pm_handler, (void *)fd, NULL, NULL);
+				    pm_handler, (void *)((long)fd), NULL, NULL);
 		if (fd_handler == NULL) {
 			_E("Failed ecore_main_handler_add() in init_pm_poll()");
 			goto out2;
@@ -264,9 +273,14 @@ int init_pm_poll_input(int (*pm_callback)(int , PMMsg * ), const char *path)
 	}
 	strncpy(dev_path, path, strlen(path) +1);
 
+	/*
+	 * To pass a fd data through the fd hander infrastructure
+	 * without memory allocation, a fd data becomes typecast
+	 * to long and void *(64bit) type.
+	 */
 	fd_handler = ecore_main_fd_handler_add(fd,
 			    ECORE_FD_READ|ECORE_FD_ERROR,
-			    pm_handler, (void *)fd, NULL, NULL);
+			    pm_handler, (void *)((long)fd), NULL, NULL);
 	if (!fd_handler) {
 		_E("Fail to ecore fd handler add! %s", path);
 		close(fd);

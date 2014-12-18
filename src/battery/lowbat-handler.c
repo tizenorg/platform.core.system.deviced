@@ -565,7 +565,7 @@ static int booting_done(void *data)
 
 	if (data == NULL)
 		goto out;
-	done = (int)data;
+	done = *(int*)data;
 	if (!done)
 		goto out;
 	_I("booting done");

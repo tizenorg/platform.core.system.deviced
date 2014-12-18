@@ -200,7 +200,7 @@ static void *_system_suspend_cb(void *data)
 	if (ret < 0)
 		_E("Failed to system suspend! %d", ret);
 
-	return (void *)ret;
+	return NULL;
 }
 
 static int system_suspend(void)
