@@ -25,8 +25,8 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <vconf.h>
 
-#include "vconf-keys.h"
 #include "log.h"
 #include "launch.h"
 #include "common.h"
@@ -40,7 +40,7 @@ static int set_current_lang(void)
 	char *lang;
 	int ret;
 
-	lang = (char *)vconf_get_str(VCONFKEY_LANGSET);
+	lang = vconf_get_str(VCONFKEY_LANGSET);
 	if (lang == NULL)
 		return -1;
 	ret = setenv("LANG", lang, 1);
