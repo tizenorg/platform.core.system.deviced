@@ -82,7 +82,7 @@ Deviced library for device control (devel)
 Summary:    Sysman library
 License:    Apache-2.0
 Group:      System/Libraries
-Requires:   %{name} = %{version}-%{release}
+Requires:   libdeviced = %{version}-%{release}
 
 %description -n sysman
 sysman library.
@@ -91,7 +91,7 @@ sysman library.
 Summary:    Sysman devel library
 License:    Apache-2.0
 Group:      System/Development
-Requires:   %{name} = %{version}-%{release}
+Requires:   sysman = %{version}-%{release}
 
 %description -n sysman-devel
 sysman devel library.
@@ -100,7 +100,7 @@ sysman devel library.
 Summary:    Sysman internal devel library
 License:    Apache-2.0
 Group:      System/Development
-Requires:   %{name} = %{version}-%{release}
+Requires:   sysman = %{version}-%{release}
 
 %description -n sysman-internal-devel
 sysman internal devel library.
@@ -108,7 +108,7 @@ sysman internal devel library.
 %package -n libslp-pm
 Summary:    Power manager client
 Group:      System/Libraries
-Requires:   %{name} = %{version}-%{release}
+Requires:   libdeviced = %{version}-%{release}
 
 %description -n libslp-pm
 power-manager library.
@@ -124,7 +124,6 @@ power-manager devel library.
 %package -n libhaptic
 Summary:    Haptic library
 Group:      Development/Libraries
-Requires:   %{name} = %{version}-%{release}
 
 %description -n libhaptic
 Haptic library for device control
@@ -140,6 +139,7 @@ Haptic library for device control (devel)
 %package -n libhaptic-plugin-devel
 Summary:    Haptic plugin library for (devel)
 Group:      Development/Libraries
+Requires:   libhaptic = %{version}-%{release}
 
 %description -n libhaptic-plugin-devel
 Haptic plugin library for device control (devel)
@@ -147,7 +147,7 @@ Haptic plugin library for device control (devel)
 %package -n libdevman
 Summary:    Device manager library
 Group:      Development/Libraries
-Requires:   %{name} = %{version}-%{release}
+Requires:   libdeviced = %{version}-%{release}
 
 %description -n libdevman
 Device manager library for device control
