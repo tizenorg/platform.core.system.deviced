@@ -180,7 +180,7 @@ Haptic Device manager library for device control (devel)
 export CFLAGS+=" -DX11_SUPPORT"
 %endif
 
-cmake . \
+%cmake . \
 	-DTZ_SYS_ETC=%TZ_SYS_ETC \
 	-DCMAKE_INSTALL_PREFIX=%{_prefix} \
 	-DARCH=%{ARCH} \
