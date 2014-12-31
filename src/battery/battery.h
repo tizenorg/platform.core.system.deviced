@@ -40,4 +40,7 @@ struct battery_config_info {
 
 int battery_charge_err_low_act(void *data);
 int battery_charge_err_high_act(void *data);
+
+extern int system_wakeup_flag;
+
 #endif /* __BATTERY_H__ */

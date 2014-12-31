@@ -32,7 +32,7 @@
 #define CMD_OFF		"off"
 #define CMD_STANDBY	"standby"
 
-static const char *xset_arg[] = {
+static const char * const xset_arg[] = {
 	"/usr/bin/xset",
 	"dpms", "force", NULL, NULL,
 };

@@ -41,12 +41,12 @@ struct popup_data {
 	char *value;
 };
 
-static const char *ext4_arg[] = {
+static const char * const ext4_arg[] = {
 	"/sbin/mkfs.ext4",
 	NULL, NULL,
 };
 
-static const char *ext4_check_arg[] = {
+static const char * const ext4_check_arg[] = {
 	"/sbin/fsck.ext4",
 	"-f", "-y", NULL, NULL,
 };
@@ -81,7 +81,7 @@ static bool ext4_match(const char *devpath)
 	if (r < 0)
 		goto error;
 
-	_I("mmc search magic : 0x%2x, 0x%2x", buf[0],buf[1]);
+	_I("mmc search magic : 0x%2x, 0x%2x", buf[0], buf[1]);
 	if (memcmp(buf, ext4_info.magic, ext4_info.magic_sz))
 		goto error;
 
@@ -122,7 +122,7 @@ static int check_smack_popup(void)
 	int ret = -1;
 	int val = -1;
 	struct popup_data *params;
-	static const struct device_ops *apps = NULL;
+	static const struct device_ops *apps;
 
 	ret = vconf_get_int(VCONFKEY_STARTER_SEQUENCE, &val);
 	if (val == 1 || ret != 0) {

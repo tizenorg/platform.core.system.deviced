@@ -82,9 +82,8 @@ static struct uevent_handler uh = {
 };
 
 struct battery_status battery;
-static Ecore_Timer *power_timer = NULL;
-static Ecore_Timer *abnormal_timer = NULL;
-extern int battery_power_off_act(void *data);
+static Ecore_Timer *power_timer;
+static Ecore_Timer *abnormal_timer;
 
 static void pm_check_and_change(int bInserted)
 {
@@ -97,13 +96,13 @@ static void pm_check_and_change(int bInserted)
 
 static int check_lowbat_charge_device(int bInserted)
 {
-	static int bChargeDeviceInserted = 0;
+	static int bChargeDeviceInserted;
 	int val = -1;
 	int bat_state = -1;
 	int ret = -1;
 	char *value;
 	struct popup_data *params;
-	static const struct device_ops *apps = NULL;
+	static const struct device_ops *apps;
 
 	pm_check_and_change(bInserted);
 	if (bInserted == 1) {
@@ -113,13 +112,13 @@ static int check_lowbat_charge_device(int bInserted)
 	} else if (bInserted == 0) {
 		if (!battery.charge_now && bChargeDeviceInserted == 1) {
 			bChargeDeviceInserted = 0;
-			//low bat popup during charging device removing
+			/* low bat popup during charging device removing */
 			if (vconf_get_int(VCONFKEY_SYSMAN_BATTERY_STATUS_LOW, &bat_state) == 0) {
-				if(bat_state < VCONFKEY_SYSMAN_BAT_NORMAL
+				if (bat_state < VCONFKEY_SYSMAN_BAT_NORMAL
 						|| bat_state == VCONFKEY_SYSMAN_BAT_REAL_POWER_OFF) {
 					FIND_DEVICE_INT(apps, "apps");
 
-					if(bat_state == VCONFKEY_SYSMAN_BAT_REAL_POWER_OFF)
+					if (bat_state == VCONFKEY_SYSMAN_BAT_REAL_POWER_OFF)
 						value = "poweroff";
 					else
 						value = "warning";
@@ -149,7 +148,7 @@ static int check_lowbat_charge_device(int bInserted)
 static int changed_battery_cf(enum present_type status)
 {
 	struct popup_data *params;
-	static const struct device_ops *apps = NULL;
+	static const struct device_ops *apps;
 
 	FIND_DEVICE_INT(apps, "apps");
 	params = malloc(sizeof(struct popup_data));
@@ -189,7 +188,7 @@ static void health_status_broadcast(void)
 static int clean_health_popup(void)
 {
 	struct popup_data *params;
-	static const struct device_ops *apps = NULL;
+	static const struct device_ops *apps;
 
 	FIND_DEVICE_INT(apps, "apps");
 	params = malloc(sizeof(struct popup_data));
@@ -295,7 +294,7 @@ static int send_full_noti(enum charge_full_type state)
 
 	switch (state) {
 	case CHARGING_FULL:
-		for (retry = RETRY_MAX; retry > 0 ;retry--) {
+		for (retry = RETRY_MAX; retry > 0; retry--) {
 			ret = dbus_method_async_with_reply(POPUP_BUS_NAME,
 					POPUP_PATH_BATTERY,
 					POPUP_INTERFACE_BATTERY,
@@ -313,7 +312,7 @@ static int send_full_noti(enum charge_full_type state)
 			return -EPERM;
 		snprintf(str_id, sizeof(str_id), "%d", noti_id);
 		arr[0] = str_id;
-		for (retry = RETRY_MAX; retry > 0 ;retry--) {
+		for (retry = RETRY_MAX; retry > 0; retry--) {
 			ret = dbus_method_async(POPUP_BUS_NAME,
 					POPUP_PATH_BATTERY,
 					POPUP_INTERFACE_BATTERY,
@@ -336,7 +335,7 @@ int send_charge_noti(void)
 	int ret = 0;
 	int retry;
 
-	for (retry = RETRY_MAX; retry > 0 ;retry--) {
+	for (retry = RETRY_MAX; retry > 0; retry--) {
 		ret = dbus_method_async(POPUP_BUS_NAME,
 				POPUP_PATH_BATTERY,
 				POPUP_INTERFACE_BATTERY,
@@ -385,7 +384,7 @@ void battery_noti(enum battery_noti_type type, enum battery_noti_status status)
 static void noti_batt_full(void)
 {
 	char params[BUFF_MAX];
-	static int bat_full_noti = 0;
+	static int bat_full_noti;
 	int r_disturb, s_disturb, r_block, s_block;
 
 	r_disturb = vconf_get_int("memory/shealth/sleep/do_not_disturb", &s_disturb);
@@ -565,8 +564,7 @@ void power_supply(void *data)
 	if (old.online != battery.online ||
 	    old.charge_now != battery.charge_now ||
 	    old.charge_full != battery.charge_full) {
-		switch (battery.charge_now)
-		{
+		switch (battery.charge_now) {
 		case CHARGER_ABNORMAL:
 			status = POWER_SUPPLY_STATUS_NOT_CHARGING;
 			break;
@@ -599,7 +597,7 @@ void power_supply(void *data)
 
 void power_supply_broadcast(char *sig, int status)
 {
-	static int old = 0;
+	static int old;
 	static char sig_old[32];
 	char *arr[1];
 	char str_status[32];
@@ -753,8 +751,7 @@ static int load_uevent(struct parse_result *result, void *user_data)
 			info->charge_now = CHARGER_ABNORMAL;
 			info->charge_full = CHARGING_NOT_FULL;
 		}
-	}
-	else if (MATCH(result->name, CAPACITY))
+	} else if (MATCH(result->name, CAPACITY))
 		info->capacity = atoi(result->value);
 	return 0;
 }
@@ -825,7 +822,7 @@ void power_supply_timer_start(void)
 
 void power_supply_timer_stop(void)
 {
-    _D("battery init timer during booting");
+	_D("battery init timer during booting");
 	if (!power_timer)
 		return;
 	ecore_timer_del(power_timer);

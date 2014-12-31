@@ -331,7 +331,7 @@ static int power_saving_cpu_cb(keynode_t *key_nodes, void *data)
 	if (ret < 0)
 		_E("Write failed");
 out:
-	device_notify(DEVICE_NOTIFIER_PMQOS_POWERSAVING, (void*)val);
+	device_notify(DEVICE_NOTIFIER_PMQOS_POWERSAVING, (void *)val);
 	return ret;
 }
 
@@ -346,7 +346,7 @@ static void set_emergency_limit(void)
 	}
 	if (val == SETTING_PSMODE_EMERGENCY) {
 		val = EMERGENCY_LOCK;
-		device_notify(DEVICE_NOTIFIER_PMQOS_EMERGENCY, (void*)val);
+		device_notify(DEVICE_NOTIFIER_PMQOS_EMERGENCY, (void *)val);
 	}
 }
 
@@ -360,7 +360,7 @@ static int emergency_cpu_cb(keynode_t *key_nodes, void *data)
 	else
 		val = EMERGENCY_UNLOCK;
 
-	device_notify(DEVICE_NOTIFIER_PMQOS_EMERGENCY, (void*)val);
+	device_notify(DEVICE_NOTIFIER_PMQOS_EMERGENCY, (void *)val);
 	return 0;
 }
 
@@ -409,7 +409,7 @@ static void set_freq_limit(void)
 		_E("Write entry failed");
 out:
 	_I("init");
-	device_notify(DEVICE_NOTIFIER_PMQOS_POWERSAVING, (void*)val);
+	device_notify(DEVICE_NOTIFIER_PMQOS_POWERSAVING, (void *)val);
 }
 
 static int remove_entry_from_cpu_number_list(int pid)

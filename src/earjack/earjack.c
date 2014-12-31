@@ -40,11 +40,11 @@
 
 #define SIGNAL_EARJACK_STATE	"ChangedEarjack"
 
-static int earjack_status = 0;
+static int earjack_status;
 
 static void earjack_send_broadcast(int status)
 {
-	static int old = 0;
+	static int old;
 	char *arr[1];
 	char str_status[32];
 

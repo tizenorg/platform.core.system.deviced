@@ -22,25 +22,25 @@
 #include "core/devices.h"
 #include "core/list.h"
 
-static dd_list *apps_head = NULL;
+static dd_list *apps_head;
 
 void add_apps(const struct apps_ops *dev)
 {
 	_I("add %s", dev->name);
-	DD_LIST_APPEND(apps_head, (void*)dev);
+	DD_LIST_APPEND(apps_head, (void *)dev);
 }
 
 void remove_apps(const struct apps_ops *dev)
 {
-	DD_LIST_REMOVE(apps_head, (void*)dev);
+	DD_LIST_REMOVE(apps_head, (void *)dev);
 }
 
 static void apps_init(void *data)
 {
-	const struct apps_ops*dev;
+	const struct apps_ops *dev;
 	dd_list *elem;
 	struct apps_data *input_data;
-	static int initialized =0;
+	static int initialized;
 
 	if (!initialized) {
 		DD_LIST_FOREACH(apps_head, elem, dev) {
@@ -67,7 +67,7 @@ static void apps_init(void *data)
 
 static void apps_exit(void *data)
 {
-	const struct apps_ops*dev;
+	const struct apps_ops *dev;
 	dd_list *elem;
 	struct apps_data *input_data;
 

@@ -62,7 +62,7 @@ API int mmc_secure_unmount(const char *mount_point)
 
 static void mount_mmc_cb(void *data, DBusMessage *msg, DBusError *err)
 {
-	struct mmc_contents *mmc_data = (struct mmc_contents*)data;
+	struct mmc_contents *mmc_data = (struct mmc_contents *)data;
 	DBusError r_err;
 	int r, mmc_ret;
 
@@ -84,9 +84,6 @@ static void mount_mmc_cb(void *data, DBusMessage *msg, DBusError *err)
 	}
 
 	_I("Mount State : %d", mmc_ret);
-
-//	if (mmc_ret == ODE_MOUNT_STATE)
-//		return;
 
 exit:
 	(mmc_data->mmc_cb)(mmc_ret, mmc_data->user_data);
@@ -111,7 +108,7 @@ API int deviced_request_mount_mmc(struct mmc_contents *mmc_data)
 
 static void unmount_mmc_cb(void *data, DBusMessage *msg, DBusError *err)
 {
-	struct mmc_contents *mmc_data = (struct mmc_contents*)data;
+	struct mmc_contents *mmc_data = (struct mmc_contents *)data;
 	DBusError r_err;
 	int r, mmc_ret;
 
@@ -164,7 +161,7 @@ API int deviced_request_unmount_mmc(struct mmc_contents *mmc_data, int option)
 
 static void format_mmc_cb(void *data, DBusMessage *msg, DBusError *err)
 {
-	struct mmc_contents *mmc_data = (struct mmc_contents*)data;
+	struct mmc_contents *mmc_data = (struct mmc_contents *)data;
 	DBusError r_err;
 	int r, mmc_ret;
 

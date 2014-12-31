@@ -116,12 +116,12 @@ static void late_init_stop(void)
 
 static int booting_done(void *data)
 {
-	static int done = 0;
+	static int done;
 
 	if (data == NULL)
 		goto out;
 
-	done = *(int*)data;
+	done = *(int *)data;
 	if (late_init_timer == NULL)
 		return done;
 	late_init_stop();

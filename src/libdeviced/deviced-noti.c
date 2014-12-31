@@ -142,7 +142,7 @@ static int noti_send(struct sysnoti *msg)
 	return result;
 }
 
-static int dbus_flightmode_handler(char* type, char *buf)
+static int dbus_flightmode_handler(char *type, char *buf)
 {
 	DBusError err;
 	DBusMessage *msg;
@@ -213,7 +213,7 @@ API int deviced_call_predef_action(const char *type, int num, ...)
 	return ret;
 }
 
-static int dbus_proc_handler(char* type, char *buf)
+static int dbus_proc_handler(char *type, char *buf)
 {
 	DBusError err;
 	DBusMessage *msg;
@@ -273,7 +273,7 @@ API int deviced_inform_inactive(pid_t pid)
 	return dbus_proc_handler(PREDEF_INACTIVE, buf);
 }
 
-static int dbus_power_handler(char* type)
+static int dbus_power_handler(char *type)
 {
 	DBusError err;
 	DBusMessage *msg;
@@ -324,7 +324,7 @@ API int deviced_request_reboot(void)
 	return dbus_power_handler(PREDEF_REBOOT);
 }
 
-static int dbus_time_handler(char* type, char* buf)
+static int dbus_time_handler(char *type, char *buf)
 {
 	DBusError err;
 	DBusMessage *msg;
@@ -457,7 +457,7 @@ API int deviced_set_timezone(char *tzpath_str)
 	return dbus_time_handler(PREDEF_SET_TIMEZONE, buf);
 }
 
-static int dbus_cpu_handler(char* type, char* buf_pid, char* buf_freq)
+static int dbus_cpu_handler(char *type, char *buf_pid, char *buf_freq)
 {
 	DBusError err;
 	DBusMessage *msg;
@@ -495,7 +495,7 @@ API int deviced_request_set_cpu_max_frequency(int val)
 	char buf_pid[8];
 	char buf_freq[256];
 
-	// to do - need to check new frequncy is valid
+	/* to do - need to check new frequncy is valid */
 	snprintf(buf_pid, sizeof(buf_pid), "%d", getpid());
 	snprintf(buf_freq, sizeof(buf_freq), "%d", val * 1000);
 
@@ -507,7 +507,7 @@ API int deviced_request_set_cpu_min_frequency(int val)
 	char buf_pid[8];
 	char buf_freq[256];
 
-	// to do - need to check new frequncy is valid
+	/* to do - need to check new frequncy is valid */
 	snprintf(buf_pid, sizeof(buf_pid), "%d", getpid());
 	snprintf(buf_freq, sizeof(buf_freq), "%d", val * 1000);
 

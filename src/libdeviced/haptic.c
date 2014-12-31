@@ -48,7 +48,7 @@
 #define TEMP_BUFFER_SIZE			(64*1024)
 
 /* START of Static Function Section */
-static unsigned char* convert_file_to_buffer(const char *file_name, int *size)
+static unsigned char *convert_file_to_buffer(const char *file_name, int *size)
 {
 	FILE *pf;
 	long file_size;
@@ -74,7 +74,7 @@ static unsigned char* convert_file_to_buffer(const char *file_name, int *size)
 	if (file_size < 0)
 		goto error;
 
-	pdata = (unsigned char*)malloc(file_size);
+	pdata = (unsigned char *)malloc(file_size);
 	if (!pdata)
 		goto error;
 
@@ -120,7 +120,8 @@ static int save_data(const unsigned char *data, int size, const char *file_path)
 	}
 
 	if (fsync(fd) < 0) {
-		_E("To be synchronized with the disk is failed : %s", strerror(errno));
+		_E("To be synchronized with the disk is failed : %s",
+				strerror(errno));
 		fclose(file);
 		return -1;
 	}
@@ -133,20 +134,22 @@ static haptic_feedback_e convert_setting_to_module_level(void)
 {
 	int setting_fb_level;
 
-	if (vconf_get_int(VCONFKEY_SETAPPL_TOUCH_FEEDBACK_VIBRATION_LEVEL_INT, &setting_fb_level) < 0) {
+	if (vconf_get_int(VCONFKEY_SETAPPL_TOUCH_FEEDBACK_VIBRATION_LEVEL_INT,
+				&setting_fb_level) < 0) {
 		setting_fb_level = SETTING_VIB_FEEDBACK_LEVEL3;
 	}
 
-	if (setting_fb_level < HAPTIC_FEEDBACK_0 || setting_fb_level > HAPTIC_FEEDBACK_5)
+	if (setting_fb_level < HAPTIC_FEEDBACK_0 ||
+	    setting_fb_level > HAPTIC_FEEDBACK_5)
 		return -1;
 
 	switch (setting_fb_level) {
-	case SETTING_VIB_FEEDBACK_LEVEL0 : return HAPTIC_FEEDBACK_0;
-	case SETTING_VIB_FEEDBACK_LEVEL1 : return HAPTIC_FEEDBACK_1;
-	case SETTING_VIB_FEEDBACK_LEVEL2 : return HAPTIC_FEEDBACK_2;
-	case SETTING_VIB_FEEDBACK_LEVEL3 : return HAPTIC_FEEDBACK_3;
-	case SETTING_VIB_FEEDBACK_LEVEL4 : return HAPTIC_FEEDBACK_4;
-	case SETTING_VIB_FEEDBACK_LEVEL5 : return HAPTIC_FEEDBACK_5;
+	case SETTING_VIB_FEEDBACK_LEVEL0: return HAPTIC_FEEDBACK_0;
+	case SETTING_VIB_FEEDBACK_LEVEL1: return HAPTIC_FEEDBACK_1;
+	case SETTING_VIB_FEEDBACK_LEVEL2: return HAPTIC_FEEDBACK_2;
+	case SETTING_VIB_FEEDBACK_LEVEL3: return HAPTIC_FEEDBACK_3;
+	case SETTING_VIB_FEEDBACK_LEVEL4: return HAPTIC_FEEDBACK_4;
+	case SETTING_VIB_FEEDBACK_LEVEL5: return HAPTIC_FEEDBACK_5;
 	default:
 		break;
 	}
@@ -175,15 +178,17 @@ API int haptic_get_count(int *device_number)
 	return HAPTIC_ERROR_NONE;
 }
 
-API int haptic_open(haptic_device_e device_index, haptic_device_h *device_handle)
+API int haptic_open(haptic_device_e device_index,
+		haptic_device_h *device_handle)
 {
 	char str_index[32];
 	char *arr[1];
 	int ret;
 
 	/* check if index is valid */
-	if (!(device_index == HAPTIC_DEVICE_0 || device_index == HAPTIC_DEVICE_1 ||
-				device_index == HAPTIC_DEVICE_ALL)) {
+	if (!(device_index == HAPTIC_DEVICE_0 ||
+	    device_index == HAPTIC_DEVICE_1 ||
+		device_index == HAPTIC_DEVICE_ALL)) {
 		_E("Invalid parameter : device_index(%d)", device_index);
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
@@ -233,20 +238,19 @@ API int haptic_close(haptic_device_h device_handle)
 	return HAPTIC_ERROR_NONE;
 }
 
-API int haptic_vibrate_monotone(haptic_device_h device_handle, int duration, haptic_effect_h *effect_handle)
+API int haptic_vibrate_monotone(haptic_device_h device_handle,
+		int duration, haptic_effect_h *effect_handle)
 {
 	return haptic_vibrate_monotone_with_detail(device_handle,
-											   duration,
-											   HAPTIC_FEEDBACK_AUTO,
-											   HAPTIC_PRIORITY_MIN,
-											   effect_handle);
+			duration, HAPTIC_FEEDBACK_AUTO, HAPTIC_PRIORITY_MIN,
+			effect_handle);
 }
 
 API int haptic_vibrate_monotone_with_detail(haptic_device_h device_handle,
-                                        int duration,
-                                        haptic_feedback_e feedback,
-                                        haptic_priority_e priority,
-                                        haptic_effect_h *effect_handle)
+		int duration,
+		haptic_feedback_e feedback,
+		haptic_priority_e priority,
+		haptic_effect_h *effect_handle)
 {
 	char str_handle[32];
 	char str_duration[32];
@@ -303,7 +307,8 @@ API int haptic_vibrate_monotone_with_detail(haptic_device_h device_handle,
 	return HAPTIC_ERROR_NONE;
 }
 
-API int haptic_vibrate_file(haptic_device_h device_handle, const char *file_path, haptic_effect_h *effect_handle)
+API int haptic_vibrate_file(haptic_device_h device_handle,
+		const char *file_path, haptic_effect_h *effect_handle)
 {
 	char *vibe_buffer;
 	int size, ret;
@@ -315,22 +320,19 @@ API int haptic_vibrate_file(haptic_device_h device_handle, const char *file_path
 	}
 
 	ret = haptic_vibrate_buffers_with_detail(device_handle,
-											vibe_buffer,
-											size,
-											HAPTIC_ITERATION_ONCE,
-											HAPTIC_FEEDBACK_AUTO,
-											HAPTIC_PRIORITY_MIN,
-											effect_handle);
+			vibe_buffer, size, HAPTIC_ITERATION_ONCE,
+			HAPTIC_FEEDBACK_AUTO, HAPTIC_PRIORITY_MIN,
+			effect_handle);
 	free(vibe_buffer);
 	return ret;
 }
 
 API int haptic_vibrate_file_with_detail(haptic_device_h device_handle,
-                                    const char *file_path,
-                                    haptic_iteration_e iteration,
-                                    haptic_feedback_e feedback,
-                                    haptic_priority_e priority,
-                                    haptic_effect_h *effect_handle)
+		const char *file_path,
+		haptic_iteration_e iteration,
+		haptic_feedback_e feedback,
+		haptic_priority_e priority,
+		haptic_effect_h *effect_handle)
 {
 	char *vibe_buffer;
 	int size, ret;
@@ -342,64 +344,52 @@ API int haptic_vibrate_file_with_detail(haptic_device_h device_handle,
 	}
 
 	ret = haptic_vibrate_buffers_with_detail(device_handle,
-											vibe_buffer,
-											size,
-											iteration,
-											feedback,
-											priority,
-											effect_handle);
+			vibe_buffer, size, iteration, feedback, priority,
+			effect_handle);
 	free(vibe_buffer);
 	return ret;
 }
 
-API int haptic_vibrate_buffer(haptic_device_h device_handle, const unsigned char *vibe_buffer, haptic_effect_h *effect_handle)
+API int haptic_vibrate_buffer(haptic_device_h device_handle,
+		const unsigned char *vibe_buffer,
+		haptic_effect_h *effect_handle)
 {
 	return haptic_vibrate_buffers_with_detail(device_handle,
-											 vibe_buffer,
-											 TEMP_BUFFER_SIZE,
-											 HAPTIC_ITERATION_ONCE,
-											 HAPTIC_FEEDBACK_AUTO,
-											 HAPTIC_PRIORITY_MIN,
-											 effect_handle);
+			vibe_buffer, TEMP_BUFFER_SIZE,
+			HAPTIC_ITERATION_ONCE, HAPTIC_FEEDBACK_AUTO,
+			HAPTIC_PRIORITY_MIN, effect_handle);
 }
 
 API int haptic_vibrate_buffer_with_detail(haptic_device_h device_handle,
-                                      const unsigned char *vibe_buffer,
-                                      haptic_iteration_e iteration,
-                                      haptic_feedback_e feedback,
-                                      haptic_priority_e priority,
-                                      haptic_effect_h *effect_handle)
+		const unsigned char *vibe_buffer,
+		haptic_iteration_e iteration,
+		haptic_feedback_e feedback,
+		haptic_priority_e priority,
+		haptic_effect_h *effect_handle)
 {
 	return haptic_vibrate_buffers_with_detail(device_handle,
-											 vibe_buffer,
-											 TEMP_BUFFER_SIZE,
-											 iteration,
-											 feedback,
-											 priority,
-											 effect_handle);
+			vibe_buffer, TEMP_BUFFER_SIZE,
+			iteration, feedback, priority, effect_handle);
 }
 
 API int haptic_vibrate_buffers(haptic_device_h device_handle,
-							const unsigned char *vibe_buffer,
-							int size,
-							haptic_effect_h *effect_handle)
+		const unsigned char *vibe_buffer,
+		int size,
+		haptic_effect_h *effect_handle)
 {
 	return haptic_vibrate_buffers_with_detail(device_handle,
-											 vibe_buffer,
-											 size,
-											 HAPTIC_ITERATION_ONCE,
-											 HAPTIC_FEEDBACK_AUTO,
-											 HAPTIC_PRIORITY_MIN,
-											 effect_handle);
+			vibe_buffer, size, HAPTIC_ITERATION_ONCE,
+			HAPTIC_FEEDBACK_AUTO, HAPTIC_PRIORITY_MIN,
+			effect_handle);
 }
 
 API int haptic_vibrate_buffers_with_detail(haptic_device_h device_handle,
-                                      const unsigned char *vibe_buffer,
-									  int size,
-                                      haptic_iteration_e iteration,
-                                      haptic_feedback_e feedback,
-                                      haptic_priority_e priority,
-                                      haptic_effect_h *effect_handle)
+		const unsigned char *vibe_buffer,
+		int size,
+		haptic_iteration_e iteration,
+		haptic_feedback_e feedback,
+		haptic_priority_e priority,
+		haptic_effect_h *effect_handle)
 {
 	char str_handle[32];
 	char str_iteration[32];
@@ -421,7 +411,8 @@ API int haptic_vibrate_buffers_with_detail(haptic_device_h device_handle,
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
 
-	if (iteration < HAPTIC_ITERATION_ONCE || iteration > HAPTIC_ITERATION_INFINITE) {
+	if (iteration < HAPTIC_ITERATION_ONCE ||
+	    iteration > HAPTIC_ITERATION_INFINITE) {
 		_E("Invalid parameter : iteration(%d)", iteration);
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
@@ -444,7 +435,7 @@ API int haptic_vibrate_buffers_with_detail(haptic_device_h device_handle,
 	arr[0] = str_handle;
 	bytes.size = size;
 	bytes.data = vibe_buffer;
-	arr[2] = (char*)&bytes;
+	arr[2] = (char *)&bytes;
 	snprintf(str_iteration, sizeof(str_iteration), "%d", iteration);
 	arr[3] = str_iteration;
 	snprintf(str_feedback, sizeof(str_feedback), "%d", feedback);
@@ -465,7 +456,8 @@ API int haptic_vibrate_buffers_with_detail(haptic_device_h device_handle,
 	return HAPTIC_ERROR_NONE;
 }
 
-API int haptic_stop_effect(haptic_device_h device_handle, haptic_effect_h effect_handle)
+API int haptic_stop_effect(haptic_device_h device_handle,
+		haptic_effect_h effect_handle)
 {
 	return haptic_stop_all_effects(device_handle);
 }
@@ -495,7 +487,8 @@ API int haptic_stop_all_effects(haptic_device_h device_handle)
 	return HAPTIC_ERROR_NONE;
 }
 
-API int haptic_get_effect_state(haptic_device_h device_handle, haptic_effect_h effect_handle, haptic_state_e *effect_state)
+API int haptic_get_effect_state(haptic_device_h device_handle,
+		haptic_effect_h effect_handle, haptic_state_e *effect_state)
 {
 	char str_index[32];
 	char *arr[1];
@@ -528,9 +521,9 @@ API int haptic_get_effect_state(haptic_device_h device_handle, haptic_effect_h e
 }
 
 API int haptic_create_effect(unsigned char *vibe_buffer,
-                         int max_bufsize,
-                         haptic_effect_element_s *elem_arr,
-                         int max_elemcnt)
+		int max_bufsize,
+		haptic_effect_element_s *elem_arr,
+		int max_elemcnt)
 {
 	DBusError err;
 	DBusMessage *msg;
@@ -566,7 +559,8 @@ API int haptic_create_effect(unsigned char *vibe_buffer,
 	/* convert to proper feedback level in case of auto */
 	for (i = 0; i < max_elemcnt; i++) {
 		if (elem_arr[i].haptic_level == HAPTIC_FEEDBACK_AUTO) {
-			vconf_get_int(VCONFKEY_SETAPPL_TOUCH_FEEDBACK_VIBRATION_LEVEL_INT, &temp);
+			vconf_get_int(VCONFKEY_SETAPPL_TOUCH_FEEDBACK_VIBRATION_LEVEL_INT,
+					&temp);
 			elem_arr[i].haptic_level = temp*20;
 		}
 	}
@@ -574,8 +568,8 @@ API int haptic_create_effect(unsigned char *vibe_buffer,
 	snprintf(str_bufsize, sizeof(str_bufsize), "%d", max_bufsize);
 	arr[0] = str_bufsize;
 	bytes.size = sizeof(haptic_effect_element_s)*max_elemcnt;
-	bytes.data = (unsigned char*)elem_arr;
-	arr[2] = (char*)&bytes;
+	bytes.data = (unsigned char *)elem_arr;
+	arr[2] = (char *)&bytes;
 	snprintf(str_elemcnt, sizeof(str_elemcnt), "%d", max_elemcnt);
 	arr[3] = str_elemcnt;
 
@@ -588,7 +582,8 @@ API int haptic_create_effect(unsigned char *vibe_buffer,
 
 	dbus_error_init(&err);
 
-	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE, &data, &size,
+	ret = dbus_message_get_args(msg, &err,
+			DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE, &data, &size,
 			DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
 	if (!ret) {
 		_E("no message : [%s:%s]", err.name, err.message);
@@ -597,12 +592,14 @@ API int haptic_create_effect(unsigned char *vibe_buffer,
 	}
 
 	if (ret_val < 0) {
-		_E("%s-%s failed : %d", DEVICED_INTERFACE_HAPTIC, METHOD_CREATE_EFFECT, ret_val);
+		_E("%s-%s failed : %d", DEVICED_INTERFACE_HAPTIC,
+				METHOD_CREATE_EFFECT, ret_val);
 		goto err;
 	}
 
 	if (max_bufsize < size) {
-		_E("max_bufsize(%d) is smaller than effect buffer size(%d)", max_bufsize, size);
+		_E("max_bufsize(%d) is smaller than effect buffer size(%d)",
+				max_bufsize, size);
 		goto err;
 	}
 
@@ -615,8 +612,7 @@ err:
 }
 
 API int haptic_save_effect(const unsigned char *vibe_buffer,
-                       int max_bufsize,
-                       const char *file_path)
+		int max_bufsize, const char *file_path)
 {
 	struct stat buf;
 	int size, ret;
@@ -653,7 +649,8 @@ API int haptic_save_effect(const unsigned char *vibe_buffer,
 	return HAPTIC_ERROR_NONE;
 }
 
-API int haptic_get_file_duration(haptic_device_h device_handle, const char *file_path, int *file_duration)
+API int haptic_get_file_duration(haptic_device_h device_handle,
+		const char *file_path, int *file_duration)
 {
 	char *vibe_buffer;
 	int size, ret;
@@ -665,22 +662,21 @@ API int haptic_get_file_duration(haptic_device_h device_handle, const char *file
 	}
 
 	ret = haptic_get_buffers_duration(device_handle,
-									 vibe_buffer,
-									 size,
-									 file_duration);
+			vibe_buffer, size, file_duration);
 	free(vibe_buffer);
 	return ret;
 }
 
-API int haptic_get_buffer_duration(haptic_device_h device_handle, const unsigned char *vibe_buffer, int *buffer_duration)
+API int haptic_get_buffer_duration(haptic_device_h device_handle,
+		const unsigned char *vibe_buffer, int *buffer_duration)
 {
 	return haptic_get_buffers_duration(device_handle,
-									vibe_buffer,
-									TEMP_BUFFER_SIZE,
-									buffer_duration);
+			vibe_buffer, TEMP_BUFFER_SIZE, buffer_duration);
 }
 
-API int haptic_get_buffers_duration(haptic_device_h device_handle, const unsigned char *vibe_buffer, int size, int *buffer_duration)
+API int haptic_get_buffers_duration(haptic_device_h device_handle,
+		const unsigned char *vibe_buffer, int size,
+		int *buffer_duration)
 {
 	char str_handle[32];
 	char *arr[3];
@@ -708,7 +704,7 @@ API int haptic_get_buffers_duration(haptic_device_h device_handle, const unsigne
 	arr[0] = str_handle;
 	bytes.size = size;
 	bytes.data = vibe_buffer;
-	arr[2] = (char*)&bytes;
+	arr[2] = (char *)&bytes;
 
 	/* request to deviced to open haptic device */
 	ret = dbus_method_sync(DEVICED_BUS_NAME,
@@ -721,7 +717,8 @@ API int haptic_get_buffers_duration(haptic_device_h device_handle, const unsigne
 	return HAPTIC_ERROR_NONE;
 }
 
-API int haptic_save_led(const unsigned char *vibe_buffer, int max_bufsize, const char *file_path)
+API int haptic_save_led(const unsigned char *vibe_buffer, int max_bufsize,
+		const char *file_path)
 {
 	struct stat buf;
 	char str_bufsize[32];
@@ -753,8 +750,8 @@ API int haptic_save_led(const unsigned char *vibe_buffer, int max_bufsize, const
 
 	bytes.size = max_bufsize;
 	bytes.data = vibe_buffer;
-	arr[1] = (char*)&bytes;
-	arr[2] = (char*)file_path;
+	arr[1] = (char *)&bytes;
+	arr[2] = (char *)file_path;
 
 	/* request to deviced to open haptic device */
 	ret = dbus_method_sync(DEVICED_BUS_NAME,

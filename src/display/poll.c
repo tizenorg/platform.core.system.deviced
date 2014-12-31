@@ -66,7 +66,7 @@ extern int check_key_filter(int length, char buf[], int fd);
 		if (CHECK_OPS(keyfilter_ops, check) && \
 		    keyfilter_ops->check(a, b, c) != 0) \
 			return EINA_TRUE;\
-	} while (0);
+	} while (0)
 #else
 #  define CHECK_KEY_FILTER(a, b, c)
 #endif
@@ -79,7 +79,7 @@ static Eina_Bool pm_handler(void *data, Ecore_Fd_Handler *fd_handler)
 	struct sockaddr_un clientaddr;
 	int fd;
 	int ret;
-	static const struct device_ops *display_device_ops = NULL;
+	static const struct device_ops *display_device_ops;
 
 	if (!data)
 		return EINA_FALSE;
@@ -186,7 +186,7 @@ int init_pm_poll(int (*pm_callback) (int, PMMsg *))
 		memset(new_dev, 0, sizeof(indev));
 
 		len = strlen(path) + 1;
-		new_path = (char*) malloc(len);
+		new_path = (char *) malloc(len);
 		if (!new_path) {
 			_E("Fail to malloc for dev_path %s", path);
 			goto out4;
@@ -234,7 +234,7 @@ int exit_pm_poll(void)
 	return 0;
 }
 
-int init_pm_poll_input(int (*pm_callback)(int , PMMsg * ), const char *path)
+int init_pm_poll_input(int (*pm_callback)(int , PMMsg *), const char *path)
 {
 	indev *new_dev = NULL;
 	indev *data = NULL;
@@ -250,7 +250,7 @@ int init_pm_poll_input(int (*pm_callback)(int , PMMsg * ), const char *path)
 	}
 
 	EINA_LIST_FOREACH_SAFE(indev_list, l, l_next, data)
-		if(!strcmp(path, data->dev_path)) {
+		if (!strcmp(path, data->dev_path)) {
 			_E("%s is already polled!", path);
 			return -1;
 		}
@@ -265,13 +265,13 @@ int init_pm_poll_input(int (*pm_callback)(int , PMMsg * ), const char *path)
 		return -1;
 	}
 
-	dev_path = (char*)malloc(strlen(path) + 1);
+	dev_path = (char *)malloc(strlen(path) + 1);
 	if (!dev_path) {
 		_E("Fail to malloc for dev_path");
 		close(fd);
 		return -1;
 	}
-	strncpy(dev_path, path, strlen(path) +1);
+	strncpy(dev_path, path, strlen(path) + 1);
 
 	/*
 	 * To pass a fd data through the fd hander infrastructure
@@ -315,7 +315,7 @@ int check_pre_install(int fd)
 	Eina_List *l_next = NULL;
 
 	EINA_LIST_FOREACH_SAFE(indev_list, l, l_next, data)
-		if(fd == data->fd) {
+		if (fd == data->fd) {
 			return data->pre_install;
 		}
 

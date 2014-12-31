@@ -80,7 +80,7 @@ static void *format_start(void *arg);
 
 static const struct mmc_thread_func {
 	enum mmc_operation type;
-	void *(*func) (void*);
+	void *(*func) (void *);
 } mmc_func[MMC_END] = {
 	[MMC_MOUNT] = {.type = MMC_MOUNT, .func = mount_start},
 	[MMC_UNMOUNT] = {.type = MMC_UNMOUNT, .func = unmount_start},
@@ -100,9 +100,9 @@ struct popup_data {
 
 static dd_list *fs_head;
 static char *mmc_curpath;
-static bool smack = false;
-static bool mmc_disabled = false;
-static Ecore_Timer *smack_timer = NULL;
+static bool smack;
+static bool mmc_disabled;
+static Ecore_Timer *smack_timer;
 
 static void __CONSTRUCTOR__ smack_check(void)
 {
@@ -120,12 +120,12 @@ static void __CONSTRUCTOR__ smack_check(void)
 
 void add_fs(const struct mmc_fs_ops *fs)
 {
-	DD_LIST_APPEND(fs_head, (void*)fs);
+	DD_LIST_APPEND(fs_head, (void *)fs);
 }
 
 void remove_fs(const struct mmc_fs_ops *fs)
 {
-	DD_LIST_REMOVE(fs_head, (void*)fs);
+	DD_LIST_REMOVE(fs_head, (void *)fs);
 }
 
 const struct mmc_fs_ops *find_fs(enum mmc_fs_type type)
@@ -159,7 +159,7 @@ bool mmc_check_mounted(const char *mount_point)
 static void launch_syspopup(char *str)
 {
 	struct popup_data *params;
-	static const struct device_ops *apps = NULL;
+	static const struct device_ops *apps;
 
 	FIND_DEVICE_VOID(apps, "apps");
 
@@ -244,7 +244,8 @@ int get_block_number(void)
 
 	while ((dir = readdir(dp)) != NULL) {
 		memset(&stat, 0, sizeof(struct stat));
-		if(lstat(dir->d_name, &stat) < 0) {continue;}
+		if (lstat(dir->d_name, &stat) < 0)
+			continue;
 		if (S_ISDIR(stat.st_mode) || S_ISLNK(stat.st_mode)) {
 			if (strncmp(".", dir->d_name, 1) == 0
 			    || strncmp("..", dir->d_name, 2) == 0)
@@ -286,22 +287,22 @@ int get_block_number(void)
 						return mmcblk_num;
 					}
 					r = read(fd, buf, 255);
-					if ((r >=0) && (r < 255)) {
+					if ((r >= 0) && (r < 255)) {
 						buf[r] = '\0';
 					} else {
-						_E("%s read error: %s", buf,strerror(errno));
+						_E("%s read error: %s", buf, strerror(errno));
 					}
 					close(fd);
 					pre_mmc_device_id = vconf_get_str(VCONFKEY_INTERNAL_PRIVATE_MMC_ID);
 					if (pre_mmc_device_id) {
 						if (strcmp(pre_mmc_device_id, "") == 0) {
 							vconf_set_str(VCONFKEY_INTERNAL_PRIVATE_MMC_ID, buf);
-						} else if (strncmp(pre_mmc_device_id,buf,33) == 0) {
-							if ( vconf_get_int(VCONFKEY_SYSMAN_MMC_DEVICE_CHANGED,&mmc_dev_changed) == 0
+						} else if (strncmp(pre_mmc_device_id, buf, 33) == 0) {
+							if (vconf_get_int(VCONFKEY_SYSMAN_MMC_DEVICE_CHANGED, &mmc_dev_changed) == 0
 							&& mmc_dev_changed != VCONFKEY_SYSMAN_MMC_NOT_CHANGED) {
 								vconf_set_int(VCONFKEY_SYSMAN_MMC_DEVICE_CHANGED, VCONFKEY_SYSMAN_MMC_NOT_CHANGED);
 							}
-						} else if (strncmp(pre_mmc_device_id,buf,32) != 0) {
+						} else if (strncmp(pre_mmc_device_id, buf, 32) != 0) {
 							vconf_set_str(VCONFKEY_INTERNAL_PRIVATE_MMC_ID, buf);
 							vconf_set_int(VCONFKEY_SYSMAN_MMC_DEVICE_CHANGED, VCONFKEY_SYSMAN_MMC_CHANGED);
 						}
@@ -435,7 +436,7 @@ static int mmc_mount(const char *devpath, const char *mount_point)
 
 static void *mount_start(void *arg)
 {
-	struct mmc_data *data = (struct mmc_data*)arg;
+	struct mmc_data *data = (struct mmc_data *)arg;
 	char *devpath;
 	int r;
 
@@ -547,7 +548,7 @@ static int mmc_unmount(int option, const char *mount_point)
 
 static void *unmount_start(void *arg)
 {
-	struct mmc_data *data = (struct mmc_data*)arg;
+	struct mmc_data *data = (struct mmc_data *)arg;
 	int option, r;
 
 	option = data->option;
@@ -627,7 +628,7 @@ static int format(const char *devpath)
 
 static void *format_start(void *arg)
 {
-	struct mmc_data *data = (struct mmc_data*)arg;
+	struct mmc_data *data = (struct mmc_data *)arg;
 	char *devpath;
 	int option, r, key = VCONFKEY_SYSMAN_MMC_MOUNTED;
 	bool format_ret = true;
@@ -662,7 +663,7 @@ release_memory:
 error:
 	_E("Format Failed : %s", strerror(-r));
 	vconf_set_int(VCONFKEY_SYSMAN_MMC_FORMAT, VCONFKEY_SYSMAN_MMC_FORMAT_FAILED);
-	return (void*)r;
+	return (void *)r;
 }
 
 static int mmc_make_thread(int type, int option, const char *devpath)
@@ -720,7 +721,7 @@ static int mmc_removed(void)
 
 static int mmc_changed_cb(void *data)
 {
-	char *devpath = (char*)data;
+	char *devpath = (char *)data;
 
 	/* if MMC is inserted */
 	if (devpath)
@@ -729,7 +730,7 @@ static int mmc_changed_cb(void *data)
 		return mmc_removed();
 }
 
-static int mmc_booting_done(void* data)
+static int mmc_booting_done(void *data)
 {
 	char devpath[NAME_MAX] = {0,};
 	int r;

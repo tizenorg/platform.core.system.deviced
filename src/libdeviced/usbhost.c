@@ -45,7 +45,7 @@ static struct signal_handler handlers[] = {
 	{ SIGNAL_NAME_USB_STORAGE_CHANGED    , NULL, NULL, NULL },
 };
 
-static E_DBus_Connection *conn = NULL;
+static E_DBus_Connection *conn;
 
 static int register_edbus_signal_handler(const char *path, const char *interface,
 		const char *name, E_DBus_Signal_Cb cb,
@@ -60,7 +60,7 @@ static int register_edbus_signal_handler(const char *path, const char *interface
 		goto out;
 	}
 
-	for (i = 0 ; i < ARRAY_SIZE(handlers) ; i++) {
+	for (i = 0; i < ARRAY_SIZE(handlers); i++) {
 		if (strncmp(handlers[i].name, name, strlen(name)))
 			continue;
 		break;
@@ -116,7 +116,7 @@ static void storage_signal_handler(void *data, DBusMessage *msg)
 		return;
 	}
 
-	for (i = 0 ; i < ARRAY_SIZE(handlers) ; i++) {
+	for (i = 0; i < ARRAY_SIZE(handlers); i++) {
 		if (strcmp(handlers[i].name, SIGNAL_NAME_USB_STORAGE_CHANGED))
 			continue;
 		break;
@@ -162,7 +162,7 @@ API void deinit_usbhost_signal(void)
 	if (!conn)
 		return;
 
-	for (i = 0 ; i < ARRAY_SIZE(handlers) ; i++) {
+	for (i = 0; i < ARRAY_SIZE(handlers); i++) {
 		if (handlers[i].handler) {
 			e_dbus_signal_handler_del(conn, handlers[i].handler);
 			handlers[i].handler = NULL;
@@ -202,7 +202,7 @@ API int unregister_usb_storage_change_handler(void)
 {
 	int i;
 
-	for (i = 0 ; i < ARRAY_SIZE(handlers) ; i++) {
+	for (i = 0; i < ARRAY_SIZE(handlers); i++) {
 		if (strcmp(handlers[i].name, SIGNAL_NAME_USB_STORAGE_CHANGED))
 			continue;
 		if (handlers[i].handler == NULL)

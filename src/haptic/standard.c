@@ -86,7 +86,7 @@ static bool check_valid_handle(struct ff_info *info)
 static int ff_stop(int fd, struct ff_effect *effect);
 static Eina_Bool timer_cb(void *data)
 {
-	struct ff_info *info = (struct ff_info*)data;
+	struct ff_info *info = (struct ff_info *)data;
 
 	if (!info)
 		return ECORE_CALLBACK_CANCEL;
@@ -222,7 +222,7 @@ static int ff_play(int fd, struct ff_effect *effect)
 	play.code = effect->id;
 	play.value = 1; /* 1 : PLAY, 0 : STOP */
 
-	if (write(fd, (const void*)&play, sizeof(play)) == -1)
+	if (write(fd, (const void *)&play, sizeof(play)) == -1)
 		return -errno;
 
 	return 0;
@@ -240,7 +240,7 @@ static int ff_stop(int fd, struct ff_effect *effect)
 	stop.code = effect->id;
 	stop.value = 0; /* 1 : PLAY, 0 : STOP */
 
-	if (write(fd, (const void*)&stop, sizeof(stop)) == -1)
+	if (write(fd, (const void *)&stop, sizeof(stop)) == -1)
 		return -errno;
 
 	/* removing an effect from the device */
@@ -255,7 +255,7 @@ static int ff_stop(int fd, struct ff_effect *effect)
 
 static int create_unique_id(void)
 {
-	static int i = 0;
+	static int i;
 	return i++;		/* TODO: overflow */
 }
 

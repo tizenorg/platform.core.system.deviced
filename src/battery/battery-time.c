@@ -58,17 +58,17 @@ enum state_a {
 	A_END = 2
 };
 
-static Ecore_Timer *timeout_id = NULL;
+static Ecore_Timer *timeout_id;
 
 static Batt_node *batt_head[B_END];
 static Batt_node *batt_tail[B_END];
 static int MAX_VALUE_COUNT[B_END] = {MAX_COUNT_UNCHARGING, MAX_COUNT_CHARGING};
 static double avg_factor[B_END] = {-1.0, -1.0};
-static int full_capacity = 0;
-static int old_capacity = 0;
-static int charging_state = 0;
+static int full_capacity;
+static int old_capacity;
+static int charging_state;
 static int multiply_value[B_END] = {-1, 1};
-extern int system_wakeup_flag;
+int system_wakeup_flag;
 
 static int get_battery_capacity(void)
 {
@@ -128,14 +128,14 @@ static void print_all_batt_node(enum state_b b_index)
 
 	_I("print_all_batt_node [%d]", b_index);
 
-	if(b_index < 0 || b_index >= B_END)
+	if (b_index < 0 || b_index >= B_END)
 		return;
 
-	if(batt_head[b_index] == NULL)
+	if (batt_head[b_index] == NULL)
 		return;
 
 	node = batt_head[b_index];
-	while(node != NULL) {
+	while (node != NULL) {
 		cnt++;
 		_I("[%d] capacity %5d, time %s", cnt, node->capacity,
 				ctime(&node->clock));
@@ -143,28 +143,28 @@ static void print_all_batt_node(enum state_b b_index)
 	}
 }
 
-static int check_value_validity(enum state_b b_index,time_t clock,int capacity)
+static int check_value_validity(enum state_b b_index, time_t clock, int capacity)
 {
 	time_t old_clock = 0;
 	int old_capacity = 0;
 	int capadiff = 0;
 
-	if(b_index < 0 || b_index >= B_END)
+	if (b_index < 0 || b_index >= B_END)
 		return -1;
 
-	if(batt_head[b_index] == NULL)
+	if (batt_head[b_index] == NULL)
 		return 0;
 
 	old_capacity = batt_head[b_index]->capacity;
 
-	if(system_wakeup_flag == true) {
+	if (system_wakeup_flag == true) {
 		_E("check value validity : invalid cuz system suspend!");
 		system_wakeup_flag = false;
 		return -1;
 	}
 	/* capacity */
 	capadiff = capacity - old_capacity;
-	if((capadiff * multiply_value[b_index]) <= 0) {
+	if ((capadiff * multiply_value[b_index]) <= 0) {
 		_E("check value validity : capadiff(%d) wrong!", capadiff);
 		return -1;
 	}
@@ -177,11 +177,11 @@ static int add_batt_node(enum state_b b_index, time_t clock, int capacity)
 
 	PRINT_ALL_BATT_NODE(b_index);
 
-	if(b_index < 0 || b_index >= B_END)
+	if (b_index < 0 || b_index >= B_END)
 		return -1;
 
 	node = (Batt_node *) malloc(sizeof(Batt_node));
-	if(node == NULL) {
+	if (node == NULL) {
 		_E("Not enough memory, add battery node fail!");
 		return -1;
 	}
@@ -189,7 +189,7 @@ static int add_batt_node(enum state_b b_index, time_t clock, int capacity)
 	node->clock = clock;
 	node->capacity = capacity;
 
-	if(batt_head[b_index] == NULL && batt_tail[b_index] == NULL) {
+	if (batt_head[b_index] == NULL && batt_tail[b_index] == NULL) {
 		batt_head[b_index] = batt_tail[b_index] = node;
 		node->preview = NULL;
 		node->next = NULL;
@@ -211,25 +211,26 @@ static int reap_batt_node(enum state_b b_index, int max_count)
 
 	PRINT_ALL_BATT_NODE(b_index);
 
-	if(b_index < 0 || b_index >= B_END)
+	if (b_index < 0 || b_index >= B_END)
 		return -1;
 
-	if(max_count <= 0)
+	if (max_count <= 0)
 		return -1;
 
 	node = batt_head[b_index];
 
-	while(node != NULL) {
-		if(cnt >= max_count) break;
+	while (node != NULL) {
+		if (cnt >= max_count)
+			break;
 		cnt++;
 		node = node->next;
 	}
 
-	if(node != NULL && node != batt_tail[b_index]) {
+	if (node != NULL && node != batt_tail[b_index]) {
 		batt_tail[b_index] = node;
 		node = node->next;
 		batt_tail[b_index]->next = NULL;
-		while(node != NULL) {
+		while (node != NULL) {
 			tmp = node;
 			node = node->next;
 			free(tmp);
@@ -245,12 +246,12 @@ static int del_all_batt_node(enum state_b b_index)
 
 	PRINT_ALL_BATT_NODE(b_index);
 
-	if(b_index < 0 || b_index >= B_END)
+	if (b_index < 0 || b_index >= B_END)
 		return -1;
-	if(batt_head[b_index] == NULL)
+	if (batt_head[b_index] == NULL)
 		return 0;
 
-	while(batt_head[b_index] != NULL) {
+	while (batt_head[b_index] != NULL) {
 		node = batt_head[b_index];
 		batt_head[b_index] = batt_head[b_index]->next;
 		free(node);
@@ -269,19 +270,19 @@ static float update_factor(enum state_b b_index)
 	double timediff = 0.0;
 	double capadiff = 0.0;
 
-	if(b_index < 0 || b_index >= B_END)
+	if (b_index < 0 || b_index >= B_END)
 		return 0;
 
-	if(batt_head[b_index] == NULL || batt_head[b_index]->next == NULL)
+	if (batt_head[b_index] == NULL || batt_head[b_index]->next == NULL)
 		return  avg_factor[b_index];
 
 	node = batt_head[b_index];
-	while(1) {
+	while (1) {
 		timediff = difftime(node->clock, node->next->clock);
 		capadiff = node->capacity - node->next->capacity;
-		if(capadiff < 0)
-			capadiff*=(-1);
-		if(capadiff != 0)
+		if (capadiff < 0)
+			capadiff *= (-1);
+		if (capadiff != 0)
 			factor = timediff / capadiff;
 		total_factor += factor;
 
@@ -292,9 +293,9 @@ static float update_factor(enum state_b b_index)
 			cnt, timediff, capadiff, factor);*/
 		factor = 0.0;
 
-		if(node == NULL || node->next == NULL)
+		if (node == NULL || node->next == NULL)
 			break;
-		if(cnt >= MAX_VALUE_COUNT[b_index]) {
+		if (cnt >= MAX_VALUE_COUNT[b_index]) {
 			reap_batt_node(b_index, MAX_VALUE_COUNT[b_index]);
 			break;
 		}
@@ -308,21 +309,21 @@ static void update_time(enum state_a a_index, int seconds)
 {
 	int clock;
 
-	if(a_index < 0 || a_index >= A_END)
+	if (a_index < 0 || a_index >= A_END)
 		return;
 
-	if(seconds <= 0)
+	if (seconds <= 0)
 		return;
 
-	switch(a_index) {
-		case A_TIMETOFULL:
-			vconf_set_int(VCONFKEY_PM_BATTERY_TIMETOFULL,
-				seconds);
-			break;
-		case A_TIMETOEMPTY:
-			vconf_set_int(VCONFKEY_PM_BATTERY_TIMETOEMPTY,
-				seconds);
-			break;
+	switch (a_index) {
+	case A_TIMETOFULL:
+		vconf_set_int(VCONFKEY_PM_BATTERY_TIMETOFULL,
+			seconds);
+		break;
+	case A_TIMETOEMPTY:
+		vconf_set_int(VCONFKEY_PM_BATTERY_TIMETOEMPTY,
+			seconds);
+		break;
 	}
 }
 
@@ -335,20 +336,20 @@ static int battinfo_calculation(void)
 
 	capacity = get_battery_capacity_cb();
 
-	if(capacity <= 0)
+	if (capacity <= 0)
 		return -1;
-	if(capacity == old_capacity)
+	if (capacity == old_capacity)
 		return 0;
 
 	old_capacity = capacity;
 
-	if(get_charging_status(&tmp) == 0)
+	if (get_charging_status(&tmp) == 0)
 		charging_state = (tmp > 0 ? EINA_TRUE : EINA_FALSE);
 
 	clock = time(NULL);
-	if(charging_state == EINA_TRUE) {
+	if (charging_state == EINA_TRUE) {
 		del_all_batt_node(B_UNCHARGING);
-		if((capacity * 100 / full_capacity)
+		if ((capacity * 100 / full_capacity)
 				>= BATTERY_FULL_THRESHOLD) {
 			if (get_battery_charge_full()) {
 				del_all_batt_node(B_CHARGING);
@@ -357,7 +358,7 @@ static int battinfo_calculation(void)
 				return 0;
 			}
 		}
-		if(batt_head[B_CHARGING] == NULL) {
+		if (batt_head[B_CHARGING] == NULL) {
 			add_batt_node(B_CHARGING, clock, capacity);
 		} else {
 			add_batt_node(B_CHARGING, clock, capacity);
@@ -368,11 +369,11 @@ static int battinfo_calculation(void)
 		update_time(A_TIMETOFULL, estimated_time);
 	} else {
 		del_all_batt_node(B_CHARGING);
-		if(system_wakeup_flag == true) {
+		if (system_wakeup_flag == true) {
 			del_all_batt_node(B_UNCHARGING);
 			system_wakeup_flag = false;
 		}
-		if(batt_head[B_UNCHARGING] == NULL) {
+		if (batt_head[B_UNCHARGING] == NULL) {
 			add_batt_node(B_UNCHARGING, clock, capacity);
 		} else {
 			add_batt_node(B_UNCHARGING, clock, capacity);
@@ -395,7 +396,7 @@ static int init_battery_func(void)
 	int ret = -1;
 
 	ret = get_battery_capacity_raw();
-	if(ret >= 0) {
+	if (ret >= 0) {
 		get_battery_capacity_cb = get_battery_capacity_raw;
 		full_capacity = FULL_CAPACITY_RAW;
 		_I("init_battery_func : full capacity(%d)", full_capacity);
@@ -403,7 +404,7 @@ static int init_battery_func(void)
 	}
 
 	ret = get_battery_capacity();
-	if(ret >= 0) {
+	if (ret >= 0) {
 		get_battery_capacity_cb = get_battery_capacity;
 		full_capacity = FULL_CAPACITY;
 		_I("init_battery_func : full capacity(%d)", full_capacity);
@@ -420,17 +421,17 @@ static int start_battinfo_gathering(int timeout)
 
 	_I("Start battery gathering!");
 
-	if(timeout <= 0) {
+	if (timeout <= 0) {
 		_E("invalid timeout value [%d]!", timeout);
 		return -1;
 	}
-	if(init_battery_func() != 0)
+	if (init_battery_func() != 0)
 		return -1;
 
 	old_capacity = 0;
 	battinfo_calculation();
 
-	if(timeout > 0)	{
+	if (timeout > 0)	{
 		/* Using g_timer for gathering battery info */
 		timeout_id = ecore_timer_add(timeout,
 			(Ecore_Task_Cb)battinfo_cb, NULL);

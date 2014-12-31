@@ -34,7 +34,7 @@
 #define DBUS_REPLY_TIMEOUT	(-1)
 #define RETRY_MAX 5
 
-struct edbus_list{
+struct edbus_list {
 	char *signal_name;
 	E_DBus_Signal_Handler *handler;
 };
@@ -295,7 +295,8 @@ static DBusHandlerResult message_filter(DBusConnection *connection,
 	_D("Argument : %s", arg);
 
 	DD_LIST_FOREACH(edbus_watch_list, n, watch) {
-		if (strcmp(arg, watch->name)) continue;
+		if (strcmp(arg, watch->name))
+			continue;
 
 		if (watch->func)
 			watch->func(watch->name, watch->id);
@@ -352,11 +353,11 @@ int register_edbus_watch(DBusMessage *msg, enum watch_id id, int (*func)(char *n
 		return 0;
 	}
 
-        watch = malloc(sizeof(struct watch));
-        if (!watch) {
-                _E("Fail to malloc for watch!");
-                return -ENOMEM;
-        }
+	watch = malloc(sizeof(struct watch));
+	if (!watch) {
+		_E("Fail to malloc for watch!");
+		return -ENOMEM;
+	}
 
 	watch->id = id;
 	watch->func = func;
@@ -427,8 +428,8 @@ int unregister_edbus_watch(DBusMessage *msg, enum watch_id id)
 
 	/* remove match */
 	if (!matched) {
-                snprintf(match, sizeof(match), NAME_OWNER_MATCH, sender);
-                dbus_bus_remove_match(conn, match, NULL);
+		snprintf(match, sizeof(match), NAME_OWNER_MATCH, sender);
+		dbus_bus_remove_match(conn, match, NULL);
 
 		if (DD_LIST_LENGTH(edbus_watch_list) == 0)
 			dbus_connection_remove_filter(conn, message_filter,

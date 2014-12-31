@@ -89,32 +89,32 @@ static int parse_cmd(const char *cmdline, char **argv, int max_args)
 			escape = 0;
 		} else {
 			switch (*p) {
-				case '\\':
-					escape = 1;
-					break;
-				case '"':
-					if (squote)
-						*bufp++ = *p;
-					else
-						dquote = !dquote;
-					break;
-				case '\'':
-					if (dquote)
-						*bufp++ = *p;
-					else
-						squote = !squote;
-					break;
-				case ' ':
-					if (!squote && !dquote) {
-						*bufp = '\0';
-						if (nargs < max_args)
-							argv[nargs++] = strdup(buf);
-						bufp = buf;
-						break;
-					}
-				default:
+			case '\\':
+				escape = 1;
+				break;
+			case '"':
+				if (squote)
 					*bufp++ = *p;
+				else
+					dquote = !dquote;
+				break;
+			case '\'':
+				if (dquote)
+					*bufp++ = *p;
+				else
+					squote = !squote;
+				break;
+			case ' ':
+				if (!squote && !dquote) {
+					*bufp = '\0';
+					if (nargs < max_args)
+						argv[nargs++] = strdup(buf);
+					bufp = buf;
 					break;
+				}
+			default:
+				*bufp++ = *p;
+				break;
 			}
 		}
 		p++;
@@ -238,7 +238,7 @@ int launch_if_noexist(const char *execpath, const char *arg, ...)
 	}
 
 	snprintf(buf, buf_size, "%s %s", execpath, arg);
-	//pid = launch_app_cmd_with_nice(buf, nice_value, flag);
+	/* pid = launch_app_cmd_with_nice(buf, nice_value, flag); */
 	pid = launch_app_cmd_with_nice(buf, nice_value);
 	if (pid == -2)
 		exit(EXIT_FAILURE);
@@ -277,13 +277,13 @@ int launch_evenif_exist(const char *execpath, const char *arg, ...)
 	buf_size = strlen(execpath) + strlen(arg) + 10;
 	buf = malloc(buf_size);
 	if (buf == NULL) {
-		// Do something for not enought memory error
+		/* Do something for not enought memory error */
 		_E("Malloc failed");
 		return -1;
 	}
 
 	snprintf(buf, buf_size, "%s %s", execpath, arg);
-	//pid = launch_app_cmd_with_nice(buf, nice_value, flag);
+	/* pid = launch_app_cmd_with_nice(buf, nice_value, flag); */
 	pid = launch_app_cmd_with_nice(buf, nice_value);
 	if (pid == -2)
 		exit(EXIT_FAILURE);
@@ -331,7 +331,7 @@ int launch_after_kill_if_exist(const char *execpath, const char *arg, ...)
 	}
 
 	snprintf(buf, buf_size, "%s %s", execpath, arg);
-	//pid = launch_app_cmd_with_nice(buf, nice_value, flag);
+	/* pid = launch_app_cmd_with_nice(buf, nice_value, flag); */
 	pid = launch_app_cmd_with_nice(buf, nice_value);
 	if (pid == -2)		/* It means that the 'execvp' return -1 */
 		exit(EXIT_FAILURE);

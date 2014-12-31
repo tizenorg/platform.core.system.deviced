@@ -42,9 +42,9 @@
 #define POPUP_TYPE_LAUNCH		"launch"
 #define POPUP_TYPE_TERMINATE		"terminate"
 
-static Ecore_Timer *popup_timer = NULL;
+static Ecore_Timer *popup_timer;
 static int popup_pid = -1;
-static bool brightness_ready = false;
+static bool brightness_ready;
 
 static void broadcast_brightness_changed(int val)
 {
@@ -180,7 +180,7 @@ static int lcd_changed_cb(void *data)
 	if (!data)
 		return 0;
 
-	lcd_state = *(int*)data;
+	lcd_state = *(int *)data;
 	if (lcd_state == S_LCDOFF && popup_pid > 0) {
 		if (popup_timer)
 			ecore_timer_del(popup_timer);

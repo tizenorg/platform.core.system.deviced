@@ -81,12 +81,12 @@ static int haptic_internal_init(void);
 
 void add_haptic(const struct haptic_ops *ops)
 {
-	DD_LIST_APPEND(h_head, (void*)ops);
+	DD_LIST_APPEND(h_head, (void *)ops);
 }
 
 void remove_haptic(const struct haptic_ops *ops)
 {
-	DD_LIST_REMOVE(h_head, (void*)ops);
+	DD_LIST_REMOVE(h_head, (void *)ops);
 }
 
 static int haptic_module_load(void)
@@ -440,7 +440,7 @@ exit:
 	return reply;
 }
 
-static unsigned char* convert_file_to_buffer(const char *file_name, int *size)
+static unsigned char *convert_file_to_buffer(const char *file_name, int *size)
 {
 	FILE *pf;
 	long file_size;
@@ -466,7 +466,7 @@ static unsigned char* convert_file_to_buffer(const char *file_name, int *size)
 	if (file_size < 0)
 		goto error;
 
-	pdata = (unsigned char*)malloc(file_size);
+	pdata = (unsigned char *)malloc(file_size);
 	if (!pdata)
 		goto error;
 
@@ -585,7 +585,7 @@ static void sound_capturing_cb(keynode_t *key, void *data)
 
 static int parse_section(struct parse_result *result, void *user_data, int index)
 {
-	struct haptic_config *conf = (struct haptic_config*)user_data;
+	struct haptic_config *conf = (struct haptic_config *)user_data;
 
 	assert(result);
 	assert(result->section && result->name && result->value);
@@ -608,10 +608,10 @@ static int parse_section(struct parse_result *result, void *user_data, int index
 
 static int haptic_load_config(struct parse_result *result, void *user_data)
 {
-	struct haptic_config *conf = (struct haptic_config*)user_data;
+	struct haptic_config *conf = (struct haptic_config *)user_data;
 	char name[NAME_MAX];
 	int ret;
-	static int index = 0;
+	static int index;
 
 	if (!result)
 		return 0;

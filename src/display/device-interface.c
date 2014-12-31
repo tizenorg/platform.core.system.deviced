@@ -71,13 +71,13 @@ struct _power_ops power_ops;
 
 #ifdef ENABLE_X_LCD_ONOFF
 #include "x-lcd-on.c"
-static bool x_dpms_enable = false;
+static bool x_dpms_enable;
 #endif
 
 static int power_lock_support = -1;
-static bool custom_status = false;
-static int custom_brightness = 0;
-static int force_brightness = 0;
+static bool custom_status;
+static int custom_brightness;
+static int force_brightness;
 
 static int _bl_onoff(PMSys *p, int on)
 {
@@ -164,7 +164,7 @@ static int _sys_get_lcd_power(PMSys *p)
 static void _init_bldev(PMSys *p, unsigned int flags)
 {
 	int ret;
-	//_update_curbrt(p);
+	/* _update_curbrt(p); */
 	p->bl_brt = _bl_brt;
 	p->bl_onoff = _bl_onoff;
 #ifdef ENABLE_X_LCD_ONOFF
@@ -208,10 +208,10 @@ static int system_suspend(void)
 	pthread_t pth;
 	int ret;
 
-	ret = pthread_create(&pth, 0, _system_suspend_cb, (void*)NULL);
+	ret = pthread_create(&pth, 0, _system_suspend_cb, (void *)NULL);
 	if (ret < 0) {
 		_E("pthread creation failed!, suspend directly!");
-		_system_suspend_cb((void*)NULL);
+		_system_suspend_cb((void *)NULL);
 	} else {
 		pthread_join(pth, NULL);
 	}
@@ -314,7 +314,8 @@ void change_brightness(int start, int end, int step)
 		val = (int)ceil(diff / step);
 
 	while (start != end) {
-		if (val == 0) break;
+		if (val == 0)
+			break;
 
 		start += val;
 		if ((val > 0 && start > end) ||
@@ -590,7 +591,7 @@ int exit_sysfs(void)
 
 	free(pmsys);
 	pmsys = NULL;
-	if(fd != -1)
+	if (fd != -1)
 		close(fd);
 
 	return 0;

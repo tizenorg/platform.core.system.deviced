@@ -86,34 +86,34 @@ enum snd_jack_types {
 #define USB_NAME		"usb"
 #define USB_NAME_LEN		3
 
-#define CHARGER_NAME 		"charger"
+#define CHARGER_NAME		"charger"
 #define CHARGER_NAME_LEN	7
 
-#define EARJACK_NAME 		"earjack"
+#define EARJACK_NAME		"earjack"
 #define EARJACK_NAME_LEN	7
 
-#define EARKEY_NAME 		"earkey"
+#define EARKEY_NAME			"earkey"
 #define EARKEY_NAME_LEN	6
 
-#define TVOUT_NAME 		"tvout"
+#define TVOUT_NAME			"tvout"
 #define TVOUT_NAME_LEN		5
 
-#define HDMI_NAME 		"hdmi"
+#define HDMI_NAME			"hdmi"
 #define HDMI_NAME_LEN		4
 
-#define HDCP_NAME 		"hdcp"
+#define HDCP_NAME			"hdcp"
 #define HDCP_NAME_LEN		4
 
-#define HDMI_AUDIO_NAME 	"ch_hdmi_audio"
+#define HDMI_AUDIO_NAME		"ch_hdmi_audio"
 #define HDMI_AUDIO_LEN		13
 
-#define CRADLE_NAME 		"cradle"
+#define CRADLE_NAME		"cradle"
 #define CRADLE_NAME_LEN	6
 
-#define KEYBOARD_NAME 		"keyboard"
+#define KEYBOARD_NAME		"keyboard"
 #define KEYBOARD_NAME_LEN	8
 
-#define SWITCH_DEVICE_USB 	"usb_cable"
+#define SWITCH_DEVICE_USB	"usb_cable"
 
 #define METHOD_GET_HDMI		"GetHDMI"
 #define METHOD_GET_HDCP		"GetHDCP"
@@ -143,17 +143,17 @@ struct siop_data {
 	int rear;
 };
 
-static int ss_flags = 0;
+static int ss_flags;
 
 static int input_device_number;
 
 /* Uevent */
-static struct udev *udev = NULL;
+static struct udev *udev;
 /* Kernel Uevent */
-static struct udev_monitor *mon = NULL;
-static Ecore_Fd_Handler *ufdh = NULL;
+static struct udev_monitor *mon;
+static Ecore_Fd_Handler *ufdh;
 static int ufd = -1;
-static int hdmi_status = 0;
+static int hdmi_status;
 
 enum udev_subsystem_type {
 	UDEV_INPUT,
@@ -322,7 +322,7 @@ static void usb_chgdet_cb(void *data)
 		if (val < 0)
 			val = get_usb_state_direct();
 
-		_I("jack - usb changed %d",val);
+		_I("jack - usb changed %d", val);
 	} else {
 		_E("fail to get usb_online status");
 	}
@@ -336,7 +336,7 @@ static int display_changed(void *data)
 	if (!data)
 		return 0;
 
-	state = *(int*)data;
+	state = *(int *)data;
 	if (state != S_NORMAL)
 		return 0;
 
@@ -354,7 +354,7 @@ static int display_changed(void *data)
 
 static void cradle_send_broadcast(int status)
 {
-	static int old = 0;
+	static int old;
 	char *arr[1];
 	char str_status[32];
 
@@ -372,7 +372,7 @@ static void cradle_send_broadcast(int status)
 
 static int cradle_cb(void *data)
 {
-	static int old = 0;
+	static int old;
 	int val = 0;
 	int ret = 0;
 
@@ -456,7 +456,7 @@ static void tvout_chgdet_cb(void *data)
 
 static void hdcp_hdmi_send_broadcast(int status)
 {
-	static int old = 0;
+	static int old;
 	char *arr[1];
 	char str_status[32];
 
@@ -474,7 +474,7 @@ static void hdcp_hdmi_send_broadcast(int status)
 
 static int hdcp_hdmi_cb(void *data)
 {
-	static int old = 0;
+	static int old;
 	int val = 0;
 	int ret = 0;
 
@@ -494,7 +494,7 @@ static int hdcp_hdmi_cb(void *data)
 
 static int hdmi_cec_execute(void *data)
 {
-	static const struct device_ops *ops = NULL;
+	static const struct device_ops *ops;
 
 	FIND_DEVICE_INT(ops, "hdmi-cec");
 
@@ -508,7 +508,7 @@ static void hdmi_chgdet_cb(void *data)
 
 	pm_change_internal(getpid(), LCD_NORMAL);
 	if (device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_HDMI_SUPPORT, &val) == 0) {
-		if (val!=1) {
+		if (val != 1) {
 			_I("target is not support HDMI");
 			vconf_set_int(VCONFKEY_SYSMAN_HDMI, HDMI_NOT_SUPPORTED);
 			return;
@@ -530,7 +530,7 @@ static void hdmi_chgdet_cb(void *data)
 	hdmi_status = val;
 	device_notify(DEVICE_NOTIFIER_HDMI, &val);
 
-	if(val == 1) {
+	if (val == 1) {
 		pm_lock_internal(INTERNAL_LOCK_HDMI, LCD_DIM, STAY_CUR_STATE, 0);
 	} else {
 		pm_unlock_internal(INTERNAL_LOCK_HDMI, LCD_DIM, PM_SLEEP_MARGIN);
@@ -540,7 +540,7 @@ static void hdmi_chgdet_cb(void *data)
 
 static void hdcp_send_broadcast(int status)
 {
-	static int old = 0;
+	static int old;
 	char *arr[1];
 	char str_status[32];
 
@@ -558,7 +558,7 @@ static void hdcp_send_broadcast(int status)
 
 static int hdcp_chgdet_cb(void *data)
 {
-	static int old = 0;
+	static int old;
 	int val = 0;
 
 	if (data == NULL)
@@ -575,7 +575,7 @@ static int hdcp_chgdet_cb(void *data)
 
 static void hdmi_audio_send_broadcast(int status)
 {
-	static int old = 0;
+	static int old;
 	char *arr[1];
 	char str_status[32];
 
@@ -593,7 +593,7 @@ static void hdmi_audio_send_broadcast(int status)
 
 static int hdmi_audio_chgdet_cb(void *data)
 {
-	static int old = 0;
+	static int old;
 	int val = 0;
 
 	if (data == NULL)
@@ -624,7 +624,7 @@ static void keyboard_chgdet_cb(void *data)
 		}
 	}
 	_I("jack - keyboard changed %d", val);
-	if(val != 1)
+	if (val != 1)
 		val = 0;
 	vconf_set_int(VCONFKEY_SYSMAN_SLIDING_KEYBOARD, val);
 }
@@ -635,7 +635,7 @@ static void ums_unmount_cb(void *data)
 }
 
 #ifdef ENABLE_EDBUS_USE
-static void cb_xxxxx_signaled(void *data, DBusMessage * msg)
+static void cb_xxxxx_signaled(void *data, DBusMessage *msg)
 {
 	char *args;
 	DBusError err;
@@ -643,7 +643,8 @@ static void cb_xxxxx_signaled(void *data, DBusMessage * msg)
 	dbus_error_init(&err);
 	if (dbus_message_get_args
 	    (msg, &err, DBUS_TYPE_STRING, &args, DBUS_TYPE_INVALID)) {
-		if (!strcmp(args, "action")) ;	/* action */
+		if (!strcmp(args, "action"))
+			;	/* action */
 	}
 
 	return;
@@ -652,7 +653,7 @@ static void cb_xxxxx_signaled(void *data, DBusMessage * msg)
 
 static int earjack_execute(void *data)
 {
-	static const struct device_ops *ops = NULL;
+	static const struct device_ops *ops;
 
 	FIND_DEVICE_INT(ops, "earjack");
 
@@ -661,7 +662,7 @@ static int earjack_execute(void *data)
 
 static int siop_execute(const char *siop, const char *rear)
 {
-	static const struct device_ops *ops = NULL;
+	static const struct device_ops *ops;
 	struct siop_data params;
 
 	FIND_DEVICE_INT(ops, PROC_OPS_NAME);
@@ -704,8 +705,7 @@ static int changed_device(const char *name, const char *value)
 	else if (strncmp(name, HDCP_NAME, HDCP_NAME_LEN) == 0) {
 		hdcp_chgdet_cb((void *)state);
 		hdcp_hdmi_cb((void *)state);
-	}
-	else if (strncmp(name, HDMI_AUDIO_NAME, HDMI_AUDIO_LEN) == 0)
+	} else if (strncmp(name, HDMI_AUDIO_NAME, HDMI_AUDIO_LEN) == 0)
 		hdmi_audio_chgdet_cb((void *)state);
 	else if (strncmp(name, CRADLE_NAME, CRADLE_NAME_LEN) == 0)
 		cradle_chgdet_cb((void *)state);
@@ -717,13 +717,13 @@ out:
 
 static int booting_done(void *data)
 {
-	static int done = 0;
+	static int done;
 	int ret;
 	int val;
 
 	if (data == NULL)
 		return done;
-	done = *(int*)data;
+	done = *(int *)data;
 	if (done == 0)
 		return done;
 
@@ -1000,7 +1000,7 @@ int uevent_udev_get_path(const char *subsystem, dd_list **list)
 		const char *path;
 		path = udev_list_entry_get_name(dev_list_entry);
 		_D("subsystem : %s, path : %s", subsystem, path);
-		DD_LIST_APPEND(*list, (void*)path);
+		DD_LIST_APPEND(*list, (void *)path);
 	}
 
 	return 0;
@@ -1168,7 +1168,7 @@ void internal_pm_change_state(unsigned int s_bits)
 
 static const struct edbus_method edbus_methods[] = {
 	{ PREDEF_DEVICE_CHANGED, "siss",    "i", dbus_device_handler },
-	{ PREDEF_UDEV_CONTROL,   "sis","i", dbus_udev_handler },
+	{ PREDEF_UDEV_CONTROL,   "sis",     "i", dbus_udev_handler },
 	{ METHOD_GET_HDCP,       NULL, "i", dbus_hdcp_handler },
 	{ METHOD_GET_HDMI_AUDIO, NULL, "i", dbus_hdmi_audio_handler },
 	{ METHOD_GET_HDMI,       NULL, "i", dbus_hdcp_hdmi_handler },

@@ -81,27 +81,27 @@ static enum device_ops_status status = DEVICE_OPS_STATUS_UNINIT;
 int pm_cur_state;
 int pm_old_state;
 Ecore_Timer *timeout_src_id;
-static int pre_suspend_flag = false;
-int system_wakeup_flag = false;
-static unsigned int custom_normal_timeout = 0;
-static unsigned int custom_dim_timeout = 0;
-static int custom_holdkey_block = false;
+static int pre_suspend_flag;
+int system_wakeup_flag;
+static unsigned int custom_normal_timeout;
+static unsigned int custom_dim_timeout;
+static int custom_holdkey_block;
 static int custom_change_pid = -1;
 static char *custom_change_name;
-static int standby_mode = false;
-static int standby_state = false;
-static Eina_List *standby_mode_list = NULL;
+static int standby_mode;
+static int standby_state;
+static Eina_List *standby_mode_list;
 static int (*basic_action) (int);
 static bool hallic_open = true;
 static Ecore_Timer *lock_timeout_id;
 static int lock_screen_timeout = LOCK_SCREEN_INPUT_TIMEOUT;
-static int hdmi_state = 0;
-static int tts_state = false;
+static int hdmi_state;
+static int tts_state;
 static struct timeval lcdon_tv;
-static int lcd_paneloff_mode = false;
-static int stay_touchscreen_off = false;
-static Eina_List *lcdon_ops = NULL;
-static bool lcdon_broadcast = false;
+static int lcd_paneloff_mode;
+static int stay_touchscreen_off;
+static Eina_List *lcdon_ops;
+static bool lcdon_broadcast;
 
 /* default transition, action fuctions */
 static int default_trans(int evt);
@@ -174,7 +174,7 @@ struct display_config display_conf = {
 	.lcdoff_timeout		= LCDOFF_TIMEOUT,
 	.brightness_change_step	= BRIGHTNESS_CHANGE_STEP,
 	.lcd_always_on		= LCD_ALWAYS_ON,
-	.framerate_app		= {0,0,0,0},
+	.framerate_app		= {0, 0, 0, 0},
 	.control_display	= 0,
 	.powerkey_doublepress	= 0,
 	.accel_sensor_on	= ACCEL_SENSOR_ON,
@@ -993,7 +993,7 @@ static int proc_condition(PMMsg *data)
 			 */
 			cond_timeout_id =
 			    ecore_timer_add(MSEC_TO_SEC(data->timeout),
-				    (Ecore_Task_Cb)del_dim_cond, (void*)((intptr_t)pid));
+				    (Ecore_Task_Cb)del_dim_cond, (void *)((intptr_t)pid));
 		}
 		holdkey_block = GET_HOLDKEY_BLOCK_STATE(val);
 		tmp = find_node(S_LCDDIM, pid);
@@ -1024,7 +1024,7 @@ static int proc_condition(PMMsg *data)
 			 */
 			cond_timeout_id =
 			    ecore_timer_add(MSEC_TO_SEC(data->timeout),
-				    (Ecore_Task_Cb)del_off_cond, (void*)((intptr_t)pid));
+				    (Ecore_Task_Cb)del_off_cond, (void *)((intptr_t)pid));
 		}
 		holdkey_block = GET_HOLDKEY_BLOCK_STATE(val);
 		tmp = find_node(S_LCDOFF, pid);
@@ -1063,7 +1063,7 @@ static int proc_condition(PMMsg *data)
 			 */
 			cond_timeout_id =
 			    ecore_timer_add(MSEC_TO_SEC(data->timeout),
-				    (Ecore_Task_Cb)del_sleep_cond, (void*)((intptr_t)pid));
+				    (Ecore_Task_Cb)del_sleep_cond, (void *)((intptr_t)pid));
 		}
 		if (GET_STANDBY_MODE_STATE(val))
 			set_standby_mode(pid, true);
@@ -1230,7 +1230,7 @@ void update_lcdoff_source(int source)
 	if (standby_mode)
 		return;
 
-	switch(source) {
+	switch (source) {
 	case VCONFKEY_PM_LCDOFF_BY_TIMEOUT:
 		_I("LCD OFF by timeout");
 		break;
@@ -1247,14 +1247,14 @@ void update_lcdoff_source(int source)
 #ifdef ENABLE_PM_LOG
 
 typedef struct _pm_history {
-        time_t time;
-        enum pm_log_type log_type;
-        int keycode;
+	time_t time;
+	enum pm_log_type log_type;
+	int keycode;
 } pm_history;
 
 static int max_history_count = MAX_LOG_COUNT;
 static pm_history pm_history_log[MAX_LOG_COUNT] = {0,};
-static int history_count = 0;
+static int history_count;
 
 static const char history_string[PM_LOG_MAX][15] =
 	{"PRESS", "LONG PRESS", "RELEASE", "LCD ON", "LCD ON FAIL",
@@ -1269,16 +1269,16 @@ void pm_history_init()
 
 void pm_history_save(enum pm_log_type log_type, int code)
 {
-        time_t now;
+	time_t now;
 
-        time(&now);
-        pm_history_log[history_count].time = now;
-        pm_history_log[history_count].log_type = log_type;
-        pm_history_log[history_count].keycode = code;
-        history_count++;
+	time(&now);
+	pm_history_log[history_count].time = now;
+	pm_history_log[history_count].log_type = log_type;
+	pm_history_log[history_count].keycode = code;
+	history_count++;
 
-        if (history_count >= max_history_count)
-                history_count = 0;
+	if (history_count >= max_history_count)
+		history_count = 0;
 }
 
 void pm_history_print(int fd, int count)
@@ -1323,7 +1323,7 @@ void print_dev_list(int fd)
 	total = eina_list_count(indev_list);
 	_I("***** total list : %d *****", total);
 	for (i = 0; i < total; i++) {
-		tmp = (indev*)eina_list_nth(indev_list, i);
+		tmp = (indev *)eina_list_nth(indev_list, i);
 		_I("* %d | path:%s, fd:%d, dev_fd:%d",
 			i, tmp->dev_path, tmp->fd, tmp->dev_fd);
 		if (fd >= 0) {
@@ -1352,7 +1352,7 @@ void print_info(int fd)
 		"\n==========================================="
 		"===========================\n");
 	write(fd, buf, strlen(buf));
-	snprintf(buf, sizeof(buf),"Timeout Info: Run[%dms] Dim[%dms] Off[%dms]\n",
+	snprintf(buf, sizeof(buf), "Timeout Info: Run[%dms] Dim[%dms] Off[%dms]\n",
 		 states[S_NORMAL].timeout,
 		 states[S_LCDDIM].timeout, states[S_LCDOFF].timeout);
 	write(fd, buf, strlen(buf));
@@ -1367,7 +1367,7 @@ void print_info(int fd)
 		state_string[pm_cur_state]);
 	write(fd, buf, strlen(buf));
 
-	snprintf(buf, sizeof(buf), "Current Lock Conditions: \n");
+	snprintf(buf, sizeof(buf), "Current Lock Conditions:\n");
 	write(fd, buf, strlen(buf));
 
 	for (s_index = S_NORMAL; s_index < S_END; s_index++) {
@@ -1397,7 +1397,7 @@ void print_info(int fd)
 			snprintf(buf, sizeof(buf),
 			    "  standby mode acquired by pid %d"
 			    " - process %s\n", data, pname);
-                        write(fd, buf, strlen(buf));
+			write(fd, buf, strlen(buf));
 		}
 	}
 	print_lock_info_list(fd);
@@ -1547,8 +1547,7 @@ static int default_trans(int evt)
 		if (check_lcdoff_direct() == true) {
 			/* enter next state directly */
 			states[pm_cur_state].trans(EVENT_TIMEOUT);
-		}
-		else {
+		} else {
 			st->action(st->timeout);
 		}
 	}
@@ -1606,7 +1605,7 @@ static void check_lock_screen(void)
 
 	/* Use time to check lock is done. */
 	lock_timeout_id = ecore_timer_add(display_conf.lock_wait_time,
-	    (Ecore_Task_Cb)lcd_on_expired, (void*)NULL);
+	    (Ecore_Task_Cb)lcd_on_expired, (void *)NULL);
 
 	return;
 
@@ -1627,8 +1626,8 @@ static int default_action(int timeout)
 	int app_state = -1;
 	time_t now;
 	double diff;
-	static time_t last_update_time = 0;
-	static int last_timeout = 0;
+	static time_t last_update_time;
+	static int last_timeout;
 	struct timeval now_tv;
 
 	if (status != DEVICE_OPS_STATUS_START) {
@@ -1788,8 +1787,8 @@ static int default_check(int next)
 	int app_state = -1;
 
 	vconf_get_int(VCONFKEY_IDLE_LOCK_STATE, &lock_state);
-	if (lock_state==VCONFKEY_IDLE_LOCK && next != S_SLEEP) {
-		while(0) {
+	if (lock_state == VCONFKEY_IDLE_LOCK && next != S_SLEEP) {
+		while (0) {
 			vconf_get_int(VCONFKEY_CALL_STATE, &app_state);
 			if (app_state != VCONFKEY_CALL_OFF)
 				break;
@@ -1927,7 +1926,7 @@ static int update_setting(int key_idx, int val)
 		}
 		backlight_ops.set_default_brt(val);
 		snprintf(buf, sizeof(buf), "%d", val);
-		_D("Brightness set in bl : %d",val);
+		_D("Brightness set in bl : %d", val);
 		launch_evenif_exist(SET_BRIGHTNESS_IN_BOOTLOADER, buf);
 		break;
 	case SETTING_LOCK_SCREEN:
@@ -2092,7 +2091,7 @@ static const char *errMSG[INIT_END] = {
 	[INIT_DBUS] = "d-bus init error",
 };
 
-static int input_action(char* input_act, char* input_path)
+static int input_action(char *input_act, char *input_path)
 {
 	int ret = 0;
 	Eina_List *l = NULL;
@@ -2199,7 +2198,7 @@ int get_hdmi_state(void)
 static int hdmi_changed(void *data)
 {
 	if (data)
-		hdmi_state = *(int*)data;
+		hdmi_state = *(int *)data;
 
 	return 0;
 }
@@ -2211,7 +2210,7 @@ static int hall_ic_open(void *data)
 	if (!data)
 		return -EINVAL;
 
-	open = *(int*)data;
+	open = *(int *)data;
 	update_pm_setting(SETTING_HALLIC_OPEN, open);
 
 	if (display_info.update_auto_brightness)
@@ -2246,10 +2245,10 @@ static int input_device_remove(void *data)
 
 static int booting_done(void *data)
 {
-	static bool done = false;
+	static bool done;
 
 	if (data != NULL) {
-		done = *(int*)data;
+		done = *(int *)data;
 		if (done)
 			return 0;
 		_I("booting done, unlock LCD_OFF");
@@ -2434,7 +2433,7 @@ static void display_exit(void *data)
 		case INIT_POLL:
 			unregister_notifier(DEVICE_NOTIFIER_INPUT_ADD,
 			    input_device_add);
-		        unregister_notifier(DEVICE_NOTIFIER_INPUT_REMOVE,
+			unregister_notifier(DEVICE_NOTIFIER_INPUT_REMOVE,
 			    input_device_remove);
 			unregister_notifier(DEVICE_NOTIFIER_BOOTING_DONE,
 			    booting_done);

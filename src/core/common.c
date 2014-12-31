@@ -43,10 +43,10 @@
  * Opens "/proc/$pid/oom_score_adj" file for w/r;
  * Return: FILE pointer or NULL
  */
-FILE * open_proc_oom_score_adj_file(int pid, const char *mode)
+FILE *open_proc_oom_score_adj_file(int pid, const char *mode)
 {
-        char buf[32];
-        FILE *fp;
+	char buf[32];
+	FILE *fp;
 
 	snprintf(buf, sizeof(buf), "/proc/%d/oom_score_adj", pid);
 	fp = fopen(buf, mode);
@@ -315,7 +315,7 @@ int sys_set_str(char *fname, char *val)
 	return r;
 }
 
-int terminate_process(const char* partition, bool force)
+int terminate_process(const char *partition, bool force)
 {
 	const char *argv[7] = {"/sbin/fuser", "-m", "-k", "-S", NULL, NULL, NULL};
 	int argc;
@@ -329,17 +329,17 @@ int terminate_process(const char* partition, bool force)
 	return run_child(argc, argv);
 }
 
-int mount_check(const char* path)
+int mount_check(const char *path)
 {
 	int ret = false;
-	struct mntent* mnt;
-	const char* table = "/etc/mtab";
-	FILE* fp;
+	struct mntent *mnt;
+	const char *table = "/etc/mtab";
+	FILE *fp;
 
 	fp = setmntent(table, "r");
 	if (!fp)
 		return ret;
-	while (mnt=getmntent(fp)) {
+	while (mnt = getmntent(fp)) {
 		if (!strcmp(mnt->mnt_dir, path)) {
 			ret = true;
 			break;

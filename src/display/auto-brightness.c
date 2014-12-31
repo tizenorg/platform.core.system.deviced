@@ -48,7 +48,7 @@
 #define AUTOMATIC_DEVIDE_VAL	10
 #define AUTOMATIC_DELAY_TIME	0.5	/* 0.5 sec */
 
-#define RADIAN_VALUE 		(57.2957)
+#define RADIAN_VALUE	(57.2957)
 #define ROTATION_90		90
 #define WORKING_ANGLE_MIN	0
 #define WORKING_ANGLE_MAX	20
@@ -76,14 +76,14 @@ struct lbm_config lbm_conf = {
 };
 
 static int (*_default_action) (int);
-static Ecore_Timer *alc_timeout_id = 0;
+static Ecore_Timer *alc_timeout_id;
 static Ecore_Timer *update_timeout;
 static int light_handle = -1;
 static int accel_handle = -1;
-static int fault_count = 0;
+static int fault_count;
 static int automatic_brt = DEFAULT_AUTOMATIC_BRT;
 static int min_brightness = PM_MIN_BRIGHTNESS;
-static char *min_brightness_name = 0;
+static char *min_brightness_name;
 static int value_table[MAX_AUTOMATIC_COUNT];
 static int lbm_state = -1;
 
@@ -166,7 +166,8 @@ static void alc_set_brightness(int setting, int value, int lux)
 
 		_D("%d", step);
 		while (tmp_value != value) {
-			if (step == 0) break;
+			if (step == 0)
+				break;
 
 			tmp_value += step;
 			if ((step > 0 && tmp_value > value) ||
@@ -224,7 +225,7 @@ static bool check_lbm(int lux, int setting)
 static bool check_brightness_changed(int value)
 {
 	int i;
-	static int values[MAX_SAMPLING_COUNT], count = 0;
+	static int values[MAX_SAMPLING_COUNT], count;
 
 	if (!get_hallic_open())
 		return false;
@@ -292,9 +293,9 @@ static bool alc_update_brt(bool setting)
 	return EINA_TRUE;
 }
 
-static bool alc_handler(void* data)
+static bool alc_handler(void *data)
 {
-	if (pm_cur_state != S_NORMAL || !get_hallic_open()){
+	if (pm_cur_state != S_NORMAL || !get_hallic_open()) {
 		if (alc_timeout_id > 0)
 			ecore_timer_del(alc_timeout_id);
 		alc_timeout_id = NULL;
@@ -388,7 +389,7 @@ static int disconnect_sfsvc(void)
 {
 	_I("disconnect with sensor fw");
 	/* light sensor*/
-	if(light_handle >= 0) {
+	if (light_handle >= 0) {
 		sf_stop(light_handle);
 		sf_disconnect(light_handle);
 		light_handle = -1;
@@ -430,7 +431,7 @@ static int set_autobrightness_state(int status)
 	int max_brt = -1;
 
 	if (status == SETTING_BRIGHTNESS_AUTOMATIC_ON) {
-		if(connect_sfsvc() < 0)
+		if (connect_sfsvc() < 0)
 			return -1;
 
 		/* escape dim state if it's in low battery.*/
@@ -460,7 +461,7 @@ static int set_autobrightness_state(int status)
 		if (ret != 0 || (default_brt < PM_MIN_BRIGHTNESS || default_brt > PM_MAX_BRIGHTNESS)) {
 			_I("fail to read vconf value for brightness");
 			brt = PM_DEFAULT_BRIGHTNESS;
-			if(default_brt < PM_MIN_BRIGHTNESS || default_brt > PM_MAX_BRIGHTNESS)
+			if (default_brt < PM_MIN_BRIGHTNESS || default_brt > PM_MAX_BRIGHTNESS)
 				vconf_set_int(VCONFKEY_SETAPPL_LCD_BRIGHTNESS, brt);
 			default_brt = brt;
 		}
@@ -495,7 +496,7 @@ static void set_alc_function(keynode_t *key_nodes, void *data)
 	}
 }
 
-static bool check_sfsvc(void* data)
+static bool check_sfsvc(void *data)
 {
 	/* this function will return opposite value for re-callback in fail */
 	int vconf_auto;
@@ -505,7 +506,7 @@ static bool check_sfsvc(void* data)
 
 	vconf_get_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT, &vconf_auto);
 	if (vconf_auto == SETTING_BRIGHTNESS_AUTOMATIC_ON) {
-		if(connect_sfsvc() < 0)
+		if (connect_sfsvc() < 0)
 			return EINA_TRUE;
 
 		/* change alc action func */
@@ -536,7 +537,7 @@ static void set_alc_automatic_brt(keynode_t *key_nodes, void *data)
 	alc_update_brt(true);
 }
 
-static Eina_Bool update_handler(void* data)
+static Eina_Bool update_handler(void *data)
 {
 	int ret, on;
 
@@ -664,7 +665,7 @@ static int lcd_changed_cb(void *data)
 	if (!data)
 		return 0;
 
-	lcd_state = *(int*)data;
+	lcd_state = *(int *)data;
 	if (lcd_state == S_LCDOFF && alc_timeout_id > 0) {
 		ecore_timer_del(alc_timeout_id);
 		alc_timeout_id = NULL;

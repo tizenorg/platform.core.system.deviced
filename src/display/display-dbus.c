@@ -57,7 +57,7 @@
 
 static DBusMessage *edbus_start(E_DBus_Object *obj, DBusMessage *msg)
 {
-	static const struct device_ops *display_device_ops = NULL;
+	static const struct device_ops *display_device_ops;
 
 	if (!display_device_ops)
 		display_device_ops = find_device("display");
@@ -70,7 +70,7 @@ static DBusMessage *edbus_start(E_DBus_Object *obj, DBusMessage *msg)
 
 static DBusMessage *edbus_stop(E_DBus_Object *obj, DBusMessage *msg)
 {
-	static const struct device_ops *display_device_ops = NULL;
+	static const struct device_ops *display_device_ops;
 
 	if (!display_device_ops)
 		display_device_ops = find_device("display");
@@ -546,7 +546,7 @@ static DBusMessage *edbus_releasebrightness(E_DBus_Object *obj, DBusMessage *msg
 	if (ret < 0)
 		brt = ret;
 
-	// check dim state
+	/* check dim state */
 	if (low_battery_state(bat) &&
 	    charger == VCONFKEY_SYSMAN_CHARGER_DISCONNECTED && !changed) {
 		_D("batt warning low : brightness is not changed!");
@@ -668,11 +668,11 @@ static DBusMessage *edbus_setautobrightnessmin(E_DBus_Object *obj, DBusMessage *
 	const char *sender;
 
 	sender = dbus_message_get_sender(msg);
-        if (!sender) {
-                _E("invalid sender name!");
-                ret = -EINVAL;
+	if (!sender) {
+		_E("invalid sender name!");
+		ret = -EINVAL;
 		goto error;
-        }
+	}
 	if (!display_info.set_autobrightness_min) {
 		ret = -EIO;
 		goto error;
@@ -971,7 +971,7 @@ static const struct edbus_method edbus_methods[] = {
 	{ "setlcdtimeout",  "iii",   "i", edbus_setlcdtimeout },
 	{ "LockScreenBgOn",   "s",   "i", edbus_lockscreenbgon },
 	{ "GetDisplayCount", NULL,   "i", edbus_getdisplaycount },
-	{ "GetMaxBrightness",NULL,   "i", edbus_getmaxbrightness },
+	{ "GetMaxBrightness", NULL,   "i", edbus_getmaxbrightness },
 	{ "SetMaxBrightness", "i",   "i", edbus_setmaxbrightness },
 	{ "GetBrightness",   NULL,   "i", edbus_getbrightness },
 	{ "SetBrightness",    "i",   "i", edbus_setbrightness },
@@ -985,7 +985,7 @@ static const struct edbus_method edbus_methods[] = {
 	{ "PowerKeyIgnore",   "i",  NULL, edbus_powerkeyignore },
 	{ "PowerKeyLCDOff",  NULL,   "i", edbus_powerkeylcdoff },
 	{ "CustomLCDOn",      "i",   "i", edbus_customlcdon },
-	{ "StayTouchScreenOff","i",  "i", edbus_staytouchscreenoff },
+	{ "StayTouchScreenOff", "i",  "i", edbus_staytouchscreenoff },
 	{ "LCDPanelOffMode",  "i",   "i", edbus_lcdpaneloffmode },
 	{ "ActorControl",   "sii",   "i", edbus_actorcontrol },
 	/* Add methods here */
@@ -995,7 +995,7 @@ static void sim_signal_handler(void *data, DBusMessage *msg)
 {
 	DBusError err;
 	int ret, val;
-	static int state = false;
+	static int state;
 
 	if (!find_display_feature("auto-brightness")) {
 		_D("auto brightness is not supported!");

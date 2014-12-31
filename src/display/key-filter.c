@@ -86,16 +86,16 @@ int __WEAK__ get_glove_state(void);
 void __WEAK__ switch_glove_key(int val);
 
 static struct timeval pressed_time;
-static Ecore_Timer *longkey_timeout_id = NULL;
-static Ecore_Timer *combination_timeout_id = NULL;
-static Ecore_Timer *hardkey_timeout_id = NULL;
+static Ecore_Timer *longkey_timeout_id;
+static Ecore_Timer *combination_timeout_id;
+static Ecore_Timer *hardkey_timeout_id;
 static int cancel_lcdoff;
 static int key_combination = KEY_COMBINATION_STOP;
-static int menu_pressed = false;
+static int menu_pressed;
 static int hardkey_duration;
-static bool touch_pressed = false;
-static int skip_lcd_off = false;
-static bool powerkey_pressed = false;
+static bool touch_pressed;
+static int skip_lcd_off;
+static bool powerkey_pressed;
 
 static inline int current_state_in_on(void)
 {
@@ -111,7 +111,7 @@ static inline void restore_custom_brightness(void)
 
 static int power_execute(void *data)
 {
-	static const struct device_ops *ops = NULL;
+	static const struct device_ops *ops;
 
 	FIND_DEVICE_INT(ops, POWER_OPS_NAME);
 
@@ -786,7 +786,7 @@ static int hardkey_lcd_changed_cb(void *data)
 	if (!data)
 		return 0;
 
-	lcd_state = *(int*)data;
+	lcd_state = *(int *)data;
 	if (lcd_state == S_NORMAL
 	    && hardkey_duration == KEYBACKLIGHT_TIME_ALWAYS_ON) {
 		turnon_hardkey_backlight();
@@ -846,7 +846,7 @@ static const struct display_keyfilter_ops normal_keyfilter_ops = {
 	.init			= keyfilter_init,
 	.exit			= keyfilter_exit,
 	.check			= check_key_filter,
-	.set_powerkey_ignore 	= NULL,
+	.set_powerkey_ignore = NULL,
 	.powerkey_lcdoff	= NULL,
 	.backlight_enable	= key_backlight_enable,
 };

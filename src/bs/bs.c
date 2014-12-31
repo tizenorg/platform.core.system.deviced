@@ -65,8 +65,7 @@
 
 static int noti_fd;
 static int add_noti(void);
-struct crash_arg
-{
+struct crash_arg {
 	char crash_mode[CRASH_MODE_MAX];
 	char crash_processname[CRASH_PROCESSNAME_MAX];
 	char crash_timestr[CRASH_TIME_MAX];
@@ -172,13 +171,16 @@ static int clean_coredump_dir(void)
 		return 0;
 	}
 	dfd = dirfd(dir);
-	if (dfd < 0) return 0;
+	if (dfd < 0)
+		return 0;
 	while ((dp = readdir(dir)) != NULL) {
 		const char *name = dp->d_name;
 		/* always skip "." and ".." */
 		if (name[0] == '.') {
-			if (name[1] == 0) continue;
-			if ((name[1] == '.') && (name[2] == 0)) continue;
+			if (name[1] == 0)
+				continue;
+			if ((name[1] == '.') && (name[2] == 0))
+				continue;
 		}
 		if (unlinkat(dfd, name, 0) < 0) {
 			_SE("FAIL: clean_coredump_dir (%s)", name);
@@ -204,8 +206,10 @@ static int clean_dump_dir(void)
 			const char *name = dp->d_name;
 			/* always skip "." and ".." */
 			if (name[0] == '.') {
-				if (name[1] == 0) continue;
-				if ((name[1] == '.') && (name[2] == 0)) continue;
+				if (name[1] == 0)
+					continue;
+				if ((name[1] == '.') && (name[2] == 0))
+					continue;
 			}
 			snprintf(dirname, sizeof(dirname), "%s/%s", CRASH_DUMP_PATH, name);
 			if (ecore_file_recursive_rm(dirname) == EINA_FALSE) {
@@ -228,16 +232,19 @@ static int clean_info_dir(void)
 		return 0;
 	}
 	dfd = dirfd(dir);
-	if (dfd < 0) return 0;
+	if (dfd < 0)
+		return 0;
 	while ((dp = readdir(dir)) != NULL) {
 		const char *name = dp->d_name;
 		/* always skip "." and ".." */
 		if (name[0] == '.') {
-			if (name[1] == 0) continue;
-			if ((name[1] == '.') && (name[2] == 0)) continue;
+			if (name[1] == 0)
+				continue;
+			if ((name[1] == '.') && (name[2] == 0))
+				continue;
 		}
 		if (unlinkat(dfd, name, 0) < 0) {
-			_E("FAIL: clean_info_dir (%s)",name);
+			_E("FAIL: clean_info_dir (%s)", name);
 			continue;
 		}
 	}
@@ -301,7 +308,7 @@ static int crash_arg_parser(char *linebuffer, struct crash_arg *arg)
 
 static void launch_crash_worker(const char *filename, int popup_on)
 {
-	static int popup_pid = 0;
+	static int popup_pid;
 	FILE *fp;
 	int ret = -1;
 	int len, count;
@@ -330,7 +337,7 @@ static void launch_crash_worker(const char *filename, int popup_on)
 		_SD("crash_worker args(%s)", crash_worker_args);
 		_SD("(%s%s%s)", parsing_arg.crash_mode,
 				parsing_arg.crash_processname, parsing_arg.crash_timestr);
-		ret = ss_launch_evenif_exist (CRASH_WORKER_PATH, crash_worker_args);
+		ret = ss_launch_evenif_exist(CRASH_WORKER_PATH, crash_worker_args);
 		if (ret > 0) {
 			char buf[PATH_MAX];
 			FILE *fpAdj;
@@ -346,7 +353,7 @@ static void launch_crash_worker(const char *filename, int popup_on)
 		}
 		if (popup_on) {
 			if (!is_running_process(popup_pid))
-				popup_pid = ss_launch_evenif_exist (CRASH_POPUP_PATH, parsing_arg.crash_processname);
+				popup_pid = ss_launch_evenif_exist(CRASH_POPUP_PATH, parsing_arg.crash_processname);
 		}
 
 		if (popup_pid < 0) {
@@ -444,7 +451,7 @@ static void bs_init(void *data)
 		_E("ecore_file_init() failed");
 		launch_crash_worker(CRASH_NOTI_PATH, CRASH_POPUP_OFF);
 	}
-	crash_file_monitor = ecore_file_monitor_add(CRASH_NOTI_PATH,(void *) __crash_file_cb, NULL);
+	crash_file_monitor = ecore_file_monitor_add(CRASH_NOTI_PATH, (void *) __crash_file_cb, NULL);
 	if (!crash_file_monitor) {
 		_E("ecore_file_monitor_add() failed");
 		launch_crash_worker(CRASH_NOTI_PATH, CRASH_POPUP_OFF);

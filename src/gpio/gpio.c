@@ -40,12 +40,12 @@ static const struct gpio_device default_gpio = {
 
 void register_gpio_device(const struct gpio_device *gpio)
 {
-	DD_LIST_APPEND(gpio_head, (void*)gpio);
+	DD_LIST_APPEND(gpio_head, (void *)gpio);
 }
 
 void unregister_gpio_device(const struct gpio_device *gpio)
 {
-	DD_LIST_REMOVE(gpio_head, (void*)gpio);
+	DD_LIST_REMOVE(gpio_head, (void *)gpio);
 }
 
 int check_default_gpio_device(const struct gpio_device *gpio)

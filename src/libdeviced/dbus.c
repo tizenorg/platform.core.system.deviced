@@ -49,10 +49,10 @@ int append_variant(DBusMessageIter *iter, const char *sig, char *param[])
 	if (!sig || !param)
 		return 0;
 
-	for (ch = (char*)sig, i = 0; *ch != '\0'; ++i, ++ch) {
+	for (ch = (char *)sig, i = 0; *ch != '\0'; ++i, ++ch) {
 		switch (*ch) {
 		case 'b':
-			bool_type = (atoi(param[i])) ? TRUE:FALSE;
+			bool_type = (atoi(param[i])) ? TRUE : FALSE;
 			dbus_message_iter_append_basic(iter, DBUS_TYPE_BOOLEAN, &bool_type);
 			break;
 		case 'i':
@@ -75,7 +75,7 @@ int append_variant(DBusMessageIter *iter, const char *sig, char *param[])
 			switch (*ch) {
 			case 'y':
 				dbus_message_iter_open_container(iter, DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE_AS_STRING, &arr);
-				byte = (struct dbus_byte*)param[i];
+				byte = (struct dbus_byte *)param[i];
 				dbus_message_iter_append_fixed_array(&arr, DBUS_TYPE_BYTE, &(byte->data), byte->size);
 				dbus_message_iter_close_container(iter, &arr);
 				break;

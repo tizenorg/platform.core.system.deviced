@@ -40,11 +40,11 @@ static const char *setting_keys[SETTING_GET_END] = {
 };
 
 static int lock_screen_state = VCONFKEY_IDLE_UNLOCK;
-static bool lock_screen_bg_state = false;
-static int force_lcdtimeout = 0;
-static int custom_on_timeout = 0;
-static int custom_normal_timeout = 0;
-static int custom_dim_timeout = 0;
+static bool lock_screen_bg_state;
+static int force_lcdtimeout;
+static int custom_on_timeout;
+static int custom_normal_timeout;
+static int custom_dim_timeout;
 
 int (*update_pm_setting) (int key_idx, int val);
 
@@ -212,13 +212,13 @@ static int setting_cb(keynode_t *key_nodes, void *data)
 		return -1;
 	}
 	if (update_pm_setting != NULL) {
-		switch(index) {
-			case SETTING_ACCESSIBILITY_TTS:
-				update_pm_setting(index, vconf_keynode_get_bool(tmp));
-				break;
-			default:
-				update_pm_setting(index, vconf_keynode_get_int(tmp));
-				break;
+		switch (index) {
+		case SETTING_ACCESSIBILITY_TTS:
+			update_pm_setting(index, vconf_keynode_get_bool(tmp));
+			break;
+		default:
+			update_pm_setting(index, vconf_keynode_get_int(tmp));
+			break;
 		}
 	}
 

@@ -78,7 +78,7 @@ struct lowbat_process_entry {
 static int cur_bat_state = BATTERY_UNKNOWN;
 static int cur_bat_capacity = -1;
 
-static int lowbat_popup_option = 0;
+static int lowbat_popup_option;
 static int lowbat_freq = -1;
 static struct battery_config_info battery_info = {
 	.normal   = BATTERY_NORMAL,
@@ -88,8 +88,8 @@ static struct battery_config_info battery_info = {
 	.realoff  = BATTERY_REALOFF,
 };
 
-static dd_list *lpe = NULL;
-static int scenario_count = 0;
+static dd_list *lpe;
+static int scenario_count;
 
 static int lowbat_initialized(void *data)
 {
@@ -157,7 +157,7 @@ static void print_lowbat_state(unsigned int bat_percent)
 
 static int power_execute(void)
 {
-	static const struct device_ops *ops = NULL;
+	static const struct device_ops *ops;
 
 	FIND_DEVICE_INT(ops, POWER_OPS_NAME);
 
@@ -166,10 +166,10 @@ static int power_execute(void)
 
 static int lowbat_popup(char *option)
 {
-	static int launched_poweroff = 0;
-	static const struct device_ops *apps = NULL;
+	static int launched_poweroff;
+	static const struct device_ops *apps;
 	struct popup_data *params;
-	int ret, state=0;
+	int ret, state = 0;
 	int r_disturb, s_disturb, r_block, s_block;
 	char *value;
 	pid_t pid;
@@ -464,7 +464,7 @@ static int lowbat_process(int bat_percent, void *ad)
 	if (new_bat_capacity <= battery_info.warning)
 		low_bat = true;
 
-	device_notify(DEVICE_NOTIFIER_LOWBAT, (void*)low_bat);
+	device_notify(DEVICE_NOTIFIER_LOWBAT, (void *)low_bat);
 
 	if (cur_bat_state == new_bat_state && new_bat_state > battery_info.realoff)
 		goto exit;
@@ -561,11 +561,11 @@ static int check_power_save_mode(void)
 
 static int booting_done(void *data)
 {
-	static int done = 0;
+	static int done;
 
 	if (data == NULL)
 		goto out;
-	done = *(int*)data;
+	done = *(int *)data;
 	if (!done)
 		goto out;
 	_I("booting done");
