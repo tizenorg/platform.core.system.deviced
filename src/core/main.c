@@ -28,6 +28,7 @@
 #include "devices.h"
 #include "shared/dbus.h"
 #include "device-notifier.h"
+#include "battery/battery.h"
 
 #define PIDFILE_PATH		"/var/run/.deviced.pid"
 

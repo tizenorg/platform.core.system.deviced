@@ -25,6 +25,7 @@
 #include <error.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <notification.h>
 
 #define ARRAY_SIZE(name) (sizeof(name)/sizeof(name[0]))
 
@@ -139,6 +140,7 @@ int sys_set_int(char *fname, int val);
 int terminate_process(const char* partition, bool force);
 int mount_check(const char* path);
 void print_time(const char *prefix);
+int manage_notification(notification_h noti, char *title, char *content);
 
 #endif	/* __CORE_COMMON_H__ */
 

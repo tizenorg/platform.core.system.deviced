@@ -34,6 +34,7 @@
 #include <poll.h>
 #include <mntent.h>
 #include "log.h"
+#include <notification.h>
 
 #define PERMANENT_DIR		"/tmp/permanent"
 #define VIP_DIR			"/tmp/vip"
@@ -358,3 +359,19 @@ void print_time(const char *prefix)
 	_D("%s --> %d:%02d:%02d %d",
 			prefix, tm->tm_hour, tm->tm_min, tm->tm_sec, tv.tv_usec);
 }
+
+int manage_notification(notification_h noti, char *title, char *content)
+{
+        noti = notification_create(NOTIFICATION_TYPE_NOTI);
+
+	if (noti == NULL) {
+                return -1;
+	}
+
+	notification_set_text(noti, NOTIFICATION_TEXT_TYPE_TITLE, title, NULL, NOTIFICATION_TYPE_NONE);
+	notification_set_text(noti, NOTIFICATION_TEXT_TYPE_CONTENT, content, NULL, NOTIFICATION_TYPE_NONE);
+        notification_insert(noti, NULL);
+        notification_free(noti);
+	return 0;
+}
+
