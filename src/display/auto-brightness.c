@@ -713,7 +713,7 @@ static void auto_brightness_init(void *data)
 	/* load configutation */
 	ret = config_parse(BOARD_CONF_FILE, lbm_load_config, &lbm_conf);
 	if (ret < 0)
-		_W("Failed to load %s, %s Use default value!",
+		_W("Failed to load %s, %d Use default value!",
 		    BOARD_CONF_FILE, ret);
 
 	register_notifier(DEVICE_NOTIFIER_LCD, lcd_changed_cb);

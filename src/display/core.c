@@ -2336,7 +2336,7 @@ static void display_init(void *data)
 	/* load configutation */
 	ret = config_parse(DISPLAY_CONF_FILE, display_load_config, &display_conf);
 	if (ret < 0)
-		_W("Failed to load %s, %s Use default value!",
+		_W("Failed to load %s, %d Use default value!",
 		    DISPLAY_CONF_FILE, ret);
 
 	register_notifier(DEVICE_NOTIFIER_INPUT_ADD, input_device_add);
