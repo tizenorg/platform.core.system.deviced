@@ -61,7 +61,6 @@ deviced
 %package deviced
 Summary:    deviced daemon
 Group:      main
-Requires:   %{name} = %{version}-%{release}
 
 %description deviced
 deviced daemon.
@@ -69,6 +68,7 @@ deviced daemon.
 %package -n libdeviced
 Summary:    Deviced library
 Group:      Development/Libraries
+Requires:   %{name} = %{version}-%{release}
 
 %description -n libdeviced
 Deviced library for device control
