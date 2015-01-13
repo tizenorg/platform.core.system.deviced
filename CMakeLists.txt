@@ -133,6 +133,7 @@ SET(PKG_MODULES
 	sensor
 	tapi
 	libtzplatform-config
+	notification
 )
 
 IF(X11_SUPPORT)

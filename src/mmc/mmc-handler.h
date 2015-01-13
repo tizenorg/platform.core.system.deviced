@@ -29,10 +29,6 @@
 #define BUF_LEN		20
 #define RETRY_COUNT	10
 
-#define MMC_POPUP_NAME		"mmc-syspopup"
-#define MMC_POPUP_APP_KEY	"_APP_NAME_"
-#define MMC_POPUP_SMACK_VALUE	"checksmack"
-
 enum mmc_fs_type {
 	FS_TYPE_VFAT = 0,
 	FS_TYPE_EXT4,

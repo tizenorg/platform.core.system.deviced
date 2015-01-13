@@ -127,17 +127,6 @@ enum snd_jack_types {
 #define METHOD_GET_CRADLE	"GetCradle"
 #define SIGNAL_CRADLE_STATE	"ChangedCradle"
 
-struct ticker_data {
-	char *name;
-	int type;
-};
-
-struct popup_data {
-	char *name;
-	char *key;
-	char *value;
-};
-
 struct siop_data {
 	int siop;
 	int rear;

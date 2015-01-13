@@ -60,15 +60,6 @@
 #define LOWBAT_CPU_CTRL_ID	"id6"
 #define LOWBAT_CPU_FREQ_RATE	(0.7)
 
-#define LOWBAT_POPUP_NAME "lowbat-syspopup"
-#define LOWBAT_EXEC_PATH		PREFIX"/bin/lowbatt-popup"
-
-struct popup_data {
-	char *name;
-	char *key;
-	char *value;
-};
-
 struct lowbat_process_entry {
 	int old;
 	int now;
@@ -78,7 +69,6 @@ struct lowbat_process_entry {
 static int cur_bat_state = BATTERY_UNKNOWN;
 static int cur_bat_capacity = -1;
 
-static int lowbat_popup_option = 0;
 static int lowbat_freq = -1;
 static struct battery_config_info battery_info = {
 	.normal   = BATTERY_NORMAL,
@@ -166,80 +156,40 @@ static int power_execute(void)
 
 static int lowbat_popup(char *option)
 {
-	static int launched_poweroff = 0;
-	static const struct device_ops *apps = NULL;
-	struct popup_data *params;
 	int ret, state=0;
 	int r_disturb, s_disturb, r_block, s_block;
+	int lowbat_popup_option = -1;
 	char *value;
-	pid_t pid;
 
 	if (!option)
 		return -1;
 
-	if (strcmp(option, POWER_OFF_BAT_ACT))
-		launched_poweroff = 0;
-
 	if (!strcmp(option, CRITICAL_LOW_BAT_ACT)) {
-#ifdef MICRO_DD
-		value = "lowbattery_critical";
-#else
-		value = "critical";
-#endif
-		lowbat_popup_option = LOWBAT_OPT_CHECK;
+		value = "Critical";
 	} else if (!strcmp(option, WARNING_LOW_BAT_ACT)) {
-#ifdef MICRO_DD
-		value = "lowbattery_warning";
-#else
-		value = "warning";
-#endif
-		lowbat_popup_option = LOWBAT_OPT_WARNING;
+		value = "Warning";
 	} else if (!strcmp(option, POWER_OFF_BAT_ACT)) {
-		value = "poweroff";
-		lowbat_popup_option = LOWBAT_OPT_POWEROFF;
+		value = "Poweroff";
 	} else if (!strcmp(option, CHARGE_ERROR_ACT)) {
-		value = "chargeerr";
+		value = "Charger error";
 		lowbat_popup_option = LOWBAT_OPT_CHARGEERR;
 	} else if (!strcmp(option, CHARGE_ERROR_LOW_ACT)) {
-		value = "chargeerrlow";
+		value = "Charger low temperature error";
 		lowbat_popup_option = LOWBAT_OPT_CHARGEERR;
 	} else if (!strcmp(option, CHARGE_ERROR_HIGH_ACT)) {
-		value = "chargeerrhigh";
+		value = "Charger high temperature error";
 		lowbat_popup_option = LOWBAT_OPT_CHARGEERR;
 	} else if (!strcmp(option, CHARGE_ERROR_OVP_ACT)) {
-		value = "chargeerrovp";
+		value = "Charger ovp error";
 		lowbat_popup_option = LOWBAT_OPT_CHARGEERR;
 	} else if (!strcmp(option, CHARGE_CHECK_ACT)) {
-		launched_poweroff = 0;
 		return 0;
 	} else
 		return -1;
+
 	_D("%s", value);
 	ret = vconf_get_int(VCONFKEY_STARTER_SEQUENCE, &state);
 	if (state == 1 || ret != 0 || booting_done(NULL)) {
-
-		if (launched_poweroff == 1) {
-			_I("will be foreced power off");
-			power_execute();
-			return 0;
-		}
-
-		if (lowbat_popup_option == LOWBAT_OPT_POWEROFF)
-			launched_poweroff = 1;
-
-		pid = get_exec_pid(LOWBAT_EXEC_PATH);
-		if (pid > 0) {
-			_I("pre launched %s destroy", LOWBAT_EXEC_PATH);
-			kill(pid, SIGTERM);
-		}
-
-		FIND_DEVICE_INT(apps, "apps");
-
-		params = malloc(sizeof(struct popup_data));
-		if (params == NULL) {
-			_E("Malloc failed");
-			return -1;
-		}
 		r_disturb = vconf_get_int("memory/shealth/sleep/do_not_disturb", &s_disturb);
 		r_block = vconf_get_bool("db/setting/blockmode_wearable", &s_block);
 		if ((r_disturb != 0 && r_block != 0) ||
@@ -248,12 +198,9 @@ static int lowbat_popup(char *option)
 			pm_change_internal(getpid(), LCD_NORMAL);
 		else
 			_I("block LCD");
-		params->name = LOWBAT_POPUP_NAME;
-		params->key = POPUP_KEY_CONTENT;
-		params->value = strdup(value);
-		apps->init((void *)params);
-		free(params->value);
-		free(params);
+		ret = manage_notification("Low battery", value);
+		if (ret == -1)
+			return -1;
 	} else {
 		_D("boot-animation running yet");
 	}
@@ -311,17 +258,6 @@ int battery_charge_err_ovp_act(void *data)
 
 static int battery_charge_act(void *data)
 {
-#ifdef NOUSE
-	int val;
-	char argstr[128];
-
-	/* instead of adding action to the queue, execute it right here */
-	if (device_get_property(DEVTYPE_JACK, JACK_PROP_TA_ONLINE, &val) == 0
-	    && val == 1) {
-		snprintf(argstr, 128, "-t 4");
-		launch_after_kill_if_exist(LOWBAT_EXEC_PATH, argstr);
-	}
-#endif
 	return 0;
 }
 

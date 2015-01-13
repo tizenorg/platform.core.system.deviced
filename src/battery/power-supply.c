@@ -34,7 +34,6 @@
 #include "power-supply.h"
 
 #define BUFF_MAX		255
-#define POPUP_KEY_CONTENT		"_SYSPOPUP_CONTENT_"
 
 #define SIGNAL_CHARGEERR_RESPONSE	"ChargeErrResponse"
 #define SIGNAL_TEMP_GOOD		"TempGood"
@@ -70,18 +69,6 @@ enum power_supply_init_type {
 	POWER_SUPPLY_INITIALIZED = 1,
 };
 
-struct popup_data {
-	char *name;
-	char *key;
-	char *value;
-};
-
-static struct uevent_handler uh = {
-	.subsystem = POWER_SUBSYSTEM,
-	.uevent_func = uevent_power_handler,
-};
-
-struct battery_status battery;
 static Ecore_Timer *power_timer = NULL;
 static Ecore_Timer *abnormal_timer = NULL;
 extern int battery_power_off_act(void *data);
@@ -102,8 +89,6 @@ static int check_lowbat_charge_device(int bInserted)
 	int bat_state = -1;
 	int ret = -1;
 	char *value;
-	struct popup_data *params;
-	static const struct device_ops *apps = NULL;
 
 	pm_check_and_change(bInserted);
 	if (bInserted == 1) {
@@ -117,24 +102,15 @@ static int check_lowbat_charge_device(int bInserted)
 			if (vconf_get_int(VCONFKEY_SYSMAN_BATTERY_STATUS_LOW, &bat_state) == 0) {
 				if(bat_state < VCONFKEY_SYSMAN_BAT_NORMAL
 						|| bat_state == VCONFKEY_SYSMAN_BAT_REAL_POWER_OFF) {
-					FIND_DEVICE_INT(apps, "apps");
 
 					if(bat_state == VCONFKEY_SYSMAN_BAT_REAL_POWER_OFF)
-						value = "poweroff";
+						value = "Poweroff";
 					else
-						value = "warning";
-					params = malloc(sizeof(struct popup_data));
-					if (params == NULL) {
-						_E("Malloc failed");
+						value = "Warning";
+					_I("%s %s", "lowbat", value);
+					ret = manage_notification("Low battery", value);
+					if (ret == -1)
 						return -1;
-					}
-					params->name = "lowbat-syspopup";
-					params->key = POPUP_KEY_CONTENT;
-					params->value = value;
-					_I("%s %s %s(%x)", params->name, params->key, params->value, params);
-					if (apps->init)
-						apps->init((void *)params);
-					free(params);
 				}
 			} else {
 				_E("failed to get vconf key");
@@ -148,26 +124,11 @@ static int check_lowbat_charge_device(int bInserted)
 
 static int changed_battery_cf(enum present_type status)
 {
-	struct popup_data *params;
-	static const struct device_ops *apps = NULL;
+	int ret;
+	ret = manage_notification("Battery disconnect", "Battery disconnect");
+	if (ret < 0)
+		return -1;
 
-	FIND_DEVICE_INT(apps, "apps");
-	params = malloc(sizeof(struct popup_data));
-	if (params == NULL) {
-		_E("Malloc failed");
-		return -ENOMEM;
-	}
-	params->name = "lowbat-syspopup";
-	params->key = POPUP_KEY_CONTENT;
-	params->value = "battdisconnect";
-	if (apps->init == NULL || apps->exit == NULL)
-		goto out;
-	if (status == PRESENT_ABNORMAL)
-		apps->init((void *)params);
-	else
-		apps->exit((void *)params);
-out:
-	free(params);
 	return 0;
 }
 
@@ -184,28 +145,6 @@ static void health_status_broadcast(void)
 {
 	broadcast_edbus_signal(DEVICED_PATH_BATTERY, DEVICED_INTERFACE_BATTERY,
 	    SIGNAL_TEMP_GOOD, NULL, NULL);
-}
-
-static int clean_health_popup(void)
-{
-	struct popup_data *params;
-	static const struct device_ops *apps = NULL;
-
-	FIND_DEVICE_INT(apps, "apps");
-	params = malloc(sizeof(struct popup_data));
-	if (params == NULL) {
-		_E("Malloc failed");
-		return -ENOMEM;
-	}
-	params->name = "lowbat-syspopup";
-	params->key = POPUP_KEY_CONTENT;
-	if (apps->exit)
-		apps->exit((void *)params);
-	health_status_broadcast();
-out:
-	free(params);
-	return 0;
-
 }
 
 static void health_timer_reset(void)
@@ -477,7 +416,6 @@ static void update_health(enum battery_noti_status status)
 	} else {
 		vconf_set_int(SIOP_DISABLE, 0);
 		pm_unlock_internal(INTERNAL_LOCK_POPUP, LCD_DIM, PM_SLEEP_MARGIN);
-		clean_health_popup();
 		abnormal_popup_timer_init();
 	}
 }
