@@ -35,12 +35,6 @@
 
 #define FS_EXT4_SMACK_LABEL "/usr/bin/mmc-smack-label"
 
-struct popup_data {
-	char *name;
-	char *key;
-	char *value;
-};
-
 static const char *ext4_arg[] = {
 	"/sbin/mkfs.ext4",
 	NULL, NULL,
@@ -121,24 +115,13 @@ static int check_smack_popup(void)
 {
 	int ret = -1;
 	int val = -1;
-	struct popup_data *params;
-	static const struct device_ops *apps = NULL;
 
 	ret = vconf_get_int(VCONFKEY_STARTER_SEQUENCE, &val);
 	if (val == 1 || ret != 0) {
 
-		FIND_DEVICE_INT(apps, "apps");
-
-		params = malloc(sizeof(struct popup_data));
-		if (params == NULL) {
-			_E("Malloc failed");
+		ret = manage_notification(MMC_POPUP_NAME, MMC_POPUP_SMACK_VALUE);
+		if (ret == -1)
 			return -1;
-		}
-		params->name = MMC_POPUP_NAME;
-		params->key = MMC_POPUP_APP_KEY;
-		params->value = MMC_POPUP_SMACK_VALUE;
-		apps->init(params);
-		free(params);
 	}
 
 	return 0;

@@ -62,11 +62,6 @@
 
 static void poweroff_control_cb(keynode_t *in_key, void *data);
 
-struct popup_data {
-	char *name;
-	char *key;
-};
-
 static struct timeval tv_start_poweroff;
 
 static int power_off = 0;
@@ -166,20 +161,12 @@ static int poweroff(void)
 
 static int pwroff_popup(void)
 {
-	struct popup_data *params;
-	static const struct device_ops *apps = NULL;
-	int val;
+	int ret;
 
-	FIND_DEVICE_INT(apps, "apps");
-
-	params = malloc(sizeof(struct popup_data));
-	if (params == NULL) {
-		_E("Malloc failed");
+	ret = manage_notification(POWEROFF_POPUP_NAME, "Poweroff");
+	if (ret == -1)
 		return -1;
-	}
-	params->name = POWEROFF_POPUP_NAME;
-	apps->init((void *)params);
-	free(params);
+
 	return 0;
 }
 

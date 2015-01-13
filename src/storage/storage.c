@@ -74,12 +74,6 @@ enum memnoti_level {
 	MEMNOTI_LEVEL_NORMAL,
 } ;
 
-struct popup_data {
-	char *name;
-	char *key;
-	char *value;
-};
-
 struct storage_config_info {
 	double warning_level;
 	double critical_level;
@@ -133,8 +127,6 @@ static int memnoti_popup(enum memnoti_level level)
 	int ret = -1;
 	int val = -1;
 	char *value = NULL;
-	struct popup_data *params;
-	static const struct device_ops *apps = NULL;
 
 	if (level != MEMNOTI_LEVEL_WARNING && level != MEMNOTI_LEVEL_CRITICAL) {
 		_E("level check error : %d",level);
@@ -149,23 +141,12 @@ static int memnoti_popup(enum memnoti_level level)
 
 	ret = vconf_get_int(VCONFKEY_STARTER_SEQUENCE, &val);
 	if (val == 0 || ret != 0)
-		goto out;
+		return 0;
 
-	FIND_DEVICE_INT(apps, "apps");
-
-	params = malloc(sizeof(struct popup_data));
-	if (params == NULL) {
-		_E("Malloc failed");
+	ret = manage_notification("Low memory", value);
+	if (ret == -1)
 		return -1;
-	}
-	params->name = LOWMEM_POPUP_NAME;
-	params->key = POPUP_KEY_MEMNOTI;
-	params->value = strdup(value);
-	apps->init((void *)params);
-	free(params);
 	return 0;
-out:
-	return -1;
 }
 
 static enum memnoti_level check_memnoti_level(double total, double avail)
