@@ -15,7 +15,7 @@
 %bcond_with vibrator
 
 Name:       deviced
-Summary:    deviced
+Summary:    Deviced
 Version:    1.0.0
 Release:    1
 Group:      Framework/system
@@ -48,6 +48,7 @@ BuildRequires:  pkgconfig(libsystemd-daemon)
 BuildRequires:  pkgconfig(capi-base-common)
 BuildRequires:	pkgconfig(dbus-glib-1)
 BuildRequires:  pkgconfig(libtzplatform-config)
+BuildRequires:  pkgconfig(notification)
 
 %{?systemd_requires}
 Requires(preun): /usr/bin/systemctl

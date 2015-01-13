@@ -92,12 +92,6 @@ struct mmc_data {
 	char *devpath;
 };
 
-struct popup_data {
-	char *name;
-	char *key;
-	char *value;
-};
-
 static dd_list *fs_head;
 static char *mmc_curpath;
 static bool smack = false;
@@ -158,21 +152,7 @@ bool mmc_check_mounted(const char *mount_point)
 
 static void launch_syspopup(char *str)
 {
-	struct popup_data *params;
-	static const struct device_ops *apps = NULL;
-
-	FIND_DEVICE_VOID(apps, "apps");
-
-	params = malloc(sizeof(struct popup_data));
-	if (params == NULL) {
-		_E("Malloc failed");
-		return;
-	}
-	params->name = MMC_POPUP_NAME;
-	params->key = POPUP_KEY_CONTENT;
-	params->value = strdup(str);
-	apps->init((void *)params);
-	free(params);
+	manage_notification("MMC", str);
 }
 
 static int get_partition(const char *devpath, char *subpath)
