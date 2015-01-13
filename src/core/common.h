@@ -139,6 +139,7 @@ int sys_set_int(char *fname, int val);
 int terminate_process(const char* partition, bool force);
 int mount_check(const char* path);
 void print_time(const char *prefix);
+int manage_notification(char *title, char *content);
 
 #endif	/* __CORE_COMMON_H__ */
 
