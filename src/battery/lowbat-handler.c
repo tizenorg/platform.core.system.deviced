@@ -63,12 +63,6 @@
 #define LOWBAT_POPUP_NAME "lowbat-syspopup"
 #define LOWBAT_EXEC_PATH		PREFIX"/bin/lowbatt-popup"
 
-struct popup_data {
-	char *name;
-	char *key;
-	char *value;
-};
-
 struct lowbat_process_entry {
 	int old;
 	int now;
@@ -168,7 +162,7 @@ static int lowbat_popup(char *option)
 {
 	static int launched_poweroff = 0;
 	static const struct device_ops *apps = NULL;
-	struct popup_data *params;
+	notification_h noti;
 	int ret, state=0;
 	int r_disturb, s_disturb, r_block, s_block;
 	char *value;
@@ -235,11 +229,6 @@ static int lowbat_popup(char *option)
 
 		FIND_DEVICE_INT(apps, "apps");
 
-		params = malloc(sizeof(struct popup_data));
-		if (params == NULL) {
-			_E("Malloc failed");
-			return -1;
-		}
 		r_disturb = vconf_get_int("memory/shealth/sleep/do_not_disturb", &s_disturb);
 		r_block = vconf_get_bool("db/setting/blockmode_wearable", &s_block);
 		if ((r_disturb != 0 && r_block != 0) ||
@@ -248,12 +237,9 @@ static int lowbat_popup(char *option)
 			pm_change_internal(getpid(), LCD_NORMAL);
 		else
 			_I("block LCD");
-		params->name = LOWBAT_POPUP_NAME;
-		params->key = POPUP_KEY_CONTENT;
-		params->value = strdup(value);
-		apps->init((void *)params);
-		free(params->value);
-		free(params);
+		ret = manage_notification(noti, "Low battery", value);
+		if (ret == -1)
+			return -1;
 	} else {
 		_D("boot-animation running yet");
 	}

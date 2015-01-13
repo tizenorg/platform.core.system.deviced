@@ -70,18 +70,6 @@ enum power_supply_init_type {
 	POWER_SUPPLY_INITIALIZED = 1,
 };
 
-struct popup_data {
-	char *name;
-	char *key;
-	char *value;
-};
-
-static struct uevent_handler uh = {
-	.subsystem = POWER_SUBSYSTEM,
-	.uevent_func = uevent_power_handler,
-};
-
-struct battery_status battery;
 static Ecore_Timer *power_timer = NULL;
 static Ecore_Timer *abnormal_timer = NULL;
 extern int battery_power_off_act(void *data);
@@ -102,7 +90,7 @@ static int check_lowbat_charge_device(int bInserted)
 	int bat_state = -1;
 	int ret = -1;
 	char *value;
-	struct popup_data *params;
+	notification_h noti;
 	static const struct device_ops *apps = NULL;
 
 	pm_check_and_change(bInserted);
@@ -123,18 +111,10 @@ static int check_lowbat_charge_device(int bInserted)
 						value = "poweroff";
 					else
 						value = "warning";
-					params = malloc(sizeof(struct popup_data));
-					if (params == NULL) {
-						_E("Malloc failed");
+					_I("%s %s %s", "lowbat-syspopup", POPUP_KEY_CONTENT, value);
+					ret = manage_notification(noti, "Low battery", value);
+					if (ret == -1)
 						return -1;
-					}
-					params->name = "lowbat-syspopup";
-					params->key = POPUP_KEY_CONTENT;
-					params->value = value;
-					_I("%s %s %s(%x)", params->name, params->key, params->value, params);
-					if (apps->init)
-						apps->init((void *)params);
-					free(params);
 				}
 			} else {
 				_E("failed to get vconf key");
@@ -148,26 +128,14 @@ static int check_lowbat_charge_device(int bInserted)
 
 static int changed_battery_cf(enum present_type status)
 {
-	struct popup_data *params;
 	static const struct device_ops *apps = NULL;
+	notification_h noti;
+	char *value;
+	int ret;
 
 	FIND_DEVICE_INT(apps, "apps");
-	params = malloc(sizeof(struct popup_data));
-	if (params == NULL) {
-		_E("Malloc failed");
-		return -ENOMEM;
-	}
-	params->name = "lowbat-syspopup";
-	params->key = POPUP_KEY_CONTENT;
-	params->value = "battdisconnect";
-	if (apps->init == NULL || apps->exit == NULL)
-		goto out;
-	if (status == PRESENT_ABNORMAL)
-		apps->init((void *)params);
-	else
-		apps->exit((void *)params);
-out:
-	free(params);
+	value = "battdisconnect";
+	ret = manage_notification(noti, "Battery disconnect", value);
 	return 0;
 }
 
