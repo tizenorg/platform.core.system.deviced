@@ -2329,6 +2329,9 @@ static void display_init(void *data)
 
 	signal(SIGHUP, sig_hup);
 
+	/* Load backlight HAL structure */
+	backlight_service_load();
+
 	power_saving_func = default_saving_mode;
 	/* noti init for new input device like bt mouse */
 	indev_list = NULL;
@@ -2447,6 +2450,9 @@ static void display_exit(void *data)
 
 	exit_lcd_operation();
 	free_lock_info_list();
+
+	/* Free backlight HAL structure */
+	backlight_service_free();
 
 	_I("Stop power manager");
 }

@@ -36,6 +36,7 @@
 #include "proc/proc-handler.h"
 #include "core/device-notifier.h"
 #include "core/config-parser.h"
+#include "backlight-service.h"
 
 #define DISP_FORCE_SHIFT	12
 #define DISP_FORCE_CMD(prop, force)	(((force) << DISP_FORCE_SHIFT) | prop)
@@ -118,12 +119,8 @@ static bool update_working_position(void)
 
 static int get_siop_brightness(int value)
 {
-	int cmd, ret, brt;
-
-	cmd = DISP_CMD(PROP_DISPLAY_MAX_BRIGHTNESS, DEFAULT_DISPLAY);
-	ret = device_get_property(DEVICE_TYPE_DISPLAY, cmd, &brt);
-	if (ret >= 0 && value > brt)
-		return brt;
+	if (value > BACKLIGHT_MAX_BRIGHTNESS)
+		return BACKLIGHT_MAX_BRIGHTNESS;
 
 	return value;
 }
