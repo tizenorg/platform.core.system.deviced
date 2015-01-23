@@ -88,6 +88,7 @@ ENDIF(TIZEN_SIM)
 
 IF(TIZEN_DISPLAY)
 SET(SRCS ${SRCS}
+	src/display/backlight-service.c
 	src/display/auto-brightness.c
 	src/display/brightness.c
 	src/display/core.c
@@ -133,6 +134,7 @@ SET(PKG_MODULES
 	sensor
 	tapi
 	libtzplatform-config
+	hwcommon
 )
 
 IF(X11_SUPPORT)

@@ -48,6 +48,7 @@ BuildRequires:  pkgconfig(libsystemd-daemon)
 BuildRequires:  pkgconfig(capi-base-common)
 BuildRequires:	pkgconfig(dbus-glib-1)
 BuildRequires:  pkgconfig(libtzplatform-config)
+BuildRequires:  pkgconfig(hwcommon)
 
 %{?systemd_requires}
 Requires(preun): /usr/bin/systemctl
