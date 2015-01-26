@@ -292,6 +292,7 @@ static void booting_done_edbus_signal_handler(void *data, DBusMessage *msg)
 		return;
 
 	_I("signal booting done");
+	done = TRUE;
 	device_notify(DEVICE_NOTIFIER_BOOTING_DONE, &done);
 }
 
