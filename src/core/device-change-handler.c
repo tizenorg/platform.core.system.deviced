@@ -132,12 +132,6 @@ struct ticker_data {
 	int type;
 };
 
-struct popup_data {
-	char *name;
-	char *key;
-	char *value;
-};
-
 struct siop_data {
 	int siop;
 	int rear;
