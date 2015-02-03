@@ -26,7 +26,7 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <vconf.h>
-#include <sensor.h>
+#include <sensor_internal.h>
 #include <Ecore.h>
 
 #include "util.h"
