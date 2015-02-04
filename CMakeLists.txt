@@ -41,6 +41,10 @@ SET(SRCS
 	src/time/time-handler.c
 )
 
+SET(SRCS ${SRCS}
+	src/usb/usb.c
+)
+
 IF(TIZEN_BUZZER)
 SET(SRCS ${SRCS}
 	src/gpio/buzzer.c)
