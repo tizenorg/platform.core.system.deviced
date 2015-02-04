@@ -437,22 +437,11 @@ exit:
 	return result;
 }
 
-static int lowbat_read(void)
-{
-	int bat_percent, r;
-
-	r = device_get_property(DEVICE_TYPE_POWER, PROP_POWER_CAPACITY, &bat_percent);
-	if (r < 0)
-		return r;
-
-	return bat_percent;
-}
-
 static int check_lowbat_percent(int *pct)
 {
 	int bat_percent;
 
-	bat_percent = lowbat_read();
+	bat_percent = battery.capacity;
 	if (bat_percent < 0) {
 		_E("[BATMON] Cannot read battery gage. stop read fuel gage");
 		return -ENODEV;
@@ -480,20 +469,6 @@ void lowbat_monitor(void *data)
 		bat_percent = *(int *)data;
 	print_lowbat_state(bat_percent);
 	lowbat_process(bat_percent, NULL);
-}
-
-/* for debugging (request by kernel) */
-static int check_battery()
-{
-	int r;
-	int ret = -1;
-
-	if (device_get_property(DEVICE_TYPE_POWER, PROP_POWER_PRESENT, &ret) < 0) {
-		_E("FAIL: device_get_property(): [BATMON] battery check : %d", ret);
-	}
-	_D("[BATMON] battery check : %d", ret);
-
-	return ret;
 }
 
 static int check_power_save_mode(void)
