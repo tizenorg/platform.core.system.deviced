@@ -45,14 +45,12 @@ SET(SRCS ${SRCS}
 	src/gpio/buzzer.c)
 ENDIF(TIZEN_BUZZER)
 
-IF(TIZEN_BATTERY)
 SET(SRCS ${SRCS}
 	src/battery/battery-time.c
 	src/battery/config.c
 	src/battery/lowbat-handler.c
 	src/battery/power-supply.c
    )
-ENDIF(TIZEN_BATTERY)
 
 IF(TIZEN_EXTCON)
 SET(SRCS ${SRCS}
