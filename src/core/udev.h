@@ -58,6 +58,9 @@
 /* switch device */
 #define SWITCH_SUBSYSTEM	"switch"
 
+/* extcon */
+#define EXTCON_SUBSYSTEM	"extcon"
+
 /* host device */
 #define HOST_SUBSYSTEM		"host_notify"
 

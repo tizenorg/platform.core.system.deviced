@@ -43,6 +43,7 @@
 #include "devices.h"
 #include "display/setting.h"
 #include "display/core.h"
+#include "extcon/extcon.h"
 
 #define PREDEF_DEVICE_CHANGED		"device_changed"
 #define PREDEF_POWER_CHANGED		POWER_SUBSYSTEM
@@ -153,6 +154,7 @@ enum udev_subsystem_type {
 	UDEV_INPUT,
 	UDEV_PLATFORM,
 	UDEV_SWITCH,
+	UDEV_EXTCON,
 };
 
 static const struct udev_subsystem {
@@ -160,9 +162,10 @@ static const struct udev_subsystem {
 	const char *str;
 	const char *devtype;
 } udev_subsystems[] = {
-	{ UDEV_INPUT,            INPUT_SUBSYSTEM, NULL },
-	{ UDEV_PLATFORM,         PLATFORM_SUBSYSTEM, NULL },
-	{ UDEV_SWITCH,		 SWITCH_SUBSYSTEM, NULL },
+	{ UDEV_INPUT,			INPUT_SUBSYSTEM,		NULL },
+	{ UDEV_PLATFORM,		PLATFORM_SUBSYSTEM,		NULL },
+	{ UDEV_SWITCH,			SWITCH_SUBSYSTEM,		NULL },
+	{ UDEV_EXTCON,			EXTCON_SUBSYSTEM,		NULL },
 };
 
 static dd_list *udev_event_list;
@@ -785,6 +788,12 @@ static Eina_Bool uevent_kernel_control_cb(void *data, Ecore_Fd_Handler *fd_handl
 		if (!env_value)
 			break;
 		changed_device(env_value, NULL);
+		break;
+	case UDEV_EXTCON:
+		env_value = udev_device_get_property_value(dev, "STATE");
+		if (!env_value)
+			break;
+		extcon_update(env_value);
 		break;
 	}
 

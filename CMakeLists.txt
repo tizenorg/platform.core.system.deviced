@@ -33,6 +33,7 @@ SET(SRCS
 	src/core/log.c
 	src/core/main.c
 	src/core/sig-handler.c
+	src/extcon/extcon.c
 	src/gpio/gpio.c
 	src/power/power-handler.c
 	src/proc/cpu-info.c
