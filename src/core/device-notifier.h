@@ -41,7 +41,7 @@ enum device_notifier_type {
  * This is for internal callback method.
  */
 int register_notifier(enum device_notifier_type status, int (*func)(void *data));
-int unregister_notifier_del(enum device_notifier_type status, int (*func)(void *data));
+int unregister_notifier(enum device_notifier_type status, int (*func)(void *data));
 void device_notify(enum device_notifier_type status, void *value);
 
 #endif /* __DEVICE_NOTIFIER_H__ */
