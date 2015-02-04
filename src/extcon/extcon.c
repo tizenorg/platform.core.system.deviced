@@ -168,7 +168,7 @@ static int get_extcon_uevent_state(char *state, unsigned int len)
 	return ret;
 }
 
-static void extcon_init(void *data)
+static int extcon_booting_done(void *data)
 {
 	int ret;
 	char state[256];
@@ -182,6 +182,16 @@ static void extcon_init(void *data)
 	} else {
 		_E("Failed to get extcon uevent state node");
 	}
+
+	unregister_notifier(DEVICE_NOTIFIER_BOOTING_DONE, extcon_booting_done);
+	device_notify(DEVICE_NOTIFIER_EXTCON_READY, NULL);
+
+	return 0;
+}
+
+static void extcon_init(void *data)
+{
+	register_notifier(DEVICE_NOTIFIER_BOOTING_DONE, extcon_booting_done);
 }
 
 static void extcon_exit(void *data)
