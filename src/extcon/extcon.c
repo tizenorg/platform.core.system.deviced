@@ -79,6 +79,20 @@ static struct extcon_dev *find_extcon(const char *name)
 	return NULL;
 }
 
+int get_extcon_status(const char *name)
+{
+	struct extcon_dev *dev;
+
+	if (!name)
+		return -EINVAL;
+
+	dev = find_extcon(name);
+	if (!dev)
+		return -ENOENT;
+
+	return dev->status;
+}
+
 int extcon_update(const char *value)
 {
 	char *s, *p;

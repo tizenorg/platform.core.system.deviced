@@ -21,5 +21,6 @@
 #define __EXTCON_H__
 
 int extcon_update(const char *value);
+int get_extcon_status(const char *name);
 
 #endif /* __EXTCON_H__ */
