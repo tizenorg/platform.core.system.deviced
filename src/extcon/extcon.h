@@ -42,5 +42,6 @@ void add_extcon(const struct extcon_ops *dev);
 void remove_extcon(const struct extcon_ops *dev);
 
 int extcon_update(const char *value);
+int extcon_get_status(const char *name);
 
 #endif /* __EXTCON_H__ */
