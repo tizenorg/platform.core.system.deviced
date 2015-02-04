@@ -22,15 +22,15 @@
 #include <vconf.h>
 #include <Ecore.h>
 #include <device-node.h>
-#include "devices.h"
-#include "device-handler.h"
-#include "device-notifier.h"
-#include "udev.h"
-#include "log.h"
+#include "core/devices.h"
+#include "core/device-handler.h"
+#include "core/device-notifier.h"
+#include "core/udev.h"
+#include "core/log.h"
 #include "display/poll.h"
 #include "display/setting.h"
 #include "proc/proc-handler.h"
-#include "config-parser.h"
+#include "core/config-parser.h"
 #include "power-supply.h"
 
 #define BUFF_MAX		255
@@ -69,6 +69,7 @@ enum power_supply_init_type {
 	POWER_SUPPLY_INITIALIZED = 1,
 };
 
+static void uevent_power_handler(struct udev_device *dev);
 static struct uevent_handler uh = {
 	.subsystem = POWER_SUBSYSTEM,
 	.uevent_func = uevent_power_handler,

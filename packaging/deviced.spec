@@ -4,7 +4,6 @@
 
 #These options are DEACTIVATED by default.
 %bcond_with x
-%bcond_with battery
 %bcond_with buzzer
 %bcond_with camera_led
 %bcond_with extcon
@@ -188,9 +187,6 @@ export CFLAGS+=" -DX11_SUPPORT"
 	-DTZ_SYS_ETC=%TZ_SYS_ETC \
 	-DCMAKE_INSTALL_PREFIX=%{_prefix} \
 	-DARCH=%{ARCH} \
-%if %{with battery}
-	-DTIZEN_BATTERY:BOOL=ON \
-%endif
 %if %{with buzzer}
 	-DTIZEN_BUZZER:BOOL=ON \
 %endif

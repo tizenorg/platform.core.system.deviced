@@ -32,6 +32,7 @@
 #include "core/device-notifier.h"
 #include "core/common.h"
 #include "core/list.h"
+#include "core/udev.h"
 #include "device-node.h"
 #include "display/setting.h"
 #include "display/poll.h"
@@ -152,6 +153,23 @@ static int power_execute(void)
 	FIND_DEVICE_INT(ops, POWER_OPS_NAME);
 
 	return ops->execute(INTERNAL_PWROFF);
+}
+
+static int booting_done(void *data)
+{
+	static int done = 0;
+
+	if (data == NULL)
+		goto out;
+	done = *(int*)data;
+	if (!done)
+		goto out;
+	_I("booting done");
+
+	power_supply_timer_stop();
+	power_supply_init(NULL);
+out:
+	return done;
 }
 
 static int lowbat_popup(char *option)
@@ -495,23 +513,6 @@ static int check_power_save_mode(void)
 	return ret;
 }
 
-static int booting_done(void *data)
-{
-	static int done = 0;
-
-	if (data == NULL)
-		goto out;
-	done = *(int*)data;
-	if (!done)
-		goto out;
-	_I("booting done");
-
-	power_supply_timer_stop();
-	power_supply_init(NULL);
-out:
-	return done;
-}
-
 static int lowbat_monitor_init(void *data)
 {
 	int status = 1;
@@ -532,6 +533,21 @@ static int display_changed(void *data)
 	if (battery.charge_now == CHARGER_ABNORMAL &&
 	    battery.health == HEALTH_BAD)
 		pm_lock_internal(INTERNAL_LOCK_POPUP, LCD_DIM, STAY_CUR_STATE, 0);
+
+	return 0;
+}
+
+static int lowbat_probe(void *data)
+{
+	/**
+	 * find power-supply class.
+	 * if there is no power-supply class,
+	 * deviced does not activate a battery module.
+	 */
+	if (access(POWER_PATH, R_OK) != 0) {
+		_E("there is no power-supply class");
+		return -ENODEV;
+	}
 
 	return 0;
 }
@@ -561,6 +577,7 @@ static void lowbat_exit(void *data)
 static const struct device_ops lowbat_device_ops = {
 	.priority = DEVICE_PRIORITY_NORMAL,
 	.name     = "lowbat",
+	.probe    = lowbat_probe,
 	.init     = lowbat_init,
 	.exit     = lowbat_exit,
 };
