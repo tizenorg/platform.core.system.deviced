@@ -43,6 +43,7 @@ enum device_flags {
 struct device_ops {
 	enum device_priority priority;
 	char *name;
+	int (*probe) (void *data);
 	void (*init) (void *data);
 	void (*exit) (void *data);
 	int (*start) (enum device_flags flags);
