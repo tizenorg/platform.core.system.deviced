@@ -25,6 +25,7 @@ enum device_notifier_type {
 	DEVICE_NOTIFIER_HDMI,
 	DEVICE_NOTIFIER_LCD,
 	DEVICE_NOTIFIER_MMC,
+	DEVICE_NOTIFIER_EXTCON_READY,
 	DEVICE_NOTIFIER_TA,
 	DEVICE_NOTIFIER_USB,
 	DEVICE_NOTIFIER_USBHOST,
@@ -43,7 +44,7 @@ enum device_notifier_type {
  * This is for internal callback method.
  */
 int register_notifier(enum device_notifier_type status, int (*func)(void *data));
-int unregister_notifier_del(enum device_notifier_type status, int (*func)(void *data));
+int unregister_notifier(enum device_notifier_type status, int (*func)(void *data));
 void device_notify(enum device_notifier_type status, void *value);
 
 #endif /* __DEVICE_NOTIFIER_H__ */

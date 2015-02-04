@@ -39,6 +39,7 @@ SET(SRCS
 	src/proc/cpu-info.c
 	src/proc/proc-handler.c
 	src/time/time-handler.c
+	src/usb/usb-client.c
 )
 
 IF(TIZEN_BUZZER)
