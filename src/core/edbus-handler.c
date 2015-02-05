@@ -39,12 +39,7 @@ struct edbus_list{
 	E_DBus_Signal_Handler *handler;
 };
 
-static struct edbus_object {
-	const char *path;
-	const char *interface;
-	E_DBus_Object *obj;
-	E_DBus_Interface *iface;
-} edbus_objects[] = {
+static struct edbus_object edbus_objects[] = {
 	{ DEVICED_PATH_CORE   , DEVICED_INTERFACE_CORE   , NULL, NULL },
 	{ DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY, NULL, NULL },
 	{ DEVICED_PATH_POWER  , DEVICED_INTERFACE_POWER  , NULL, NULL },
@@ -59,7 +54,6 @@ static struct edbus_object {
 	{ DEVICED_PATH_USB    , DEVICED_INTERFACE_USB    , NULL, NULL },
 	{ DEVICED_PATH_USBHOST, DEVICED_INTERFACE_USBHOST, NULL, NULL },
 	{ DEVICED_PATH_EXTCON , DEVICED_INTERFACE_EXTCON , NULL, NULL },
-	{ DEVICED_PATH_BATTERY, DEVICED_INTERFACE_BATTERY, NULL, NULL },
 	{ DEVICED_PATH_GPIO, DEVICED_INTERFACE_GPIO, NULL, NULL},
 	{ DEVICED_PATH_HDMICEC, DEVICED_INTERFACE_HDMICEC, NULL, NULL},
 	/* Add new object & interface here*/
@@ -454,6 +448,37 @@ static void unregister_edbus_watch_all(void)
 		free(watch->name);
 		free(watch);
 	}
+}
+
+int register_edbus_interface_with_method(struct edbus_object *object,
+		const struct edbus_method *edbus_methods, int size)
+{
+	int ret, i;
+
+	if (!object || !edbus_methods || size < 1) {
+		_E("Invalid parameter");
+		return -EINVAL;
+	}
+
+	ret = register_edbus_interface(object);
+	if (ret < 0) {
+		_E("fail to register %s interface(%d)", object->path, ret);
+		return ret;
+	}
+
+	for (i = 0; i < size; i++) {
+		ret = e_dbus_interface_method_add(object->iface,
+				    edbus_methods[i].member,
+				    edbus_methods[i].signature,
+				    edbus_methods[i].reply_signature,
+				    edbus_methods[i].func);
+		if (!ret) {
+			_E("fail to add method %s!", edbus_methods[i].member);
+			return -EINVAL;
+		}
+	}
+
+	return 0;
 }
 
 int register_edbus_method(const char *path, const struct edbus_method *edbus_methods, int size)
