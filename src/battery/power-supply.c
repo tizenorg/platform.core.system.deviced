@@ -842,18 +842,10 @@ static DBusMessage *dbus_get_percent_raw(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
-	int ret, val;
+	int ret;
 
-	ret = device_get_property(DEVICE_TYPE_POWER, PROP_POWER_CAPACITY_RAW, &val);
-	if (ret < 0)
-		goto out;
+	ret = -ENOTSUP;
 
-	if (val > 10000)
-		val = 10000;
-
-	ret = val;
-
-out:
 	reply = dbus_message_new_method_return(msg);
 	dbus_message_iter_init_append(reply, &iter);
 	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
