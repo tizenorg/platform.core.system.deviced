@@ -68,6 +68,11 @@ void devices_init(void *data)
 	const struct device_ops *dev;
 
 	DD_LIST_FOREACH(dev_head, elem, dev) {
+		if (dev->probe && dev->probe(data) != 0) {
+			_E("[%s] probe fail", dev->name);
+			continue;
+		}
+
 		_D("[%s] initialize", dev->name);
 		if (dev->init)
 			dev->init(data);
