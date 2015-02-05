@@ -23,6 +23,13 @@
 #include <E_DBus.h>
 #include "shared/dbus.h"
 
+struct edbus_object {
+	const char *path;
+	const char *interface;
+	E_DBus_Object *obj;
+	E_DBus_Interface *iface;
+};
+
 struct edbus_method {
 	const char *member;
 	const char *signature;
@@ -43,6 +50,8 @@ struct watch {
 	int (*func)(char *name, enum watch_id id);
 };
 
+int register_edbus_interface_with_method(struct edbus_object *object,
+		const struct edbus_method *edbus_methods, int size);
 int register_edbus_method(const char *path, const struct edbus_method *edbus_methods, int size);
 int register_edbus_signal_handler(const char *path, const char *interface,
 		const char *name, E_DBus_Signal_Cb cb);
