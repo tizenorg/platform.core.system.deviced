@@ -221,7 +221,6 @@ static void control_init(void *data)
 }
 
 static const struct device_ops control_device_ops = {
-	.priority = DEVICE_PRIORITY_NORMAL,
 	.name     = "control",
 	.init     = control_init,
 };

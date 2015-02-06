@@ -541,7 +541,6 @@ static void power_init(void *data)
 }
 
 static const struct device_ops power_device_ops = {
-	.priority = DEVICE_PRIORITY_NORMAL,
 	.name     = POWER_OPS_NAME,
 	.init     = power_init,
 	.execute  = power_execute,

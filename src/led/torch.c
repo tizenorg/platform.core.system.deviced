@@ -112,7 +112,6 @@ static void torch_init(void *data)
 }
 
 static const struct device_ops torchled_device_ops = {
-	.priority = DEVICE_PRIORITY_NORMAL,
 	.name     = "torchled",
 	.init     = torch_init,
 };

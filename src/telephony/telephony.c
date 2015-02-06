@@ -411,7 +411,6 @@ static void telephony_init(void *data)
 }
 
 static const struct device_ops tel_device_ops = {
-	.priority = DEVICE_PRIORITY_NORMAL,
 	.name     = "telephony",
 	.init     = telephony_init,
 	.start    = telephony_start,

@@ -131,7 +131,6 @@ static int earjack_execute(void *data)
 }
 
 static const struct device_ops earjack_device_ops = {
-	.priority = DEVICE_PRIORITY_NORMAL,
 	.name     = "earjack",
 	.init     = earjack_init,
 	.status   = earjack_get_status,

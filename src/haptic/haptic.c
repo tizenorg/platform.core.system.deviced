@@ -735,7 +735,6 @@ static int haptic_stop(void)
 }
 
 static const struct device_ops haptic_device_ops = {
-	.priority = DEVICE_PRIORITY_NORMAL,
 	.name     = "haptic",
 	.init     = haptic_init,
 	.exit     = haptic_exit,

@@ -70,7 +70,6 @@ static void signal_init(void *data)
 }
 
 static const struct device_ops signal_device_ops = {
-	.priority = DEVICE_PRIORITY_NORMAL,
 	.name     = "signal",
 	.init     = signal_init,
 };
