@@ -550,7 +550,6 @@ static void lowbat_exit(void *data)
 }
 
 static const struct device_ops lowbat_device_ops = {
-	.priority = DEVICE_PRIORITY_NORMAL,
 	.name     = "lowbat",
 	.probe    = lowbat_probe,
 	.init     = lowbat_init,

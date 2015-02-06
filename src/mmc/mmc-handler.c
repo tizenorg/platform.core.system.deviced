@@ -969,7 +969,6 @@ static int mmc_stop(enum device_flags flags)
 }
 
 const struct device_ops mmc_device_ops = {
-	.priority = DEVICE_PRIORITY_NORMAL,
 	.name     = "mmc",
 	.init     = mmc_init,
 	.exit     = mmc_exit,

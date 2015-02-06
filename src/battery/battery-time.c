@@ -463,7 +463,6 @@ static void battery_exit(void *data)
 }
 
 static const struct device_ops battery_time_device_ops = {
-	.priority = DEVICE_PRIORITY_NORMAL,
 	.name     = "battery-time",
 	.init     = battery_init,
 	.exit     = battery_exit,

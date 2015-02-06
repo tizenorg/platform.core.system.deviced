@@ -85,7 +85,6 @@ static void apps_exit(void *data)
 }
 
 static const struct device_ops apps_device_ops = {
-	.priority = DEVICE_PRIORITY_NORMAL,
 	.name     = "apps",
 	.init     = apps_init,
 	.exit     = apps_exit,

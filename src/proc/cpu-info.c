@@ -143,7 +143,6 @@ static void cpu_info_init(void *data)
 }
 
 static const struct device_ops cpu_info_device_ops = {
-	.priority = DEVICE_PRIORITY_NORMAL,
 	.name     = "cpu_info",
 	.init     = cpu_info_init,
 };

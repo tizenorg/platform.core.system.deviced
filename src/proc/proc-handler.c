@@ -787,7 +787,6 @@ static void process_init(void *data)
 }
 
 static const struct device_ops process_device_ops = {
-	.priority = DEVICE_PRIORITY_NORMAL,
 	.name     = PROC_OPS_NAME,
 	.init     = process_init,
 	.execute  = process_execute,

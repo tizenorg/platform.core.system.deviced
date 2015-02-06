@@ -545,7 +545,6 @@ static void cpu_init(void *data)
 }
 
 static const struct device_ops cpu_device_ops = {
-	.priority = DEVICE_PRIORITY_NORMAL,
 	.name     = "cpu",
 	.init     = cpu_init,
 };

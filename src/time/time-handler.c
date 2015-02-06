@@ -376,7 +376,6 @@ static void time_init(void *data)
 }
 
 static const struct device_ops time_device_ops = {
-	.priority = DEVICE_PRIORITY_NORMAL,
 	.name     = "time",
 	.init     = time_init,
 };

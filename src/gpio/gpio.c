@@ -116,7 +116,6 @@ static void gpio_init(void *data)
 }
 
 const struct device_ops gpio_device_ops = {
-	.priority = DEVICE_PRIORITY_NORMAL,
 	.name     = "gpio",
 	.init     = gpio_init,
 };

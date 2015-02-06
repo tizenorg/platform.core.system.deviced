@@ -426,7 +426,6 @@ static void lowmem_exit(void *data)
 }
 
 static const struct device_ops lowmem_device_ops = {
-	.priority = DEVICE_PRIORITY_NORMAL,
 	.name     = "lowmem",
 	.init     = lowmem_init,
 	.exit	  = lowmem_exit,

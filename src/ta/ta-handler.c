@@ -69,7 +69,6 @@ static void ta_init(void *data)
 }
 
 static const struct device_ops ta_device_ops = {
-	.priority = DEVICE_PRIORITY_NORMAL,
 	.name     = "ta",
 	.init     = ta_init,
 };

@@ -65,7 +65,6 @@ static void ir_init(void *data)
 }
 
 static const struct device_ops irled_device_ops = {
-	.priority = DEVICE_PRIORITY_NORMAL,
 	.name     = "irled",
 	.init     = ir_init,
 };
