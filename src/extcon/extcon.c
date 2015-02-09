@@ -33,12 +33,12 @@
 
 static dd_list *extcon_list;
 
-void add_extcon(const struct extcon_ops *dev)
+void add_extcon(struct extcon_ops *dev)
 {
 	DD_LIST_APPEND(extcon_list, dev);
 }
 
-void remove_extcon(const struct extcon_ops *dev)
+void remove_extcon(struct extcon_ops *dev)
 {
 	DD_LIST_REMOVE(extcon_list, dev);
 }
