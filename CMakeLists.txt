@@ -43,6 +43,7 @@ SET(SRCS
 
 SET(SRCS ${SRCS}
 	src/usb/usb.c
+	src/usb/usb-default.c
 )
 
 IF(TIZEN_BUZZER)
@@ -189,6 +190,9 @@ INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.pc DESTINATION ${LIB_I
 INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/scripts/deviced-pre.sh DESTINATION bin)
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/scripts/deviced.conf DESTINATION /etc/dbus-1/system.d)
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/scripts/movi_format.sh DESTINATION bin)
+INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/usb/usb-base.conf DESTINATION /etc/deviced)
+INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/usb/usb-setting.conf DESTINATION /etc/deviced)
+INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/usb/usb-operation.conf DESTINATION /etc/deviced)
 IF(TIZEN_SDCARD)
 	INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/scripts/mmc-smack-label DESTINATION bin)
 	INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/fsck-msdos/LICENSE DESTINATION share/license RENAME fsck_msdosfs)

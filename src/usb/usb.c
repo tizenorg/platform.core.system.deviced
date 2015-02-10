@@ -87,9 +87,7 @@ static int usb_config_init(void)
 		return -ENOENT;
 	}
 
-	/* TODO:
-	 * parameter "DEFAULT" can be changed */
-	return config_plugin->init("DEFAULT");
+	return config_plugin->init(NULL);
 }
 
 static void usb_config_deinit(void)
@@ -104,9 +102,7 @@ static void usb_config_deinit(void)
 		return;
 	}
 
-	/* TODO:
-	 * parameter "DEFAULT" can be changed */
-	config_plugin->deinit("DEFAULT");
+	config_plugin->deinit(NULL);
 }
 
 static int usb_config_enable(void)
@@ -121,9 +117,7 @@ static int usb_config_enable(void)
 		return -ENOENT;
 	}
 
-	/* TODO:
-	 * parameter "DEFAULT" can be changed */
-	return config_plugin->enable("DEFAULT");
+	return config_plugin->enable(NULL);
 }
 
 static int usb_config_disable(void)
@@ -138,9 +132,7 @@ static int usb_config_disable(void)
 		return -ENOENT;
 	}
 
-	/* TODO:
-	 * parameter "DEFAULT" can be changed */
-	return config_plugin->disable("DEFAULT");
+	return config_plugin->disable(NULL);
 }
 
 static int usb_state_changed(void *data)
