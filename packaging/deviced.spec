@@ -317,6 +317,8 @@ systemctl daemon-reload
 %{_bindir}/deviced
 %{_bindir}/devicectl
 %{_bindir}/movi_format.sh
+/etc/deviced/usb-config.conf
+/etc/deviced/usb-operation.conf
 %if %{with sdcard}
 %{_bindir}/mmc-smack-label
 %{_bindir}/fsck_msdosfs
