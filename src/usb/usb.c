@@ -20,26 +20,123 @@
 #include <stdio.h>
 
 #include "core/log.h"
+#include "core/list.h"
 #include "core/common.h"
 #include "core/device-notifier.h"
 #include "extcon/extcon.h"
+#include "usb.h"
 
 enum usb_state {
 	USB_DISCONNECTED,
 	USB_CONNECTED,
 };
 
+static dd_list *config_list;
 struct extcon_ops extcon_usb_ops;
+const struct usb_config_plugin_ops *config_plugin;
+
+void add_usb_config(const struct usb_config_ops *ops)
+{
+	DD_LIST_APPEND(config_list, ops);
+}
+
+void remove_usb_config(const struct usb_config_ops *ops)
+{
+	DD_LIST_REMOVE(config_list, ops);
+}
 
 static int get_current_usb_status(void)
 {
 	return extcon_usb_ops.status;
 }
 
+static int usb_config_module_load(void)
+{
+	dd_list *l;
+	struct usb_config_ops *ops;
+
+	DD_LIST_FOREACH(config_list, l, ops) {
+		if (ops->is_valid && ops->is_valid()) {
+			if (ops->load)
+				config_plugin = ops->load();
+			return 0;
+		}
+	}
+	return -ENOENT;
+}
+
+static int usb_config_init(void)
+{
+	if (!config_plugin) {
+		_E("There is no usb config plugin");
+		return -ENOENT;
+	}
+
+	if (config_plugin->init == NULL) {
+		_E("There is no usb config init function");
+		return -ENOENT;
+	}
+
+	/* TODO:
+	 * parameter "DAFAULT" can be changed */
+	return config_plugin->init("DEFAULT");
+}
+
+static void usb_config_deinit(void)
+{
+	if (!config_plugin) {
+		_E("There is no usb config plugin");
+		return;
+	}
+
+	if (config_plugin->deinit == NULL) {
+		_E("There is no usb config deinit function");
+		return;
+	}
+
+	/* TODO:
+	 * parameter "DAFAULT" can be changed */
+	config_plugin->deinit("DEFAULT");
+}
+
+static int usb_config_enable(void)
+{
+	if (!config_plugin) {
+		_E("There is no usb config plugin");
+		return -ENOENT;
+	}
+
+	if (config_plugin->enable == NULL) {
+		_E("There is no usb config enable function");
+		return -ENOENT;
+	}
+
+	/* TODO:
+	 * parameter "DAFAULT" can be changed */
+	return config_plugin->enable("DEFAULT");
+}
+
+static int usb_config_disable(void)
+{
+	if (!config_plugin) {
+		_E("There is no usb config plugin");
+		return -ENOENT;
+	}
+
+	if (config_plugin->disable == NULL) {
+		_E("There is no usb config disable function");
+		return -ENOENT;
+	}
+
+	/* TODO:
+	 * parameter "DAFAULT" can be changed */
+	return config_plugin->disable("DEFAULT");
+}
+
 static int usb_state_changed(void *data)
 {
 	static int state = USB_DISCONNECTED;
-	int input;
+	int input, ret;
 
 	if (!data)
 		return -EINVAL;
@@ -54,18 +151,22 @@ static int usb_state_changed(void *data)
 	switch (input) {
 	case USB_CONNECTED:
 		_I("USB cable is connected");
+		ret = usb_config_enable();
 		break;
 	case USB_DISCONNECTED:
 		_I("USB cable is disconnected");
+		ret = usb_config_disable();
 		break;
 	default:
 		_E("Invalid USB state(%d)", state);
 		return -EINVAL;
 	}
+	if (ret < 0)
+		_E("Failed to operate usb connection(%d)", ret);
+	else
+		state = input;
 
-	state = input;
-
-	return 0;
+	return ret;
 }
 
 static void usb_init(void *data)
@@ -73,6 +174,16 @@ static void usb_init(void *data)
 	int ret, status;
 
 	register_notifier(DEVICE_NOTIFIER_USB, usb_state_changed);
+
+	ret = usb_config_module_load();
+	if (ret < 0) {
+		_E("Failed to get config module (%d)",ret);
+		return;
+	}
+
+	ret = usb_config_init();
+	if (ret < 0)
+		_E("Failed to initialize usb configuation");
 
 	status = get_current_usb_status();
 	if (status < 0) {
@@ -88,6 +199,7 @@ static void usb_init(void *data)
 static void usb_exit(void *data)
 {
 	unregister_notifier(DEVICE_NOTIFIER_USB, usb_state_changed);
+	usb_config_deinit();
 }
 
 struct extcon_ops extcon_usb_ops = {
