@@ -35,6 +35,13 @@
 #define DBUS_REPLY_TIMEOUT	(-1)
 #define RETRY_MAX 5
 
+struct edbus_object {
+	const char *path;
+	const char *interface;
+	E_DBus_Object *obj;
+	E_DBus_Interface *iface;
+};
+
 struct edbus_list{
 	char *signal_name;
 	E_DBus_Signal_Handler *handler;
@@ -60,6 +67,7 @@ static struct edbus_object edbus_objects[] = {
 	/* Add new object & interface here*/
 };
 
+static dd_list *edbus_object_list;
 static dd_list *edbus_owner_list;
 static dd_list *edbus_handler_list;
 static dd_list *edbus_watch_list;
@@ -475,26 +483,67 @@ static int register_method(E_DBus_Interface *iface,
 	return 0;
 }
 
-int register_edbus_interface_with_method(struct edbus_object *object,
+int register_edbus_interface_and_method(const char *path,
+		const char *interface,
 		const struct edbus_method *edbus_methods, int size)
 {
+	struct edbus_object *obj;
+	dd_list *elem;
 	int ret;
 
-	if (!object || !edbus_methods || size < 1) {
+	if (!path || !interface || !edbus_methods || size < 1) {
 		_E("invalid parameter");
 		return -EINVAL;
 	}
 
-	ret = register_edbus_interface(object);
+	/* find matched obj */
+	DD_LIST_FOREACH(edbus_object_list, elem, obj) {
+		if (strncmp(obj->path, path, strlen(obj->path)) == 0 &&
+		    strncmp(obj->interface, interface, strlen(obj->interface)) == 0) {
+			_I("found matched item : obj(%p)", obj);
+			break;
+		}
+	}
+
+	/* if there is no matched obj */
+	if (!obj) {
+		obj = malloc(sizeof(struct edbus_object));
+		if (!obj) {
+			_E("fail to allocate %s interface(%d)", path, ret);
+			return -ENOMEM;
+		}
+
+		obj->path = strdup(path);
+		obj->interface = strdup(interface);
+
+		ret = register_edbus_interface(obj);
+		if (ret < 0) {
+			_E("fail to register %s interface(%d)", obj->path, ret);
+			return ret;
+		}
+
+		DD_LIST_APPEND(edbus_object_list, obj);
+	}
+
+	ret = register_method(obj->iface, edbus_methods, size);
 	if (ret < 0) {
-		_E("fail to register %s interface(%d)", object->path, ret);
+		_E("fail to register %s method(%d)", obj->path, ret);
 		return ret;
 	}
 
-	ret = register_method(object->iface, edbus_methods, size);
-	if (ret < 0) {
-		_E("fail to register %s method(%d)", object->path, ret);
-		return ret;
+	return 0;
+}
+
+int unregister_edbus_interface_all(void)
+{
+	struct edbus_object *obj;
+	dd_list *elem, *n;
+
+	DD_LIST_FOREACH_SAFE(edbus_object_list, elem, n, obj) {
+		DD_LIST_REMOVE(edbus_object_list, obj);
+		free(obj->path);
+		free(obj->interface);
+		free(obj);
 	}
 
 	return 0;
@@ -709,6 +758,7 @@ void edbus_exit(void *data)
 {
 	unregister_edbus_signal_handle();
 	unregister_edbus_watch_all();
+	unregister_edbus_interface_all();
 	e_dbus_connection_close(edbus_conn);
 	e_dbus_shutdown();
 }
