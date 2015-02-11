@@ -953,16 +953,12 @@ static const struct edbus_method edbus_methods[] = {
 	{ POWER_SUBSYSTEM,       "sisssss", "i", dbus_battery_handler },
 };
 
-static struct edbus_object battery_obj = {
-	.path = DEVICED_PATH_BATTERY,
-	.interface = DEVICED_INTERFACE_BATTERY,
-};
-
 int power_supply_init(void *data)
 {
 	int ret;
 
-	ret = register_edbus_interface_with_method(&battery_obj,
+	ret = register_edbus_interface_and_method(DEVICED_PATH_BATTERY,
+			DEVICED_INTERFACE_BATTERY,
 			edbus_methods, ARRAY_SIZE(edbus_methods));
 	if (ret < 0)
 		_E("fail to init edbus interface and method(%d)", ret);
