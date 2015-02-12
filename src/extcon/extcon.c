@@ -178,6 +178,21 @@ static int get_extcon_uevent_state(char *state, unsigned int len)
 	return ret;
 }
 
+static int extcon_probe(void *data)
+{
+	/**
+	 * find extcon class.
+	 * if there is no extcon class,
+	 * deviced does not control extcon devices.
+	 */
+	if (access(EXTCON_PATH, R_OK) != 0) {
+		_E("there is no extcon class");
+		return -ENODEV;
+	}
+
+	return 0;
+}
+
 static void extcon_init(void *data)
 {
 	int ret;
@@ -218,9 +233,10 @@ static void extcon_exit(void *data)
 }
 
 const struct device_ops extcon_device_ops = {
-	.name	= "extcon",
-	.init	= extcon_init,
-	.exit	= extcon_exit,
+	.name   = "extcon",
+	.probe  = extcon_probe,
+	.init   = extcon_init,
+	.exit   = extcon_exit,
 };
 
 DEVICE_OPS_REGISTER(&extcon_device_ops)
