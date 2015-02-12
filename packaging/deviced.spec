@@ -5,7 +5,6 @@
 #These options are DEACTIVATED by default.
 %bcond_with x
 %bcond_with buzzer
-%bcond_with camera_led
 %bcond_with extcon
 %bcond_with hall
 %bcond_with sdcard
@@ -48,6 +47,7 @@ BuildRequires:  pkgconfig(capi-base-common)
 BuildRequires:	pkgconfig(dbus-glib-1)
 BuildRequires:  pkgconfig(libtzplatform-config)
 BuildRequires:  pkgconfig(notification)
+BuildRequires:  pkgconfig(hwcommon)
 
 %{?systemd_requires}
 Requires(preun): /usr/bin/systemctl
@@ -189,9 +189,6 @@ export CFLAGS+=" -DX11_SUPPORT"
 	-DARCH=%{ARCH} \
 %if %{with buzzer}
 	-DTIZEN_BUZZER:BOOL=ON \
-%endif
-%if %{with camera_led}
-	-DTIZEN_CAMERA_LED:BOOL=ON \
 %endif
 %if %{with display}
 	-DTIZEN_DISPLAY:BOOL=ON \
