@@ -106,13 +106,11 @@ SET(SRCS ${SRCS}
 )
 ENDIF(TIZEN_DISPLAY)
 
-IF(TIZEN_CAMERA_LED)
 SET(SRCS ${SRCS}
 	src/led/ir.c
 	src/led/noti.c
 	src/led/torch.c
 )
-ENDIF(TIZEN_CAMERA_LED)
 
 IF(TIZEN_VIBRATOR)
 SET(SRCS ${SRCS}
@@ -138,6 +136,7 @@ SET(PKG_MODULES
 	tapi
 	libtzplatform-config
 	notification
+	hwcommon
 )
 
 IF(X11_SUPPORT)
