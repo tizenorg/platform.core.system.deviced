@@ -154,7 +154,6 @@ enum udev_subsystem_type {
 	UDEV_INPUT,
 	UDEV_PLATFORM,
 	UDEV_SWITCH,
-	UDEV_EXTCON,
 };
 
 static const struct udev_subsystem {
@@ -165,7 +164,6 @@ static const struct udev_subsystem {
 	{ UDEV_INPUT,			INPUT_SUBSYSTEM,		NULL },
 	{ UDEV_PLATFORM,		PLATFORM_SUBSYSTEM,		NULL },
 	{ UDEV_SWITCH,			SWITCH_SUBSYSTEM,		NULL },
-	{ UDEV_EXTCON,			EXTCON_SUBSYSTEM,		NULL },
 };
 
 static dd_list *udev_event_list;
@@ -788,14 +786,6 @@ static Eina_Bool uevent_kernel_control_cb(void *data, Ecore_Fd_Handler *fd_handl
 		if (!env_value)
 			break;
 		changed_device(env_value, NULL);
-		break;
-	case UDEV_EXTCON:
-		env_value = udev_device_get_property_value(dev, "STATE");
-		if (!env_value)
-			break;
-		ret = extcon_update(env_value);
-		if (ret < 0)
-			_E("Failed to update extcon status");
 		break;
 	}
 
