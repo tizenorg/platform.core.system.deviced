@@ -20,6 +20,18 @@
 #ifndef __EXTCON_H__
 #define __EXTCON_H__
 
+/**
+ * Extcon cable name is shared with kernel extcon class.
+ * So do not change below strings.
+ */
+#define EXTCON_CABLE_USB              "USB"
+#define EXTCON_CABLE_USB_HOST         "USB-Host"
+#define EXTCON_CABLE_TA               "TA"
+#define EXTCON_CABLE_HDMI             "HDMI"
+#define EXTCON_CABLE_DOCK             "Dock"
+#define EXTCON_CABLE_MIC_IN           "Microphone"
+#define EXTCON_CABLE_HEADPHONE_OUT    "Headphone"
+
 struct extcon_ops {
 	const char *name;
 	int status;
