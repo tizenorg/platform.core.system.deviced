@@ -25,9 +25,11 @@
 #include "core/devices.h"
 #include "core/config-parser.h"
 #include "core/device-notifier.h"
+#include "core/udev.h"
 #include "extcon.h"
 
-#define EXTCON_PATH	"/sys/class/extcon"
+#define EXTCON_PATH "/sys/class/extcon"
+#define STATE_NAME  "STATE"
 
 #define BUF_MAX 256
 
@@ -89,7 +91,7 @@ int extcon_get_status(const char *name)
 	return dev->status;
 }
 
-int extcon_update(const char *value)
+static int extcon_update(const char *value)
 {
 	char *s, *p;
 	char name[NAME_MAX];
@@ -178,6 +180,22 @@ static int get_extcon_uevent_state(char *state, unsigned int len)
 	return ret;
 }
 
+static void uevent_extcon_handler(struct udev_device *dev)
+{
+	const char *env_value;
+	int ret;
+
+	env_value = udev_device_get_property_value(dev, STATE_NAME);
+	if (!env_value)
+		return;
+
+	ret = extcon_update(env_value);
+	if (ret < 0)
+		_E("fail to update extcon status : %d", ret);
+
+	return;
+}
+
 static int extcon_probe(void *data)
 {
 	/**
@@ -192,6 +210,11 @@ static int extcon_probe(void *data)
 
 	return 0;
 }
+
+static struct uevent_handler uh = {
+	.subsystem = EXTCON_SUBSYSTEM,
+	.uevent_func = uevent_extcon_handler,
+};
 
 static void extcon_init(void *data)
 {
@@ -209,6 +232,11 @@ static void extcon_init(void *data)
 			dev->init(data);
 	}
 
+	/* register extcon uevent */
+	ret = register_kernel_uevent_control(&uh);
+	if (ret < 0)
+		_E("fail to register extcon uevent : %d", ret);
+
 	/* load extcon uevent */
 	ret = get_extcon_uevent_state(state, sizeof(state));
 	if (ret == 0) {
@@ -224,6 +252,12 @@ static void extcon_exit(void *data)
 {
 	dd_list *l;
 	struct extcon_ops *dev;
+	int ret;
+
+	/* unreigster extcon uevent */
+	ret = unregister_kernel_uevent_control(&uh);
+	if (ret < 0)
+		_E("fail to unregister extcon uevent : %d", ret);
 
 	DD_LIST_FOREACH(extcon_list, l, dev) {
 		_I("[extcon] deinit (%s)", dev->name);
