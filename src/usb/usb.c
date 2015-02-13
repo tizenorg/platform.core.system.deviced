@@ -208,7 +208,7 @@ static void usb_exit(void *data)
 }
 
 struct extcon_ops extcon_usb_ops = {
-	.name	= "USB",
+	.name	= EXTCON_USB,
 	.noti	= DEVICE_NOTIFIER_USB,
 	.init	= usb_init,
 	.exit	= usb_exit,

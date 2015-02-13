@@ -25,6 +25,7 @@
 #include "core/devices.h"
 #include "core/config-parser.h"
 #include "core/device-notifier.h"
+#include "core/edbus-handler.h"
 #include "core/udev.h"
 #include "extcon.h"
 
@@ -196,6 +197,44 @@ static void uevent_extcon_handler(struct udev_device *dev)
 	return;
 }
 
+static DBusMessage *dbus_get_extcon_status(E_DBus_Object *obj,
+		DBusMessage *msg)
+{
+	DBusError err;
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	struct extcon_ops *dev;
+	char *str;
+	int ret;
+
+	dbus_error_init(&err);
+
+	if (!dbus_message_get_args(msg, &err,
+				DBUS_TYPE_STRING, &str,
+				DBUS_TYPE_INVALID)) {
+		_E("fail to get message : %s - %s", err.name, err.message);
+		dbus_error_free(&err);
+		ret = -EINVAL;
+		goto error;
+	}
+
+	dev = find_extcon(str);
+	if (!dev) {
+		_E("fail to matched extcon device : %s", str);
+		ret = -ENOENT;
+		goto error;
+	}
+
+	ret = dev->status;
+	_D("Extcon device : %s, status : %d", dev->name, dev->status);
+
+error:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+	return reply;
+}
+
 static int extcon_probe(void *data)
 {
 	/**
@@ -214,6 +253,10 @@ static int extcon_probe(void *data)
 static struct uevent_handler uh = {
 	.subsystem = EXTCON_SUBSYSTEM,
 	.uevent_func = uevent_extcon_handler,
+};
+
+static const struct edbus_method edbus_methods[] = {
+	{ "GetStatus", "s", "i", dbus_get_extcon_status },
 };
 
 static void extcon_init(void *data)
@@ -246,6 +289,12 @@ static void extcon_init(void *data)
 	} else {
 		_E("Failed to get extcon uevent state node");
 	}
+
+	ret = register_edbus_interface_and_method(DEVICED_PATH_EXTCON,
+			DEVICED_INTERFACE_EXTCON,
+			edbus_methods, ARRAY_SIZE(edbus_methods));
+	if (ret < 0)
+		_E("fail to init edbus interface and method(%d)", ret);
 }
 
 static void extcon_exit(void *data)
