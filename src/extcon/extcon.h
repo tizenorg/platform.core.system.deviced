@@ -35,9 +35,9 @@
 struct extcon_ops {
 	const char *name;
 	int status;
-	enum device_notifier_type noti;
 	void (*init)(void *data);
 	void (*exit)(void *data);
+	int (*update)(int status);
 };
 
 #define EXTCON_OPS_REGISTER(dev) \

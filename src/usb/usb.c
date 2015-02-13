@@ -143,22 +143,17 @@ static int usb_config_disable(void)
 	return config_plugin->disable("DEFAULT");
 }
 
-static int usb_state_changed(void *data)
+static int usb_state_changed(int status)
 {
-	static int state = USB_DISCONNECTED;
-	int input, ret;
+	static int old = USB_DISCONNECTED;
+	int ret;
 
-	if (!data)
-		return -EINVAL;
+	_I("USB state is changed from (%d) to (%d)", old, status);
 
-	input = *(int *)data;
-
-	_I("USB state is changed from (%d) to (%d)", state, input);
-
-	if (state == input)
+	if (old == status)
 		return 0;
 
-	switch (input) {
+	switch (status) {
 	case USB_CONNECTED:
 		_I("USB cable is connected");
 		ret = usb_config_enable();
@@ -168,13 +163,13 @@ static int usb_state_changed(void *data)
 		ret = usb_config_disable();
 		break;
 	default:
-		_E("Invalid USB state(%d)", state);
+		_E("Invalid USB state(%d)", status);
 		return -EINVAL;
 	}
 	if (ret < 0)
 		_E("Failed to operate usb connection(%d)", ret);
 	else
-		state = input;
+		old = status;
 
 	return ret;
 }
@@ -182,8 +177,6 @@ static int usb_state_changed(void *data)
 static void usb_init(void *data)
 {
 	int ret;
-
-	register_notifier(DEVICE_NOTIFIER_USB, usb_state_changed);
 
 	ret = usb_config_module_load();
 	if (ret < 0) {
@@ -202,16 +195,15 @@ static void usb_init(void *data)
 
 static void usb_exit(void *data)
 {
-	unregister_notifier(DEVICE_NOTIFIER_USB, usb_state_changed);
 	usb_config_deinit();
 	usb_config_module_unload();
 }
 
 struct extcon_ops extcon_usb_ops = {
 	.name	= EXTCON_CABLE_USB,
-	.noti	= DEVICE_NOTIFIER_USB,
 	.init	= usb_init,
 	.exit	= usb_exit,
+	.update = usb_state_changed,
 };
 
 EXTCON_OPS_REGISTER(&extcon_usb_ops)

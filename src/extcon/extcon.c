@@ -57,7 +57,8 @@ static int extcon_changed(struct extcon_ops *dev, int status)
 	_I("Changed %s device : %d -> %d", dev->name, dev->status, status);
 
 	dev->status = status;
-	device_notify(dev->noti, &status);
+	if (dev->update)
+		dev->update(status);
 
 	return 0;
 }
