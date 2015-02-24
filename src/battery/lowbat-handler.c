@@ -520,6 +520,14 @@ static int lowbat_probe(void *data)
 	 * deviced does not activate a battery module.
 	 */
 	if (access(POWER_PATH, R_OK) != 0) {
+		/**
+		 * Set battery vconf as -ENOTSUP
+		 * These vconf key used by runtime-info and capi-system-device.
+		 */
+		vconf_set_int(VCONFKEY_SYSMAN_CHARGER_STATUS, -ENOTSUP);
+		vconf_set_int(VCONFKEY_SYSMAN_BATTERY_CHARGE_NOW, -ENOTSUP);
+		vconf_set_int(VCONFKEY_SYSMAN_BATTERY_LEVEL_STATUS, -ENOTSUP);
+
 		_E("there is no power-supply class");
 		return -ENODEV;
 	}
