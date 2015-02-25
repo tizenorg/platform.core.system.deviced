@@ -198,12 +198,10 @@ static void uevent_extcon_handler(struct udev_device *dev)
 	return;
 }
 
-static DBusMessage *dbus_get_extcon_status(E_DBus_Object *obj,
+static int get_extcon_status(E_DBus_Object *obj,
 		DBusMessage *msg)
 {
 	DBusError err;
-	DBusMessageIter iter;
-	DBusMessage *reply;
 	struct extcon_ops *dev;
 	char *str;
 	int ret;
@@ -216,24 +214,21 @@ static DBusMessage *dbus_get_extcon_status(E_DBus_Object *obj,
 		_E("fail to get message : %s - %s", err.name, err.message);
 		dbus_error_free(&err);
 		ret = -EINVAL;
-		goto error;
+		goto out;
 	}
 
 	dev = find_extcon(str);
 	if (!dev) {
 		_E("fail to matched extcon device : %s", str);
 		ret = -ENOENT;
-		goto error;
+		goto out;
 	}
 
 	ret = dev->status;
 	_D("Extcon device : %s, status : %d", dev->name, dev->status);
 
-error:
-	reply = dbus_message_new_method_return(msg);
-	dbus_message_iter_init_append(reply, &iter);
-	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
-	return reply;
+out:
+	return make_reply_message(msg, ret);
 }
 
 static int extcon_probe(void *data)
@@ -257,7 +252,7 @@ static struct uevent_handler uh = {
 };
 
 static const struct edbus_method edbus_methods[] = {
-	{ "GetStatus", "s", "i", dbus_get_extcon_status },
+	{ "GetStatus", "s", "i", get_extcon_status },
 };
 
 static void extcon_init(void *data)

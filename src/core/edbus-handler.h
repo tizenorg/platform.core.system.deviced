@@ -43,6 +43,16 @@ struct watch {
 	int (*func)(char *name, enum watch_id id);
 };
 
+static inline DBusMessage *make_reply_message(DBusMessage *msg, int ret)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+	return reply;
+}
+
 int register_edbus_interface_and_method(const char *path,
 		const char *interface,
 		const struct edbus_method *edbus_methods, int size);
