@@ -202,8 +202,6 @@ static DBusMessage *dbus_get_extcon_status(E_DBus_Object *obj,
 		DBusMessage *msg)
 {
 	DBusError err;
-	DBusMessageIter iter;
-	DBusMessage *reply;
 	struct extcon_ops *dev;
 	char *str;
 	int ret;
@@ -230,10 +228,7 @@ static DBusMessage *dbus_get_extcon_status(E_DBus_Object *obj,
 	_D("Extcon device : %s, status : %d", dev->name, dev->status);
 
 error:
-	reply = dbus_message_new_method_return(msg);
-	dbus_message_iter_init_append(reply, &iter);
-	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
-	return reply;
+	return make_reply_message(msg, ret);
 }
 
 static int extcon_probe(void *data)
