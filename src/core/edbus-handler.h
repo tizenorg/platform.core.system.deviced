@@ -43,6 +43,20 @@ struct watch {
 	int (*func)(char *name, enum watch_id id);
 };
 
+#define DBUS_FUNCTION(func) automake_##func
+
+#define AUTOMAKE_DBUS_FUNCTION(func) \
+	static DBusMessage *automake_##func(E_DBus_Object *obj, \
+			DBusMessage *msg) { \
+		DBusMessageIter iter; \
+		DBusMessage *reply; \
+		int ret = func(obj, msg); \
+		reply = dbus_message_new_method_return(msg); \
+		dbus_message_iter_init_append(reply, &iter); \
+		dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret); \
+		return reply; \
+	}
+
 int register_edbus_interface_and_method(const char *path,
 		const char *interface,
 		const struct edbus_method *edbus_methods, int size);
