@@ -35,19 +35,17 @@
 #define DBUS_REPLY_TIMEOUT	(-1)
 #define RETRY_MAX 5
 
-struct edbus_object {
-	const char *path;
-	const char *interface;
-	E_DBus_Object *obj;
-	E_DBus_Interface *iface;
-};
-
-struct edbus_list{
+struct edbus_list {
 	char *signal_name;
 	E_DBus_Signal_Handler *handler;
 };
 
-static struct edbus_object edbus_objects[] = {
+static struct edbus_object {
+	const char *path;
+	const char *interface;
+	E_DBus_Object *obj;
+	E_DBus_Interface *iface;
+} edbus_objects[] = {
 	{ DEVICED_PATH_CORE   , DEVICED_INTERFACE_CORE   , NULL, NULL },
 	{ DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY, NULL, NULL },
 	{ DEVICED_PATH_POWER  , DEVICED_INTERFACE_POWER  , NULL, NULL },
@@ -76,8 +74,6 @@ static DBusPendingCall *edbus_request_name;
 
 static int register_edbus_interface(struct edbus_object *object)
 {
-	int ret;
-
 	if (!object) {
 		_E("object is invalid value!");
 		return -1;
@@ -176,10 +172,10 @@ pid_t get_edbus_sender_pid(DBusMessage *msg)
 
 static void unregister_edbus_signal_handle(void)
 {
-	dd_list *tmp;
+	dd_list *tmp, *next;
 	struct edbus_list *entry;
 
-	DD_LIST_FOREACH(edbus_handler_list, tmp, entry) {
+	DD_LIST_FOREACH_SAFE(edbus_handler_list, tmp, next, entry) {
 		e_dbus_signal_handler_del(edbus_conn, entry->handler);
 		DD_LIST_REMOVE(edbus_handler_list, entry);
 		free(entry->signal_name);
@@ -272,7 +268,7 @@ static DBusHandlerResult message_filter(DBusConnection *connection,
 	int ret;
 	const char *iface, *member, *arg = NULL;
 	struct watch *watch;
-	dd_list *n;
+	dd_list *n, *next;
 
 	if (dbus_message_get_type(message) != DBUS_MESSAGE_TYPE_SIGNAL)
 		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
@@ -295,7 +291,7 @@ static DBusHandlerResult message_filter(DBusConnection *connection,
 
 	_D("Argument : %s", arg);
 
-	DD_LIST_FOREACH(edbus_watch_list, n, watch) {
+	DD_LIST_FOREACH_SAFE(edbus_watch_list, n, next, watch) {
 		if (strcmp(arg, watch->name)) continue;
 
 		if (watch->func)
@@ -353,11 +349,11 @@ int register_edbus_watch(DBusMessage *msg, enum watch_id id, int (*func)(char *n
 		return 0;
 	}
 
-        watch = malloc(sizeof(struct watch));
-        if (!watch) {
-                _E("Fail to malloc for watch!");
-                return -ENOMEM;
-        }
+	watch = malloc(sizeof(struct watch));
+	if (!watch) {
+		_E("Fail to malloc for watch!");
+		return -ENOMEM;
+	}
 
 	watch->id = id;
 	watch->func = func;
@@ -399,7 +395,7 @@ int unregister_edbus_watch(DBusMessage *msg, enum watch_id id)
 	char match[256];
 	const char *sender;
 	struct watch *watch;
-	dd_list *n;
+	dd_list *n, *next;
 	bool matched = false;
 
 	if (!msg) {
@@ -413,7 +409,7 @@ int unregister_edbus_watch(DBusMessage *msg, enum watch_id id)
 		return -EINVAL;
 	}
 
-	DD_LIST_FOREACH(edbus_watch_list, n, watch) {
+	DD_LIST_FOREACH_SAFE(edbus_watch_list, n, next, watch) {
 		if (strcmp(sender, watch->name))
 			continue;
 
@@ -428,8 +424,8 @@ int unregister_edbus_watch(DBusMessage *msg, enum watch_id id)
 
 	/* remove match */
 	if (!matched) {
-                snprintf(match, sizeof(match), NAME_OWNER_MATCH, sender);
-                dbus_bus_remove_match(conn, match, NULL);
+		snprintf(match, sizeof(match), NAME_OWNER_MATCH, sender);
+		dbus_bus_remove_match(conn, match, NULL);
 
 		if (DD_LIST_LENGTH(edbus_watch_list) == 0)
 			dbus_connection_remove_filter(conn, message_filter,
@@ -442,13 +438,13 @@ int unregister_edbus_watch(DBusMessage *msg, enum watch_id id)
 static void unregister_edbus_watch_all(void)
 {
 	char match[256];
-	dd_list *n;
+	dd_list *n, *next;
 	struct watch *watch;
 
 	if (DD_LIST_LENGTH(edbus_watch_list) > 0)
 		dbus_connection_remove_filter(conn, message_filter, NULL);
 
-	DD_LIST_FOREACH(edbus_watch_list, n, watch) {
+	DD_LIST_FOREACH_SAFE(edbus_watch_list, n, next, watch) {
 		snprintf(match, sizeof(match), NAME_OWNER_MATCH, watch->name);
 		dbus_bus_remove_match(conn, match, NULL);
 		DD_LIST_REMOVE(edbus_watch_list, watch);
