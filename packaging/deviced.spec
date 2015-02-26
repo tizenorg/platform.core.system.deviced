@@ -11,7 +11,6 @@
 %bcond_with sdcard
 %bcond_with sim
 %bcond_with usb
-%bcond_with vibrator
 
 Name:       deviced
 Summary:    Deviced
@@ -210,9 +209,6 @@ export CFLAGS+=" -DX11_SUPPORT"
 %endif
 %if %{with usb}
 	-DTIZEN_USB:BOOL=ON \
-%endif
-%if %{with vibrator}
-	-DTIZEN_VIBRATOR:BOOL=ON \
 %endif
 	#eol
 

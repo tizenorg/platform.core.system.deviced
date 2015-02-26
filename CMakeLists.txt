@@ -114,13 +114,11 @@ SET(SRCS ${SRCS}
 )
 ENDIF(TIZEN_CAMERA_LED)
 
-IF(TIZEN_VIBRATOR)
 SET(SRCS ${SRCS}
 	src/haptic/haptic.c
 	src/haptic/external.c
 	src/haptic/standard.c
 	src/haptic/emulator.c)
-ENDIF(TIZEN_VIBRATOR)
 
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/src)
