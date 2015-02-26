@@ -70,7 +70,7 @@ error:
 		dlopen_handle = NULL;
 	}
 
-	_I("Do not support external haptic device");
+	_E("Do not support external haptic device");
 	return false;
 }
 
