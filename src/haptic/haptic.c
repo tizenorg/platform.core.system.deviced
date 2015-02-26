@@ -660,12 +660,19 @@ static const struct edbus_method edbus_methods[] = {
 	/* Add methods here */
 };
 
+static int haptic_probe(void *data)
+{
+	/**
+	 * load haptic module.
+	 * if there is no haptic module,
+	 * deviced does not activate a haptic interface.
+	 */
+	return haptic_module_load();
+}
+
 static void haptic_init(void *data)
 {
 	int r;
-
-	/* Load haptic module */
-	haptic_module_load();
 
 	/* get haptic data from configuration file */
 	r = config_parse(HAPTIC_CONF_PATH, haptic_load_config, &haptic_conf);
@@ -675,9 +682,11 @@ static void haptic_init(void *data)
 	}
 
 	/* init dbus interface */
-	r = register_edbus_method(DEVICED_PATH_HAPTIC, edbus_methods, ARRAY_SIZE(edbus_methods));
+	r = register_edbus_interface_and_method(DEVICED_PATH_HAPTIC,
+			DEVICED_INTERFACE_HAPTIC,
+			edbus_methods, ARRAY_SIZE(edbus_methods));
 	if (r < 0)
-		_E("fail to init edbus method(%d)", r);
+		_E("fail to init edbus interface and method(%d)", r);
 
 	/* register notifier for below each event */
 	register_notifier(DEVICE_NOTIFIER_TOUCH_HARDKEY, haptic_hardkey_changed_cb);
@@ -736,6 +745,7 @@ static int haptic_stop(void)
 
 static const struct device_ops haptic_device_ops = {
 	.name     = "haptic",
+	.probe    = haptic_probe,
 	.init     = haptic_init,
 	.exit     = haptic_exit,
 };

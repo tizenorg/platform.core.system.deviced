@@ -499,7 +499,7 @@ static bool is_valid(void)
 
 	ret = ff_find_device();
 	if (ret < 0) {
-		_I("Do not support standard haptic device");
+		_E("Do not support standard haptic device");
 		return false;
 	}
 
