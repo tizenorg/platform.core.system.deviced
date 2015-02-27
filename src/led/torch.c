@@ -164,11 +164,16 @@ static int led_service_free(void)
 {
 	struct hw_info *info;
 
+	if (!led_dev)
+		return -ENOENT;
+
 	info = led_dev->common.info;
 
 	assert(info);
 
 	info->close((struct hw_common *)led_dev);
+
+	return 0;
 }
 
 static int torch_probe(void *data)
