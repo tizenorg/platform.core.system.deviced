@@ -64,12 +64,13 @@ int check_default(const struct device_ops *dev)
 
 void devices_init(void *data)
 {
-	dd_list *elem;
+	dd_list *elem, *elem_n;
 	const struct device_ops *dev;
 
-	DD_LIST_FOREACH(dev_head, elem, dev) {
+	DD_LIST_FOREACH_SAFE(dev_head, elem, elem_n, dev) {
 		if (dev->probe && dev->probe(data) != 0) {
 			_E("[%s] probe fail", dev->name);
+			DD_LIST_REMOVE(dev_head, dev);
 			continue;
 		}
 
