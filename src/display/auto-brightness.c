@@ -118,11 +118,10 @@ static bool update_working_position(void)
 
 static int get_siop_brightness(int value)
 {
-	int cmd, ret, brt;
+	int brt;
 
-	cmd = DISP_CMD(PROP_DISPLAY_MAX_BRIGHTNESS, DEFAULT_DISPLAY);
-	ret = device_get_property(DEVICE_TYPE_DISPLAY, cmd, &brt);
-	if (ret >= 0 && value > brt)
+	brt = DEFAULT_DISPLAY_MAX_BRIGHTNESS;
+	if (value > brt)
 		return brt;
 
 	return value;
@@ -131,10 +130,10 @@ static int get_siop_brightness(int value)
 static void alc_set_brightness(int setting, int value, int lux)
 {
 	static int old;
-	int position, cmd, tmp_value = 0;
+	int position, tmp_value = 0, ret;
 
-	cmd = DISP_CMD(PROP_DISPLAY_BRIGHTNESS, DEFAULT_DISPLAY);
-	if (device_get_property(DEVICE_TYPE_DISPLAY, cmd, &tmp_value) < 0) {
+	ret = backlight_ops.get_brightness(&tmp_value);
+	if (ret < 0) {
 		_E("Fail to get display brightness!");
 		return;
 	}

@@ -330,12 +330,9 @@ static DBusMessage *edbus_getdisplaycount(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
-	int cmd, cnt, ret;
+	int ret;
 
-	cmd = DISP_CMD(PROP_DISPLAY_DISPLAY_COUNT, DEFAULT_DISPLAY);
-	ret = device_get_property(DEVICE_TYPE_DISPLAY, cmd, &cnt);
-	if (ret >= 0)
-		ret = cnt;
+	ret = DEFAULT_DISPLAY_COUNT;
 
 	reply = dbus_message_new_method_return(msg);
 	dbus_message_iter_init_append(reply, &iter);
@@ -347,12 +344,9 @@ static DBusMessage *edbus_getmaxbrightness(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
-	int cmd, brt, ret;
+	int ret;
 
-	cmd = DISP_CMD(PROP_DISPLAY_MAX_BRIGHTNESS, DEFAULT_DISPLAY);
-	ret = device_get_property(DEVICE_TYPE_DISPLAY, cmd, &brt);
-	if (ret >= 0)
-		ret = brt;
+	ret = DEFAULT_DISPLAY_MAX_BRIGHTNESS;
 
 	reply = dbus_message_new_method_return(msg);
 	dbus_message_iter_init_append(reply, &iter);
@@ -364,13 +358,9 @@ static DBusMessage *edbus_setmaxbrightness(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
-	int cmd, brt, ret;
+	int ret;
 
-	dbus_message_iter_init(msg, &iter);
-	dbus_message_iter_get_basic(&iter, &brt);
-
-	cmd = DISP_CMD(PROP_DISPLAY_MAX_BRIGHTNESS, DEFAULT_DISPLAY);
-	ret = device_set_property(DEVICE_TYPE_DISPLAY, cmd, brt);
+	ret = -ENOTSUP;
 
 	reply = dbus_message_new_method_return(msg);
 	dbus_message_iter_init_append(reply, &iter);
@@ -382,10 +372,9 @@ static DBusMessage *edbus_getbrightness(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
-	int cmd, brt, ret;
+	int brt, ret;
 
-	cmd = DISP_CMD(PROP_DISPLAY_BRIGHTNESS, DEFAULT_DISPLAY);
-	ret = device_get_property(DEVICE_TYPE_DISPLAY, cmd, &brt);
+	ret = backlight_ops.get_brightness(&brt);
 	if (ret >= 0)
 		ret = brt;
 
@@ -401,7 +390,7 @@ static DBusMessage *edbus_setbrightness(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
-	int cmd, brt, autobrt, ret, caps;
+	int brt, autobrt, ret, caps;
 
 	caps = display_get_caps(DISPLAY_ACTOR_API);
 
@@ -431,8 +420,7 @@ static DBusMessage *edbus_setbrightness(E_DBus_Object *obj, DBusMessage *msg)
 		goto error;
 	}
 
-	cmd = DISP_CMD(PROP_DISPLAY_BRIGHTNESS, DEFAULT_DISPLAY);
-	ret = device_set_property(DEVICE_TYPE_DISPLAY, cmd, brt);
+	ret = backlight_ops.set_brightness(brt);
 	if (ret < 0)
 		goto error;
 	if (vconf_set_int(VCONFKEY_SETAPPL_LCD_BRIGHTNESS, brt) != 0)
@@ -454,7 +442,7 @@ static DBusMessage *edbus_holdbrightness(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
-	int cmd, brt, autobrt, ret, caps;
+	int brt, autobrt, ret, caps;
 
 	caps = display_get_caps(DISPLAY_ACTOR_API);
 
@@ -480,8 +468,7 @@ static DBusMessage *edbus_holdbrightness(E_DBus_Object *obj, DBusMessage *msg)
 
 	vconf_set_int(VCONFKEY_PM_CUSTOM_BRIGHTNESS_STATUS, VCONFKEY_PM_CUSTOM_BRIGHTNESS_ON);
 
-	cmd = DISP_CMD(PROP_DISPLAY_BRIGHTNESS, DEFAULT_DISPLAY);
-	ret = device_set_property(DEVICE_TYPE_DISPLAY, cmd, brt);
+	ret = backlight_ops.set_brightness(brt);
 	if (ret < 0)
 		goto error;
 
@@ -507,7 +494,7 @@ static DBusMessage *edbus_releasebrightness(E_DBus_Object *obj, DBusMessage *msg
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
-	int cmd, bat, charger, changed, setting, brt, autobrt, ret = 0;
+	int bat, charger, changed, setting, brt, autobrt, ret = 0;
 
 	if (vconf_get_int(VCONFKEY_SYSMAN_BATTERY_STATUS_LOW, &bat) != 0) {
 		_E("Failed to get VCONFKEY_SYSMAN_BATTERY_STATUS_LOW value");
@@ -541,8 +528,7 @@ static DBusMessage *edbus_releasebrightness(E_DBus_Object *obj, DBusMessage *msg
 
 	vconf_set_int(VCONFKEY_PM_CUSTOM_BRIGHTNESS_STATUS, VCONFKEY_PM_CUSTOM_BRIGHTNESS_OFF);
 
-	cmd = DISP_CMD(PROP_DISPLAY_BRIGHTNESS, DEFAULT_DISPLAY);
-	ret = device_get_property(DEVICE_TYPE_DISPLAY, cmd, &brt);
+	ret = backlight_ops.get_brightness(&brt);
 	if (ret < 0)
 		brt = ret;
 
@@ -551,14 +537,14 @@ static DBusMessage *edbus_releasebrightness(E_DBus_Object *obj, DBusMessage *msg
 	    charger == VCONFKEY_SYSMAN_CHARGER_DISCONNECTED && !changed) {
 		_D("batt warning low : brightness is not changed!");
 		if (brt != 0) {
-			device_set_property(DEVICE_TYPE_DISPLAY, PROP_DISPLAY_BRIGHTNESS, 0);
+			backlight_ops.set_brightness(0);
 		}
 		goto error;
 	}
 
 	if (autobrt == SETTING_BRIGHTNESS_AUTOMATIC_OFF) {
 		if (brt != setting) {
-			device_set_property(DEVICE_TYPE_DISPLAY, PROP_DISPLAY_BRIGHTNESS, setting);
+			backlight_ops.set_brightness(setting);
 			if (vconf_set_int(VCONFKEY_PM_CURRENT_BRIGHTNESS, setting) != 0) {
 				_E("Failed to set VCONFKEY_PM_CURRENT_BRIGHTNESS value");
 			}

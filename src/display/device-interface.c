@@ -1,7 +1,7 @@
 /*
  * deviced
  *
- * Copyright (c) 2012 - 2013 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2012 - 2015 Samsung Electronics Co., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the License);
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,9 @@
 #include <unistd.h>
 #include <limits.h>
 #include <math.h>
+#include <assert.h>
+#include <errno.h>
+#include <hw/display.h>
 
 #include "core/log.h"
 #include "core/devices.h"
@@ -79,19 +82,29 @@ static bool custom_status = false;
 static int custom_brightness = 0;
 static int force_brightness = 0;
 
+static struct display_device *display_dev;
+
 static int _bl_onoff(PMSys *p, int on)
 {
-	int cmd;
+	if (!display_dev || !display_dev->set_state) {
+		_E("there is no display device");
+		return -ENOENT;
+	}
 
-	cmd = DISP_CMD(PROP_DISPLAY_ONOFF, DEFAULT_DISPLAY);
-	return device_set_property(DEVICE_TYPE_DISPLAY, cmd, on);
+	return display_dev->set_state(on);
 }
 
 static int _bl_brt(PMSys *p, int brightness, int delay)
 {
 	int ret = -1;
-	int cmd;
 	int prev;
+
+	if (!display_dev ||
+	    !display_dev->get_brightness ||
+	    !display_dev->set_brightness) {
+		_E("there is no display device");
+		return -ENOENT;
+	}
 
 	if (delay > 0)
 		usleep(delay);
@@ -102,8 +115,7 @@ static int _bl_brt(PMSys *p, int brightness, int delay)
 		brightness = force_brightness;
 	}
 
-	cmd = DISP_CMD(PROP_DISPLAY_BRIGHTNESS, DEFAULT_DISPLAY);
-	ret = device_get_property(DEVICE_TYPE_DISPLAY, cmd, &prev);
+	ret = display_dev->get_brightness(&prev);
 
 	/* Update new brightness to vconf */
 	if (!ret && (brightness != prev)) {
@@ -111,7 +123,7 @@ static int _bl_brt(PMSys *p, int brightness, int delay)
 	}
 
 	/* Update device brightness */
-	ret = device_set_property(DEVICE_TYPE_DISPLAY, cmd, brightness);
+	ret = display_dev->set_brightness(brightness);
 
 	_I("set brightness %d, %d", brightness, ret);
 
@@ -148,17 +160,19 @@ static int _sys_get_power_lock_support(PMSys *p)
 
 static int _sys_get_lcd_power(PMSys *p)
 {
-	int value = -1;
-	int ret = -1;
-	int cmd;
+	enum display_state state;
+	int ret;
 
-	cmd = DISP_CMD(PROP_DISPLAY_ONOFF, DEFAULT_DISPLAY);
-	ret = device_get_property(DEVICE_TYPE_DISPLAY, cmd, &value);
+	if (!display_dev || !display_dev->get_state) {
+		_E("there is no display device");
+		return -ENOENT;
+	}
 
-	if (ret < 0 || value < 0)
-		return -1;
+	ret = display_dev->get_state(&state);
+	if (ret < 0)
+		return ret;
 
-	return value;
+	return state;
 }
 
 static void _init_bldev(PMSys *p, unsigned int flags)
@@ -291,15 +305,23 @@ void change_brightness(int start, int end, int step)
 {
 	int diff, val;
 	int ret = -1;
-	int cmd;
 	int prev;
+
+	if (!display_dev ||
+	    !display_dev->get_brightness) {
+		_E("there is no display device");
+		return;
+	}
 
 	if ((pm_status_flag & PWRSV_FLAG) &&
 	    !(pm_status_flag & BRTCH_FLAG))
 		return;
 
-	cmd = DISP_CMD(PROP_DISPLAY_BRIGHTNESS, DEFAULT_DISPLAY);
-	ret = device_get_property(DEVICE_TYPE_DISPLAY, cmd, &prev);
+	ret = display_dev->get_brightness(&prev);
+	if (ret < 0) {
+		_E("fail to get brightness : %d", ret);
+		return;
+	}
 
 	if (prev == end)
 		return;
@@ -336,8 +358,8 @@ static int backlight_on(enum device_flags flags)
 		return -1;
 
 	for (i = 0; i < PM_LCD_RETRY_CNT; i++) {
-		ret = pmsys->bl_onoff(pmsys, STATUS_ON);
-		if (get_lcd_power() == PM_LCD_POWER_ON) {
+		ret = pmsys->bl_onoff(pmsys, DISPLAY_ON);
+		if (get_lcd_power() == DISPLAY_ON) {
 #ifdef ENABLE_PM_LOG
 			pm_history_save(PM_LOG_LCD_ON, pm_cur_state);
 #endif
@@ -381,8 +403,8 @@ static int backlight_off(enum device_flags flags)
 		if (x_dpms_enable == false)
 #endif
 			usleep(30000);
-		ret = pmsys->bl_onoff(pmsys, STATUS_OFF);
-		if (get_lcd_power() == PM_LCD_POWER_OFF) {
+		ret = pmsys->bl_onoff(pmsys, DISPLAY_OFF);
+		if (get_lcd_power() == DISPLAY_OFF) {
 #ifdef ENABLE_PM_LOG
 			pm_history_save(PM_LOG_LCD_OFF, pm_cur_state);
 #endif
@@ -430,10 +452,15 @@ static bool get_custom_status(void)
 
 static int save_custom_brightness(void)
 {
-	int cmd, ret, brightness;
+	int ret, brightness;
 
-	cmd = DISP_CMD(PROP_DISPLAY_BRIGHTNESS, DEFAULT_DISPLAY);
-	ret = device_get_property(DEVICE_TYPE_DISPLAY, cmd, &brightness);
+	if (!display_dev ||
+	    !display_dev->get_brightness) {
+		_E("there is no display device");
+		return -ENOENT;
+	}
+
+	ret = display_dev->get_brightness(&brightness);
 
 	custom_brightness = brightness;
 
@@ -490,9 +517,9 @@ static int backlight_standby(int force)
 	if (!pmsys || !pmsys->bl_onoff)
 		return -1;
 
-	if ((get_lcd_power() == PM_LCD_POWER_ON) || force) {
+	if ((get_lcd_power() == DISPLAY_ON) || force) {
 		_I("LCD standby");
-		ret = pmsys->bl_onoff(pmsys, STATUS_STANDBY);
+		ret = pmsys->bl_onoff(pmsys, DISPLAY_STANDBY);
 	}
 
 	return ret;
@@ -518,6 +545,26 @@ static int check_wakeup_src(void)
 	return EVENT_DEVICE;
 }
 
+static int set_brightness(int val)
+{
+	if (!display_dev || !display_dev->set_brightness) {
+		_E("there is no display device");
+		return -ENOENT;
+	}
+
+	return display_dev->set_brightness(val);
+}
+
+static int get_brightness(int *val)
+{
+	if (!display_dev || !display_dev->get_brightness) {
+		_E("there is no display device");
+		return -ENOENT;
+	}
+
+	return display_dev->get_brightness(val);
+}
+
 void _init_ops(void)
 {
 	backlight_ops.off = backlight_off;
@@ -532,6 +579,8 @@ void _init_ops(void)
 	backlight_ops.save_custom_brightness = save_custom_brightness;
 	backlight_ops.custom_update = custom_backlight_update;
 	backlight_ops.set_force_brightness = set_force_brightness;
+	backlight_ops.set_brightness = set_brightness;
+	backlight_ops.get_brightness = get_brightness;
 
 	power_ops.suspend = system_suspend;
 	power_ops.pre_suspend = system_pre_suspend;
@@ -540,6 +589,49 @@ void _init_ops(void)
 	power_ops.power_unlock = system_power_unlock;
 	power_ops.get_power_lock_support = system_get_power_lock_support;
 	power_ops.check_wakeup_src = check_wakeup_src;
+}
+
+int display_service_load(void)
+{
+	struct hw_info *info;
+	int r;
+
+	r = hw_get_info(DISPLAY_HARDWARE_DEVICE_ID,
+			(const struct hw_info **)&info);
+	if (r < 0) {
+		_E("fail to load display shared library : %d", r);
+		return -ENOENT;
+	}
+
+	if (!info->open) {
+		_E("fail to open display device : open(NULL)");
+		return -EPERM;
+	}
+
+	r = info->open(info, NULL, (struct hw_common **)&display_dev);
+	if (r < 0) {
+		_E("fail to get display device structure : %d", r);
+		return -EPERM;
+	}
+
+	_D("display device structure load success");
+	return 0;
+}
+
+int display_service_free(void)
+{
+	struct hw_info *info;
+
+	if (!display_dev)
+		return -ENOENT;
+
+	info = display_dev->common.info;
+
+	assert(info);
+
+	info->close((struct hw_common *)display_dev);
+
+	return 0;
 }
 
 int init_sysfs(unsigned int flags)

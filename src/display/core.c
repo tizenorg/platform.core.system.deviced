@@ -2319,6 +2319,16 @@ static int display_load_config(struct parse_result *result, void *user_data)
  * Power manager Main
  *
  */
+static int display_probe(void *data)
+{
+	/**
+	 * load display service
+	 * if there is no display shared library,
+	 * deviced does not provide any method and function of display.
+	 */
+	return display_service_load();
+}
+
 static void display_init(void *data)
 {
 	int ret, i;
@@ -2448,6 +2458,9 @@ static void display_exit(void *data)
 	exit_lcd_operation();
 	free_lock_info_list();
 
+	/* free display service */
+	display_service_free();
+
 	_I("Stop power manager");
 }
 
@@ -2504,6 +2517,7 @@ static int display_status(void)
 static const struct device_ops display_device_ops = {
 	.priority = DEVICE_PRIORITY_HIGH,
 	.name     = "display",
+	.probe    = display_probe,
 	.init     = display_init,
 	.exit     = display_exit,
 	.start    = display_start,

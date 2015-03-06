@@ -36,13 +36,15 @@
 #define PM_DEFAULT_BRIGHTNESS	60
 
 #define PM_LCD_POWER_ON		0
-#define PM_LCD_POWER_OFF	4
+#define PM_LCD_POWER_OFF	3
 
 #define PM_LCD_RETRY_CNT	3
-#define STATUS_STANDBY		(STATUS_ON + 1)
 
 #define DISP_INDEX_SHIFT	16
 #define DISP_CMD(prop, index)	((index << DISP_INDEX_SHIFT) | prop)
+
+#define DEFAULT_DISPLAY_COUNT           1
+#define DEFAULT_DISPLAY_MAX_BRIGHTNESS  100
 
 /*
  * Event type enumeration
@@ -54,8 +56,10 @@ enum {
 	EVENT_END,
 };
 
-extern int init_sysfs(unsigned int);
-extern int exit_sysfs(void);
+int init_sysfs(unsigned int);
+int exit_sysfs(void);
+int display_service_load(void);
+int display_service_free(void);
 
 struct _backlight_ops {
 	int (*off)(enum device_flags);
@@ -70,6 +74,8 @@ struct _backlight_ops {
 	int (*save_custom_brightness)(void);
 	int (*custom_update)(void);
 	int (*set_force_brightness)(int level);
+	int (*set_brightness)(int val);
+	int (*get_brightness)(int *val);
 };
 
 struct _power_ops {
