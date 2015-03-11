@@ -18,6 +18,7 @@
 
 
 #include <stdio.h>
+#include <vconf.h>
 
 #include "core/log.h"
 #include "core/list.h"
@@ -137,7 +138,8 @@ static int usb_config_disable(void)
 
 static int usb_state_changed(int status)
 {
-	static int old = USB_DISCONNECTED;
+	static int old = -1;	/* to update at the first time */
+	int vconf_state;
 	int ret;
 
 	_I("USB state is changed from (%d) to (%d)", old, status);
@@ -149,10 +151,15 @@ static int usb_state_changed(int status)
 	case USB_CONNECTED:
 		_I("USB cable is connected");
 		ret = usb_config_enable();
+		if (ret == 0)
+			vconf_state = VCONFKEY_SYSMAN_USB_AVAILABLE;
+		else
+			vconf_state = VCONFKEY_SYSMAN_USB_CONNECTED;
 		break;
 	case USB_DISCONNECTED:
 		_I("USB cable is disconnected");
 		ret = usb_config_disable();
+		vconf_state = VCONFKEY_SYSMAN_USB_DISCONNECTED;
 		break;
 	default:
 		_E("Invalid USB state(%d)", status);
@@ -163,6 +170,7 @@ static int usb_state_changed(int status)
 	else
 		old = status;
 
+	vconf_set_int(VCONFKEY_SYSMAN_USB_STATUS, vconf_state);
 	return ret;
 }
 
@@ -180,7 +188,7 @@ static void usb_init(void *data)
 	if (ret < 0)
 		_E("Failed to initialize usb configuation");
 
-	ret = usb_state_changed(&(extcon_usb_ops.status));
+	ret = usb_state_changed(extcon_usb_ops.status);
 	if (ret < 0)
 		_E("Failed to update usb status(%d)", ret);
 }
