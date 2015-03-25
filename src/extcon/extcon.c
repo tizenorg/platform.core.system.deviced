@@ -46,23 +46,6 @@ void remove_extcon(struct extcon_ops *dev)
 	DD_LIST_REMOVE(extcon_list, dev);
 }
 
-static int extcon_changed(struct extcon_ops *dev, int status)
-{
-	if (!dev)
-		return -EINVAL;
-
-	if (dev->status == status)
-		return 0;
-
-	_I("Changed %s device : %d -> %d", dev->name, dev->status, status);
-
-	dev->status = status;
-	if (dev->update)
-		dev->update(status);
-
-	return 0;
-}
-
 static struct extcon_ops *find_extcon(const char *name)
 {
 	dd_list *l;
@@ -93,7 +76,31 @@ int extcon_get_status(const char *name)
 	return dev->status;
 }
 
-static int extcon_update(const char *value)
+static int extcon_update(const char *name, const char *value)
+{
+	struct extcon_ops *dev;
+	int status;
+
+	if (!name || !value)
+		return -EINVAL;
+
+	dev = find_extcon(name);
+	if (!dev) {
+		_E("fail to find matched extcon device : name(%s)", name);
+		return -EINVAL;
+	}
+
+	status = atoi(value);
+	_I("Changed %s device : %d -> %d", name, dev->status, status);
+
+	dev->status = status;
+	if (dev->update)
+		dev->update(status);
+
+	return 0;
+}
+
+static int extcon_parsing_value(const char *value)
 {
 	char *s, *p;
 	char name[NAME_MAX];
@@ -109,9 +116,8 @@ static int extcon_update(const char *value)
 			break;
 		memset(name, 0, sizeof(name));
 		memcpy(name, s, p-s);
-		dev = find_extcon(name);
-		if (dev)
-			extcon_changed(dev, atoi(p+1));
+		/* name is env_name and p+1 is env_value */
+		extcon_update(name, p+1);
 		s = strchr(p, '\n');
 		if (!s)
 			break;
@@ -121,26 +127,34 @@ static int extcon_update(const char *value)
 	return 0;
 }
 
+static void uevent_extcon_handler(struct udev_device *dev)
+{
+	const char *env_value;
+	int ret;
+
+	env_value = udev_device_get_property_value(dev, STATE_NAME);
+	if (!env_value)
+		return;
+
+	ret = extcon_parsing_value(env_value);
+	if (ret < 0)
+		_E("fail to parse extcon value : %d", ret);
+}
+
 static int extcon_load_uevent(struct parse_result *result, void *user_data)
 {
-	struct extcon_ops *dev;
-	int val;
-
 	if (!result)
 		return 0;
 
 	if (!result->name || !result->value)
 		return 0;
 
-	val = atoi(result->value);
-	dev = find_extcon(result->name);
-	if (dev)
-		extcon_changed(dev, val);
+	extcon_update(result->name, result->value);
 
 	return 0;
 }
 
-static int get_extcon_uevent_state(char *state, unsigned int len)
+static int get_extcon_state_node(char *state, unsigned int len)
 {
 	DIR *dir;
 	struct dirent *entry;
@@ -180,22 +194,6 @@ static int get_extcon_uevent_state(char *state, unsigned int len)
 	}
 
 	return ret;
-}
-
-static void uevent_extcon_handler(struct udev_device *dev)
-{
-	const char *env_value;
-	int ret;
-
-	env_value = udev_device_get_property_value(dev, STATE_NAME);
-	if (!env_value)
-		return;
-
-	ret = extcon_update(env_value);
-	if (ret < 0)
-		_E("fail to update extcon status : %d", ret);
-
-	return;
 }
 
 static DBusMessage *dbus_get_extcon_status(E_DBus_Object *obj,
@@ -276,12 +274,12 @@ static void extcon_init(void *data)
 	if (ret < 0)
 		_E("fail to register extcon uevent : %d", ret);
 
-	/* load extcon uevent */
-	ret = get_extcon_uevent_state(state, sizeof(state));
+	/* set initialize extcon device state */
+	ret = get_extcon_state_node(state, sizeof(state));
 	if (ret == 0) {
 		ret = config_parse(state, extcon_load_uevent, NULL);
 		if (ret < 0)
-			_E("Failed to load %s file : %d", EXTCON_PATH, ret);
+			_E("Failed to load %s file : %d", state, ret);
 	} else {
 		_E("Failed to get extcon uevent state node");
 	}
@@ -311,7 +309,7 @@ static void extcon_exit(void *data)
 	}
 }
 
-const struct device_ops extcon_device_ops = {
+static const struct device_ops extcon_device_ops = {
 	.name   = "extcon",
 	.probe  = extcon_probe,
 	.init   = extcon_init,
