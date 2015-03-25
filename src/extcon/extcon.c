@@ -229,6 +229,54 @@ error:
 	return make_reply_message(msg, ret);
 }
 
+static DBusMessage *dbus_enable_device(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	char *device;
+	int ret;
+
+	if (!dbus_message_get_args(msg, NULL,
+		    DBUS_TYPE_STRING, &device, DBUS_TYPE_INVALID)) {
+		_E("there is no message");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	extcon_update(device, "1");
+
+out:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+
+	return reply;
+}
+
+static DBusMessage *dbus_disable_device(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	char *device;
+	int ret;
+
+	if (!dbus_message_get_args(msg, NULL,
+		    DBUS_TYPE_STRING, &device, DBUS_TYPE_INVALID)) {
+		_E("there is no message");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	extcon_update(device, "0");
+
+out:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+
+	return reply;
+}
+
 static int extcon_probe(void *data)
 {
 	/**
@@ -251,6 +299,8 @@ static struct uevent_handler uh = {
 
 static const struct edbus_method edbus_methods[] = {
 	{ "GetStatus", "s", "i", dbus_get_extcon_status },
+	{ "enable",    "s", "i", dbus_enable_device },
+	{ "disable",   "s", "i", dbus_disable_device },
 };
 
 static void extcon_init(void *data)
