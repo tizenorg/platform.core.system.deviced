@@ -229,6 +229,42 @@ error:
 	return make_reply_message(msg, ret);
 }
 
+static DBusMessage *dbus_enable_device(E_DBus_Object *obj, DBusMessage *msg)
+{
+	char *device;
+	int ret;
+
+	if (!dbus_message_get_args(msg, NULL,
+		    DBUS_TYPE_STRING, &device, DBUS_TYPE_INVALID)) {
+		_E("there is no message");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	ret = extcon_update(device, "1");
+
+out:
+	return make_reply_message(msg, ret);
+}
+
+static DBusMessage *dbus_disable_device(E_DBus_Object *obj, DBusMessage *msg)
+{
+	char *device;
+	int ret;
+
+	if (!dbus_message_get_args(msg, NULL,
+		    DBUS_TYPE_STRING, &device, DBUS_TYPE_INVALID)) {
+		_E("there is no message");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	ret = extcon_update(device, "0");
+
+out:
+	return make_reply_message(msg, ret);
+}
+
 static int extcon_probe(void *data)
 {
 	/**
@@ -250,7 +286,9 @@ static struct uevent_handler uh = {
 };
 
 static const struct edbus_method edbus_methods[] = {
-	{ "GetStatus", "s", "i", dbus_get_extcon_status },
+	{ "GetStatus", "s",  "i", dbus_get_extcon_status },
+	{ "enable",    "s", NULL, dbus_enable_device },  /* for devicectl */
+	{ "disable",   "s", NULL, dbus_disable_device }, /* for devicectl */
 };
 
 static void extcon_init(void *data)
