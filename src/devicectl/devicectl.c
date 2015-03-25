@@ -37,6 +37,7 @@ enum device_type {
 	DEVICE_LED,
 	DEVICE_PASS,
 	DEVICE_USB,
+	DEVICE_EXTCON,
 	DEVICE_MAX,
 	DEVICE_ALL,
 };
@@ -53,6 +54,7 @@ static const struct device {
 	{ DEVICE_LED,     "led",     DEVICED_PATH_LED,     DEVICED_INTERFACE_LED     },
 	{ DEVICE_PASS,    "pass",    DEVICED_PATH_PASS,    DEVICED_INTERFACE_PASS    },
 	{ DEVICE_USB,     "usb",     DEVICED_PATH_USB,     DEVICED_INTERFACE_USB     },
+	{ DEVICE_EXTCON,  "extcon",  DEVICED_PATH_EXTCON,  DEVICED_INTERFACE_EXTCON  },
 };
 
 static int start_device(char **args)
@@ -157,6 +159,48 @@ static int unset_usb_mode(char **args)
 	return unload_usb_mode(args[3]);
 }
 
+static int enable_device(char **args)
+{
+	DBusMessage *msg;
+	char *arr[1];
+
+	if (!args[3])
+		return -EINVAL;
+
+	printf("enable %s device!\n", args[3]);
+
+	arr[0] = args[3];
+
+	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
+		    devices[arg_id].path, devices[arg_id].iface,
+		    "enable", "s", arr);
+	if (!msg)
+		return -EBADMSG;
+
+	dbus_message_unref(msg);
+}
+
+static int disable_device(char **args)
+{
+	DBusMessage *msg;
+	char *arr[1];
+
+	if (!args[3])
+		return -EINVAL;
+
+	printf("disable %s device!\n", args[3]);
+
+	arr[0] = args[3];
+
+	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
+		    devices[arg_id].path, devices[arg_id].iface,
+		    "disable", "s", arr);
+	if (!msg)
+		return -EBADMSG;
+
+	dbus_message_unref(msg);
+}
+
 static const struct action {
 	const enum device_type id;
 	const char *action;
@@ -171,6 +215,8 @@ static const struct action {
 	{ DEVICE_DISPLAY,   "savelog",         3, save_log,          ""            },
 	{ DEVICE_USB,       "set",             4, set_usb_mode,      "[sdb|ssh]"   },
 	{ DEVICE_USB,       "unset",           4, unset_usb_mode,    "[sdb|ssh]"   },
+	{ DEVICE_EXTCON,    "enable",          4, enable_device,     "[USB|HEADPHONE|HDMI|DOCK]" },
+	{ DEVICE_EXTCON,    "disable",         4, disable_device,    "[USB|HEADPHONE|HDMI|DOCK]" },
 };
 
 static inline void usage()
