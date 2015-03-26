@@ -44,6 +44,7 @@ SET(SRCS
 SET(SRCS ${SRCS}
 	src/usb/usb.c
 	src/usb/usb-default.c
+	src/usb/usb-host.c
 )
 
 IF(TIZEN_BUZZER)
