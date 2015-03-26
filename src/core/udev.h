@@ -64,6 +64,10 @@
 /* host device */
 #define HOST_SUBSYSTEM		"host_notify"
 
+/* usb */
+#define USB_SUBSYSTEM           "usb"
+#define USB_INTERFACE_DEVTYPE   "usb_interface"
+
 /* power supply status */
 enum {
 	POWER_SUPPLY_STATUS_UNKNOWN = 0,
