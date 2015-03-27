@@ -7,7 +7,6 @@
 %bcond_with buzzer
 %bcond_with extcon
 %bcond_with hall
-%bcond_with sdcard
 %bcond_with sim
 %bcond_with usb
 
@@ -198,9 +197,6 @@ export CFLAGS+=" -DX11_SUPPORT"
 %if %{with hall}
 	-DTIZEN_HALL:BOOL=ON \
 %endif
-%if %{with sdcard}
-	-DTIZEN_SDCARD:BOOL=ON \
-%endif
 %if %{with sim}
 	-DTIZEN_SIM:BOOL=ON \
 %endif
@@ -312,13 +308,11 @@ systemctl daemon-reload
 %{_bindir}/movi_format.sh
 %{_sysconfdir}/deviced/usb-setting.conf
 %{_sysconfdir}/deviced/usb-operation.conf
-%if %{with sdcard}
 %{_bindir}/mmc-smack-label
 %{_bindir}/fsck_msdosfs
 %{_bindir}/newfs_msdos
 %{_datadir}/license/fsck_msdosfs
 %{_datadir}/license/newfs_msdos
-%endif
 %{_unitdir}/multi-user.target.wants/deviced.service
 %{_unitdir}/sockets.target.wants/deviced.socket
 %{_unitdir}/graphical.target.wants/zbooting-done.service
