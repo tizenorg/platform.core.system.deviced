@@ -22,6 +22,7 @@
 
 #include "core/log.h"
 #include "core/devices.h"
+#include "core/edbus-handler.h"
 #include "core/udev.h"
 #include "core/list.h"
 
@@ -35,6 +36,40 @@
 #define USB_SERIAL              "serial"
 
 #define BUF_MAX 255
+
+/**
+ * Below usb host class is defined in www.usb.org.
+ * Please refer to below site.
+ * http://www.usb.org/developers/defined_class
+ */
+enum usb_host_class {
+	USB_HOST_REF_INTERFACE   = 0x0,
+	USB_HOST_AUDIO           = 0x1,
+	USB_HOST_CDC             = 0x2,
+	USB_HOST_HID             = 0x3,
+	USB_HOST_IMAGE           = 0x6,
+	USB_HOST_PRINTER         = 0x7,
+	USB_HOST_MASS_STORAGE    = 0x8,
+	USB_HOST_HUB             = 0x9,
+	USB_HOST_VIDEO           = 0xe,
+	USB_HOST_MISCELLANEOUS   = 0xef,
+	USB_HOST_VENDOR_SPECIFIC = 0xff,
+	/* USB_HOST_ALL is a Tizen specific. */
+	USB_HOST_ALL             = 0xffffffff,
+};
+
+/**
+ * HID Standard protocol information.
+ * Please refer to below site.
+ * http://www.usb.org/developers/hidpage/HID1_11.pdf
+ * Below protocol only has meaning
+ * if the subclass is a boot interface subclass,
+ * otherwise it is 0.
+ */
+enum usb_host_hid_protocol {
+	USB_HOST_HID_KEYBOARD = 1,
+	USB_HOST_HID_MOUSE    = 2,
+};
 
 struct usb_host_device {
 	char devpath[PATH_MAX]; /* unique info. */
@@ -171,9 +206,109 @@ static void uevent_usb_handler(struct udev_device *dev)
 	}
 }
 
+static DBusMessage *print_device_list(E_DBus_Object *obj, DBusMessage *msg)
+{
+	dd_list *elem;
+	struct usb_host_device *usb_host;
+	int cnt = 0;
+
+	DD_LIST_FOREACH(usb_host_list, elem, usb_host) {
+		_I("== [%2d USB HOST DEVICE] ===============", cnt++);
+		_I("devpath : %s", usb_host->devpath);
+		_I("interface class : %xh", usb_host->class);
+		_I("interface subclass : %xh", usb_host->subclass);
+		_I("interface protocol : %xh", usb_host->protocol);
+		_I("vendor id : %xh", usb_host->vendorid);
+		_I("product id : %xh", usb_host->productid);
+		_I("manufacturer : %s", usb_host->manufacturer);
+		_I("product : %s", usb_host->product);
+		_I("serial : %s", usb_host->serial);
+	}
+
+	return make_reply_message(msg, 0);
+}
+
+static DBusMessage *get_device_list(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessageIter arr;
+	DBusMessageIter s;
+	DBusMessage *reply;
+	dd_list *elem;
+	struct usb_host_device *usb_host;
+	const char *str;
+	int baseclass;
+
+	if (!dbus_message_get_args(msg, NULL,
+				DBUS_TYPE_INT32, &baseclass, DBUS_TYPE_INVALID)) {
+		_E("there is no message");
+		goto out;
+	}
+
+	reply = dbus_message_new_method_return(msg);
+
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY, "(siiiiisss)", &arr);
+
+	DD_LIST_FOREACH(usb_host_list, elem, usb_host) {
+		if (baseclass != USB_HOST_ALL && usb_host->class != baseclass)
+			continue;
+		dbus_message_iter_open_container(&arr, DBUS_TYPE_STRUCT, NULL, &s);
+		str = usb_host->devpath;
+		dbus_message_iter_append_basic(&s, DBUS_TYPE_STRING, &str);
+		dbus_message_iter_append_basic(&s, DBUS_TYPE_INT32, &usb_host->class);
+		dbus_message_iter_append_basic(&s, DBUS_TYPE_INT32, &usb_host->subclass);
+		dbus_message_iter_append_basic(&s, DBUS_TYPE_INT32, &usb_host->protocol);
+		dbus_message_iter_append_basic(&s, DBUS_TYPE_INT32, &usb_host->vendorid);
+		dbus_message_iter_append_basic(&s, DBUS_TYPE_INT32, &usb_host->productid);
+		str = usb_host->manufacturer;
+		dbus_message_iter_append_basic(&s, DBUS_TYPE_STRING, &str);
+		str = usb_host->product;
+		dbus_message_iter_append_basic(&s, DBUS_TYPE_STRING, &str);
+		str = usb_host->serial;
+		dbus_message_iter_append_basic(&s, DBUS_TYPE_STRING, &str);
+		dbus_message_iter_close_container(&arr, &s);
+	}
+
+	dbus_message_iter_close_container(&iter, &arr);
+
+out:
+	return reply;
+}
+
+static DBusMessage *get_device_list_count(E_DBus_Object *obj, DBusMessage *msg)
+{
+	dd_list *elem;
+	struct usb_host_device *usb_host;
+	int baseclass;
+	int ret = 0;
+
+	if (!dbus_message_get_args(msg, NULL,
+				DBUS_TYPE_INT32, &baseclass, DBUS_TYPE_INVALID)) {
+		_E("there is no message");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	DD_LIST_FOREACH(usb_host_list, elem, usb_host) {
+		if (baseclass != USB_HOST_ALL && usb_host->class != baseclass)
+			continue;
+		ret++;
+	}
+
+out:
+	return make_reply_message(msg, ret);
+}
+
 static struct uevent_handler uh = {
 	.subsystem = USB_SUBSYSTEM,
 	.uevent_func = uevent_usb_handler,
+};
+
+static const struct edbus_method edbus_methods[] = {
+	{ "PrintDeviceList",   NULL,            "i", print_device_list }, /* for debugging */
+	{ "GetDeviceList",      "i", "a(siiiiisss)", get_device_list },
+	{ "GetDeviceListCount", "i",            "i", get_device_list_count },
 };
 
 static void usbhost_init(void *data)
@@ -184,6 +319,13 @@ static void usbhost_init(void *data)
 	ret = register_kernel_uevent_control(&uh);
 	if (ret < 0)
 		_E("fail to register usb uevent : %d", ret);
+
+	/* register usbhost interface and method */
+	ret = register_edbus_interface_and_method(DEVICED_PATH_USBHOST,
+			DEVICED_INTERFACE_USBHOST,
+			edbus_methods, ARRAY_SIZE(edbus_methods));
+	if (ret < 0)
+		_E("fail to register edbus interface and method! %d", ret);
 }
 
 static void usbhost_exit(void *data)
