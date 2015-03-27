@@ -37,6 +37,8 @@
 
 #define BUF_MAX 255
 
+#define SIGNAL_USB_HOST_CHANGED "ChangedDevice"
+
 /**
  * Below usb host class is defined in www.usb.org.
  * Please refer to below site.
@@ -71,6 +73,11 @@ enum usb_host_hid_protocol {
 	USB_HOST_HID_MOUSE    = 2,
 };
 
+enum usb_host_state {
+	USB_HOST_REMOVED,
+	USB_HOST_ADDED,
+};
+
 struct usb_host_device {
 	char devpath[PATH_MAX]; /* unique info. */
 	int class;
@@ -84,6 +91,58 @@ struct usb_host_device {
 };
 
 static dd_list *usb_host_list;
+
+static void broadcast_usb_host_signal(enum usb_host_state state,
+		struct usb_host_device *usb_host)
+{
+	DBusConnection *conn;
+	DBusMessage *msg;
+	DBusMessageIter iter;
+	DBusMessageIter s;
+	DBusMessage *reply;
+	const char *str;
+	int r;
+
+	conn = dbus_bus_get(DBUS_BUS_SYSTEM, NULL);
+	if (!conn) {
+		_E("dbus_bus_get error");
+		return;
+	}
+
+	msg = dbus_message_new_signal(DEVICED_PATH_USBHOST,
+			DEVICED_INTERFACE_USBHOST,
+			SIGNAL_USB_HOST_CHANGED);
+	if (!msg) {
+		_E("fail to allocate new %s.%s signal",
+				DEVICED_INTERFACE_USBHOST, SIGNAL_USB_HOST_CHANGED);
+		return;
+	}
+
+	dbus_message_iter_init_append(msg, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &state);
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_STRUCT, NULL, &s);
+	str = usb_host->devpath;
+	dbus_message_iter_append_basic(&s, DBUS_TYPE_STRING, &str);
+	dbus_message_iter_append_basic(&s, DBUS_TYPE_INT32, &usb_host->class);
+	dbus_message_iter_append_basic(&s, DBUS_TYPE_INT32, &usb_host->subclass);
+	dbus_message_iter_append_basic(&s, DBUS_TYPE_INT32, &usb_host->protocol);
+	dbus_message_iter_append_basic(&s, DBUS_TYPE_INT32, &usb_host->vendorid);
+	dbus_message_iter_append_basic(&s, DBUS_TYPE_INT32, &usb_host->productid);
+	str = usb_host->manufacturer;
+	dbus_message_iter_append_basic(&s, DBUS_TYPE_STRING, &str);
+	str = usb_host->product;
+	dbus_message_iter_append_basic(&s, DBUS_TYPE_STRING, &str);
+	str = usb_host->serial;
+	dbus_message_iter_append_basic(&s, DBUS_TYPE_STRING, &str);
+	dbus_message_iter_close_container(&iter, &s);
+
+	r = dbus_connection_send(conn, msg, NULL);
+	dbus_message_unref(msg);
+	if (r) {
+		_E("fail to send dbus signal");
+		return;
+	}
+}
 
 static void uevent_usb_handler(struct udev_device *dev)
 {
@@ -175,6 +234,8 @@ static void uevent_usb_handler(struct udev_device *dev)
 
 		DD_LIST_APPEND(usb_host_list, usb_host);
 
+		broadcast_usb_host_signal(USB_HOST_ADDED, usb_host);
+
 		/* for debugging */
 		_I("USB HOST Added");
 		_I("devpath : %s", usb_host->devpath);
@@ -193,6 +254,8 @@ static void uevent_usb_handler(struct udev_device *dev)
 		DD_LIST_FOREACH_SAFE(usb_host_list, n, next, usb_host) {
 			if (!strncmp(usb_host->devpath,
 						devpath, sizeof(usb_host->devpath))) {
+
+				broadcast_usb_host_signal(USB_HOST_REMOVED, usb_host);
 
 				/* for debugging */
 				_I("USB HOST Removed");
