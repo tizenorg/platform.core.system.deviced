@@ -22,6 +22,7 @@
 
 #include "core/log.h"
 #include "core/devices.h"
+#include "core/edbus-handler.h"
 #include "core/udev.h"
 #include "core/list.h"
 
@@ -33,6 +34,29 @@
 #define USB_MANUFACTURER        "manufacturer"
 #define USB_PRODUCT             "product"
 #define USB_SERIAL              "serial"
+
+/**
+ * Below usb host class is defined by www.usb.org.
+ * Please refer to below site.
+ * http://www.usb.org/developers/defined_class
+ * You can find the detail class codes in linux/usb/ch9.h.
+ * Deviced uses kernel defines.
+ */
+#include <linux/usb/ch9.h>
+#define USB_CLASS_ALL   0xffffffff
+
+/**
+ * HID Standard protocol information.
+ * Please refer to below site.
+ * http://www.usb.org/developers/hidpage/HID1_11.pdf
+ * Below protocol only has meaning
+ * if the subclass is a boot interface subclass,
+ * otherwise it is 0.
+ */
+enum usbhost_hid_protocol {
+	USB_HOST_HID_KEYBOARD = 1,
+	USB_HOST_HID_MOUSE    = 2,
+};
 
 struct usbhost_device {
 	char devpath[PATH_MAX]; /* unique info. */
@@ -216,9 +240,107 @@ static void uevent_usbhost_handler(struct udev_device *dev)
 		remove_usbhost_list(devpath);
 }
 
+static DBusMessage *print_device_list(E_DBus_Object *obj, DBusMessage *msg)
+{
+	dd_list *elem;
+	struct usbhost_device *usbhost;
+	int cnt = 0;
+
+	DD_LIST_FOREACH(usbhost_list, elem, usbhost) {
+		_I("== [%2d USB HOST DEVICE] ===============", cnt++);
+		print_usbhost(usbhost);
+	}
+
+	return dbus_message_new_method_return(msg);
+}
+
+static DBusMessage *get_device_list(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessageIter arr;
+	DBusMessageIter s;
+	DBusMessage *reply;
+	dd_list *elem;
+	struct usbhost_device *usbhost;
+	const char *str;
+	int baseclass;
+
+	reply = dbus_message_new_method_return(msg);
+
+	if (!dbus_message_get_args(msg, NULL,
+				DBUS_TYPE_INT32, &baseclass, DBUS_TYPE_INVALID)) {
+		_E("there is no message");
+		goto out;
+	}
+
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_open_container(&iter,
+			DBUS_TYPE_ARRAY, "(siiiiisss)", &arr);
+
+	DD_LIST_FOREACH(usbhost_list, elem, usbhost) {
+		if (baseclass != USB_CLASS_ALL && usbhost->baseclass != baseclass)
+			continue;
+		dbus_message_iter_open_container(&arr, DBUS_TYPE_STRUCT, NULL, &s);
+		str = usbhost->devpath;
+		dbus_message_iter_append_basic(&s, DBUS_TYPE_STRING, &str);
+		dbus_message_iter_append_basic(&s,
+				DBUS_TYPE_INT32, &usbhost->baseclass);
+		dbus_message_iter_append_basic(&s,
+				DBUS_TYPE_INT32, &usbhost->subclass);
+		dbus_message_iter_append_basic(&s,
+				DBUS_TYPE_INT32, &usbhost->protocol);
+		dbus_message_iter_append_basic(&s,
+				DBUS_TYPE_INT32, &usbhost->vendorid);
+		dbus_message_iter_append_basic(&s,
+				DBUS_TYPE_INT32, &usbhost->productid);
+		dbus_message_iter_append_basic(&s,
+				DBUS_TYPE_STRING, &usbhost->manufacturer);
+		dbus_message_iter_append_basic(&s,
+				DBUS_TYPE_STRING, &usbhost->product);
+		dbus_message_iter_append_basic(&s,
+				DBUS_TYPE_STRING, &usbhost->serial);
+		dbus_message_iter_close_container(&arr, &s);
+	}
+
+	dbus_message_iter_close_container(&iter, &arr);
+
+out:
+	return reply;
+}
+
+static DBusMessage *get_device_list_count(E_DBus_Object *obj, DBusMessage *msg)
+{
+	dd_list *elem;
+	struct usbhost_device *usbhost;
+	int baseclass;
+	int ret = 0;
+
+	if (!dbus_message_get_args(msg, NULL,
+				DBUS_TYPE_INT32, &baseclass, DBUS_TYPE_INVALID)) {
+		_E("there is no message");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	DD_LIST_FOREACH(usbhost_list, elem, usbhost) {
+		if (baseclass != USB_CLASS_ALL && usbhost->baseclass != baseclass)
+			continue;
+		ret++;
+	}
+
+out:
+	return make_reply_message(msg, ret);
+}
+
 static struct uevent_handler uh = {
 	.subsystem = USB_SUBSYSTEM,
 	.uevent_func = uevent_usbhost_handler,
+};
+
+static const struct edbus_method edbus_methods[] = {
+	{ "PrintDeviceList",   NULL,           NULL, print_device_list }, /* for debugging */
+	{ "GetDeviceList",      "i", "a(siiiiisss)", get_device_list },
+	{ "GetDeviceListCount", "i",            "i", get_device_list_count },
 };
 
 static void usbhost_init(void *data)
@@ -229,6 +351,13 @@ static void usbhost_init(void *data)
 	ret = register_kernel_uevent_control(&uh);
 	if (ret < 0)
 		_E("fail to register usb uevent : %d", ret);
+
+	/* register usbhost interface and method */
+	ret = register_edbus_interface_and_method(DEVICED_PATH_USBHOST,
+			DEVICED_INTERFACE_USBHOST,
+			edbus_methods, ARRAY_SIZE(edbus_methods));
+	if (ret < 0)
+		_E("fail to register edbus interface and method! %d", ret);
 }
 
 static void usbhost_exit(void *data)
