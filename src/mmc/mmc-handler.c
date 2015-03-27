@@ -927,9 +927,11 @@ static void mmc_init(void *data)
 	int ret;
 
 	mmc_load_config();
-	ret = register_edbus_method(DEVICED_PATH_MMC, edbus_methods, ARRAY_SIZE(edbus_methods));
+	ret = register_edbus_interface_and_method(DEVICED_PATH_MMC,
+			DEVICED_INTERFACE_MMC,
+			edbus_methods, ARRAY_SIZE(edbus_methods));
 	if (ret < 0)
-		_E("fail to init edbus method(%d)", ret);
+		_E("fail to init edbus interface and method(%d)", ret);
 
 	/* register mmc uevent control routine */
 	ret = mmc_uevent_start();
