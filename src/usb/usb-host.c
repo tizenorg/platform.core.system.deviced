@@ -35,6 +35,8 @@
 #define USB_PRODUCT             "product"
 #define USB_SERIAL              "serial"
 
+#define SIGNAL_USB_HOST_CHANGED "ChangedDevice"
+
 /**
  * Below usb host class is defined by www.usb.org.
  * Please refer to below site.
@@ -56,6 +58,11 @@
 enum usbhost_hid_protocol {
 	USB_HOST_HID_KEYBOARD = 1,
 	USB_HOST_HID_MOUSE    = 2,
+};
+
+enum usbhost_state {
+	USB_HOST_REMOVED,
+	USB_HOST_ADDED,
 };
 
 struct usbhost_device {
@@ -86,6 +93,49 @@ static void print_usbhost(struct usbhost_device *usbhost)
 	_I("manufacturer : %s", usbhost->manufacturer);
 	_I("product : %s", usbhost->product);
 	_I("serial : %s", usbhost->serial);
+}
+
+static void broadcast_usbhost_signal(enum usbhost_state state,
+		struct usbhost_device *usbhost)
+{
+	char *arr[10];
+	char str_state[32];
+	char str_baseclass[32];
+	char str_subclass[32];
+	char str_protocol[32];
+	char str_vendorid[32];
+	char str_productid[32];
+
+	if (!usbhost)
+		return;
+
+	snprintf(str_state, sizeof(str_state), "%d", state);
+	arr[0] = str_state;
+	/* devpath is always valid */
+	arr[1] = usbhost->devpath;
+	snprintf(str_baseclass, sizeof(str_baseclass),
+			"%d", usbhost->baseclass);
+	arr[2] = str_baseclass;
+	snprintf(str_subclass, sizeof(str_subclass),
+			"%d", usbhost->subclass);
+	arr[3] = str_subclass;
+	snprintf(str_protocol, sizeof(str_protocol),
+			"%d", usbhost->protocol);
+	arr[4] = str_protocol;
+	snprintf(str_vendorid, sizeof(str_vendorid),
+			"%d", usbhost->vendorid);
+	arr[5] = str_vendorid;
+	snprintf(str_productid, sizeof(str_productid),
+			"%d", usbhost->productid);
+	arr[6] = str_productid;
+	arr[7] = (!usbhost->manufacturer ? "" : usbhost->manufacturer);
+	arr[8] = (!usbhost->product ? "" : usbhost->product);
+	arr[9] = (!usbhost->serial ? "" : usbhost->serial);
+
+	broadcast_edbus_signal(DEVICED_PATH_USBHOST,
+			DEVICED_INTERFACE_USBHOST,
+			SIGNAL_USB_HOST_CHANGED,
+			"isiiiiisss", arr);
 }
 
 static int add_usbhost_list(struct udev_device *dev, const char *devpath)
@@ -143,6 +193,8 @@ static int add_usbhost_list(struct udev_device *dev, const char *devpath)
 
 	DD_LIST_APPEND(usbhost_list, usbhost);
 
+	broadcast_usbhost_signal(USB_HOST_ADDED, usbhost);
+
 	/* for debugging */
 	_I("USB HOST Added");
 	print_usbhost(usbhost);
@@ -166,6 +218,8 @@ static int remove_usbhost_list(const char *devpath)
 		_E("fail to find the matched usbhost device");
 		return -ENODEV;
 	}
+
+	broadcast_usbhost_signal(USB_HOST_REMOVED, usbhost);
 
 	/* for debugging */
 	_I("USB HOST Removed");
