@@ -23,7 +23,6 @@ pkg_check_modules(libpkgs REQUIRED
 	vconf
 	dlog
 	dbus-1
-	dbus-glib-1
 	edbus)
 
 FOREACH(flag ${libpkgs_CFLAGS})

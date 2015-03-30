@@ -42,7 +42,7 @@ BuildRequires:  pkgconfig(sensor)
 BuildRequires:	gettext
 BuildRequires:  pkgconfig(libsystemd-daemon)
 BuildRequires:  pkgconfig(capi-base-common)
-BuildRequires:	pkgconfig(dbus-glib-1)
+BuildRequires:	pkgconfig(dbus-1)
 BuildRequires:  pkgconfig(libtzplatform-config)
 BuildRequires:  pkgconfig(notification)
 BuildRequires:  pkgconfig(hwcommon)
