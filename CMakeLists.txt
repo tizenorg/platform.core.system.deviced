@@ -4,6 +4,10 @@ PROJECT(deviced C)
 ########################################################
 # Build options:
 ########################################################
+IF("$ENV{CFLAGS}" MATCHES "-DTIZEN_ENGINEER_MODE")
+	OPTION(USE_ENGINEER_MODE "Use Engineer mode" ON)
+ENDIF()
+
 IF("${ARCH}" STREQUAL "emulator")
 	OPTION(USE_EMULATOR "Use Emulator" ON)
 ELSEIF("${ARCH}" STREQUAL "arm")
@@ -187,6 +191,11 @@ INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/usb/usb-setting.conf DESTINATION /
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/usb/usb-operation.conf DESTINATION /etc/deviced)
 INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/scripts/mmc-smack-label DESTINATION bin)
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/fsck-msdos/LICENSE DESTINATION share/license RENAME fsck_msdosfs)
+
+# USB (Manual setting)
+IF(USE_ENGINEER_MODE)
+INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/scripts/direct_set_debug.sh DESTINATION bin)
+ENDIF()
 
 INSTALL(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/systemd/ DESTINATION lib/systemd/system
 		FILES_MATCHING

@@ -181,6 +181,9 @@ Haptic Device manager library for device control (devel)
 export CFLAGS+=" -DX11_SUPPORT"
 %endif
 
+export CFLAGS+=" -DTIZEN_ENGINEER_MODE"
+%define ENGINEER_MODE 1
+
 %cmake . \
 	-DTZ_SYS_ETC=%TZ_SYS_ETC \
 	-DCMAKE_INSTALL_PREFIX=%{_prefix} \
@@ -306,6 +309,9 @@ systemctl daemon-reload
 %{_bindir}/deviced
 %{_bindir}/devicectl
 %{_bindir}/movi_format.sh
+%if %ENGINEER_MODE
+%{_bindir}/direct_set_debug.sh
+%endif
 %{_sysconfdir}/deviced/usb-setting.conf
 %{_sysconfdir}/deviced/usb-operation.conf
 %{_bindir}/mmc-smack-label
