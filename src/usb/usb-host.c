@@ -405,12 +405,12 @@ static DBusMessage *get_device_list(E_DBus_Object *obj, DBusMessage *msg)
 				DBUS_TYPE_INT32, &usbhost->vendorid);
 		dbus_message_iter_append_basic(&s,
 				DBUS_TYPE_INT32, &usbhost->productid);
-		dbus_message_iter_append_basic(&s,
-				DBUS_TYPE_STRING, &usbhost->manufacturer);
-		dbus_message_iter_append_basic(&s,
-				DBUS_TYPE_STRING, &usbhost->product);
-		dbus_message_iter_append_basic(&s,
-				DBUS_TYPE_STRING, &usbhost->serial);
+		str = (!usbhost->manufacturer ? "" : usbhost->manufacturer);
+		dbus_message_iter_append_basic(&s, DBUS_TYPE_STRING, &str);
+		str = (!usbhost->product ? "" : usbhost->product);
+		dbus_message_iter_append_basic(&s, DBUS_TYPE_STRING, &str);
+		str = (!usbhost->serial ? "" : usbhost->serial);
+		dbus_message_iter_append_basic(&s, DBUS_TYPE_STRING, &str);
 		dbus_message_iter_close_container(&arr, &s);
 	}
 
