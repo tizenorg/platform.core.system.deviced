@@ -23,6 +23,7 @@
 #include "core/log.h"
 #include "core/devices.h"
 #include "core/edbus-handler.h"
+#include "core/device-notifier.h"
 #include "core/udev.h"
 #include "core/list.h"
 
@@ -294,6 +295,63 @@ static void uevent_usbhost_handler(struct udev_device *dev)
 		remove_usbhost_list(devpath);
 }
 
+static int usbhost_init_from_udev_enumerate(void)
+{
+	struct udev *udev;
+	struct udev_enumerate *enumerate;
+	struct udev_list_entry *list_entry;
+	struct udev_device *dev;
+	const char *syspath;
+	const char *devpath;
+	int ret;
+
+	udev = udev_new();
+	if (!udev) {
+		_E("fail to create udev library context");
+		return -EPERM;
+	}
+
+	/* create a list of the devices in the 'usb' subsystem */
+	enumerate = udev_enumerate_new(udev);
+	if (!enumerate) {
+		_E("fail to create an enumeration context");
+		return -EPERM;
+	}
+
+	udev_enumerate_add_match_subsystem(enumerate, USB_SUBSYSTEM);
+	udev_enumerate_add_match_property(enumerate,
+			UDEV_DEVTYPE, USB_INTERFACE_DEVTYPE);
+	udev_enumerate_scan_devices(enumerate);
+
+	udev_list_entry_foreach(list_entry,
+			udev_enumerate_get_list_entry(enumerate)) {
+		syspath = udev_list_entry_get_name(list_entry);
+		if (!syspath)
+			continue;
+
+		dev = udev_device_new_from_syspath(udev_enumerate_get_udev(enumerate),
+				syspath);
+		if (!dev)
+			continue;
+
+		/* devpath is an unique information among usb host devices */
+		devpath = udev_device_get_devpath(dev);
+		if (!devpath) {
+			_E("fail to get devpath from %s device", syspath);
+			continue;
+		}
+
+		/* add usbhost list */
+		add_usbhost_list(dev, devpath);
+
+		udev_device_unref(dev);
+	}
+
+	udev_enumerate_unref(enumerate);
+	udev_unref(udev);
+	return 0;
+}
+
 static DBusMessage *print_device_list(E_DBus_Object *obj, DBusMessage *msg)
 {
 	dd_list *elem;
@@ -397,6 +455,21 @@ static const struct edbus_method edbus_methods[] = {
 	{ "GetDeviceListCount", "i",            "i", get_device_list_count },
 };
 
+static int booting_done(void *data)
+{
+	/**
+	 * To search the attched usb host device is not an argent task.
+	 * So deviced does not load while booting time.
+	 * After booting task is done, it tries to find the attached devices.
+	 */
+	usbhost_init_from_udev_enumerate();
+
+	/* unregister booting done notifier */
+	unregister_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
+
+	return 0;
+}
+
 static void usbhost_init(void *data)
 {
 	int ret;
@@ -412,6 +485,9 @@ static void usbhost_init(void *data)
 			edbus_methods, ARRAY_SIZE(edbus_methods));
 	if (ret < 0)
 		_E("fail to register edbus interface and method! %d", ret);
+
+	/* register notifier */
+	register_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
 }
 
 static void usbhost_exit(void *data)
