@@ -87,6 +87,9 @@
 #ifndef SEC_TO_MSEC
 #define SEC_TO_MSEC(x)		((x)*1000)
 #endif
+#ifndef MSEC_TO_USEC
+#define MSEC_TO_USEC(x)		((unsigned int)(x)*1000)
+#endif
 #ifndef NSEC_TO_MSEC
 #define NSEC_TO_MSEC(x)		((double)x/1000000)
 #endif
