@@ -1,7 +1,0 @@
-[Unit]
-Description=Device Control Stop %I
-DefaultDependencies=no
-
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/devicectl %I stop
