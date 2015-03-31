@@ -221,7 +221,6 @@ rm -rf %{buildroot}
 %install_service multi-user.target.wants deviced.service
 %install_service sockets.target.wants deviced.socket
 %install_service graphical.target.wants zbooting-done.service
-%install_service graphical.target.wants devicectl-stop@.service
 
 %post
 #memory type vconf key init
@@ -316,13 +315,10 @@ systemctl daemon-reload
 %{_unitdir}/multi-user.target.wants/deviced.service
 %{_unitdir}/sockets.target.wants/deviced.socket
 %{_unitdir}/graphical.target.wants/zbooting-done.service
-%{_unitdir}/graphical.target.wants/devicectl-stop@.service
 %{_unitdir}/deviced.service
 %{_unitdir}/deviced.socket
 %{_unitdir}/deviced-pre.service
 %{_unitdir}/zbooting-done.service
-%{_unitdir}/devicectl-start@.service
-%{_unitdir}/devicectl-stop@.service
 
 %files -n libdeviced
 %defattr(-,root,root,-)

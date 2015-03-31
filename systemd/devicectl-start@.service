@@ -1,7 +1,0 @@
-[Unit]
-Description=Device Control Start %I
-DefaultDependencies=no
-
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/devicectl %I start
