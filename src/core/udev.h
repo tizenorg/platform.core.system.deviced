@@ -52,10 +52,6 @@
 #define CHARGE_STATUS		"POWER_SUPPLY_STATUS"
 #define CHARGE_ONLINE		"POWER_SUPPLY_ONLINE"
 
-/* input device */
-#define INPUT_SUBSYSTEM		"input"
-#define INPUT_PATH			"*/input[0-9]*/event[0-9]*"
-
 /* switch device */
 #define SWITCH_SUBSYSTEM	"switch"
 

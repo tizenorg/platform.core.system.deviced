@@ -145,7 +145,7 @@ extern struct display_function_info display_info;
 struct display_keyfilter_ops {
 	void (*init)(void);
 	void (*exit)(void);
-	int (*check)(int, char[], int);
+	int (*check)(void *, int);
 	void (*set_powerkey_ignore)(int);
 	int (*powerkey_lcdoff)(void);
 	void (*backlight_enable)(bool);
