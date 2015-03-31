@@ -54,7 +54,6 @@
 
 #define MOVINAND_MOUNT_POINT		"/opt/media"
 #define BUFF_MAX		255
-#define SYS_CLASS_INPUT		"/sys/class/input"
 
 #define USB_STATE_PLATFORM_PATH "/sys/devices/platform/jack/usb_online"
 #define USB_STATE_SWITCH_PATH "/sys/devices/virtual/switch/usb_cable/state"
@@ -64,13 +63,6 @@
 #include <E_DBus.h>
 static E_DBus_Connection *conn;
 #endif				/* ENABLE_EDBUS_USE */
-
-struct input_event {
-	long dummy[2];
-	unsigned short type;
-	unsigned short code;
-	int value;
-};
 
 enum snd_jack_types {
 	SND_JACK_HEADPHONE = 0x0001,
@@ -140,8 +132,6 @@ struct siop_data {
 
 static int ss_flags = 0;
 
-static int input_device_number;
-
 /* Uevent */
 static struct udev *udev = NULL;
 /* Kernel Uevent */
@@ -151,7 +141,6 @@ static int ufd = -1;
 static int hdmi_status = 0;
 
 enum udev_subsystem_type {
-	UDEV_INPUT,
 	UDEV_PLATFORM,
 	UDEV_SWITCH,
 };
@@ -161,7 +150,6 @@ static const struct udev_subsystem {
 	const char *str;
 	const char *devtype;
 } udev_subsystems[] = {
-	{ UDEV_INPUT,			INPUT_SUBSYSTEM,		NULL },
 	{ UDEV_PLATFORM,		PLATFORM_SUBSYSTEM,		NULL },
 	{ UDEV_SWITCH,			SWITCH_SUBSYSTEM,		NULL },
 };
@@ -725,7 +713,6 @@ static int booting_done(void *data)
 	_I("booting done");
 
 	/* set initial state for devices */
-	input_device_number = 0;
 	cradle_chgdet_cb(NULL);
 	keyboard_chgdet_cb(NULL);
 	hdmi_chgdet_cb(NULL);
@@ -764,18 +751,6 @@ static Eina_Bool uevent_kernel_control_cb(void *data, Ecore_Fd_Handler *fd_handl
 	devpath = udev_device_get_devpath(dev);
 
 	switch (udev_subsystems[i].type) {
-	case UDEV_INPUT:
-		/* check new input device */
-		if (!fnmatch(INPUT_PATH, devpath, 0)) {
-			action = udev_device_get_action(dev);
-			devnode = udev_device_get_devnode(dev);
-			if (!strcmp(action, UDEV_ADD))
-				device_notify(DEVICE_NOTIFIER_INPUT_ADD, (void *)devnode);
-			else if (!strcmp(action, UDEV_REMOVE))
-				device_notify(DEVICE_NOTIFIER_INPUT_REMOVE, (void *)devnode);
-			goto out;
-		}
-		break;
 	case UDEV_SWITCH:
 		env_name = udev_device_get_property_value(dev, "SWITCH_NAME");
 		env_value = udev_device_get_property_value(dev, "SWITCH_STATE");

@@ -1313,29 +1313,6 @@ void pm_history_print(int fd, int count)
 }
 #endif
 
-/* logging indev_list for debug */
-void print_dev_list(int fd)
-{
-	int i;
-	unsigned int total = 0;
-	indev *tmp;
-
-	total = eina_list_count(indev_list);
-	_I("***** total list : %d *****", total);
-	for (i = 0; i < total; i++) {
-		tmp = (indev*)eina_list_nth(indev_list, i);
-		_I("* %d | path:%s, fd:%d, dev_fd:%d",
-			i, tmp->dev_path, tmp->fd, tmp->dev_fd);
-		if (fd >= 0) {
-			char buf[255];
-			snprintf(buf, sizeof(buf), " %2d| path:%s, fd:%d, dev_fd:%d\n",
-				i, tmp->dev_path, tmp->fd, tmp->dev_fd);
-			write(fd, buf, strlen(buf));
-		}
-	}
-	_I("***************************\n");
-}
-
 void print_info(int fd)
 {
 	int s_index = 0;
@@ -1385,8 +1362,6 @@ void print_info(int fd)
 			t = t->next;
 		}
 	}
-
-	print_dev_list(fd);
 
 	if (standby_mode) {
 		snprintf(buf, sizeof(buf), "\n\nstandby mode is on\n");
@@ -2092,32 +2067,6 @@ static const char *errMSG[INIT_END] = {
 	[INIT_DBUS] = "d-bus init error",
 };
 
-static int input_action(char* input_act, char* input_path)
-{
-	int ret = 0;
-	Eina_List *l = NULL;
-	Eina_List *l_next = NULL;
-	indev *data = NULL;
-
-	if (!strcmp("add", input_act)) {
-		_I("add input path : %s", input_path);
-		ret = init_pm_poll_input(poll_callback, input_path);
-	} else if (!strcmp("remove", input_act)) {
-		EINA_LIST_FOREACH_SAFE(indev_list, l, l_next, data)
-			if (!strcmp(input_path, data->dev_path)) {
-				_I("remove %s", input_path);
-				ecore_main_fd_handler_del(data->dev_fd);
-				close(data->fd);
-				free(data->dev_path);
-				free(data);
-				indev_list = eina_list_remove_list(indev_list, l);
-			}
-	} else {
-		ret = -EINVAL;
-	}
-	return ret;
-}
-
 int set_lcd_timeout(int on, int dim, int holdkey_block, char *name)
 {
 	if (on == 0 && dim == 0) {
@@ -2220,30 +2169,6 @@ static int hall_ic_open(void *data)
 	return 0;
 }
 
-static int input_device_add(void *data)
-{
-	char *path = (char *)data;
-
-	if (!path)
-		return -EINVAL;
-
-	input_action(UDEV_ADD, path);
-
-	return 0;
-}
-
-static int input_device_remove(void *data)
-{
-	char *path = (char *)data;
-
-	if (!path)
-		return -EINVAL;
-
-	input_action(UDEV_REMOVE, path);
-
-	return 0;
-}
-
 static int booting_done(void *data)
 {
 	static bool done = false;
@@ -2340,8 +2265,6 @@ static void display_init(void *data)
 	signal(SIGHUP, sig_hup);
 
 	power_saving_func = default_saving_mode;
-	/* noti init for new input device like bt mouse */
-	indev_list = NULL;
 
 	/* load configutation */
 	ret = config_parse(DISPLAY_CONF_FILE, display_load_config, &display_conf);
@@ -2349,8 +2272,6 @@ static void display_init(void *data)
 		_W("Failed to load %s, %d Use default value!",
 		    DISPLAY_CONF_FILE, ret);
 
-	register_notifier(DEVICE_NOTIFIER_INPUT_ADD, input_device_add);
-	register_notifier(DEVICE_NOTIFIER_INPUT_REMOVE, input_device_remove);
 	register_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
 	register_notifier(DEVICE_NOTIFIER_HDMI, hdmi_changed);
 
@@ -2364,8 +2285,8 @@ static void display_init(void *data)
 			ret = init_sysfs(flags);
 			break;
 		case INIT_POLL:
-			_I("poll init");
-			ret = init_pm_poll(poll_callback);
+			_I("input init");
+			ret = init_input(poll_callback);
 			break;
 		case INIT_DBUS:
 			_I("dbus init");
@@ -2442,15 +2363,11 @@ static void display_exit(void *data)
 			exit_sysfs();
 			break;
 		case INIT_POLL:
-			unregister_notifier(DEVICE_NOTIFIER_INPUT_ADD,
-			    input_device_add);
-		        unregister_notifier(DEVICE_NOTIFIER_INPUT_REMOVE,
-			    input_device_remove);
 			unregister_notifier(DEVICE_NOTIFIER_BOOTING_DONE,
 			    booting_done);
 			unregister_notifier(DEVICE_NOTIFIER_HDMI, hdmi_changed);
 
-			exit_pm_poll();
+			exit_input();
 			break;
 		}
 	}
