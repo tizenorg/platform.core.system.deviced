@@ -46,6 +46,7 @@ BuildRequires:	pkgconfig(dbus-glib-1)
 BuildRequires:  pkgconfig(libtzplatform-config)
 BuildRequires:  pkgconfig(notification)
 BuildRequires:  pkgconfig(hwcommon)
+BuildRequires:  pkgconfig(libinput)
 
 %{?systemd_requires}
 Requires(preun): /usr/bin/systemctl

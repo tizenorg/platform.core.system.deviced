@@ -21,10 +21,9 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdbool.h>
-
+#include <assert.h>
 #include <vconf.h>
 #include <Ecore.h>
-
 #include "util.h"
 #include "core.h"
 #include "poll.h"
@@ -134,8 +133,8 @@ static void longkey_pressed()
 		/* change state - LCD on */
 		recv_data.pid = getpid();
 		recv_data.cond = 0x100;
-		(*g_pm_callback)(PM_CONTROL_EVENT, &recv_data);
-		(*g_pm_callback)(INPUT_POLL_EVENT, NULL);
+		(*pm_callback)(PM_CONTROL_EVENT, &recv_data);
+		(*pm_callback)(INPUT_POLL_EVENT, NULL);
 	}
 
 	if (!display_has_caps(caps, DISPLAY_CAPA_LCDOFF)) {
@@ -344,7 +343,7 @@ static int lcdoff_powerkey(void)
 			update_lcdoff_source(VCONFKEY_PM_LCDOFF_BY_POWERKEY);
 			recv_data.pid = getpid();
 			recv_data.cond = 0x400;
-			(*g_pm_callback)(PM_CONTROL_EVENT, &recv_data);
+			(*pm_callback)(PM_CONTROL_EVENT, &recv_data);
 		}
 	} else {
 		ignore = false;
@@ -469,7 +468,7 @@ static int process_screenlock_key(struct input_event *pinput)
 		/* LCD off forcly */
 		recv_data.pid = -1;
 		recv_data.cond = 0x400;
-		(*g_pm_callback)(PM_CONTROL_EVENT, &recv_data);
+		(*pm_callback)(PM_CONTROL_EVENT, &recv_data);
 	}
 
 	return true;
@@ -599,8 +598,6 @@ static int check_key(struct input_event *pinput, int fd)
 		if (current_state_in_on()) {
 			process_hardkey_backlight(pinput);
 			ignore = false;
-		} else if (!check_pre_install(fd)) {
-			ignore = false;
 		}
 		break;
 	case KEY_VOLUMEUP:
@@ -641,72 +638,74 @@ static int check_key(struct input_event *pinput, int fd)
 	return ignore;
 }
 
-static int check_key_filter(int length, char buf[], int fd)
+static int check_key_filter(void *data, int fd)
 {
-	struct input_event *pinput;
+	struct input_event *pinput = data;
 	int ignore = true;
-	int idx = 0;
 	static int old_fd, code, value;
 
-	do {
-		pinput = (struct input_event *)&buf[idx];
-		switch (pinput->type) {
-		case EV_KEY:
-			if (pinput->code == BTN_TOUCH &&
-			    pinput->value == KEY_RELEASED)
-				touch_pressed = false;
-			/*
-			 * Normally, touch press/release events don't occur
-			 * in lcd off state. But touch release events can occur
-			 * in the state abnormally. Then touch events are ignored
-			 * when lcd is off state.
-			 */
-			if (pinput->code == BTN_TOUCH && !current_state_in_on())
-				break;
-			if (get_standby_state() && pinput->code != KEY_POWER) {
-				_D("standby mode,key ignored except powerkey");
-				break;
-			}
-			if (pinput->code == code && pinput->value == value) {
-				_E("Same key(%d, %d) is polled [%d,%d]",
-				    code, value, old_fd, fd);
-			}
-			old_fd = fd;
-			code = pinput->code;
-			value = pinput->value;
+//	assert(pinput);
+	if (!pinput) {
+		_E("pinput is NULL");
+		return 0;
+	}
 
-			ignore = check_key(pinput, fd);
-			restore_custom_brightness();
-
+	switch (pinput->type) {
+	case EV_KEY:
+		if (pinput->code == BTN_TOUCH &&
+			pinput->value == KEY_RELEASED)
+			touch_pressed = false;
+		/*
+		 * Normally, touch press/release events don't occur
+		 * in lcd off state. But touch release events can occur
+		 * in the state abnormally. Then touch events are ignored
+		 * when lcd is off state.
+		 */
+		if (pinput->code == BTN_TOUCH && !current_state_in_on())
 			break;
-		case EV_REL:
-			if (get_standby_state())
-				break;
-			ignore = false;
-			break;
-		case EV_ABS:
-			if (get_standby_state())
-				break;
-			if (current_state_in_on())
-				ignore = false;
-			restore_custom_brightness();
-
-			touch_pressed =
-			    (pinput->value == TOUCH_RELEASE ? false : true);
-			break;
-		case EV_SW:
-			if (!get_glove_state || !switch_glove_key)
-				break;
-			if (pinput->code == SW_GLOVE &&
-			    get_glove_state() == GLOVE_MODE) {
-				switch_glove_key(pinput->value);
-			}
+		if (get_standby_state() && pinput->code != KEY_POWER) {
+			_D("standby mode,key ignored except powerkey");
 			break;
 		}
-		idx += sizeof(struct input_event);
-		if (ignore == true && length <= idx)
-			return 1;
-	} while (length > idx);
+		if (pinput->code == code && pinput->value == value) {
+			_E("Same key(%d, %d) is polled [%d,%d]",
+				code, value, old_fd, fd);
+		}
+		old_fd = fd;
+		code = pinput->code;
+		value = pinput->value;
+
+		ignore = check_key(pinput, fd);
+		restore_custom_brightness();
+
+		break;
+	case EV_REL:
+		if (get_standby_state())
+			break;
+		ignore = false;
+		break;
+	case EV_ABS:
+		if (get_standby_state())
+			break;
+		if (current_state_in_on())
+			ignore = false;
+		restore_custom_brightness();
+
+		touch_pressed =
+			(pinput->value == TOUCH_RELEASE ? false : true);
+		break;
+	case EV_SW:
+		if (!get_glove_state || !switch_glove_key)
+			break;
+		if (pinput->code == SW_GLOVE &&
+			get_glove_state() == GLOVE_MODE) {
+			switch_glove_key(pinput->value);
+		}
+		break;
+	}
+
+	if (ignore)
+		return 1;
 
 	return 0;
 }

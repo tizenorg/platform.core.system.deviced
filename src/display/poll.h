@@ -21,10 +21,6 @@
  * @file	poll.h
  * @brief	Power Manager input device poll implementation
  *
- * This file includes the input device poll implementation.
- * Default input devices are /dev/event0 and /dev/event1
- * User can use "PM_INPUT_DEV" for setting another input device poll in an environment file (/etc/profile).
- * (ex: PM_INPUT_DEV=/dev/event0:/dev/event1:/dev/event5 )
  */
 
 #ifndef __PM_POLL_H__
@@ -103,21 +99,11 @@ typedef struct {
 	unsigned int timeout2;
 } PMMsg;
 
-typedef struct {
-	char *dev_path;
-	int fd;
-	Ecore_Fd_Handler *dev_fd;
-	int pre_install;
-} indev;
-
-Eina_List *indev_list;
-
 PMMsg recv_data;
-int (*g_pm_callback) (int, PMMsg *);
+int (*pm_callback) (int, PMMsg *);
 
-extern int init_pm_poll(int (*pm_callback) (int, PMMsg *));
-extern int exit_pm_poll();
-extern int init_pm_poll_input(int (*pm_callback)(int , PMMsg * ), const char *path);
+int init_input(int (*pm_callback) (int, PMMsg *));
+int exit_input(void);
 
 extern int pm_lock_internal(pid_t pid, int s_bits, int flag, int timeout);
 extern int pm_unlock_internal(pid_t pid, int s_bits, int flag);
