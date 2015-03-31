@@ -257,7 +257,7 @@ vconftool set -t int memory/sysman/hdmi 0 -i
 vconftool set -t int memory/sysman/stime_changed 0 -i
 
 #db type vconf key init
-vconftool set -t int db/sysman/mmc_dev_changed 0 -i
+vconftool set -t int db/sysman/mmc_dev_changed 0
 
 vconftool set -t int memory/pm/state 0 -i -g "$users_gid"
 vconftool set -t int memory/pm/battery_timetofull -1 -i
