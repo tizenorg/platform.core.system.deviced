@@ -64,6 +64,14 @@ Group:      main
 %description deviced
 deviced daemon.
 
+%package tools
+Summary:  deviced tools
+Group:    System/Utilities
+Requires: %{name} = %{version}-%{release}
+
+%description tools
+Deviced helper programs
+
 %package -n libdeviced
 Summary:    Deviced library
 Group:      Development/Libraries
@@ -304,9 +312,7 @@ systemctl daemon-reload
 %config %{_sysconfdir}/dbus-1/system.d/deviced.conf
 %{_bindir}/deviced-pre.sh
 %{_bindir}/deviced
-%{_bindir}/devicectl
 %{_bindir}/movi_format.sh
-%{_bindir}/direct_set_debug.sh
 %{_sysconfdir}/deviced/usb-setting.conf
 %{_sysconfdir}/deviced/usb-operation.conf
 %{_bindir}/mmc-smack-label
@@ -321,6 +327,11 @@ systemctl daemon-reload
 %{_unitdir}/deviced.socket
 %{_unitdir}/deviced-pre.service
 %{_unitdir}/zbooting-done.service
+
+%files tools
+%manifest %{name}.manifest
+%{_bindir}/devicectl
+%{_bindir}/direct_set_debug.sh
 
 %files -n libdeviced
 %defattr(-,root,root,-)
