@@ -27,8 +27,6 @@ enum dock_type {
 	DOCK_SOUND	= 7,
 };
 
-int get_usb_state_direct(void);
-
 void sync_cradle_status(void);
 
 void internal_pm_change_state(unsigned int s_bits);

@@ -5,7 +5,6 @@
 #These options are DEACTIVATED by default.
 %bcond_with x
 %bcond_with buzzer
-%bcond_with extcon
 %bcond_with hall
 %bcond_with sim
 %bcond_with usb
@@ -199,9 +198,6 @@ export CFLAGS+=" -DX11_SUPPORT"
 %endif
 %if %{with display}
 	-DTIZEN_DISPLAY:BOOL=ON \
-%endif
-%if %{with extcon}
-	-DTIZEN_EXTCON:BOOL=ON \
 %endif
 %if %{with hall}
 	-DTIZEN_HALL:BOOL=ON \

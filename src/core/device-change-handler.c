@@ -53,10 +53,6 @@
 #define TVOUT_FLAG			0x00000001
 
 #define MOVINAND_MOUNT_POINT		"/opt/media"
-#define BUFF_MAX		255
-
-#define USB_STATE_PLATFORM_PATH "/sys/devices/platform/jack/usb_online"
-#define USB_STATE_SWITCH_PATH "/sys/devices/virtual/switch/usb_cable/state"
 
 #define HDMI_NOT_SUPPORTED	(-1)
 #ifdef ENABLE_EDBUS_USE
@@ -76,17 +72,6 @@ enum snd_jack_types {
 
 #define CHANGE_ACTION		"change"
 #define ENV_FILTER		"CHGDET"
-#define USB_NAME		"usb"
-#define USB_NAME_LEN		3
-
-#define CHARGER_NAME 		"charger"
-#define CHARGER_NAME_LEN	7
-
-#define EARJACK_NAME 		"earjack"
-#define EARJACK_NAME_LEN	7
-
-#define EARKEY_NAME 		"earkey"
-#define EARKEY_NAME_LEN	6
 
 #define TVOUT_NAME 		"tvout"
 #define TVOUT_NAME_LEN		5
@@ -105,8 +90,6 @@ enum snd_jack_types {
 
 #define KEYBOARD_NAME 		"keyboard"
 #define KEYBOARD_NAME_LEN	8
-
-#define SWITCH_DEVICE_USB 	"usb_cable"
 
 #define METHOD_GET_HDMI		"GetHDMI"
 #define METHOD_GET_HDCP		"GetHDCP"
@@ -155,59 +138,6 @@ static const struct udev_subsystem {
 };
 
 static dd_list *udev_event_list;
-
-int get_usb_state_direct(void)
-{
-	FILE *fp;
-	char str[2];
-	int state;
-	char *path;
-
-	if (access(USB_STATE_PLATFORM_PATH, F_OK) == 0)
-		path = USB_STATE_PLATFORM_PATH;
-	else if (access(USB_STATE_SWITCH_PATH, F_OK) == 0)
-		path = USB_STATE_SWITCH_PATH;
-	else {
-		_E("Cannot get direct path");
-		return -ENOENT;
-	}
-
-	fp = fopen(path, "r");
-	if (!fp) {
-		_E("Cannot open jack node");
-		return -ENOMEM;
-	}
-
-	if (!fgets(str, sizeof(str), fp)) {
-		_E("cannot get string from jack node");
-		fclose(fp);
-		return -ENOMEM;
-	}
-
-	fclose(fp);
-
-	return atoi(str);
-}
-
-static void usb_chgdet_cb(void *data)
-{
-	int val = -1;
-	int ret = 0;
-	char params[BUFF_MAX];
-
-	if (data == NULL)
-		ret = device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_USB_ONLINE, &val);
-	else
-		val = *(int *)data;
-	if (ret == 0) {
-		if (val < 0)
-			val = get_usb_state_direct();
-
-		_I("jack - usb changed %d",val);
-	} else {
-		_E("fail to get usb_online status");
-	}
-}
 
 static int display_changed(void *data)
 {
@@ -309,24 +239,6 @@ void sync_cradle_status(void)
 		return;
 	if ((val != 0 && status == 0) || (val == 0 && status != 0))
 		cradle_chgdet_cb(NULL);
-}
-
-static void earkey_chgdet_cb(void *data)
-{
-	int val;
-	int ret = 0;
-
-	if (data)
-		val = *(int *)data;
-	else {
-		ret = device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_EARKEY_ONLINE, &val);
-		if (ret != 0) {
-			_E("failed to get status");
-			return;
-		}
-	}
-	_I("jack - earkey changed %d", val);
-	vconf_set_int(VCONFKEY_SYSMAN_EARJACKKEY, val);
 }
 
 static void tvout_chgdet_cb(void *data)
@@ -531,15 +443,6 @@ static void cb_xxxxx_signaled(void *data, DBusMessage * msg)
 }
 #endif				/* ENABLE_EDBUS_USE */
 
-static int earjack_execute(void *data)
-{
-	static const struct device_ops *ops = NULL;
-
-	FIND_DEVICE_INT(ops, "earjack");
-
-	return ops->execute(data);
-}
-
 static int siop_execute(const char *siop, const char *rear)
 {
 	static const struct device_ops *ops = NULL;
@@ -572,13 +475,7 @@ static int changed_device(const char *name, const char *value)
 		state = &val;
 	}
 
-	if (strncmp(name, USB_NAME, USB_NAME_LEN) == 0)
-		usb_chgdet_cb((void *)state);
-	else if (strncmp(name, EARJACK_NAME, EARJACK_NAME_LEN) == 0)
-		earjack_execute((void *)state);
-	else if (strncmp(name, EARKEY_NAME, EARKEY_NAME_LEN) == 0)
-		earkey_chgdet_cb((void *)state);
-	else if (strncmp(name, TVOUT_NAME, TVOUT_NAME_LEN) == 0)
+	if (strncmp(name, TVOUT_NAME, TVOUT_NAME_LEN) == 0)
 		tvout_chgdet_cb((void *)state);
 	else if (strncmp(name, HDMI_NAME, HDMI_NAME_LEN) == 0)
 		hdmi_chgdet_cb((void *)state);

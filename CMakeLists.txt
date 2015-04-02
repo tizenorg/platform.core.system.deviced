@@ -33,6 +33,7 @@ SET(SRCS
 	src/core/log.c
 	src/core/main.c
 	src/core/sig-handler.c
+	src/extcon/earjack.c
 	src/extcon/extcon.c
 	src/gpio/gpio.c
 	src/power/power-handler.c
@@ -58,14 +59,6 @@ SET(SRCS ${SRCS}
 	src/battery/lowbat-handler.c
 	src/battery/power-supply.c
    )
-
-IF(TIZEN_EXTCON)
-SET(SRCS ${SRCS}
-	src/earjack/earjack.c
-	src/ta/ta-handler.c
-	src/usb/usb-handler.c
-   )
-ENDIF(TIZEN_EXTCON)
 
 IF(TIZEN_HALL)
 SET(SRCS ${SRCS}
