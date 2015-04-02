@@ -156,108 +156,6 @@ static const struct udev_subsystem {
 
 static dd_list *udev_event_list;
 
-static struct extcon_device {
-	const enum extcon_type type;
-	const char *str;
-	int fd;
-	int count;
-} extcon_devices[] = {
-	{ EXTCON_TA, "/csa/factory/batt_cable_count", 0, 0},
-	{ EXTCON_EARJACK, "/csa/factory/earjack_count", 0, 0},
-};
-
-int extcon_set_count(int index)
-{
-	int r;
-	int ret = 0;
-	char buf[BUFF_MAX];
-
-	extcon_devices[index].count++;
-
-	if (extcon_devices[index].fd < 0) {
-		_E("cannot open file(%s)", extcon_devices[index].str);
-		return -ENOENT;
-	}
-	lseek(extcon_devices[index].fd, 0, SEEK_SET);
-	_I("ext(%d) count %d", index, extcon_devices[index].count);
-	snprintf(buf, sizeof(buf), "%d", extcon_devices[index].count);
-
-	r = write(extcon_devices[index].fd, buf, strlen(buf));
-	if (r < 0)
-		ret = -EIO;
-	return ret;
-}
-
-static int extcon_get_count(int index)
-{
-	int fd;
-	int r;
-	int ret = 0;
-	char buf[BUFF_MAX];
-
-	fd = open(extcon_devices[index].str, O_RDWR);
-	if (fd < 0)
-		return -ENOENT;
-
-	r = read(fd, buf, BUFF_MAX);
-	if ((r >= 0) && (r < BUFF_MAX))
-		buf[r] = '\0';
-	else
-		ret = -EIO;
-
-	if (ret != 0) {
-		close(fd);
-		return ret;
-	}
-	extcon_devices[index].fd = fd;
-	extcon_devices[index].count = atoi(buf);
-	_I("get extcon(%d:%x) count %d",
-		index, extcon_devices[index].fd, extcon_devices[index].count);
-
-	return ret;
-}
-
-static int extcon_create_count(int index)
-{
-	int fd;
-	int r;
-	int ret = 0;
-	char buf[BUFF_MAX];
-	fd = open(extcon_devices[index].str, O_RDWR | O_CREAT, 0644);
-	if (fd < 0) {
-		_E("cannot open file(%s)", extcon_devices[index].str);
-		return -ENOENT;
-	}
-	snprintf(buf, sizeof(buf), "%d", extcon_devices[index].count);
-	r = write(fd, buf, strlen(buf));
-	if (r < 0)
-		ret = -EIO;
-
-	if (ret != 0) {
-		close(fd);
-		_E("cannot write file(%s)", extcon_devices[index].str);
-		return ret;
-	}
-	extcon_devices[index].fd = fd;
-	_I("create extcon(%d:%x) %s",
-		index, extcon_devices[index].fd, extcon_devices[index].str);
-	return ret;
-}
-
-static int extcon_count_init(void)
-{
-	int i;
-	int ret = 0;
-	for (i = 0; i < ARRAY_SIZE(extcon_devices); i++) {
-		if (extcon_get_count(i) >= 0)
-			continue;
-		ret = extcon_create_count(i);
-		if (ret < 0)
-			break;
-	}
-	return ret;
-}
-
 int get_usb_state_direct(void)
 {
 	FILE *fp;
@@ -1155,8 +1053,6 @@ static void device_change_init(void *data)
 {
 	int ret;
 
-	if (extcon_count_init() != 0)
-		_E("fail to init extcon files");
 	register_notifier(DEVICE_NOTIFIER_POWEROFF, device_change_poweroff);
 	register_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
 	register_notifier(DEVICE_NOTIFIER_LCD, display_changed);
@@ -1183,16 +1079,9 @@ static void device_change_init(void *data)
 
 static void device_change_exit(void *data)
 {
-	int i;
 	unregister_notifier(DEVICE_NOTIFIER_POWEROFF, device_change_poweroff);
 	unregister_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
 	unregister_notifier(DEVICE_NOTIFIER_LCD, display_changed);
-	for (i = 0; i < ARRAY_SIZE(extcon_devices); i++) {
-		if (extcon_devices[i].fd <= 0)
-			continue;
-		close(extcon_devices[i].fd);
-	}
-
 }
 
 static const struct device_ops change_device_ops = {

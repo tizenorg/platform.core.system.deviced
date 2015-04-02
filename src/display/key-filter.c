@@ -70,9 +70,6 @@
 #define SIGNAL_LCDON_BY_POWERKEY	"LCDOnByPowerkey"
 #define SIGNAL_LCDOFF_BY_POWERKEY	"LCDOffByPowerkey"
 
-#define NORMAL_POWER(val)		(val == 0)
-#define KEY_TEST_MODE_POWER(val)	(val == 2)
-
 #define TOUCH_RELEASE		(-1)
 
 #ifndef VCONFKEY_SETAPPL_TOUCHKEY_LIGHT_DURATION
@@ -142,17 +139,7 @@ static void longkey_pressed()
 		return;
 	}
 
-	ret = vconf_get_int(VCONFKEY_TESTMODE_POWER_OFF_POPUP, &val);
-	if (ret != 0 || NORMAL_POWER(val)) {
-		opt = PWROFF_POPUP_ACT;
-		goto entry_call;
-	}
-	if (KEY_TEST_MODE_POWER(val)) {
-		_I("skip power off control during factory key test mode");
-		return;
-	}
 	opt = POWEROFF_ACT;
-entry_call:
 	power_execute(opt);
 }
 
