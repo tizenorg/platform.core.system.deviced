@@ -20,6 +20,8 @@
 #ifndef __EXTCON_H__
 #define __EXTCON_H__
 
+#include "core/common.h"
+
 /**
  * Extcon cable name is shared with kernel extcon class.
  * So do not change below strings.
