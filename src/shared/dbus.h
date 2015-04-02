@@ -109,12 +109,6 @@
 /* Time service */
 #define DEVICED_PATH_TIME                DEVICED_OBJECT_PATH"/Time"
 #define DEVICED_INTERFACE_TIME           DEVICED_INTERFACE_NAME".Time"
-/* Board service */
-#define DEVICED_PATH_BOARD                DEVICED_OBJECT_PATH"/Board"
-#define DEVICED_INTERFACE_BOARD           DEVICED_INTERFACE_NAME".Board"
-/* Testmode service */
-#define DEVICED_PATH_TESTMODE               DEVICED_OBJECT_PATH"/Testmode"
-#define DEVICED_INTERFACE_TESTMODE           DEVICED_INTERFACE_NAME".Testmode"
 
 /* Apps service */
 #define DEVICED_PATH_APPS               DEVICED_OBJECT_PATH"/Apps"

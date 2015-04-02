@@ -77,10 +77,8 @@ static void earjack_chgdet_cb(void *data)
 	_I("jack - earjack changed %d", val);
 	vconf_set_int(VCONFKEY_SYSMAN_EARJACK, val);
 	earjack_send_broadcast(val);
-	if (CONNECTED(val)) {
-		extcon_set_count(EXTCON_EARJACK);
+	if (val != 0)
 		internal_pm_change_state(LCD_NORMAL);
-	}
 }
 
 static DBusMessage *dbus_get_status(E_DBus_Object *obj, DBusMessage *msg)
@@ -107,11 +105,8 @@ static void earjack_init(void *data)
 {
 	int ret, val;
 
-	if (device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_EARJACK_ONLINE, &val) == 0) {
-		if (CONNECTED(val))
-			extcon_set_count(EXTCON_EARJACK);
+	if (device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_EARJACK_ONLINE, &val) == 0)
 		vconf_set_int(VCONFKEY_SYSMAN_EARJACK, val);
-	}
 
 	/* init dbus interface */
 	ret = register_edbus_method(DEVICED_PATH_SYSNOTI, edbus_methods, ARRAY_SIZE(edbus_methods));

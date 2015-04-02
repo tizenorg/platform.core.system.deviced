@@ -22,19 +22,10 @@
 
 #include "common.h"
 
-enum extcon_type {
-	EXTCON_TA = 0,
-	EXTCON_EARJACK,
-};
-
 enum dock_type {
 	DOCK_NONE	= 0,
 	DOCK_SOUND	= 7,
 };
-
-#define CONNECTED(val) ((val) != 0)
-
-int extcon_set_count(int index);
 
 int get_usb_state_direct(void);
 

@@ -485,7 +485,6 @@ static void check_online(void)
 		old_online = VCONFKEY_SYSMAN_CHARGER_CONNECTED;
 		vconf_set_int(VCONFKEY_SYSMAN_CHARGER_STATUS, old_online);
 		power_supply_broadcast(CHARGER_STATUS_SIGNAL, old_online);
-		extcon_set_count(EXTCON_TA);
 		check_power_supply(old_online);
 	} else if (battery.online <= POWER_SUPPLY_TYPE_BATTERY &&
 	    old_online == VCONFKEY_SYSMAN_CHARGER_CONNECTED) {
