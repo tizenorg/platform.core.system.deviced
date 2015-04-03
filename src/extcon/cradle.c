@@ -23,7 +23,7 @@
 #include "core/log.h"
 #include "core/device-notifier.h"
 #include "core/edbus-handler.h"
-#include "core/device-handler.h"
+#include "core/udev.h"
 #include "display/core.h"
 #include "extcon/extcon.h"
 

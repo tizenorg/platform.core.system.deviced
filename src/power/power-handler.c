@@ -35,7 +35,6 @@
 #include "dd-deviced.h"
 #include "core/log.h"
 #include "core/launch.h"
-#include "core/device-handler.h"
 #include "core/device-notifier.h"
 #include "core/common.h"
 #include "core/devices.h"

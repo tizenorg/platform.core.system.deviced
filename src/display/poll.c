@@ -24,7 +24,6 @@
  */
 
 #include <stdio.h>
-#include "core/device-handler.h"
 #include "util.h"
 #include "core.h"
 #include "poll.h"

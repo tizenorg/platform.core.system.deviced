@@ -23,7 +23,6 @@
 #include <Ecore.h>
 #include <device-node.h>
 #include "core/devices.h"
-#include "core/device-handler.h"
 #include "core/device-notifier.h"
 #include "core/udev.h"
 #include "core/log.h"
@@ -85,7 +84,7 @@ static void pm_check_and_change(int bInserted)
 	static int old = -1;
 	if (old != bInserted) {
 		old = bInserted;
-		internal_pm_change_state(LCD_NORMAL);
+		pm_change_internal(getpid(), LCD_NORMAL);
 	}
 }
 

@@ -23,9 +23,7 @@
 #include <libudev.h>
 
 #define UDEV			"kernel"
-#define UDEV_SUBSYSTEM		"SUBSYSTEM"
 
-#define UDEV_ACTION		"ACTION"
 #define UDEV_CHANGE		"change"
 #define UDEV_ADD		"add"
 #define UDEV_REMOVE		"remove"
@@ -35,9 +33,6 @@
 
 #define UDEV_MONITOR_SIZE	(10*1024)
 #define UDEV_MONITOR_SIZE_LARGE (128*1024*1024)
-
-/* platform */
-#define PLATFORM_SUBSYSTEM	"platform"
 
 /* battery device */
 #define POWER_SUBSYSTEM		"power_supply"
@@ -52,14 +47,8 @@
 #define CHARGE_STATUS		"POWER_SUPPLY_STATUS"
 #define CHARGE_ONLINE		"POWER_SUPPLY_ONLINE"
 
-/* switch device */
-#define SWITCH_SUBSYSTEM	"switch"
-
 /* extcon */
 #define EXTCON_SUBSYSTEM	"extcon"
-
-/* host device */
-#define HOST_SUBSYSTEM		"host_notify"
 
 /* usb */
 #define USB_SUBSYSTEM           "usb"
@@ -80,6 +69,11 @@ enum {
 	 POWER_SUPPLY_TYPE_UPS,
 	 POWER_SUPPLY_TYPE_MAINS,
 	 POWER_SUPPLY_TYPE_USB,
+};
+
+enum dock_type {
+	DOCK_NONE   = 0,
+	DOCK_SOUND  = 7,
 };
 
 struct uevent_handler {

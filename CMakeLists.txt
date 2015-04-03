@@ -24,7 +24,6 @@ SET(SRCS
 	src/core/common.c
 	src/core/config-parser.c
 	src/control/control.c
-	src/core/device-change-handler.c
 	src/core/device-notifier.c
 	src/core/devices.c
 	src/core/edbus-handler.c
@@ -33,6 +32,7 @@ SET(SRCS
 	src/core/log.c
 	src/core/main.c
 	src/core/sig-handler.c
+	src/core/udev.c
 	src/extcon/cradle.c
 	src/extcon/earjack.c
 	src/extcon/extcon.c
