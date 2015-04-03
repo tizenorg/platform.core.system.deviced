@@ -34,7 +34,6 @@
 #include "core/devices.h"
 #include "core/device-notifier.h"
 #include "core/edbus-handler.h"
-#include "core/device-handler.h"
 #include "power/power-handler.h"
 
 #include <linux/input.h>

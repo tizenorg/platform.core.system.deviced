@@ -45,7 +45,6 @@
 #include "display-ops.h"
 #include "core/devices.h"
 #include "core/device-notifier.h"
-#include "core/device-handler.h"
 #include "core/udev.h"
 #include "core/list.h"
 #include "core/common.h"

@@ -50,7 +50,7 @@ static int earjack_update(int status)
 	vconf_set_int(VCONFKEY_SYSMAN_EARJACK, status);
 	earjack_send_broadcast(status);
 	if (status != 0)
-		internal_pm_change_state(LCD_NORMAL);
+		pm_change_internal(getpid(), LCD_NORMAL);
 }
 
 static struct extcon_ops earjack_extcon_ops = {
