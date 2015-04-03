@@ -85,12 +85,15 @@ static int extcon_update(const char *name, const char *value)
 		return -EINVAL;
 
 	dev = find_extcon(name);
-	if (!dev) {
-		_E("fail to find matched extcon device : name(%s)", name);
+	if (!dev)
 		return -EINVAL;
-	}
 
 	status = atoi(value);
+
+	/* Do not invoke update func. if it's the same value */
+	if (dev->status == status)
+		return 0;
+
 	_I("Changed %s device : %d -> %d", name, dev->status, status);
 
 	dev->status = status;

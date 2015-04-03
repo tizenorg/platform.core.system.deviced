@@ -206,4 +206,4 @@ struct extcon_ops extcon_usb_ops = {
 	.update = usb_state_changed,
 };
 
-EXTCON_OPS_REGISTER(&extcon_usb_ops)
+EXTCON_OPS_REGISTER(extcon_usb_ops)
