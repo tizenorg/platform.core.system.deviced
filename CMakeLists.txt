@@ -71,12 +71,8 @@ SET(SRCS ${SRCS}
 	src/mmc/config.c
 	src/mmc/mmc-handler.c
 	src/mmc/vfat.c
-)
-IF(USE_EMULATOR)
-SET(SRCS ${SRCS}
 	src/mmc/ext4.c
 	)
-ENDIF(USE_EMULATOR)
 
 IF(TIZEN_SIM)
 SET(SRCS ${SRCS}
