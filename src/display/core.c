@@ -51,6 +51,7 @@
 #include "core/common.h"
 #include "core/edbus-handler.h"
 #include "core/config-parser.h"
+#include "extcon/extcon.h"
 #include "dd-display.h"
 
 #define PM_STATE_LOG_FILE		"/var/log/pm_state.log"
@@ -95,7 +96,6 @@ static int (*basic_action) (int);
 static bool hallic_open = true;
 static Ecore_Timer *lock_timeout_id;
 static int lock_screen_timeout = LOCK_SCREEN_INPUT_TIMEOUT;
-static int hdmi_state = 0;
 static int tts_state = false;
 static struct timeval lcdon_tv;
 static int lcd_paneloff_mode = false;
@@ -1435,6 +1435,7 @@ static void sig_usr(int signo)
 int check_lcdoff_direct(void)
 {
 	int ret, lock, cradle;
+	int hdmi_state;
 
 	if (pm_old_state != S_NORMAL)
 		return false;
@@ -1449,6 +1450,7 @@ int check_lcdoff_direct(void)
 	if (lock != VCONFKEY_IDLE_LOCK && hallic_open)
 		return false;
 
+	hdmi_state = extcon_get_status(EXTCON_CABLE_HDMI);
 	if (hdmi_state)
 		return false;
 
@@ -2140,19 +2142,6 @@ int reset_lcd_timeout(char *name, enum watch_id id)
 	return 0;
 }
 
-int get_hdmi_state(void)
-{
-	return hdmi_state;
-}
-
-static int hdmi_changed(void *data)
-{
-	if (data)
-		hdmi_state = *(int*)data;
-
-	return 0;
-}
-
 static int hall_ic_open(void *data)
 {
 	int open;
@@ -2273,7 +2262,6 @@ static void display_init(void *data)
 		    DISPLAY_CONF_FILE, ret);
 
 	register_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
-	register_notifier(DEVICE_NOTIFIER_HDMI, hdmi_changed);
 
 	for (i = INIT_SETTING; i < INIT_END; i++) {
 		switch (i) {
@@ -2365,7 +2353,6 @@ static void display_exit(void *data)
 		case INIT_POLL:
 			unregister_notifier(DEVICE_NOTIFIER_BOOTING_DONE,
 			    booting_done);
-			unregister_notifier(DEVICE_NOTIFIER_HDMI, hdmi_changed);
 
 			exit_input();
 			break;

@@ -36,6 +36,7 @@ SET(SRCS
 	src/extcon/cradle.c
 	src/extcon/earjack.c
 	src/extcon/extcon.c
+	src/extcon/hdmi.c
 	src/gpio/gpio.c
 	src/power/power-handler.c
 	src/proc/cpu-info.c
