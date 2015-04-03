@@ -27,7 +27,5 @@ enum dock_type {
 	DOCK_SOUND	= 7,
 };
 
-void sync_cradle_status(void);
-
 void internal_pm_change_state(unsigned int s_bits);
 #endif /* __DEVICE_HANDLER_H__ */

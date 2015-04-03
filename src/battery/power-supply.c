@@ -376,8 +376,6 @@ static void check_power_supply(int state)
 		pm_lock_internal(INTERNAL_LOCK_TA, LCD_OFF, STAY_CUR_STATE, 0);
 out:
 	_I("ta device %d(capacity %d)", state, battery.capacity);
-
-	sync_cradle_status();
 }
 
 static void update_present(enum battery_noti_status status)
