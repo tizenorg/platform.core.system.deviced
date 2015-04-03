@@ -34,7 +34,6 @@
 #include <tzplatform_config.h>
 
 #include "core/log.h"
-#include "core/device-handler.h"
 #include "core/device-notifier.h"
 #include "core/common.h"
 #include "core/devices.h"
