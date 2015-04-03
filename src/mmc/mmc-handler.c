@@ -38,6 +38,7 @@
 #include "core/device-notifier.h"
 #include "core/common.h"
 #include "core/devices.h"
+#include "core/udev.h"
 #include "mmc-handler.h"
 #include "config.h"
 #include "core/edbus-handler.h"
@@ -48,6 +49,7 @@
 
 #define MMC_PARENT_PATH	tzplatform_getenv(TZ_SYS_STORAGE)
 #define MMC_DEV			"/dev/mmcblk"
+#define MMC_PATH        "*/mmcblk[0-9]"
 
 #define SMACKFS_MAGIC	0x43415d53
 #define SMACKFS_MNT		"/smack"
@@ -698,17 +700,6 @@ static int mmc_removed(void)
 	return 0;
 }
 
-static int mmc_changed_cb(void *data)
-{
-	char *devpath = (char*)data;
-
-	/* if MMC is inserted */
-	if (devpath)
-		return mmc_inserted(devpath);
-	else
-		return mmc_removed();
-}
-
 static int mmc_booting_done(void* data)
 {
 	char devpath[NAME_MAX] = {0,};
@@ -721,6 +712,28 @@ static int mmc_booting_done(void* data)
 
 	/* if MMC exists */
 	return mmc_inserted(devpath);
+}
+
+static void uevent_block_handler(struct udev_device *dev)
+{
+	const char *devpath;
+	const char *action;
+	const char *devnode;
+
+	devpath = udev_device_get_devpath(dev);
+	if (fnmatch(MMC_PATH, devpath, 0))
+		return;
+
+	action = udev_device_get_action(dev);
+	devnode = udev_device_get_devnode(dev);
+	if (!action || !devnode)
+		return;
+
+	_D("mmc action : %s", action);
+	if (!strncmp(action, UDEV_ADD, sizeof(UDEV_ADD)))
+		mmc_inserted(devnode);
+	else if (!strncmp(action, UDEV_REMOVE, sizeof(UDEV_REMOVE)))
+		mmc_removed();
 }
 
 static DBusMessage *edbus_request_mount(E_DBus_Object *obj, DBusMessage *msg)
@@ -907,6 +920,11 @@ int get_mmc_devpath(char devpath[])
 	return 0;
 }
 
+static struct uevent_handler uh = {
+	.subsystem = BLOCK_SUBSYSTEM,
+	.uevent_func = uevent_block_handler,
+};
+
 static const struct edbus_method edbus_methods[] = {
 	{ "RequestMount",         NULL, "i", edbus_request_mount },
 	{ "RequestUnmount",        "i", "i", edbus_request_unmount },
@@ -915,12 +933,6 @@ static const struct edbus_method edbus_methods[] = {
 	{ "RequestRemove",        NULL, "i", edbus_request_remove },
 	{ "ChangeStatus",          "i", "i", edbus_change_status },
 };
-
-static int mmc_poweroff(void *data)
-{
-	mmc_uevent_stop();
-	return 0;
-}
 
 static void mmc_init(void *data)
 {
@@ -934,25 +946,25 @@ static void mmc_init(void *data)
 		_E("fail to init edbus interface and method(%d)", ret);
 
 	/* register mmc uevent control routine */
-	ret = mmc_uevent_start();
+	ret = register_kernel_uevent_control(&uh);
 	if (ret < 0)
-		_E("fail to mmc uevent start");
+		_E("fail to register extcon uevent : %d", ret);
 
 	/* register notifier if mmc exist or not */
-	register_notifier(DEVICE_NOTIFIER_POWEROFF, mmc_poweroff);
 	register_notifier(DEVICE_NOTIFIER_BOOTING_DONE, mmc_booting_done);
-	register_notifier(DEVICE_NOTIFIER_MMC, mmc_changed_cb);
 }
 
 static void mmc_exit(void *data)
 {
+	int ret;
+
 	/* unregister notifier */
-	unregister_notifier(DEVICE_NOTIFIER_POWEROFF, mmc_poweroff);
-	unregister_notifier(DEVICE_NOTIFIER_MMC, mmc_changed_cb);
 	unregister_notifier(DEVICE_NOTIFIER_BOOTING_DONE, mmc_booting_done);
 
 	/* unregister mmc uevent control routine */
-	mmc_uevent_stop();
+	ret = unregister_kernel_uevent_control(&uh);
+	if (ret < 0)
+		_E("fail to unregister extcon uevent : %d", ret);
 }
 
 static int mmc_start(enum device_flags flags)

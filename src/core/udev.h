@@ -65,6 +65,9 @@
 #define USB_SUBSYSTEM           "usb"
 #define USB_INTERFACE_DEVTYPE   "usb_interface"
 
+/* block */
+#define BLOCK_SUBSYSTEM         "block"
+
 /* power supply status */
 enum {
 	POWER_SUPPLY_STATUS_UNKNOWN = 0,

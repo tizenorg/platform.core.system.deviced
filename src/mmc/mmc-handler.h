@@ -56,8 +56,6 @@ void remove_fs(const struct mmc_fs_ops *fs);
 int get_mmc_devpath(char devpath[]);
 bool mmc_check_mounted(const char *mount_point);
 
-int mmc_uevent_start(void);
-int mmc_uevent_stop(void);
 int get_block_number(void);
 
 void mmc_mount_done(void);
