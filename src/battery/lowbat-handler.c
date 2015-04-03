@@ -173,7 +173,7 @@ out:
 
 static int lowbat_popup(char *option)
 {
-	int ret, state=0;
+	int ret;
 	int r_disturb, s_disturb, r_block, s_block;
 	int lowbat_popup_option = -1;
 	char *value;
@@ -205,8 +205,7 @@ static int lowbat_popup(char *option)
 		return -1;
 
 	_D("%s", value);
-	ret = vconf_get_int(VCONFKEY_STARTER_SEQUENCE, &state);
-	if (state == 1 || ret != 0 || booting_done(NULL)) {
+	if (booting_done(NULL)) {
 		r_disturb = vconf_get_int("memory/shealth/sleep/do_not_disturb", &s_disturb);
 		r_block = vconf_get_bool("db/setting/blockmode_wearable", &s_block);
 		if ((r_disturb != 0 && r_block != 0) ||
@@ -468,23 +467,6 @@ void lowbat_monitor(void *data)
 		bat_percent = *(int *)data;
 	print_lowbat_state(bat_percent);
 	lowbat_process(bat_percent, NULL);
-}
-
-static int check_power_save_mode(void)
-{
-	int ret = 0;
-	int power_saving_cpu_stat = -1;
-
-	ret = vconf_get_bool(VCONFKEY_SETAPPL_PWRSV_CUSTMODE_CPU,
-			&power_saving_cpu_stat);
-	if (ret < 0) {
-		_E("failed to get vconf key");
-		return ret;
-	}
-
-	if (power_saving_cpu_stat == 1)
-		ret = 1;
-	return ret;
 }
 
 static int lowbat_monitor_init(void *data)

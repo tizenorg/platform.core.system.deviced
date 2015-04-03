@@ -188,7 +188,6 @@
 #define POPUP_METHOD_LAUNCH                 "PopupLaunch"
 #define POPUP_METHOD_TERMINATE              "AppTerminateByPid"
 #define POPUP_KEY_CONTENT                   "_SYSPOPUP_CONTENT_"
-#define POPUP_METHOD_SCREENOFF_TTS          "ScreenOffTts"
 
 /*
  * Crash daemon

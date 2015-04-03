@@ -44,8 +44,6 @@
 #include "core/list.h"
 #include "core/config-parser.h"
 
-#define VCONFKEY_INTERNAL_PRIVATE_MMC_ID	"db/private/sysman/mmc_device_id"
-
 #define MMC_PARENT_PATH	tzplatform_getenv(TZ_SYS_STORAGE)
 #define MMC_DEV			"/dev/mmcblk"
 #define MMC_PATH        "*/mmcblk[0-9]"
@@ -273,23 +271,6 @@ int get_block_number(void)
 						_E("%s read error: %s", buf,strerror(errno));
 					}
 					close(fd);
-					pre_mmc_device_id = vconf_get_str(VCONFKEY_INTERNAL_PRIVATE_MMC_ID);
-					if (pre_mmc_device_id) {
-						if (strcmp(pre_mmc_device_id, "") == 0) {
-							vconf_set_str(VCONFKEY_INTERNAL_PRIVATE_MMC_ID, buf);
-						} else if (strncmp(pre_mmc_device_id,buf,33) == 0) {
-							if ( vconf_get_int(VCONFKEY_SYSMAN_MMC_DEVICE_CHANGED,&mmc_dev_changed) == 0
-							&& mmc_dev_changed != VCONFKEY_SYSMAN_MMC_NOT_CHANGED) {
-								vconf_set_int(VCONFKEY_SYSMAN_MMC_DEVICE_CHANGED, VCONFKEY_SYSMAN_MMC_NOT_CHANGED);
-							}
-						} else if (strncmp(pre_mmc_device_id,buf,32) != 0) {
-							vconf_set_str(VCONFKEY_INTERNAL_PRIVATE_MMC_ID, buf);
-							vconf_set_int(VCONFKEY_SYSMAN_MMC_DEVICE_CHANGED, VCONFKEY_SYSMAN_MMC_CHANGED);
-						}
-						free(pre_mmc_device_id);
-					} else {
-						_E("failed to get pre_mmc_device_id");
-					}
 					return mmcblk_num;
 				}
 			}
