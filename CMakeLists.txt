@@ -70,7 +70,6 @@ ENDIF(TIZEN_HALL)
 SET(SRCS ${SRCS}
 	src/mmc/config.c
 	src/mmc/mmc-handler.c
-	src/mmc/uevent.c
 	src/mmc/vfat.c
 )
 IF(USE_EMULATOR)
