@@ -41,8 +41,6 @@
 #define SIGNAL_SIM_STATUS		"Status"
 #define SIM_CARD_NOT_PRESENT		(0x01)
 
-#define VCONFKEY_LCD_BRIGHTNESS_INIT "db/private/deviced/lcd_brightness_init"
-
 #define SIGNAL_HOMESCREEN		"HomeScreen"
 #define SIGNAL_EXTREME			"Extreme"
 #define SIGNAL_NOTEXTREME		"NotExtreme"
@@ -998,10 +996,6 @@ static void sim_signal_handler(void *data, DBusMessage *msg)
 		return;
 	}
 
-	ret = vconf_get_bool(VCONFKEY_LCD_BRIGHTNESS_INIT, &state);
-	if (ret < 0 || state)
-		return;
-
 	dbus_error_init(&err);
 
 	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &val,
@@ -1014,7 +1008,6 @@ static void sim_signal_handler(void *data, DBusMessage *msg)
 	if (val != SIM_CARD_NOT_PRESENT) {
 		/* change setting : autobrightness on */
 		state = true;
-		vconf_set_bool(VCONFKEY_LCD_BRIGHTNESS_INIT, state);
 		vconf_set_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT,
 		    SETTING_BRIGHTNESS_AUTOMATIC_ON);
 		vconf_set_int(VCONFKEY_SETAPPL_LCD_BRIGHTNESS,
