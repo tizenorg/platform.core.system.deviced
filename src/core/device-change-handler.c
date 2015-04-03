@@ -54,7 +54,6 @@
 
 #define MOVINAND_MOUNT_POINT		"/opt/media"
 
-#define HDMI_NOT_SUPPORTED	(-1)
 #ifdef ENABLE_EDBUS_USE
 #include <E_DBus.h>
 static E_DBus_Connection *conn;
@@ -76,26 +75,8 @@ enum snd_jack_types {
 #define TVOUT_NAME 		"tvout"
 #define TVOUT_NAME_LEN		5
 
-#define HDMI_NAME 		"hdmi"
-#define HDMI_NAME_LEN		4
-
-#define HDCP_NAME 		"hdcp"
-#define HDCP_NAME_LEN		4
-
-#define HDMI_AUDIO_NAME 	"ch_hdmi_audio"
-#define HDMI_AUDIO_LEN		13
-
 #define KEYBOARD_NAME 		"keyboard"
 #define KEYBOARD_NAME_LEN	8
-
-#define METHOD_GET_HDMI		"GetHDMI"
-#define METHOD_GET_HDCP		"GetHDCP"
-#define METHOD_GET_HDMI_AUDIO	"GetHDMIAudio"
-#define SIGNAL_HDMI_STATE	"ChangedHDMI"
-#define SIGNAL_HDCP_STATE	"ChangedHDCP"
-#define SIGNAL_HDMI_AUDIO_STATE	"ChangedHDMIAudio"
-
-#define HDCP_HDMI_VALUE(HDCP, HDMI)	((HDCP << 1) | HDMI)
 
 struct ticker_data {
 	char *name;
@@ -115,7 +96,6 @@ static struct udev *udev = NULL;
 static struct udev_monitor *mon = NULL;
 static Ecore_Fd_Handler *ufdh = NULL;
 static int ufd = -1;
-static int hdmi_status = 0;
 
 enum udev_subsystem_type {
 	UDEV_PLATFORM,
@@ -133,183 +113,10 @@ static const struct udev_subsystem {
 
 static dd_list *udev_event_list;
 
-static int display_changed(void *data)
-{
-	enum state_t state;
-	int ret;
-
-	if (!data)
-		return 0;
-
-	state = *(int*)data;
-	if (state != S_NORMAL)
-		return 0;
-
-	if (hdmi_status) {
-		pm_lock_internal(getpid(), LCD_DIM, STAY_CUR_STATE, 0);
-		_I("hdmi is connected! dim lock is on.");
-	}
-	return 0;
-}
-
 static void tvout_chgdet_cb(void *data)
 {
 	_I("jack - tvout changed");
 	pm_change_internal(getpid(), LCD_NORMAL);
-}
-
-static void hdcp_hdmi_send_broadcast(int status)
-{
-	static int old = 0;
-	char *arr[1];
-	char str_status[32];
-
-	if (old == status)
-		return;
-
-	_I("broadcast hdmi status %d", status);
-	old = status;
-	snprintf(str_status, sizeof(str_status), "%d", status);
-	arr[0] = str_status;
-
-	broadcast_edbus_signal(DEVICED_PATH_SYSNOTI, DEVICED_INTERFACE_SYSNOTI,
-			SIGNAL_HDMI_STATE, "i", arr);
-}
-
-static int hdcp_hdmi_cb(void *data)
-{
-	static int old = 0;
-	int val = 0;
-	int ret = 0;
-
-	if (data == NULL)
-		return old;
-
-	val = *(int *)data;
-	val = HDCP_HDMI_VALUE(val, hdmi_status);
-
-	if (old == val)
-		return old;
-
-	old = val;
-	hdcp_hdmi_send_broadcast(old);
-	return old;
-}
-
-static int hdmi_cec_execute(void *data)
-{
-	static const struct device_ops *ops = NULL;
-
-	FIND_DEVICE_INT(ops, "hdmi-cec");
-
-	return ops->execute(data);
-}
-
-static void hdmi_chgdet_cb(void *data)
-{
-	int val;
-	int ret = 0;
-
-	pm_change_internal(getpid(), LCD_NORMAL);
-	if (device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_HDMI_SUPPORT, &val) == 0) {
-		if (val!=1) {
-			_I("target is not support HDMI");
-			vconf_set_int(VCONFKEY_SYSMAN_HDMI, HDMI_NOT_SUPPORTED);
-			return;
-		}
-	}
-
-	if (data)
-		val = *(int *)data;
-	else {
-		ret = device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_HDMI_ONLINE, &val);
-		if (ret != 0) {
-			_E("failed to get status");
-			return;
-		}
-	}
-
-	_I("jack - hdmi changed %d", val);
-	vconf_set_int(VCONFKEY_SYSMAN_HDMI, val);
-	hdmi_status = val;
-	device_notify(DEVICE_NOTIFIER_HDMI, &val);
-
-	if(val == 1) {
-		pm_lock_internal(INTERNAL_LOCK_HDMI, LCD_DIM, STAY_CUR_STATE, 0);
-	} else {
-		pm_unlock_internal(INTERNAL_LOCK_HDMI, LCD_DIM, PM_SLEEP_MARGIN);
-	}
-	hdmi_cec_execute(&val);
-}
-
-static void hdcp_send_broadcast(int status)
-{
-	static int old = 0;
-	char *arr[1];
-	char str_status[32];
-
-	if (old == status)
-		return;
-
-	_D("broadcast hdcp status %d", status);
-	old = status;
-	snprintf(str_status, sizeof(str_status), "%d", status);
-	arr[0] = str_status;
-
-	broadcast_edbus_signal(DEVICED_PATH_SYSNOTI, DEVICED_INTERFACE_SYSNOTI,
-			SIGNAL_HDCP_STATE, "i", arr);
-}
-
-static int hdcp_chgdet_cb(void *data)
-{
-	static int old = 0;
-	int val = 0;
-
-	if (data == NULL)
-		return old;
-
-	val = *(int *)data;
-	if (old == val)
-		return old;
-
-	old = val;
-	hdcp_send_broadcast(old);
-	return old;
-}
-
-static void hdmi_audio_send_broadcast(int status)
-{
-	static int old = 0;
-	char *arr[1];
-	char str_status[32];
-
-	if (old == status)
-		return;
-
-	_D("broadcast hdmi audio status %d", status);
-	old = status;
-	snprintf(str_status, sizeof(str_status), "%d", status);
-	arr[0] = str_status;
-
-	broadcast_edbus_signal(DEVICED_PATH_SYSNOTI, DEVICED_INTERFACE_SYSNOTI,
-			SIGNAL_HDMI_AUDIO_STATE, "i", arr);
-}
-
-static int hdmi_audio_chgdet_cb(void *data)
-{
-	static int old = 0;
-	int val = 0;
-
-	if (data == NULL)
-		return old;
-
-	val = *(int *)data;
-	if (old == val)
-		return old;
-
-	old = val;
-	hdmi_audio_send_broadcast(old);
-	return old;
 }
 
 static void keyboard_chgdet_cb(void *data)
@@ -388,14 +195,6 @@ static int changed_device(const char *name, const char *value)
 
 	if (strncmp(name, TVOUT_NAME, TVOUT_NAME_LEN) == 0)
 		tvout_chgdet_cb((void *)state);
-	else if (strncmp(name, HDMI_NAME, HDMI_NAME_LEN) == 0)
-		hdmi_chgdet_cb((void *)state);
-	else if (strncmp(name, HDCP_NAME, HDCP_NAME_LEN) == 0) {
-		hdcp_chgdet_cb((void *)state);
-		hdcp_hdmi_cb((void *)state);
-	}
-	else if (strncmp(name, HDMI_AUDIO_NAME, HDMI_AUDIO_LEN) == 0)
-		hdmi_audio_chgdet_cb((void *)state);
 	else if (strncmp(name, KEYBOARD_NAME, KEYBOARD_NAME_LEN) == 0)
 		keyboard_chgdet_cb((void *)state);
 out:
@@ -418,7 +217,6 @@ static int booting_done(void *data)
 
 	/* set initial state for devices */
 	keyboard_chgdet_cb(NULL);
-	hdmi_chgdet_cb(NULL);
 	return done;
 }
 
@@ -679,51 +477,6 @@ int uevent_udev_get_path(const char *subsystem, dd_list **list)
 	return 0;
 }
 
-static DBusMessage *dbus_hdcp_hdmi_handler(E_DBus_Object *obj, DBusMessage *msg)
-{
-	DBusMessageIter iter;
-	DBusMessage *reply;
-	int ret;
-
-	ret = hdcp_hdmi_cb(NULL);
-	_I("hdmi %d", ret);
-
-	reply = dbus_message_new_method_return(msg);
-	dbus_message_iter_init_append(reply, &iter);
-	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
-	return reply;
-}
-
-static DBusMessage *dbus_hdcp_handler(E_DBus_Object *obj, DBusMessage *msg)
-{
-	DBusMessageIter iter;
-	DBusMessage *reply;
-	int ret;
-
-	ret = hdcp_chgdet_cb(NULL);
-	_I("hdcp %d", ret);
-
-	reply = dbus_message_new_method_return(msg);
-	dbus_message_iter_init_append(reply, &iter);
-	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
-	return reply;
-}
-
-static DBusMessage *dbus_hdmi_audio_handler(E_DBus_Object *obj, DBusMessage *msg)
-{
-	DBusMessageIter iter;
-	DBusMessage *reply;
-	int ret;
-
-	ret = hdmi_audio_chgdet_cb(NULL);
-	_I("hdmi audio %d", ret);
-
-	reply = dbus_message_new_method_return(msg);
-	dbus_message_iter_init_append(reply, &iter);
-	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
-	return reply;
-}
-
 static DBusMessage *dbus_device_handler(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusError err;
@@ -827,9 +580,6 @@ void internal_pm_change_state(unsigned int s_bits)
 static const struct edbus_method edbus_methods[] = {
 	{ PREDEF_DEVICE_CHANGED, "siss",    "i", dbus_device_handler },
 	{ PREDEF_UDEV_CONTROL,   "sis","i", dbus_udev_handler },
-	{ METHOD_GET_HDCP,       NULL, "i", dbus_hdcp_handler },
-	{ METHOD_GET_HDMI_AUDIO, NULL, "i", dbus_hdmi_audio_handler },
-	{ METHOD_GET_HDMI,       NULL, "i", dbus_hdcp_hdmi_handler },
 };
 
 static int device_change_poweroff(void *data)
@@ -844,7 +594,6 @@ static void device_change_init(void *data)
 
 	register_notifier(DEVICE_NOTIFIER_POWEROFF, device_change_poweroff);
 	register_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
-	register_notifier(DEVICE_NOTIFIER_LCD, display_changed);
 	ret = register_edbus_method(DEVICED_PATH_SYSNOTI, edbus_methods, ARRAY_SIZE(edbus_methods));
 	if (ret < 0)
 		_E("fail to init edbus method(%d)", ret);
@@ -870,7 +619,6 @@ static void device_change_exit(void *data)
 {
 	unregister_notifier(DEVICE_NOTIFIER_POWEROFF, device_change_poweroff);
 	unregister_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
-	unregister_notifier(DEVICE_NOTIFIER_LCD, display_changed);
 }
 
 static const struct device_ops change_device_ops = {
