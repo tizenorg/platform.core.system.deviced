@@ -114,15 +114,10 @@ static int mmc_check_smack(const char *mount_point)
 static int check_smack_popup(void)
 {
 	int ret = -1;
-	int val = -1;
 
-	ret = vconf_get_int(VCONFKEY_STARTER_SEQUENCE, &val);
-	if (val == 1 || ret != 0) {
-
-		ret = manage_notification("MMC", "Check smack");
-		if (ret == -1)
-			return -1;
-	}
+	ret = manage_notification("MMC", "Check smack");
+	if (ret == -1)
+		return -1;
 
 	return 0;
 }

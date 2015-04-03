@@ -125,7 +125,6 @@ static void memnoti_level_broadcast(enum memnoti_level level)
 static int memnoti_popup(enum memnoti_level level)
 {
 	int ret = -1;
-	int val = -1;
 	char *value = NULL;
 
 	if (level != MEMNOTI_LEVEL_WARNING && level != MEMNOTI_LEVEL_CRITICAL) {
@@ -138,10 +137,6 @@ static int memnoti_popup(enum memnoti_level level)
 	} else if (level == MEMNOTI_LEVEL_CRITICAL) {
 		value = "Critical";
 	}
-
-	ret = vconf_get_int(VCONFKEY_STARTER_SEQUENCE, &val);
-	if (val == 0 || ret != 0)
-		return 0;
 
 	ret = manage_notification("Low memory", value);
 	if (ret == -1)

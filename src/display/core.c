@@ -95,7 +95,6 @@ static int (*basic_action) (int);
 static bool hallic_open = true;
 static Ecore_Timer *lock_timeout_id;
 static int lock_screen_timeout = LOCK_SCREEN_INPUT_TIMEOUT;
-static int tts_state = false;
 static struct timeval lcdon_tv;
 static int lcd_paneloff_mode = false;
 static int stay_touchscreen_off = false;
@@ -262,17 +261,6 @@ void broadcast_lcd_off(void)
 	    SIGNAL_LCD_OFF, NULL, NULL);
 }
 
-void tts_lcd_off(void)
-{
-	int ret;
-
-	ret = dbus_method_sync(POPUP_BUS_NAME, POPUP_PATH_SERVANT,
-	    POPUP_IFACE_SERVANT, POPUP_METHOD_SCREENOFF_TTS, NULL, NULL);
-
-	if (ret < 0)
-		_E("Failed to tts(%d)", ret);
-}
-
 static unsigned long get_lcd_on_flags(void)
 {
 	unsigned long flags = NORMAL_MODE;
@@ -334,9 +322,6 @@ inline void lcd_off_procedure(void)
 
 	EINA_LIST_REVERSE_FOREACH(lcdon_ops, l, ops)
 		ops->stop(flags);
-
-	if (tts_state)
-		tts_lcd_off();
 }
 
 void set_stay_touchscreen_off(int val)
@@ -1943,26 +1928,11 @@ static int update_setting(int key_idx, int val)
 			break;
 		}
 		break;
-	case SETTING_BOOT_POWER_ON_STATUS:
-		/*
-		 * Unlock lcd off after booting is done.
-		 * deviced guarantees all booting script is executing.
-		 * Last script of booting unlocks this suspend blocking state.
-		 */
-		if (val == VCONFKEY_DEVICED_BOOT_POWER_ON_DONE) {
-			_I("booting done");
-			pm_unlock_internal(INTERNAL_LOCK_BOOTING, LCD_OFF, PM_SLEEP_MARGIN);
-		}
-		break;
 	case SETTING_POWER_CUSTOM_BRIGHTNESS:
 		if (val == VCONFKEY_PM_CUSTOM_BRIGHTNESS_ON)
 			backlight_ops.set_custom_status(true);
 		else
 			backlight_ops.set_custom_status(false);
-		break;
-	case SETTING_ACCESSIBILITY_TTS:
-		tts_state = val;
-		_I("TTS is %s", (val ? "ON" : "OFF"));
 		break;
 
 	default:
@@ -2014,12 +1984,6 @@ static void check_seed_status(void)
 		_I("LCD NORMAL timeout is set by %d ms"
 			" for lock screen", lock_screen_timeout);
 	}
-
-	/* TTS state */
-	ret = vconf_get_bool(VCONFKEY_SETAPPL_ACCESSIBILITY_TTS, &tts_state);
-	if (ret < 0)
-		_E("Failed to get TTS setting! (%d)", ret);
-	_I("TTS is %s", (tts_state ? "ON" : "OFF"));
 
 	return;
 }

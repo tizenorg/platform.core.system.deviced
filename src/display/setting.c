@@ -34,9 +34,7 @@ static const char *setting_keys[SETTING_GET_END] = {
 	[SETTING_TO_NORMAL] = VCONFKEY_SETAPPL_LCD_TIMEOUT_NORMAL,
 	[SETTING_BRT_LEVEL] = VCONFKEY_SETAPPL_LCD_BRIGHTNESS,
 	[SETTING_LOCK_SCREEN] = VCONFKEY_IDLE_LOCK_STATE,
-	[SETTING_BOOT_POWER_ON_STATUS] = VCONFKEY_DEVICED_BOOT_POWER_ON_STATUS,
 	[SETTING_POWER_CUSTOM_BRIGHTNESS] = VCONFKEY_PM_CUSTOM_BRIGHTNESS_STATUS,
-	[SETTING_ACCESSIBILITY_TTS] = VCONFKEY_SETAPPL_ACCESSIBILITY_TTS,
 };
 
 static int lock_screen_state = VCONFKEY_IDLE_UNLOCK;
@@ -212,14 +210,7 @@ static int setting_cb(keynode_t *key_nodes, void *data)
 		return -1;
 	}
 	if (update_pm_setting != NULL) {
-		switch(index) {
-			case SETTING_ACCESSIBILITY_TTS:
-				update_pm_setting(index, vconf_keynode_get_bool(tmp));
-				break;
-			default:
-				update_pm_setting(index, vconf_keynode_get_int(tmp));
-				break;
-		}
+		update_pm_setting(index, vconf_keynode_get_int(tmp));
 	}
 
 	return 0;
