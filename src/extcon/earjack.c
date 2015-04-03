@@ -58,4 +58,4 @@ static struct extcon_ops earjack_extcon_ops = {
 	.update = earjack_update,
 };
 
-EXTCON_OPS_REGISTER(&earjack_extcon_ops)
+EXTCON_OPS_REGISTER(earjack_extcon_ops)

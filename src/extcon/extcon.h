@@ -45,11 +45,18 @@ struct extcon_ops {
 #define EXTCON_OPS_REGISTER(dev) \
 static void __CONSTRUCTOR__ extcon_init(void) \
 { \
-	add_extcon(dev); \
+	/**
+	 * If there is no predefined status value,
+	 * default status will set as a negative value(-1).
+	 * It will be updated as the initial value in booting time.
+	 */ \
+	if (!dev.status) \
+		dev.status = -1; \
+	add_extcon(&dev); \
 } \
 static void __DESTRUCTOR__ extcon_exit(void) \
 { \
-	remove_extcon(dev); \
+	remove_extcon(&dev); \
 }
 
 void add_extcon(struct extcon_ops *dev);

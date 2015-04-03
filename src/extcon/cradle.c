@@ -121,4 +121,4 @@ static struct extcon_ops cradle_extcon_ops = {
 	.update = cradle_update,
 };
 
-EXTCON_OPS_REGISTER(&cradle_extcon_ops);
+EXTCON_OPS_REGISTER(cradle_extcon_ops)

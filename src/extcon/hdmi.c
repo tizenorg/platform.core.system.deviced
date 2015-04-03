@@ -118,4 +118,4 @@ static struct extcon_ops hdmi_extcon_ops = {
 	.update = hdmi_update,
 };
 
-EXTCON_OPS_REGISTER(&hdmi_extcon_ops);
+EXTCON_OPS_REGISTER(hdmi_extcon_ops)
