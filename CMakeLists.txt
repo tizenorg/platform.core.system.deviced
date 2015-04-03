@@ -33,6 +33,7 @@ SET(SRCS
 	src/core/log.c
 	src/core/main.c
 	src/core/sig-handler.c
+	src/cradle/cradle.c
 	src/earjack/earjack.c
 	src/extcon/extcon.c
 	src/gpio/gpio.c

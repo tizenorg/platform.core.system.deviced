@@ -85,9 +85,6 @@ enum snd_jack_types {
 #define HDMI_AUDIO_NAME 	"ch_hdmi_audio"
 #define HDMI_AUDIO_LEN		13
 
-#define CRADLE_NAME 		"cradle"
-#define CRADLE_NAME_LEN	6
-
 #define KEYBOARD_NAME 		"keyboard"
 #define KEYBOARD_NAME_LEN	8
 
@@ -99,9 +96,6 @@ enum snd_jack_types {
 #define SIGNAL_HDMI_AUDIO_STATE	"ChangedHDMIAudio"
 
 #define HDCP_HDMI_VALUE(HDCP, HDMI)	((HDCP << 1) | HDMI)
-
-#define METHOD_GET_CRADLE	"GetCradle"
-#define SIGNAL_CRADLE_STATE	"ChangedCradle"
 
 struct ticker_data {
 	char *name;
@@ -142,7 +136,7 @@ static dd_list *udev_event_list;
 static int display_changed(void *data)
 {
 	enum state_t state;
-	int ret, cradle = 0;
+	int ret;
 
 	if (!data)
 		return 0;
@@ -151,94 +145,11 @@ static int display_changed(void *data)
 	if (state != S_NORMAL)
 		return 0;
 
-	ret = vconf_get_int(VCONFKEY_SYSMAN_CRADLE_STATUS, &cradle);
-	if (ret >= 0 && cradle == DOCK_SOUND) {
-		pm_lock_internal(getpid(), LCD_DIM, STAY_CUR_STATE, 0);
-		_I("sound dock is connected! dim lock is on.");
-	}
 	if (hdmi_status) {
 		pm_lock_internal(getpid(), LCD_DIM, STAY_CUR_STATE, 0);
 		_I("hdmi is connected! dim lock is on.");
 	}
 	return 0;
-}
-
-static void cradle_send_broadcast(int status)
-{
-	static int old = 0;
-	char *arr[1];
-	char str_status[32];
-
-	if (old == status)
-		return;
-
-	_I("broadcast cradle status %d", status);
-	old = status;
-	snprintf(str_status, sizeof(str_status), "%d", status);
-	arr[0] = str_status;
-
-	broadcast_edbus_signal(DEVICED_PATH_SYSNOTI, DEVICED_INTERFACE_SYSNOTI,
-			SIGNAL_CRADLE_STATE, "i", arr);
-}
-
-static int cradle_cb(void *data)
-{
-	static int old = 0;
-	int val = 0;
-	int ret = 0;
-
-	if (data == NULL)
-		return old;
-
-	val = *(int *)data;
-
-	if (old == val)
-		return old;
-
-	old = val;
-	cradle_send_broadcast(old);
-	return old;
-}
-
-static void cradle_chgdet_cb(void *data)
-{
-	int val;
-	int ret = 0;
-
-	pm_change_internal(getpid(), LCD_NORMAL);
-
-	if (data)
-		val = *(int *)data;
-	else {
-		ret = device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_CRADLE_ONLINE, &val);
-		if (ret != 0) {
-			_E("failed to get status");
-			return;
-		}
-	}
-
-	_I("jack - cradle changed %d", val);
-	cradle_cb((void *)&val);
-	if (vconf_set_int(VCONFKEY_SYSMAN_CRADLE_STATUS, val) != 0) {
-		_E("failed to set vconf status");
-		return;
-	}
-
-	if (val == DOCK_SOUND)
-		pm_lock_internal(getpid(), LCD_DIM, STAY_CUR_STATE, 0);
-	else if (val == DOCK_NONE)
-		pm_unlock_internal(getpid(), LCD_DIM, PM_SLEEP_MARGIN);
-}
-
-void sync_cradle_status(void)
-{
-	int val;
-	int status;
-	if ((device_get_property(DEVICE_TYPE_EXTCON, PROP_EXTCON_CRADLE_ONLINE, &val) != 0) ||
-	    vconf_get_int(VCONFKEY_SYSMAN_CRADLE_STATUS, &status) != 0)
-		return;
-	if ((val != 0 && status == 0) || (val == 0 && status != 0))
-		cradle_chgdet_cb(NULL);
 }
 
 static void tvout_chgdet_cb(void *data)
@@ -485,8 +396,6 @@ static int changed_device(const char *name, const char *value)
 	}
 	else if (strncmp(name, HDMI_AUDIO_NAME, HDMI_AUDIO_LEN) == 0)
 		hdmi_audio_chgdet_cb((void *)state);
-	else if (strncmp(name, CRADLE_NAME, CRADLE_NAME_LEN) == 0)
-		cradle_chgdet_cb((void *)state);
 	else if (strncmp(name, KEYBOARD_NAME, KEYBOARD_NAME_LEN) == 0)
 		keyboard_chgdet_cb((void *)state);
 out:
@@ -508,7 +417,6 @@ static int booting_done(void *data)
 	_I("booting done");
 
 	/* set initial state for devices */
-	cradle_chgdet_cb(NULL);
 	keyboard_chgdet_cb(NULL);
 	hdmi_chgdet_cb(NULL);
 	return done;
@@ -771,21 +679,6 @@ int uevent_udev_get_path(const char *subsystem, dd_list **list)
 	return 0;
 }
 
-static DBusMessage *dbus_cradle_handler(E_DBus_Object *obj, DBusMessage *msg)
-{
-	DBusMessageIter iter;
-	DBusMessage *reply;
-	int ret;
-
-	ret = cradle_cb(NULL);
-	_I("cradle %d", ret);
-
-	reply = dbus_message_new_method_return(msg);
-	dbus_message_iter_init_append(reply, &iter);
-	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
-	return reply;
-}
-
 static DBusMessage *dbus_hdcp_hdmi_handler(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
@@ -937,7 +830,6 @@ static const struct edbus_method edbus_methods[] = {
 	{ METHOD_GET_HDCP,       NULL, "i", dbus_hdcp_handler },
 	{ METHOD_GET_HDMI_AUDIO, NULL, "i", dbus_hdmi_audio_handler },
 	{ METHOD_GET_HDMI,       NULL, "i", dbus_hdcp_hdmi_handler },
-	{ METHOD_GET_CRADLE,     NULL, "i", dbus_cradle_handler },
 };
 
 static int device_change_poweroff(void *data)
