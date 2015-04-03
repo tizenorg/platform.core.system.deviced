@@ -154,15 +154,12 @@ static int extcon_load_uevent(struct parse_result *result, void *user_data)
 	return 0;
 }
 
-static int get_extcon_state_node(char *state, unsigned int len)
+static int get_extcon_init_state(void)
 {
 	DIR *dir;
 	struct dirent *entry;
 	char node[BUF_MAX];
 	int ret;
-
-	if (!state)
-		return -EINVAL;
 
 	dir = opendir(EXTCON_PATH);
 	if (!dir) {
@@ -181,19 +178,15 @@ static int get_extcon_state_node(char *state, unsigned int len)
 		if (access(node, F_OK) != 0)
 			continue;
 
-		ret = 0;
-		break;
+		ret = config_parse(node, extcon_load_uevent, NULL);
+		if (ret < 0)
+			_E("fail to parse %s data : %d", node, ret);
 	}
 
 	if (dir)
 		closedir(dir);
 
-	if (ret == 0) {
-		strncpy(state, node, len - 1);
-		state[len -1] = '\0';
-	}
-
-	return ret;
+	return 0;
 }
 
 static DBusMessage *dbus_get_extcon_status(E_DBus_Object *obj,
@@ -294,7 +287,6 @@ static const struct edbus_method edbus_methods[] = {
 static void extcon_init(void *data)
 {
 	int ret;
-	char state[256];
 	dd_list *l;
 	struct extcon_ops *dev;
 
@@ -312,15 +304,10 @@ static void extcon_init(void *data)
 	if (ret < 0)
 		_E("fail to register extcon uevent : %d", ret);
 
-	/* set initialize extcon device state */
-	ret = get_extcon_state_node(state, sizeof(state));
-	if (ret == 0) {
-		ret = config_parse(state, extcon_load_uevent, NULL);
-		if (ret < 0)
-			_E("Failed to load %s file : %d", state, ret);
-	} else {
-		_E("Failed to get extcon uevent state node");
-	}
+	/* load the initialize value by accessing the node directly */
+	ret = get_extcon_init_state();
+	if (ret < 0)
+		_E("fail to init extcon nodes : %d", ret);
 
 	ret = register_edbus_interface_and_method(DEVICED_PATH_EXTCON,
 			DEVICED_INTERFACE_EXTCON,
