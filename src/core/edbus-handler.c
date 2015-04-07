@@ -218,7 +218,7 @@ int register_edbus_signal_handler(const char *path, const char *interface,
 	entry->handler = handler;
 	DD_LIST_PREPEND(edbus_handler_list, entry);
 	if (!edbus_handler_list) {
-		_E("eina_list_prepend failed");
+		_E("dd_list_prepend failed");
 		free(entry->signal_name);
 		free(entry);
 		return -ENOMEM;
