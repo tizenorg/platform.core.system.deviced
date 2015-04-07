@@ -24,6 +24,7 @@ SET(SRCS
 	src/core/common.c
 	src/core/config-parser.c
 	src/control/control.c
+	src/core/device-idler.c
 	src/core/device-notifier.c
 	src/core/devices.c
 	src/core/edbus-handler.c
