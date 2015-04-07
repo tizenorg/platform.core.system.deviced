@@ -43,7 +43,6 @@
 
 static TapiHandle *tapi_handle = NULL;
 static Ecore_Timer *poweroff_timer_id = NULL;
-static int reboot_opt;
 
 static Eina_Bool telephony_powerdown_ap_internal(void *data)
 {
@@ -57,7 +56,7 @@ static void telephony_powerdown_ap(TapiHandle *handle, const char *noti_id, void
 
 static void telephony_restart_ap(TapiHandle *handle, const char *noti_id, void *data, void *user_data)
 {
-	restart_ap(reboot_opt);
+	restart_ap(data);
 }
 
 static Eina_Bool telephony_restart_ap_by_force(void *data)
@@ -152,37 +151,29 @@ static void telephony_exit(void *data)
 		return;
 	}
 
-	if (strncmp(data, POWER_REBOOT, POWER_REBOOT_LEN) &&
-	    strncmp(data, POWER_RECOVERY, POWER_RECOVERY_LEN) &&
-	    strncmp(data, POWER_FOTA, POWER_FOTA_LEN)) {
+	if (strncmp(data, POWER_REBOOT, POWER_REBOOT_LEN)) {
 		_E("Fail %s", data);
 		return;
 	}
 
 	_I("Option: %s", data);
-	 if (!strncmp(data, POWER_RECOVERY, POWER_RECOVERY_LEN))
-		reboot_opt = SYSTEMD_STOP_POWER_RESTART_RECOVERY;
-	else if (!strncmp(data, POWER_REBOOT, POWER_REBOOT_LEN))
-		reboot_opt = SYSTEMD_STOP_POWER_RESTART;
-	else if (!strncmp(data, POWER_FOTA, POWER_FOTA_LEN))
-		reboot_opt = SYSTEMD_STOP_POWER_RESTART_FOTA;
 
 	ret = tel_register_noti_event(tapi_handle, TAPI_NOTI_MODEM_POWER,
 			telephony_restart_ap, NULL);
 	if (ret != TAPI_API_SUCCESS) {
 		_E("tel_register_event is not subscribed. error %d", ret);
-		telephony_restart_ap_by_force((void *)POWER_RESTART);
+		telephony_restart_ap_by_force(NULL);
 		return;
 	}
 	ret = tel_process_power_command(tapi_handle, TAPI_PHONE_POWER_OFF,
 			powerdown_res_cb, NULL);
 	if (ret != TAPI_API_SUCCESS) {
 		_E("tel_process_power_command() error %d", ret);
-		telephony_restart_ap_by_force((void *)reboot_opt);
+		telephony_restart_ap_by_force(NULL);
 		return;
 	}
 	poweroff_timer_id = ecore_timer_add(15,telephony_restart_ap_by_force,
-							(void *)reboot_opt);
+							NULL);
 }
 
 static void telephony_flight_mode_on(TapiHandle *handle, int result, void *data, void *user_data)
