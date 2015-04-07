@@ -151,7 +151,7 @@ static int power_execute(void)
 
 	FIND_DEVICE_INT(ops, POWER_OPS_NAME);
 
-	return ops->execute(INTERNAL_PWROFF);
+	return ops->execute(POWER_POWEROFF);
 }
 
 static int booting_done(void *data)
@@ -244,7 +244,7 @@ static int battery_critical_low_act(void *data)
 
 int battery_power_off_act(void *data)
 {
-	vconf_set_int(VCONFKEY_SYSMAN_POWER_OFF_STATUS, VCONFKEY_SYSMAN_POWER_OFF_DIRECT);
+	power_execute();
 	return 0;
 }
 
