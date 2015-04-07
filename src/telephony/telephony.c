@@ -161,11 +161,11 @@ static void telephony_exit(void *data)
 
 	_I("Option: %s", data);
 	 if (!strncmp(data, POWER_RECOVERY, POWER_RECOVERY_LEN))
-		reboot_opt = SYSTEMD_STOP_POWER_RESTART_RECOVERY;
+		reboot_opt = POWER_OFF_RESTART_RECOVERY;
 	else if (!strncmp(data, POWER_REBOOT, POWER_REBOOT_LEN))
-		reboot_opt = SYSTEMD_STOP_POWER_RESTART;
+		reboot_opt = POWER_OFF_RESTART_INTERNAL;
 	else if (!strncmp(data, POWER_FOTA, POWER_FOTA_LEN))
-		reboot_opt = SYSTEMD_STOP_POWER_RESTART_FOTA;
+		reboot_opt = POWER_OFF_RESTART_FOTA;
 
 	ret = tel_register_noti_event(tapi_handle, TAPI_NOTI_MODEM_POWER,
 			telephony_restart_ap, NULL);
