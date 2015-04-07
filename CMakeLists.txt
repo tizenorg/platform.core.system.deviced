@@ -115,7 +115,6 @@ INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/src/deviced)
 SET(PKG_MODULES
 	ecore
 	edbus
-	eina
 	vconf
 	dlog
 	device-node
