@@ -25,21 +25,18 @@
 #define POWER_POWEROFF_LEN  8
 #define POWER_REBOOT        "reboot"
 #define POWER_REBOOT_LEN    6
-#define POWER_RECOVERY      "reboot-recovery"
-#define POWER_RECOVERY_LEN  15
-#define POWER_FOTA          "fota"
-#define POWER_FOTA_LEN      4
 #define PWROFF_POPUP        "pwroff-popup"
 #define PWROFF_POPUP_LEN    12
-#define INTERNAL_PWROFF     "internal"
-#define INTERNAL_PWROFF_LEN 8
 
-#define SYSTEMD_STOP_POWER_RESTART              5
-#define SYSTEMD_STOP_POWER_RESTART_RECOVERY     6
-#define SYSTEMD_STOP_POWER_RESTART_FOTA         7
+enum poweroff_type {
+	POWER_OFF_NONE = 0,
+	POWER_OFF_POPUP,
+	POWER_OFF_DIRECT,
+	POWER_OFF_RESTART,
+};
 
 #ifndef SYSTEMD_SHUTDOWN
-void restart_ap(int data);
+void restart_ap(void *data);
 void powerdown_ap(void *data);
 #endif
 
