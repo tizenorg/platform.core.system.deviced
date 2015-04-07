@@ -244,7 +244,7 @@ static int battery_critical_low_act(void *data)
 
 int battery_power_off_act(void *data)
 {
-	vconf_set_int(VCONFKEY_SYSMAN_POWER_OFF_STATUS, VCONFKEY_SYSMAN_POWER_OFF_DIRECT);
+	poweroff_request_internal(POWER_OFF_DIRECT);
 	return 0;
 }
 

@@ -36,6 +36,7 @@
 #include "core/log.h"
 #include "core/launch.h"
 #include "core/device-notifier.h"
+#include "core/device-idler.h"
 #include "core/common.h"
 #include "core/devices.h"
 #include "proc/proc-handler.h"
@@ -52,13 +53,9 @@
 #define POWEROFF_DURATION		2
 #define MAX_RETRY			2
 
-#define SYSTEMD_STOP_POWER_OFF				4
-
 #define SIGNAL_POWEROFF_STATE	"ChangeState"
 
 #define UMOUNT_RW_PATH "/opt/usr"
-
-static void poweroff_control_cb(keynode_t *in_key, void *data);
 
 static struct timeval tv_start_poweroff;
 
@@ -151,7 +148,6 @@ static int poweroff(void)
 			retry_count++;
 			continue;
 		}
-		vconf_ignore_key_changed(VCONFKEY_SYSMAN_POWER_OFF_STATUS, (void*)poweroff_control_cb);
 		return 0;
 	}
 	return -1;
@@ -184,9 +180,9 @@ static int power_reboot(int type)
 
 	gettimeofday(&tv_start_poweroff, NULL);
 
-	if (type == SYSTEMD_STOP_POWER_RESTART_RECOVERY)
+	if (type == POWER_OFF_RESTART_RECOVERY)
 		ret = telephony_exit(POWER_RECOVERY);
-	else if (type == SYSTEMD_STOP_POWER_RESTART_FOTA)
+	else if (type == POWER_OFF_RESTART_FOTA)
 		ret = telephony_exit(POWER_FOTA);
 	else
 		ret = telephony_exit(POWER_REBOOT);
@@ -207,11 +203,11 @@ static int power_execute(void *data)
 	else if (strncmp(PWROFF_POPUP, (char *)data, PWROFF_POPUP_LEN) == 0)
 		ret = pwroff_popup();
 	else if (strncmp(POWER_REBOOT, (char *)data, POWER_REBOOT_LEN) == 0)
-		ret = power_reboot(VCONFKEY_SYSMAN_POWER_OFF_RESTART);
+		ret = power_reboot(POWER_OFF_RESTART);
 	else if (strncmp(POWER_RECOVERY, (char *)data, POWER_RECOVERY_LEN) == 0)
-		ret = power_reboot(SYSTEMD_STOP_POWER_RESTART_RECOVERY);
+		ret = power_reboot(POWER_OFF_RESTART_RECOVERY);
 	else if (strncmp(POWER_FOTA, (char *)data, POWER_FOTA_LEN) == 0)
-		ret = power_reboot(SYSTEMD_STOP_POWER_RESTART_FOTA);
+		ret = power_reboot(POWER_OFF_RESTART_FOTA);
 	else if (strncmp(INTERNAL_PWROFF, (char *)data, INTERNAL_PWROFF_LEN) == 0)
 		ret = previous_poweroff();
 
@@ -237,18 +233,19 @@ static void poweroff_popup_edbus_signal_handler(void *data, DBusMessage *msg)
 	}
 
 	if (!strncmp(str, PWROFF_POPUP, PWROFF_POPUP_LEN))
-		val = VCONFKEY_SYSMAN_POWER_OFF_POPUP;
+		val = POWER_OFF_POPUP;
 	else if (!strncmp(str, POWER_POWEROFF, POWER_POWEROFF_LEN))
-		val = SYSTEMD_STOP_POWER_OFF;
+		val = POWER_OFF_INTERNAL;
 	else if (!strncmp(str, POWER_REBOOT, POWER_REBOOT_LEN))
-		val = SYSTEMD_STOP_POWER_RESTART;
+		val = POWER_OFF_RESTART_INTERNAL;
 	else if (!strncmp(str, POWER_FOTA, POWER_FOTA_LEN))
-		val = SYSTEMD_STOP_POWER_RESTART_FOTA;
+		val = POWER_OFF_RESTART_FOTA;
 	if (val == 0) {
 		_E("not supported message : %s", str);
 		return;
 	}
-	vconf_set_int(VCONFKEY_SYSMAN_POWER_OFF_STATUS, val);
+
+	poweroff_request_internal(val);
 }
 
 static int booting_done(void *data)
@@ -307,45 +304,43 @@ static void poweroff_stop_systemd_service(void)
 	umount2("/sys/fs/cgroup", MNT_FORCE |MNT_DETACH);
 }
 
-static void poweroff_control_cb(keynode_t *in_key, void *data)
+static int poweroff_idler_cb(void *data)
 {
-	int val;
+	enum poweroff_type val = (int)data;
 	int ret;
 	int recovery;
 
 	telephony_start();
 
-	if (vconf_get_int(VCONFKEY_SYSMAN_POWER_OFF_STATUS, &val) != 0)
-		return;
-
 	recovery = val;
 
-	if (val == SYSTEMD_STOP_POWER_OFF ||
-	    val == SYSTEMD_STOP_POWER_RESTART ||
-	    val == SYSTEMD_STOP_POWER_RESTART_RECOVERY ||
-	    val == SYSTEMD_STOP_POWER_RESTART_FOTA) {
+	if (val == POWER_OFF_INTERNAL ||
+	    val == POWER_OFF_RESTART_INTERNAL ||
+	    val == POWER_OFF_RESTART_RECOVERY ||
+	    val == POWER_OFF_RESTART_FOTA) {
 		pm_lock_internal(INTERNAL_LOCK_POWEROFF, LCD_OFF, STAY_CUR_STATE, 0);
 		poweroff_stop_systemd_service();
-		if (val == SYSTEMD_STOP_POWER_OFF)
-			val = VCONFKEY_SYSMAN_POWER_OFF_DIRECT;
+		if (val == POWER_OFF_INTERNAL)
+			val = POWER_OFF_DIRECT;
 		else
-			val = VCONFKEY_SYSMAN_POWER_OFF_RESTART;
-		vconf_ignore_key_changed(VCONFKEY_SYSMAN_POWER_OFF_STATUS, (void*)poweroff_control_cb);
-		vconf_set_int(VCONFKEY_SYSMAN_POWER_OFF_STATUS, val);
+			val = POWER_OFF_RESTART;
 	}
 
-	if (val == VCONFKEY_SYSMAN_POWER_OFF_DIRECT || val == VCONFKEY_SYSMAN_POWER_OFF_RESTART)
+	if (val == POWER_OFF_DIRECT || val == POWER_OFF_RESTART)
 		poweroff_send_broadcast(val);
 
+	/* TODO for notify. will be removed asap. */
+	vconf_set_int(VCONFKEY_SYSMAN_POWER_OFF_STATUS, val);
+
 	switch (val) {
-	case VCONFKEY_SYSMAN_POWER_OFF_DIRECT:
+	case POWER_OFF_DIRECT:
 		device_notify(DEVICE_NOTIFIER_POWEROFF, &val);
 		poweroff();
 		break;
-	case VCONFKEY_SYSMAN_POWER_OFF_POPUP:
+	case POWER_OFF_POPUP:
 		pwroff_popup();
 		break;
-	case VCONFKEY_SYSMAN_POWER_OFF_RESTART:
+	case POWER_OFF_RESTART:
 		device_notify(DEVICE_NOTIFIER_POWEROFF, &val);
 		power_reboot(recovery);
 		break;
@@ -353,6 +348,21 @@ static void poweroff_control_cb(keynode_t *in_key, void *data)
 
 	if (update_pm_setting)
 		update_pm_setting(SETTING_POWEROFF, val);
+
+	return 0;
+}
+
+int poweroff_request_internal(enum poweroff_type val)
+{
+	int ret;
+
+	ret = add_idle_request(poweroff_idler_cb, (int*)val);
+	if (ret < 0) {
+		_E("fail to add poweroff idle request : %d", ret);
+		return ret;
+	}
+
+	return 0;
 }
 
 /* umount usr data partition */
@@ -407,7 +417,6 @@ static void powerdown(void)
 	}
 	/* if this fails, that's OK */
 	telephony_stop();
-	vconf_ignore_key_changed(VCONFKEY_SYSMAN_POWER_OFF_STATUS, (void*)poweroff_control_cb);
 	power_off = 1;
 	sync();
 
@@ -436,9 +445,9 @@ static void powerdown(void)
 
 static void restart_by_mode(int mode)
 {
-	if (mode == SYSTEMD_STOP_POWER_RESTART_RECOVERY)
+	if (mode == POWER_OFF_RESTART_RECOVERY)
 		launch_evenif_exist("/usr/sbin/reboot", "recovery");
-	else if (mode == SYSTEMD_STOP_POWER_RESTART_FOTA)
+	else if (mode == POWER_OFF_RESTART_FOTA)
 		launch_evenif_exist("/usr/sbin/reboot", "fota");
 	else
 		reboot(RB_AUTOBOOT);
@@ -480,9 +489,9 @@ static DBusMessage *dbus_power_handler(E_DBus_Object *obj, DBusMessage *msg)
 	telephony_start();
 
 	if(!strncmp(type_str, POWER_REBOOT, POWER_REBOOT_LEN))
-		ret = power_reboot(VCONFKEY_SYSMAN_POWER_OFF_RESTART);
+		ret = power_reboot(POWER_OFF_RESTART);
 	else if(!strncmp(type_str, POWER_RECOVERY, POWER_RECOVERY_LEN))
-		ret = power_reboot(SYSTEMD_STOP_POWER_RESTART_RECOVERY);
+		ret = power_reboot(POWER_OFF_RESTART_RECOVERY);
 	else if(!strncmp(type_str, PWROFF_POPUP, PWROFF_POPUP_LEN))
 		ret = pwroff_popup();
 
@@ -524,10 +533,6 @@ static void power_init(void *data)
 	ret = register_edbus_method(DEVICED_PATH_POWER, edbus_methods, ARRAY_SIZE(edbus_methods));
 	if (ret < 0)
 		_E("fail to init edbus method(%d)", ret);
-
-	if (vconf_notify_key_changed(VCONFKEY_SYSMAN_POWER_OFF_STATUS, (void *)poweroff_control_cb, NULL) < 0) {
-		_E("Vconf notify key chaneged failed: KEY(%s)", VCONFKEY_SYSMAN_POWER_OFF_STATUS);
-	}
 
 	register_edbus_signal_handler(DEVICED_OBJECT_PATH, DEVICED_INTERFACE_NAME,
 			SIGNAL_NAME_POWEROFF_POPUP,

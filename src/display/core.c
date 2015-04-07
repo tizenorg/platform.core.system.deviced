@@ -51,6 +51,7 @@
 #include "core/edbus-handler.h"
 #include "core/config-parser.h"
 #include "extcon/extcon.h"
+#include "power/power-handler.h"
 #include "dd-display.h"
 
 #define PM_STATE_LOG_FILE		"/var/log/pm_state.log"
@@ -1918,12 +1919,12 @@ static int update_setting(int key_idx, int val)
 		break;
 	case SETTING_POWEROFF:
 		switch (val) {
-		case VCONFKEY_SYSMAN_POWER_OFF_NONE:
-		case VCONFKEY_SYSMAN_POWER_OFF_POPUP:
+		case POWER_OFF_NONE:
+		case POWER_OFF_POPUP:
 			pm_status_flag &= ~PWROFF_FLAG;
 			break;
-		case VCONFKEY_SYSMAN_POWER_OFF_DIRECT:
-		case VCONFKEY_SYSMAN_POWER_OFF_RESTART:
+		case POWER_OFF_DIRECT:
+		case POWER_OFF_RESTART:
 			pm_status_flag |= PWROFF_FLAG;
 			break;
 		}
