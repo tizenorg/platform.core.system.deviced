@@ -34,7 +34,6 @@
 
 #include "util.h"
 #include "core.h"
-#include "core/list.h"
 
 struct lock_info {
 	unsigned long hash;
@@ -70,7 +69,7 @@ static void shrink_lock_info_list(void)
 
 	EINA_LIST_REVERSE_FOREACH_SAFE(lock_info_list, l, l_prev, info) {
 		if (info->locktime == 0) {
-			EINA_LIST_REMOVE_LIST(lock_info_list, l);
+			lock_info_list = eina_list_remove_list(lock_info_list, l);
 			if (info->name)
 				free(info->name);
 			free(info);
@@ -101,7 +100,7 @@ int set_lock_time(const char *pname, int state)
 			if (info->locktime == 0)
 				info->locktime = get_time();
 			info->unlocktime = 0;
-			EINA_LIST_PROMOTE_LIST(lock_info_list, l);
+			lock_info_list = eina_list_promote_list(lock_info_list, l);
 			eina_list_data_set(l, info);
 			return 0;
 		}
@@ -120,7 +119,7 @@ int set_lock_time(const char *pname, int state)
 	info->unlocktime = 0;
 	info->time = 0;
 
-	EINA_LIST_APPEND(lock_info_list, info);
+	lock_info_list = eina_list_append(lock_info_list, info);
 
 	return 0;
 }
@@ -143,7 +142,7 @@ int set_unlock_time(const char *pname, int state)
 
 	EINA_LIST_FOREACH(lock_info_list, l, info)
 		if (info->hash == val && info->state == state) {
-			EINA_LIST_PROMOTE_LIST(lock_info_list, l);
+			lock_info_list = eina_list_promote_list(lock_info_list, l);
 			find = true;
 			break;
 		}
@@ -178,7 +177,7 @@ void free_lock_info_list(void)
 		return;
 
 	EINA_LIST_FOREACH_SAFE(lock_info_list, l, l_next, info) {
-		EINA_LIST_REMOVE(lock_info_list, l);
+		lock_info_list = eina_list_remove(lock_info_list, l);
 		if (info->name)
 			free(info->name);
 		free(info);

@@ -90,7 +90,7 @@ static int custom_change_pid = -1;
 static char *custom_change_name;
 static int standby_mode = false;
 static int standby_state = false;
-static Eina_List *standby_mode_list = NULL;
+static dd_list *standby_mode_list;
 static int (*basic_action) (int);
 static bool hallic_open = true;
 static Ecore_Timer *lock_timeout_id;
@@ -99,7 +99,7 @@ static int tts_state = false;
 static struct timeval lcdon_tv;
 static int lcd_paneloff_mode = false;
 static int stay_touchscreen_off = false;
-static Eina_List *lcdon_ops = NULL;
+static dd_list *lcdon_ops;
 static bool lcdon_broadcast = false;
 
 /* default transition, action fuctions */
@@ -288,7 +288,7 @@ static unsigned long get_lcd_on_flags(void)
 
 void lcd_on_procedure(int state, enum device_flags flag)
 {
-	Eina_List *l = NULL;
+	dd_list *l = NULL;
 	const struct device_ops *ops = NULL;
 	unsigned long flags = get_lcd_on_flags();
 	flags |= flag;
@@ -307,7 +307,7 @@ void lcd_on_procedure(int state, enum device_flags flag)
 			backlight_ops.update();
 	}
 
-	EINA_LIST_FOREACH(lcdon_ops, l, ops)
+	DD_LIST_FOREACH(lcdon_ops, l, ops)
 		ops->start(flags);
 
 	if (CHECK_OPS(keyfilter_ops, backlight_enable))
@@ -316,7 +316,7 @@ void lcd_on_procedure(int state, enum device_flags flag)
 
 inline void lcd_off_procedure(void)
 {
-	Eina_List *l = NULL;
+	dd_list *l = NULL;
 	const struct device_ops *ops = NULL;
 	unsigned long flags = NORMAL_MODE;
 
@@ -332,7 +332,7 @@ inline void lcd_off_procedure(void)
 	if (CHECK_OPS(keyfilter_ops, backlight_enable))
 		keyfilter_ops->backlight_enable(false);
 
-	EINA_LIST_REVERSE_FOREACH(lcdon_ops, l, ops)
+	DD_LIST_REVERSE_FOREACH(lcdon_ops, l, ops)
 		ops->stop(flags);
 
 	if (tts_state)
@@ -892,17 +892,17 @@ static int standby_action(int timeout)
 
 static void set_standby_mode(pid_t pid, int enable)
 {
-	Eina_List *l = NULL;
-	Eina_List *l_next = NULL;
+	dd_list *l = NULL;
+	dd_list *l_next = NULL;
 	void *data;
 
 	if (enable) {
-		EINA_LIST_FOREACH(standby_mode_list, l, data)
+		DD_LIST_FOREACH(standby_mode_list, l, data)
 			if (pid == (pid_t)((intptr_t)data)) {
 				_E("%d already acquired standby mode", pid);
 				return;
 			}
-		EINA_LIST_APPEND(standby_mode_list, (void *)((intptr_t)pid));
+		DD_LIST_APPEND(standby_mode_list, (void *)((intptr_t)pid));
 		_I("%d acquire standby mode", pid);
 		if (standby_mode)
 			return;
@@ -914,7 +914,7 @@ static void set_standby_mode(pid_t pid, int enable)
 	} else {
 		if (!standby_mode)
 			return;
-		EINA_LIST_FOREACH_SAFE(standby_mode_list, l, l_next, data)
+		DD_LIST_FOREACH_SAFE(standby_mode_list, l, l_next, data)
 			if (pid == (pid_t)((intptr_t)data)) {
 				standby_mode_list = eina_list_remove_list(
 						    standby_mode_list, l);
@@ -1317,7 +1317,7 @@ void print_info(int fd)
 	int s_index = 0;
 	char buf[255];
 	int i = 1, ret;
-	Eina_List *l = NULL;
+	dd_list *l = NULL;
 	void *data;
 	char pname[PATH_MAX];
 
@@ -1366,7 +1366,7 @@ void print_info(int fd)
 		snprintf(buf, sizeof(buf), "\n\nstandby mode is on\n");
 		write(fd, buf, strlen(buf));
 
-		EINA_LIST_FOREACH(standby_mode_list, l, data) {
+		DD_LIST_FOREACH(standby_mode_list, l, data) {
 			get_pname((pid_t)((intptr_t)data), pname);
 			snprintf(buf, sizeof(buf),
 			    "  standby mode acquired by pid %d"
@@ -2030,25 +2030,25 @@ static void init_lcd_operation(void)
 
 	ops = find_device("display");
 	if (!check_default(ops))
-		EINA_LIST_APPEND(lcdon_ops, ops);
+		DD_LIST_APPEND(lcdon_ops, ops);
 
 	ops = find_device("touchscreen");
 	if (!check_default(ops))
-		EINA_LIST_APPEND(lcdon_ops, ops);
+		DD_LIST_APPEND(lcdon_ops, ops);
 
 	ops = find_device("touchkey");
 	if (!check_default(ops))
-		EINA_LIST_APPEND(lcdon_ops, ops);
+		DD_LIST_APPEND(lcdon_ops, ops);
 }
 
 static void exit_lcd_operation(void)
 {
-	Eina_List *l = NULL;
-	Eina_List *l_next = NULL;
+	dd_list *l = NULL;
+	dd_list *l_next = NULL;
 	const struct device_ops *ops = NULL;
 
-	EINA_LIST_FOREACH_SAFE(lcdon_ops, l, l_next, ops)
-		EINA_LIST_REMOVE_LIST(lcdon_ops, l);
+	DD_LIST_FOREACH_SAFE(lcdon_ops, l, l_next, ops)
+		DD_LIST_REMOVE_LIST(lcdon_ops, l);
 }
 
 enum {
