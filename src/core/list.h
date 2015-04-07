@@ -46,4 +46,18 @@ typedef GList dd_list;
 	for (elem = g_list_last(head); elem && ((node = elem->data) != NULL); \
 			elem = g_list_previous(elem), node = NULL)
 
+typedef GQueue dd_queue;
+#define DD_QUEUE_INIT \
+	G_QUEUE_INIT
+#define DD_QUEUE_PUSH_HEAD(a, b) \
+	g_queue_push_head(a, b)
+#define DD_QUEUE_PUSH_TAIL(a, b) \
+	g_queue_push_tail(a, b)
+#define DD_QUEUE_POP_HEAD(a) \
+	g_queue_pop_head(a)
+#define DD_QUEUE_POP_TAIL(a) \
+	g_queue_pop_tail(a)
+#define DD_QUEUE_IS_EMPTY(a) \
+	g_queue_is_empty(a)
+
 #endif
