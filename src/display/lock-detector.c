@@ -30,11 +30,10 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <sys/types.h>
-#include <Eina.h>
+#include <core/list.h>
 
 #include "util.h"
 #include "core.h"
-#include "core/list.h"
 
 struct lock_info {
 	unsigned long hash;
@@ -48,7 +47,7 @@ struct lock_info {
 
 #define LIMIT_COUNT	128
 
-static Eina_List *lock_info_list;
+static dd_list *lock_info_list;
 
 static long get_time(void)
 {
@@ -59,18 +58,18 @@ static long get_time(void)
 
 static void shrink_lock_info_list(void)
 {
-	Eina_List *l, *l_prev;
+	dd_list *l, *l_prev;
 	struct lock_info *info;
 	unsigned int count;
 
-	count = eina_list_count(lock_info_list);
+	count = DD_LIST_LENGTH(lock_info_list);
 	if (count <= LIMIT_COUNT)
 		return;
 	_D("list is shrink : count %d", count);
 
-	EINA_LIST_REVERSE_FOREACH_SAFE(lock_info_list, l, l_prev, info) {
+	DD_LIST_REVERSE_FOREACH_SAFE(lock_info_list, l, l_prev, info) {
 		if (info->locktime == 0) {
-			EINA_LIST_REMOVE_LIST(lock_info_list, l);
+			DD_LIST_REMOVE_LIST(lock_info_list, l);
 			if (info->name)
 				free(info->name);
 			free(info);
@@ -84,7 +83,7 @@ static void shrink_lock_info_list(void)
 int set_lock_time(const char *pname, int state)
 {
 	struct lock_info *info;
-	Eina_List *l;
+	dd_list *l;
 	unsigned long val;
 
 	if (!pname)
@@ -93,16 +92,18 @@ int set_lock_time(const char *pname, int state)
 	if (state < S_NORMAL || state > S_SLEEP)
 		return -EINVAL;
 
-	val = eina_hash_superfast(pname, strlen(pname));
+	val = g_str_hash(pname);
 
-	EINA_LIST_FOREACH(lock_info_list, l, info)
-		if (info->hash == val && info->state == state) {
+	DD_LIST_FOREACH(lock_info_list, l, info)
+		if (info->hash == val &&
+		    !strncmp(info->name, pname, strlen(pname)+1) &&
+		    info->state == state) {
 			info->count += 1;
 			if (info->locktime == 0)
 				info->locktime = get_time();
 			info->unlocktime = 0;
-			EINA_LIST_PROMOTE_LIST(lock_info_list, l);
-			eina_list_data_set(l, info);
+			DD_LIST_REMOVE(lock_info_list, info);
+			DD_LIST_PREPEND(lock_info_list, info);
 			return 0;
 		}
 
@@ -120,7 +121,7 @@ int set_lock_time(const char *pname, int state)
 	info->unlocktime = 0;
 	info->time = 0;
 
-	EINA_LIST_APPEND(lock_info_list, info);
+	DD_LIST_APPEND(lock_info_list, info);
 
 	return 0;
 }
@@ -130,7 +131,7 @@ int set_unlock_time(const char *pname, int state)
 	bool find = false;
 	long diff;
 	struct lock_info *info;
-	Eina_List *l;
+	dd_list *l;
 	unsigned long val;
 
 	if (!pname)
@@ -139,11 +140,14 @@ int set_unlock_time(const char *pname, int state)
 	if (state < S_NORMAL || state > S_SLEEP)
 		return -EINVAL;
 
-	val = eina_hash_superfast(pname, strlen(pname));
+	val = g_str_hash(pname);
 
-	EINA_LIST_FOREACH(lock_info_list, l, info)
-		if (info->hash == val && info->state == state) {
-			EINA_LIST_PROMOTE_LIST(lock_info_list, l);
+	DD_LIST_FOREACH(lock_info_list, l, info)
+		if (info->hash == val &&
+		    !strncmp(info->name, pname, strlen(pname)+1) &&
+		    info->state == state) {
+			DD_LIST_REMOVE(lock_info_list, info);
+			DD_LIST_PREPEND(lock_info_list, info);
 			find = true;
 			break;
 		}
@@ -161,9 +165,7 @@ int set_unlock_time(const char *pname, int state)
 		info->time += diff;
 	info->locktime = 0;
 
-	eina_list_data_set(l, info);
-
-	if (eina_list_count(lock_info_list) > LIMIT_COUNT)
+	if (DD_LIST_LENGTH(lock_info_list) > LIMIT_COUNT)
 		shrink_lock_info_list();
 
 	return 0;
@@ -171,14 +173,14 @@ int set_unlock_time(const char *pname, int state)
 
 void free_lock_info_list(void)
 {
-	Eina_List *l, *l_next;
+	dd_list *l, *l_next;
 	struct lock_info *info;
 
 	if (!lock_info_list)
 		return;
 
-	EINA_LIST_FOREACH_SAFE(lock_info_list, l, l_next, info) {
-		EINA_LIST_REMOVE(lock_info_list, l);
+	DD_LIST_FOREACH_SAFE(lock_info_list, l, l_next, info) {
+		DD_LIST_REMOVE(lock_info_list, info);
 		if (info->name)
 			free(info->name);
 		free(info);
@@ -189,7 +191,7 @@ void free_lock_info_list(void)
 void print_lock_info_list(int fd)
 {
 	struct lock_info *info;
-	Eina_List *l;
+	dd_list *l;
 	char buf[255];
 
 	if (!lock_info_list)
@@ -204,7 +206,7 @@ void print_lock_info_list(int fd)
 	    "count", "locktime", "unlocktime", "time", "process name");
 	write(fd, buf, strlen(buf));
 
-	EINA_LIST_FOREACH(lock_info_list, l, info) {
+	DD_LIST_FOREACH(lock_info_list, l, info) {
 		long time = 0;
 		if (info->locktime != 0 && info->unlocktime == 0)
 			time = get_time() - info->locktime;
