@@ -17,17 +17,11 @@
  */
 
 
-#ifndef __MMC_HANDLER_H__
-#define __MMC_HANDLER_H__
+#ifndef __BLOCK_H__
+#define __BLOCK_H__
 
 #include <stdbool.h>
-#include <tzplatform_config.h>
-
-#define SMACKFS_MOUNT_OPT		"smackfsroot=*,smackfsdef=*"
-#define MMC_MOUNT_POINT		tzplatform_mkpath(TZ_SYS_STORAGE,"sdcard")
-
-#define BUF_LEN		20
-#define RETRY_COUNT	10
+#include "core/common.h"
 
 enum mmc_fs_type {
 	FS_TYPE_VFAT = 0,
@@ -53,10 +47,25 @@ struct fs_check {
 
 void add_fs(const struct mmc_fs_ops *fs);
 void remove_fs(const struct mmc_fs_ops *fs);
-int get_mmc_devpath(char devpath[]);
-bool mmc_check_mounted(const char *mount_point);
 
-int get_block_number(void);
+enum block_device_type {
+	BLOCK_SCSI_DEV,
+	BLOCK_MMC_DEV,
+};
 
-void mmc_mount_done(void);
-#endif /* __MMC_HANDLER_H__ */
+enum unmount_operation {
+	UNMOUNT_NORMAL,
+	UNMOUNT_FORCE,
+};
+
+struct block_data {
+	enum block_device_type type;
+	char *devpath;
+	char *mount_point;
+	bool deleted;
+};
+
+#define SMACKFS_MOUNT_OPT   "smackfsroot=*,smackfsdef=*"
+#define RETRY_COUNT         10
+
+#endif /* __BLOCK_H__ */

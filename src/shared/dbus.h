@@ -73,6 +73,9 @@
 /* Led service: play/stop led operations about led */
 #define DEVICED_PATH_LED                    DEVICED_OBJECT_PATH"/Led"
 #define DEVICED_INTERFACE_LED               DEVICED_INTERFACE_NAME".Led"
+/* Block service: manage block device */
+#define DEVICED_PATH_BLOCK                  DEVICED_OBJECT_PATH"/Block"
+#define DEVICED_INTERFACE_BLOCK             DEVICED_INTERFACE_NAME".Block"
 /* MMC service: mount/unmount/format mmc operations about mmc */
 #define DEVICED_PATH_MMC                    DEVICED_OBJECT_PATH"/Mmc"
 #define DEVICED_INTERFACE_MMC               DEVICED_INTERFACE_NAME".Mmc"
