@@ -26,6 +26,6 @@ enum mmc_config_type {
 	MAX_RATIO = 0,
 };
 
-void mmc_set_config(enum mmc_config_type type);
+void mmc_set_config(enum mmc_config_type type, const char *devpath);
 void mmc_load_config(void);
 #endif /* __MMC_CONFIG_H__ */

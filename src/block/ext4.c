@@ -29,7 +29,7 @@
 #include "core/common.h"
 #include "core/devices.h"
 #include "core/log.h"
-#include "mmc-handler.h"
+#include "block.h"
 
 #define FS_EXT4_NAME	"ext4"
 

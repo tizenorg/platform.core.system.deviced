@@ -28,7 +28,6 @@
 #include "core/log.h"
 #include "core/common.h"
 #include "core/config-parser.h"
-#include "mmc-handler.h"
 #include "config.h"
 
 #define MAX_RATIO_CONF_FILE	"/etc/deviced/mmc.conf"
@@ -42,16 +41,17 @@ static struct mmc_policy_type {
 	.max_ratio = MAX_RATIO_DURATION,
 };
 
-static void mmc_max_ratio(void)
+static void mmc_max_ratio(const char *devpath)
 {
 	char buf[PATH_MAX];
 	FILE *fp;
 	int ret;
-	int num;
+	int partition_num;
+	int dev_num;
 	int retry;
 
-	num = get_block_number();
-	snprintf(buf, PATH_MAX, MAX_RATIO_PATH, num);
+	sscanf(devpath, "/dev/mmcblk%dp%d", &dev_num, &partition_num);
+	snprintf(buf, PATH_MAX, MAX_RATIO_PATH, dev_num);
 
 	for (retry = MAX_RATIO_CONFIG_RETRY; retry > 0 ; retry--) {
 		ret = sys_set_int(buf, mmc_policy.max_ratio);
@@ -94,11 +94,11 @@ void mmc_load_config(void)
 		_E("Failed to load %s, %d Use default value!", MAX_RATIO_CONF_FILE, ret);
 }
 
-void mmc_set_config(enum mmc_config_type type)
+void mmc_set_config(enum mmc_config_type type, const char *devpath)
 {
 	switch(type) {
 	case MAX_RATIO:
-		mmc_max_ratio();
+		mmc_max_ratio(devpath);
 	break;
 	}
 }

@@ -25,7 +25,7 @@
 
 #include "core/common.h"
 #include "core/log.h"
-#include "mmc-handler.h"
+#include "block.h"
 
 #define FS_VFAT_NAME	"mkdosfs"
 
