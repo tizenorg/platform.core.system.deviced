@@ -57,6 +57,8 @@
 
 /* block */
 #define BLOCK_SUBSYSTEM         "block"
+#define BLOCK_DEVTYPE_DISK      "disk"
+#define BLOCK_DEVTYPE_PARTITION "partition"
 
 /* power supply status */
 enum {
