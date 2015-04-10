@@ -1,7 +1,7 @@
 /*
  * deviced
  *
- * Copyright (c) 2012 - 2013 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2012 - 2015 Samsung Electronics Co., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the License);
  * you may not use this file except in compliance with the License.
@@ -17,17 +17,11 @@
  */
 
 
-#ifndef __MMC_HANDLER_H__
-#define __MMC_HANDLER_H__
+#ifndef __BLOCK_H__
+#define __BLOCK_H__
 
 #include <stdbool.h>
-#include <tzplatform_config.h>
-
-#define SMACKFS_MOUNT_OPT		"smackfsroot=*,smackfsdef=*"
-#define MMC_MOUNT_POINT		tzplatform_mkpath(TZ_SYS_STORAGE,"sdcard")
-
-#define BUF_LEN		20
-#define RETRY_COUNT	10
+#include "core/common.h"
 
 enum mmc_fs_type {
 	FS_TYPE_VFAT = 0,
@@ -53,10 +47,30 @@ struct fs_check {
 
 void add_fs(const struct mmc_fs_ops *fs);
 void remove_fs(const struct mmc_fs_ops *fs);
-int get_mmc_devpath(char devpath[]);
-bool mmc_check_mounted(const char *mount_point);
 
-int get_block_number(void);
+enum block_device_type {
+	BLOCK_SCSI_DEV,
+	BLOCK_MMC_DEV,
+};
 
-void mmc_mount_done(void);
-#endif /* __MMC_HANDLER_H__ */
+enum mount_state {
+	BLOCK_UNMOUNT,
+	BLOCK_MOUNT,
+};
+
+struct block_data {
+	enum block_device_type block_type;
+	char *devnode;
+	char *fs_usage;
+	char *fs_type;
+	char *fs_version;
+	char *fs_uuid_enc;
+	bool readonly;
+	char *mount_point;
+	enum mount_state state;
+};
+
+#define SMACKFS_MOUNT_OPT   "smackfsroot=*,smackfsdef=*"
+#define RETRY_COUNT         10
+
+#endif /* __BLOCK_H__ */
