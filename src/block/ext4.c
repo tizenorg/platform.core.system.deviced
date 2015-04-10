@@ -1,7 +1,7 @@
 /*
  * deviced
  *
- * Copyright (c) 2012 - 2013 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2012 - 2015 Samsung Electronics Co., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the License);
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@
 #include "core/common.h"
 #include "core/devices.h"
 #include "core/log.h"
-#include "mmc-handler.h"
+#include "block.h"
 
 #define FS_EXT4_NAME	"ext4"
 
