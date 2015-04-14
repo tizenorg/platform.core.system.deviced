@@ -24,7 +24,7 @@
 #include "log.h"
 
 struct device_request {
-	int (*func)(void *data);
+	void (*func)(void *data);
 	void *data;
 };
 
@@ -77,7 +77,7 @@ static void process_next_request_in_idle(void)
 		_E("fail to add request to idler");
 }
 
-int add_idle_request(int (*func)(void *data), void *data)
+int add_idle_request(void (*func)(void *data), void *data)
 {
 	struct device_request *req;
 
