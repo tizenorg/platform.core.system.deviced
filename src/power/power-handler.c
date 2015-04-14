@@ -247,7 +247,7 @@ static void poweroff_stop_systemd_service(void)
 	umount2("/sys/fs/cgroup", MNT_FORCE |MNT_DETACH);
 }
 
-static int poweroff_idler_cb(void *data)
+static void poweroff_idler_cb(void *data)
 {
 	enum poweroff_type val = (int)data;
 	int ret;
@@ -280,8 +280,6 @@ static int poweroff_idler_cb(void *data)
 
 	if (update_pm_setting)
 		update_pm_setting(SETTING_POWEROFF, val);
-
-	return 0;
 }
 
 static int power_execute(void *data)
