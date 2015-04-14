@@ -23,6 +23,7 @@
 #include "common.h"
 
 struct device_notifier {
+	bool deleted;
 	enum device_notifier_type status;
 	int (*func)(void *data);
 };
@@ -51,7 +52,7 @@ int register_notifier(enum device_notifier_type status, int (*func)(void *data))
 		return -EINVAL;
 	}
 
-	notifier = malloc(sizeof(struct device_notifier));
+	notifier = calloc(1, sizeof(struct device_notifier));
 	if (!notifier) {
 		_E("Fail to malloc for notifier!");
 		return -ENOMEM;
@@ -77,25 +78,45 @@ int unregister_notifier(enum device_notifier_type status, int (*func)(void *data
 
 	FIND_NOTIFIER(device_notifier_list, n, notifier, status, func) {
 		_I("[%d, %x]", status, func);
-		DD_LIST_REMOVE(device_notifier_list, notifier);
-		free(notifier);
+		notifier->deleted = true;
 	}
 
 	return 0;
 }
 
-void device_notify(enum device_notifier_type status, void *data)
+static void delete_unused_notifier_cb(void *data)
 {
-	dd_list *n, *next;
+	dd_list *n;
+	dd_list *next;
 	struct device_notifier *notifier;
-	int cnt = 0;
 
 	DD_LIST_FOREACH_SAFE(device_notifier_list, n, next, notifier) {
-		if (status == notifier->status) {
-			if (notifier->func) {
+		if (notifier->deleted) {
+			DD_LIST_REMOVE_LIST(device_notifier_list, n);
+			free(notifier);
+		}
+	}
+}
+
+void device_notify(enum device_notifier_type status, void *data)
+{
+	dd_list *n;
+	struct device_notifier *notifier;
+	int ret;
+	static int depth;
+
+	depth++;
+	DD_LIST_FOREACH(device_notifier_list, n, notifier) {
+		if (!notifier->deleted && status == notifier->status) {
+			if (notifier->func)
 				notifier->func(data);
-				cnt++;
-			}
+		}
+	}
+
+	if (!(--depth)) {
+		ret = add_idle_request(delete_unused_notifier_cb, NULL);
+		if (ret < 0) {
+			_E("fail to add idle request : %d", ret);
 		}
 	}
 }

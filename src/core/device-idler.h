@@ -24,6 +24,6 @@
  * To allow for callbacks to be called when the daemon is idle state.
  */
 
-int add_idle_request(int (*func)(void *data), void *data);
+int add_idle_request(void (*func)(void *data), void *data);
 
 #endif /* __DEVICE_IDLER_H__ */
