@@ -671,7 +671,7 @@ static DBusMessage *edbus_setautobrightnessmin(E_DBus_Object *obj, DBusMessage *
 		goto error;
 	}
 	if (display_info.reset_autobrightness_min) {
-		register_edbus_watch(msg, WATCH_DISPLAY_AUTOBRIGHTNESS_MIN,
+		register_edbus_watch(sender, WATCH_NAME_OWNER_CHANGED,
 		    display_info.reset_autobrightness_min);
 		_I("set autobrightness min %d by %d", val, pid);
 	}
@@ -707,7 +707,7 @@ static DBusMessage *edbus_setlcdtimeout(E_DBus_Object *obj, DBusMessage *msg)
 	if (ret) {
 		_W("fail to set lcd timeout %d by %d", ret, pid);
 	} else {
-		register_edbus_watch(msg, WATCH_DISPLAY_LCD_TIMEOUT,
+		register_edbus_watch(sender, WATCH_NAME_OWNER_CHANGED,
 		    reset_lcd_timeout);
 		_I("set lcd timeout on %d, dim %d, holdblock %d by %d",
 		    on, dim, holdkey_block, pid);

@@ -60,6 +60,18 @@ static struct edbus_object {
 	/* Add new object & interface here*/
 };
 
+struct watch_func_info {
+	bool deleted;
+	void (*func)(const char *sender, enum watch_type type);
+};
+
+struct watch_info {
+	bool deleted;
+	enum watch_type type;
+	char *sender;
+	dd_list *func_list;
+};
+
 static dd_list *edbus_object_list;
 static dd_list *edbus_owner_list;
 static dd_list *edbus_handler_list;
@@ -258,14 +270,54 @@ int broadcast_edbus_signal(const char *path, const char *interface,
 	return 0;
 }
 
+static void watch_idler_cb(void *data)
+{
+	struct watch_info *watch;
+	struct watch_func_info *finfo;
+	dd_list *n;
+	dd_list *next;
+	dd_list *elem;
+	dd_list *enext;
+
+	DD_LIST_FOREACH_SAFE(edbus_watch_list, n, next, watch) {
+		if (watch->deleted) {
+			DD_LIST_REMOVE_LIST(edbus_watch_list, n);
+			DD_LIST_FOREACH_SAFE(watch->func_list, elem, enext, finfo)
+				free(finfo);
+			DD_LIST_FREE_LIST(watch->func_list);
+			free(watch->sender);
+			free(watch);
+		}
+	}
+}
+
+static void invoke_name_owner_changed(const char *sender)
+{
+	struct watch_info *watch;
+	struct watch_func_info *finfo;
+	dd_list *n;
+	dd_list *elem;
+	int len;
+
+	len = strlen(sender) + 1;
+	DD_LIST_FOREACH(edbus_watch_list, n, watch) {
+		if (!watch->deleted &&
+		    !strncmp(watch->sender, sender, len) &&
+		    watch->type == WATCH_NAME_OWNER_CHANGED) {
+			DD_LIST_FOREACH(watch->func_list, elem, finfo) {
+				if (!finfo->deleted &&
+				    finfo->func)
+				finfo->func(watch->sender, watch->type);
+			}
+		}
+	}
+}
+
 static DBusHandlerResult message_filter(DBusConnection *connection,
 		DBusMessage *message, void *data)
 {
-	char match[256];
 	int ret;
 	const char *iface, *member, *arg = NULL;
-	struct watch *watch;
-	dd_list *n, *next;
 
 	if (dbus_message_get_type(message) != DBUS_MESSAGE_TYPE_SIGNAL)
 		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
@@ -276,9 +328,6 @@ static DBusHandlerResult message_filter(DBusConnection *connection,
 	if (strcmp(iface, DBUS_INTERFACE_DBUS))
 		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 
-	if (strcmp(member, NAME_OWNER_CHANGED))
-		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
-
 	ret = dbus_message_get_args(message, NULL, DBUS_TYPE_STRING, &arg,
 		    DBUS_TYPE_INVALID);
 	if (!ret) {
@@ -286,90 +335,88 @@ static DBusHandlerResult message_filter(DBusConnection *connection,
 		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 	}
 
-	_D("Argument : %s", arg);
+	if (!strcmp(member, NAME_OWNER_CHANGED))
+		invoke_name_owner_changed(arg);
+	else
+		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 
-	DD_LIST_FOREACH_SAFE(edbus_watch_list, n, next, watch) {
-		if (strcmp(arg, watch->name)) continue;
-
-		if (watch->func)
-			watch->func(watch->name, watch->id);
-
-		DD_LIST_REMOVE(edbus_watch_list, watch);
-		free(watch->name);
-		free(watch);
-	}
-
-	/* remove registered sender */
-	snprintf(match, sizeof(match), NAME_OWNER_MATCH, arg);
-	dbus_bus_remove_match(conn, match, NULL);
-
-
-	if (DD_LIST_LENGTH(edbus_watch_list) == 0) {
-		dbus_connection_remove_filter(conn, message_filter, NULL);
-		_I("remove message filter, no watcher!");
-	}
-
+	add_idle_request(watch_idler_cb, NULL);
 	return DBUS_HANDLER_RESULT_HANDLED;
 }
 
-int register_edbus_watch(DBusMessage *msg, enum watch_id id, int (*func)(char *name, enum watch_id id))
+static struct watch_info *get_matched_watch_item(const char *sender,
+		enum watch_type type)
 {
-	char match[256];
-	const char *sender;
-	struct watch *watch;
+	int len;
 	dd_list *n;
-	int ret;
-	bool matched = false;
+	struct watch_info *watch;
 
-	if (!msg) {
-		_E("invalid argument!");
-		return -EINVAL;
-	}
+	assert(sender);
 
-	sender = dbus_message_get_sender(msg);
-	if (!sender) {
-		_E("invalid sender!");
-		return -EINVAL;
-	}
-
-	/* check the sender&id is already registered */
+	len = strlen(sender) + 1;
+	/* check the sender&type is already registered */
 	DD_LIST_FOREACH(edbus_watch_list, n, watch) {
-		if (strcmp(sender, watch->name))
-			continue;
-		if (id != watch->id) {
-			matched = true;
-			continue;
-		}
-
-		_I("%s(%d) is already watched!", watch->name, watch->id);
-
-		return 0;
+		if (!watch->deleted &&
+		    !strncmp(watch->sender, sender, len) &&
+		    type == watch->type)
+			return watch;
 	}
 
-	watch = malloc(sizeof(struct watch));
+	return NULL;
+}
+
+static bool get_valid_watch_item(void)
+{
+	struct watch_info *watch;
+	dd_list *elem;
+
+	DD_LIST_FOREACH(edbus_watch_list, elem, watch) {
+		if (!watch->deleted)
+			return true;
+	}
+
+	return false;
+}
+
+static struct watch_info *add_watch_item(const char *sender,
+		enum watch_type type)
+{
+	struct watch_info *watch;
+	char match[256];
+	int ret;
+
+	watch = calloc(1, sizeof(struct watch_info));
 	if (!watch) {
 		_E("Fail to malloc for watch!");
-		return -ENOMEM;
+		return NULL;
 	}
 
-	watch->id = id;
-	watch->func = func;
-	watch->name = strndup(sender, strlen(sender));
-
-	if (!watch->name) {
+	watch->type = type;
+	watch->sender = strndup(sender, strlen(sender));
+	if (!watch->sender) {
 		_E("Fail to malloc for watch name");
 		free(watch);
-		return -ENOMEM;
+		return NULL;
 	}
 
-	/* Add message filter */
-	if (DD_LIST_LENGTH(edbus_watch_list) == 0) {
-		ret = dbus_connection_add_filter(conn, message_filter, NULL, NULL);
+	switch (type) {
+	case WATCH_NAME_OWNER_CHANGED:
+		snprintf(match, sizeof(match), NAME_OWNER_MATCH, watch->sender);
+		dbus_bus_add_match(conn, match, NULL);
+		break;
+	default:
+		break;
+	}
+
+	/* add message filter */
+	if (!get_valid_watch_item()) {
+		ret = dbus_connection_add_filter(conn,
+				message_filter, NULL, NULL);
 		if (!ret) {
 			_E("fail to add message filter!");
-			free(watch->name);
+			free(watch->sender);
 			free(watch);
-			return -ENOMEM;
+			return NULL;
 		}
 		_I("success to add message filter!");
 	}
@@ -377,57 +424,155 @@ int register_edbus_watch(DBusMessage *msg, enum watch_id id, int (*func)(char *n
 	/* Add watch to watch list */
 	DD_LIST_APPEND(edbus_watch_list, watch);
 
-	if (!matched) {
-		snprintf(match, sizeof(match), NAME_OWNER_MATCH, watch->name);
-		dbus_bus_add_match(conn, match, NULL);
-	}
+	return watch;
+}
 
-	_I("%s(%d) is watched by dbus!", watch->name, watch->id);
+static int remove_watch_item(struct watch_info *watch)
+{
+	char match[256];
+	dd_list *elem;
+	struct watch_info *info;
+
+	assert(watch);
+
+	watch->deleted = true;
+
+	/* remove message filter */
+	if (!get_valid_watch_item())
+		dbus_connection_remove_filter(conn, message_filter, NULL);
+
+	switch (watch->type) {
+	case WATCH_NAME_OWNER_CHANGED:
+		snprintf(match, sizeof(match), NAME_OWNER_MATCH, watch->sender);
+		dbus_bus_remove_match(conn, match, NULL);
+		break;
+	default:
+		break;
+	}
 
 	return 0;
 }
 
-int unregister_edbus_watch(DBusMessage *msg, enum watch_id id)
+static int add_watch_func_item(struct watch_info *watch,
+		void (*func)(const char *sender, enum watch_type type))
 {
-	char match[256];
-	const char *sender;
-	struct watch *watch;
-	dd_list *n, *next;
+	struct watch_func_info *finfo;
+	dd_list *elem;
+
+	assert(watch);
+
+	DD_LIST_FOREACH(watch->func_list, elem, finfo) {
+		if (finfo->func == func) {
+			_E("there is already the same callback");
+			return -EEXIST;
+		}
+	}
+
+	finfo = calloc(1, sizeof(struct watch_func_info));
+	if (!finfo) {
+		_E("fail to allocate watch func info");
+		return -ENOMEM;
+	}
+
+	finfo->func = func;
+
+	/* add callback function to the watch list */
+	DD_LIST_APPEND(watch->func_list, finfo);
+
+	return 0;
+}
+
+static int remove_watch_func_item(struct watch_info *watch,
+		void (*func)(const char *sender, enum watch_type type))
+{
+	struct watch_func_info *finfo;
+	dd_list *elem;
 	bool matched = false;
 
-	if (!msg) {
-		_E("invalid argument!");
-		return -EINVAL;
-	}
+	assert(watch);
 
-	sender = dbus_message_get_sender(msg);
-	if (!sender) {
-		_E("invalid sender!");
-		return -EINVAL;
-	}
-
-	DD_LIST_FOREACH_SAFE(edbus_watch_list, n, next, watch) {
-		if (strcmp(sender, watch->name))
-			continue;
-
-		if (id != watch->id) {
+	/* check the no interest fuction */
+	DD_LIST_FOREACH(watch->func_list, elem, finfo) {
+		if (finfo->func == func)
+			finfo->deleted = true;
+		if (!finfo->deleted)
 			matched = true;
-			continue;
+	}
+
+	/* if it is the last item */
+	if (!matched)
+		remove_watch_item(watch);
+
+	return 0;
+}
+
+int register_edbus_watch(const char *sender,
+		enum watch_type type,
+		void (*func)(const char *sender, enum watch_type type))
+{
+	struct watch_info *watch;
+	bool isnew = false;
+	int ret;
+
+	if (!sender || !func) {
+		_E("invalid argument : sender(NULL) || func(NULL)");
+		return -EINVAL;
+	}
+
+	if (type < 0 || type >= WATCH_TYPE_END) {
+		_E("invalid argument : type(%d)", type);
+		return -EINVAL;
+	}
+
+	watch = get_matched_watch_item(sender, type);
+	if (!watch) {
+		/* create new watch item */
+		watch = add_watch_item(sender, type);
+		if (!watch) {
+			_E("fail to add watch item");
+			return -EPERM;
 		}
-		DD_LIST_REMOVE(edbus_watch_list, watch);
-		free(watch->name);
-		free(watch);
+		isnew = true;
 	}
 
-	/* remove match */
-	if (!matched) {
-		snprintf(match, sizeof(match), NAME_OWNER_MATCH, sender);
-		dbus_bus_remove_match(conn, match, NULL);
-
-		if (DD_LIST_LENGTH(edbus_watch_list) == 0)
-			dbus_connection_remove_filter(conn, message_filter,
-			    NULL);
+	/* add function */
+	ret = add_watch_func_item(watch, func);
+	if (ret < 0) {
+		if (isnew)
+			remove_watch_item(watch);
+		return ret;
 	}
+
+	_I("%s(%d) is watched by dbus!", sender, type);
+
+	return 0;
+}
+
+int unregister_edbus_watch(const char *sender, enum watch_type type,
+		void (*func)(const char *sender, enum watch_type type))
+{
+	struct watch_info *watch;
+
+	if (!sender || !func) {
+		_E("invalid argument : sender(NULL) || func(NULL)");
+		return -EINVAL;
+	}
+
+	if (type < 0 || type >= WATCH_TYPE_END) {
+		_E("invalid argument : type(%d)", type);
+		return -EINVAL;
+	}
+
+	watch = get_matched_watch_item(sender, type);
+	if (!watch) {
+		_E("fail to get matched watch item");
+		return -ENODEV;
+	}
+
+	/* remove function */
+	remove_watch_func_item(watch, func);
+
+	_I("%s(%d) is not watched by dbus!", sender, type);
 
 	return 0;
 }
@@ -436,18 +581,12 @@ static void unregister_edbus_watch_all(void)
 {
 	char match[256];
 	dd_list *n, *next;
-	struct watch *watch;
+	struct watch_info *watch;
 
-	if (DD_LIST_LENGTH(edbus_watch_list) > 0)
-		dbus_connection_remove_filter(conn, message_filter, NULL);
+	DD_LIST_FOREACH_SAFE(edbus_watch_list, n, next, watch)
+		remove_watch_item(watch);
 
-	DD_LIST_FOREACH_SAFE(edbus_watch_list, n, next, watch) {
-		snprintf(match, sizeof(match), NAME_OWNER_MATCH, watch->name);
-		dbus_bus_remove_match(conn, match, NULL);
-		DD_LIST_REMOVE(edbus_watch_list, watch);
-		free(watch->name);
-		free(watch);
-	}
+	add_idle_request(watch_idler_cb, NULL);
 }
 
 static int register_method(E_DBus_Interface *iface,

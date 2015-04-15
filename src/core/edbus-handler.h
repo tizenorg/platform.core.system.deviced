@@ -30,18 +30,17 @@ struct edbus_method {
 	E_DBus_Method_Cb func;
 };
 
-enum watch_id {
-	WATCH_DISPLAY_AUTOBRIGHTNESS_MIN,
-	WATCH_DISPLAY_LCD_TIMEOUT,
-	WATCH_DISPLAY_LOCK_STATE,
-	WATCH_DISPLAY_HOLD_BRIGHTNESS,
+enum watch_type {
+	WATCH_NAME_OWNER_CHANGED,
+	WATCH_TYPE_END,
 };
 
-struct watch {
-	enum watch_id id;
-	char *name;
-	int (*func)(char *name, enum watch_id id);
-};
+int register_edbus_watch(const char *sender,
+		enum watch_type type,
+		void (*func)(const char *sender, enum watch_type type));
+int unregister_edbus_watch(const char *sender,
+		enum watch_type type,
+		void (*func)(const char *sender, enum watch_type type));
 
 static inline DBusMessage *make_reply_message(DBusMessage *msg, int ret)
 {
@@ -63,8 +62,6 @@ E_DBus_Interface *get_edbus_interface(const char *path);
 pid_t get_edbus_sender_pid(DBusMessage *msg);
 int broadcast_edbus_signal(const char *path, const char *interface,
 		const char *name, const char *sig, char *param[]);
-int register_edbus_watch(DBusMessage *msg, enum watch_id id, int (*func)(char *name, enum watch_id id));
-int unregister_edbus_watch(DBusMessage *msg, enum watch_id id);
 
 void edbus_init(void *data);
 void edbus_exit(void *data);
