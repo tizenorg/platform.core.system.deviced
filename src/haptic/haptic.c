@@ -44,6 +44,7 @@
 #define HARDKEY_VIB_PRIORITY		2
 #define HARDKEY_VIB_DURATION		300
 #define HAPTIC_FEEDBACK_STEP		20
+#define DEFAULT_FEEDBACK_LEVEL      3
 
 /* power on, power off vibration variable */
 #define POWER_ON_VIB_DURATION			300
@@ -59,11 +60,17 @@
 
 #define CHECK_VALID_OPS(ops, r)		((ops) ? true : !(r = -ENODEV))
 
+static struct haptic_info {
+	const char *sender;
+	int handle;
+};
+
 /* for playing */
 static int g_handle;
 
 /* haptic operation variable */
 static dd_list *h_head;
+static dd_list *haptic_handle_list;
 static const struct haptic_plugin_ops *h_ops;
 static enum haptic_type h_type;
 static bool haptic_disabled;
@@ -134,7 +141,8 @@ static int convert_magnitude_by_conf(int level)
 		}
 	}
 
-	return -EINVAL;
+	_D("play default level");
+	return DEFAULT_FEEDBACK_LEVEL * HAPTIC_FEEDBACK_STEP;
 }
 
 static DBusMessage *edbus_get_count(E_DBus_Object *obj, DBusMessage *msg)
@@ -157,11 +165,50 @@ exit:
 	return reply;
 }
 
+static struct haptic_info *create_haptic_info(const char *sender, int handle)
+{
+	struct haptic_info *info;
+
+	if (!sender)
+		return NULL;
+
+	info = malloc(sizeof(struct haptic_info));
+	if (!info)
+		return NULL;
+
+	info->sender = strdup(sender);
+	info->handle = handle;
+	return info;
+}
+
+static void haptic_name_owner_changed(const char *sender, enum watch_type type)
+{
+	dd_list *n;
+	dd_list *next;
+	struct haptic_info *info;
+
+	_E("%s (type:%d, sender:%s)", __func__, type, sender);
+
+	DD_LIST_FOREACH_SAFE(haptic_handle_list, n, next, info) {
+		if (!strncmp(info->sender, sender, strlen(sender)+1)) {
+			h_ops->stop_device(info->handle);
+			h_ops->close_device(info->handle);
+			DD_LIST_REMOVE(haptic_handle_list, info);
+			free(info->sender);
+			free(info);
+		}
+	}
+
+	unregister_edbus_watch(sender, WATCH_NAME_OWNER_CHANGED);
+}
+
 static DBusMessage *edbus_open_device(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
 	int index, handle, ret;
+	struct haptic_info *info;
+	const char *sender;
 
 	/* Load haptic module before booting done */
 	if (!CHECK_VALID_OPS(h_ops, ret)) {
@@ -176,8 +223,23 @@ static DBusMessage *edbus_open_device(E_DBus_Object *obj, DBusMessage *msg)
 	}
 
 	ret = h_ops->open_device(index, &handle);
-	if (ret >= 0)
-		ret = handle;
+	if (ret < 0)
+		goto exit;
+
+	sender = dbus_message_get_sender(msg);
+	info = create_haptic_info(sender, handle);
+	if (ret < 0) {
+		_E("fail to create haptic information structure");
+		ret = -EPERM;
+		h_ops->close_device(handle);
+		goto exit;
+	}
+
+	DD_LIST_APPEND(haptic_handle_list, info);
+	register_edbus_watch(msg,
+			WATCH_NAME_OWNER_CHANGED, haptic_name_owner_changed);
+
+	ret = handle;
 
 exit:
 	reply = dbus_message_new_method_return(msg);
