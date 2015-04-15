@@ -136,7 +136,7 @@ extern struct display_config display_conf;
 struct display_function_info {
 	void (*update_auto_brightness)(bool);
 	int (*set_autobrightness_min)(int, char *);
-	int (*reset_autobrightness_min)(char *, enum watch_id);
+	void (*reset_autobrightness_min)(const char *, void *data);
 	int (*face_detection)(int, int, int);
 };
 
@@ -159,7 +159,7 @@ int trans_condition;
 pid_t idle_pid;
 int check_processes(enum state_t prohibit_state);
 extern struct state state[S_END];
-int reset_lcd_timeout(char *name, enum watch_id id);
+void reset_lcd_timeout(const char *sender, void *data);
 int check_lcdoff_lock_state(void);
 /**
  * @}

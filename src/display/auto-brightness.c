@@ -632,16 +632,16 @@ static int set_autobrightness_min(int val, char *name)
 	return 0;
 }
 
-static int reset_autobrightness_min(char *name, enum watch_id id)
+static void reset_autobrightness_min(const char *sender, void *data)
 {
-	if (!name)
-		return -EINVAL;
+	if (!sender)
+		return;
 
 	if (!min_brightness_name)
-		return -EINVAL;
+		return;
 
-	if (strcmp(name, min_brightness_name))
-		return -EINVAL;
+	if (strcmp(sender, min_brightness_name))
+		return;
 
 	_I("change to default %d -> %d, %s", min_brightness,
 	    PM_MIN_BRIGHTNESS, min_brightness_name);
@@ -652,8 +652,6 @@ static int reset_autobrightness_min(char *name, enum watch_id id)
 	}
 
 	update_brightness_direct();
-
-	return 0;
 }
 
 static int lcd_changed_cb(void *data)

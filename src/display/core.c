@@ -2080,18 +2080,18 @@ int set_lcd_timeout(int on, int dim, int holdkey_block, char *name)
 	return 0;
 }
 
-int reset_lcd_timeout(char *name, enum watch_id id)
+void reset_lcd_timeout(const char *sender, void *data)
 {
-	if (!name)
-		return -EINVAL;
+	if (!sender)
+		return;
 
 	if (!custom_change_name)
-		return -EINVAL;
+		return;
 
-	if (strcmp(name, custom_change_name))
-		return -EINVAL;
+	if (strcmp(sender, custom_change_name))
+		return;
 
-	_I("reset lcd timeout %s: set default timeout", name);
+	_I("reset lcd timeout %s: set default timeout", sender);
 
 	free(custom_change_name);
 	custom_change_name = 0;
@@ -2102,8 +2102,6 @@ int reset_lcd_timeout(char *name, enum watch_id id)
 	if (pm_cur_state == S_NORMAL) {
 		states[pm_cur_state].trans(EVENT_INPUT);
 	}
-
-	return 0;
 }
 
 static int hall_ic_open(void *data)
