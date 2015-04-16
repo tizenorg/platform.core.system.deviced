@@ -19,6 +19,7 @@
 
 #include <stdio.h>
 #include <errno.h>
+#include <assert.h>
 
 #include "log.h"
 #include "device-notifier.h"
@@ -27,75 +28,90 @@
 #include "list.h"
 #include "edbus-handler.h"
 
-#define PREDEF_UDEV_CONTROL		UDEV
+#define KERNEL          "kernel"
+#define UDEV            "udev"
+
+#define UDEV_MONITOR_SIZE   (10*1024)
+
+struct uevent_info {
+	struct udev_monitor *mon;
+	Ecore_Fd_Handler *fdh;
+	dd_list *event_list;
+};
 
 /* Uevent */
 static struct udev *udev;
-/* Kernel Uevent */
-static struct udev_monitor *mon;
-static Ecore_Fd_Handler *ufdh;
-static int ufd = -1;
 
-static dd_list *udev_event_list;
+static struct uevent_info kevent; /* kernel */
+static struct uevent_info uevent; /* udev */
 
-static Eina_Bool uevent_kernel_control_cb(void *data, Ecore_Fd_Handler *fd_handler)
+static Eina_Bool uevent_control_cb(void *data, Ecore_Fd_Handler *fd_handler)
 {
+	struct uevent_info *info = data;
 	struct udev_device *dev;
 	struct uevent_handler *l;
 	dd_list *elem;
 	const char *subsystem;
+	int len;
 
-	if ((dev = udev_monitor_receive_device(mon)) == NULL)
-		return EINA_TRUE;
+	assert(info);
+
+	dev = udev_monitor_receive_device(info->mon);
+	if (!dev)
+		return ECORE_CALLBACK_RENEW;
 
 	subsystem = udev_device_get_subsystem(dev);
+	if (!subsystem)
+		goto out;
 
-	DD_LIST_FOREACH(udev_event_list, elem, l) {
-		if (!strncmp(subsystem, l->subsystem, strlen(subsystem)) &&
+	len = strlen(subsystem);
+	DD_LIST_FOREACH(info->event_list, elem, l) {
+		if (!strncmp(l->subsystem, subsystem, len) &&
 		    l->uevent_func)
 			l->uevent_func(dev);
 	}
 
+out:
 	udev_device_unref(dev);
-	return EINA_TRUE;
+	return ECORE_CALLBACK_RENEW;
 }
 
-static int uevent_kernel_control_stop(void)
+static int uevent_control_stop(struct uevent_info *info)
 {
-	struct udev_device *dev = NULL;
+	struct udev_device *dev;
 
-	if (ufdh) {
-		ecore_main_fd_handler_del(ufdh);
-		ufdh = NULL;
+	if (!info)
+		return -EINVAL;
+
+	if (info->fdh) {
+		ecore_main_fd_handler_del(info->fdh);
+		info->fdh = NULL;
 	}
-	if (ufd >= 0) {
-		close(ufd);
-		ufd = -1;
-	}
-	if (mon) {
-		dev = udev_monitor_receive_device(mon);
-		if (dev) {
+	if (info->mon) {
+		dev = udev_monitor_receive_device(info->mon);
+		if (dev)
 			udev_device_unref(dev);
-			dev = NULL;
-		}
-		udev_monitor_unref(mon);
-		mon = NULL;
+		udev_monitor_unref(info->mon);
+		info->mon = NULL;
 	}
-	if (udev) {
-		udev_unref(udev);
-		udev = NULL;
-	}
+	if (udev)
+		udev = udev_unref(udev);
 	return 0;
 }
 
-static int uevent_kernel_control_start(void)
+static int uevent_control_start(const char *type,
+		struct uevent_info *info)
 {
 	struct uevent_handler *l;
 	dd_list *elem;
-	int i, ret;
+	int fd;
+	int ret;
 
-	if (udev && mon) {
-		_E("uevent control routine is alreay started");
+	if (!info)
+		return -EINVAL;
+
+	if (info->mon) {
+		_E("%s uevent control routine is alreay started", type);
 		return -EINVAL;
 	}
 
@@ -105,21 +121,25 @@ static int uevent_kernel_control_start(void)
 			_E("error create udev");
 			return -EINVAL;
 		}
-	}
+	} else
+		udev = udev_ref(udev);
 
-	mon = udev_monitor_new_from_netlink(udev, UDEV);
-	if (mon == NULL) {
+	info->mon = udev_monitor_new_from_netlink(udev, type);
+	if (info->mon == NULL) {
 		_E("error udev_monitor create");
 		goto stop;
 	}
 
-	if (udev_monitor_set_receive_buffer_size(mon, UDEV_MONITOR_SIZE) != 0) {
+	ret = udev_monitor_set_receive_buffer_size(info->mon,
+			UDEV_MONITOR_SIZE);
+	if (ret != 0) {
 		_E("fail to set receive buffer size");
 		goto stop;
 	}
 
-	DD_LIST_FOREACH(udev_event_list, elem, l) {
-		ret = udev_monitor_filter_add_match_subsystem_devtype(mon,
+	DD_LIST_FOREACH(info->event_list, elem, l) {
+		ret = udev_monitor_filter_add_match_subsystem_devtype(
+				info->mon,
 				l->subsystem, NULL);
 		if (ret < 0) {
 			_E("error apply subsystem filter");
@@ -127,52 +147,54 @@ static int uevent_kernel_control_start(void)
 		}
 	}
 
-	ret = udev_monitor_filter_update(mon);
+	ret = udev_monitor_filter_update(info->mon);
 	if (ret < 0)
 		_E("error udev_monitor_filter_update");
 
-	ufd = udev_monitor_get_fd(mon);
-	if (ufd == -1) {
+	fd = udev_monitor_get_fd(info->mon);
+	if (fd == -1) {
 		_E("error udev_monitor_get_fd");
 		goto stop;
 	}
 
-	ufdh = ecore_main_fd_handler_add(ufd, ECORE_FD_READ,
-			uevent_kernel_control_cb, NULL, NULL, NULL);
-	if (!ufdh) {
+	info->fdh = ecore_main_fd_handler_add(fd, ECORE_FD_READ,
+			uevent_control_cb, info, NULL, NULL);
+	if (!info->fdh) {
 		_E("error ecore_main_fd_handler_add");
 		goto stop;
 	}
 
-	if (udev_monitor_enable_receiving(mon) < 0) {
+	if (udev_monitor_enable_receiving(info->mon) < 0) {
 		_E("error unable to subscribe to udev events");
 		goto stop;
 	}
 
 	return 0;
 stop:
-	uevent_kernel_control_stop();
+	uevent_control_stop(info);
 	return -EINVAL;
-
 }
 
-int register_kernel_uevent_control(const struct uevent_handler *uh)
+static int register_uevent_control(struct uevent_info *info,
+		const struct uevent_handler *uh)
 {
 	struct uevent_handler *l;
 	dd_list *elem;
 	int r;
 	bool matched = false;
+	int len;
 
-	if (!uh)
+	if (!info || !uh || !uh->subsystem)
 		return -EINVAL;
 
 	/* if udev is not initialized, it just will be added list */
-	if (!udev || !mon)
+	if (!udev || !info->mon)
 		goto add_list;
 
+	len = strlen(uh->subsystem);
 	/* check if the same subsystem is already added */
-	DD_LIST_FOREACH(udev_event_list, elem, l) {
-		if (!strncmp(l->subsystem, uh->subsystem, strlen(l->subsystem))) {
+	DD_LIST_FOREACH(info->event_list, elem, l) {
+		if (!strncmp(l->subsystem, uh->subsystem, len)) {
 			matched = true;
 			break;
 		}
@@ -180,7 +202,7 @@ int register_kernel_uevent_control(const struct uevent_handler *uh)
 
 	/* the first request to add subsystem */
 	if (!matched) {
-		r = udev_monitor_filter_add_match_subsystem_devtype(mon,
+		r = udev_monitor_filter_add_match_subsystem_devtype(info->mon,
 				uh->subsystem, NULL);
 		if (r < 0) {
 			_E("fail to add %s subsystem : %d", uh->subsystem, r);
@@ -188,24 +210,30 @@ int register_kernel_uevent_control(const struct uevent_handler *uh)
 		}
 	}
 
-	r = udev_monitor_filter_update(mon);
+	r = udev_monitor_filter_update(info->mon);
 	if (r < 0)
 		_E("fail to update udev monitor filter : %d", r);
 
 add_list:
-	DD_LIST_APPEND(udev_event_list, uh);
+	DD_LIST_APPEND(info->event_list, uh);
 	return 0;
 }
 
-int unregister_kernel_uevent_control(const struct uevent_handler *uh)
+static int unregister_uevent_control(struct uevent_info *info,
+		const struct uevent_handler *uh)
 {
 	struct uevent_handler *l;
 	dd_list *n, *next;
+	int len;
 
-	DD_LIST_FOREACH_SAFE(udev_event_list, n, next, l) {
-		if (!strncmp(l->subsystem, uh->subsystem, strlen(l->subsystem)) &&
+	if (!info || !uh || !uh->subsystem)
+		return -EINVAL;
+
+	len = strlen(uh->subsystem);
+	DD_LIST_FOREACH_SAFE(info->event_list, n, next, l) {
+		if (!strncmp(l->subsystem, uh->subsystem, len) &&
 		    l->uevent_func == uh->uevent_func) {
-			DD_LIST_REMOVE(udev_event_list, l);
+			DD_LIST_REMOVE(info->event_list, l);
 			return 0;
 		}
 	}
@@ -213,100 +241,30 @@ int unregister_kernel_uevent_control(const struct uevent_handler *uh)
 	return -ENOENT;
 }
 
-int uevent_udev_get_path(const char *subsystem, dd_list **list)
+int register_kernel_uevent_control(const struct uevent_handler *uh)
 {
-	struct udev_enumerate *enumerate = NULL;
-	struct udev_list_entry *devices, *dev_list_entry;
-	int ret;
-
-	if (!udev) {
-		udev = udev_new();
-		if (!udev) {
-			_E("error create udev");
-			return -EIO;
-		}
-	}
-
-	enumerate = udev_enumerate_new(udev);
-	if (!enumerate)
-		return -EIO;
-
-	ret = udev_enumerate_add_match_subsystem(enumerate, subsystem);
-	if (ret < 0)
-		return -EIO;
-
-	ret = udev_enumerate_scan_devices(enumerate);
-	if (ret < 0)
-		return -EIO;
-
-	devices = udev_enumerate_get_list_entry(enumerate);
-
-	udev_list_entry_foreach(dev_list_entry, devices) {
-		const char *path;
-		path = udev_list_entry_get_name(dev_list_entry);
-		_D("subsystem : %s, path : %s", subsystem, path);
-		DD_LIST_APPEND(*list, (void*)path);
-	}
-
-	return 0;
+	return register_uevent_control(&kevent, uh);
 }
 
-static DBusMessage *dbus_udev_handler(E_DBus_Object *obj, DBusMessage *msg)
+int unregister_kernel_uevent_control(const struct uevent_handler *uh)
 {
-	DBusError err;
-	DBusMessageIter iter;
-	DBusMessage *reply;
-	pid_t pid;
-	int ret;
-	int argc;
-	char *type_str;
-	char *argv;
-
-	dbus_error_init(&err);
-
-	if (!dbus_message_get_args(msg, &err,
-		    DBUS_TYPE_STRING, &type_str,
-		    DBUS_TYPE_INT32, &argc,
-		    DBUS_TYPE_STRING, &argv, DBUS_TYPE_INVALID)) {
-		_E("there is no message");
-		ret = -EINVAL;
-		goto out;
-	}
-
-	if (argc < 0) {
-		_E("message is invalid!");
-		ret = -EINVAL;
-		goto out;
-	}
-
-	pid = get_edbus_sender_pid(msg);
-	if (kill(pid, 0) == -1) {
-		_E("%d process does not exist, dbus ignored!", pid);
-		ret = -ESRCH;
-		goto out;
-	}
-
-	if (strncmp(argv, "start", strlen("start")) == 0) {
-		ret = uevent_kernel_control_start();
-	} else if (strncmp(argv, "stop", strlen("stop")) == 0) {
-		ret = uevent_kernel_control_stop();
-	}
-
-out:
-	reply = dbus_message_new_method_return(msg);
-	dbus_message_iter_init_append(reply, &iter);
-	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
-
-	return reply;
+	return unregister_uevent_control(&kevent, uh);
 }
 
-static const struct edbus_method edbus_methods[] = {
-	{ PREDEF_UDEV_CONTROL,   "sis","i", dbus_udev_handler },
-};
+int register_udev_uevent_control(const struct uevent_handler *uh)
+{
+	return register_uevent_control(&uevent, uh);
+}
+
+int unregister_udev_uevent_control(const struct uevent_handler *uh)
+{
+	return unregister_uevent_control(&uevent, uh);
+}
 
 static int device_change_poweroff(void *data)
 {
-	uevent_kernel_control_stop();
+	uevent_control_stop(&kevent);
+	uevent_control_stop(&uevent);
 	return 0;
 }
 
@@ -316,15 +274,11 @@ static void udev_init(void *data)
 
 	register_notifier(DEVICE_NOTIFIER_POWEROFF, device_change_poweroff);
 
-	ret = register_edbus_method(DEVICED_PATH_SYSNOTI,
-			edbus_methods, ARRAY_SIZE(edbus_methods));
-	if (ret < 0)
-		_E("fail to init edbus method(%d)", ret);
+	if (uevent_control_start(KERNEL, &kevent) != 0)
+		_E("fail uevent kernel control init");
 
-	if (uevent_kernel_control_start() != 0) {
-		_E("fail uevent control init");
-		return;
-	}
+	if (uevent_control_start(UDEV, &uevent) != 0)
+		_E("fail uevent udev control init");
 }
 
 static void udev_exit(void *data)
