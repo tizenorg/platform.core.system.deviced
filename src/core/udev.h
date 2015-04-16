@@ -22,7 +22,8 @@
 
 #include <libudev.h>
 
-#define UDEV			"kernel"
+#define KERNEL			"kernel"
+#define UDEV			"udev"
 
 #define UDEV_CHANGE		"change"
 #define UDEV_ADD		"add"
@@ -89,5 +90,9 @@ struct uevent_handler {
 
 int register_kernel_uevent_control(const struct uevent_handler *uh);
 int unregister_kernel_uevent_control(const struct uevent_handler *uh);
+
+int register_udev_uevent_control(const struct uevent_handler *uh);
+int unregister_udev_uevent_control(const struct uevent_handler *uh);
+
 
 #endif /* __UDEV_H__ */
