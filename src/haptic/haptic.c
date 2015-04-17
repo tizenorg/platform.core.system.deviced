@@ -44,6 +44,7 @@
 #define HARDKEY_VIB_PRIORITY		2
 #define HARDKEY_VIB_DURATION		300
 #define HAPTIC_FEEDBACK_STEP		20
+#define DEFAULT_FEEDBACK_LEVEL		3
 
 /* power on, power off vibration variable */
 #define POWER_ON_VIB_DURATION			300
@@ -59,11 +60,17 @@
 
 #define CHECK_VALID_OPS(ops, r)		((ops) ? true : !(r = -ENODEV))
 
+struct haptic_info {
+	char *sender;
+	dd_list *handle_list;
+};
+
 /* for playing */
 static int g_handle;
 
 /* haptic operation variable */
 static dd_list *h_head;
+static dd_list *haptic_handle_list;
 static const struct haptic_plugin_ops *h_ops;
 static enum haptic_type h_type;
 static bool haptic_disabled;
@@ -78,6 +85,7 @@ static struct haptic_config haptic_conf;
 static int haptic_start(void);
 static int haptic_stop(void);
 static int haptic_internal_init(void);
+static int remove_haptic_info(struct haptic_info *info);
 
 void add_haptic(const struct haptic_ops *ops)
 {
@@ -134,7 +142,8 @@ static int convert_magnitude_by_conf(int level)
 		}
 	}
 
-	return -EINVAL;
+	_D("play default level");
+	return DEFAULT_FEEDBACK_LEVEL * HAPTIC_FEEDBACK_STEP;
 }
 
 static DBusMessage *edbus_get_count(E_DBus_Object *obj, DBusMessage *msg)
@@ -157,11 +166,91 @@ exit:
 	return reply;
 }
 
+static void haptic_name_owner_changed(const char *sender, enum watch_type type)
+{
+	dd_list *n;
+	struct haptic_info *info;
+	int len;
+	int handle;
+	bool matched = false;
+
+	_I("%s (type:%d, sender:%s)", __func__, type, sender);
+
+	len = strlen(sender) + 1;
+	DD_LIST_FOREACH(haptic_handle_list, n, info) {
+		if (!strncmp(info->sender, sender, len))
+			break;
+	}
+
+	for (n = info->handle_list; n; n = n->next) {
+		handle = n->data;
+		h_ops->stop_device(handle);
+		h_ops->close_device(handle);
+	}
+	remove_haptic_info(info);
+}
+
+static struct haptic_info *add_haptic_info(const char *sender)
+{
+	struct haptic_info *info;
+
+	assert(sender);
+
+	info = calloc(1, sizeof(struct haptic_info));
+	if (!info)
+		return NULL;
+
+	info->sender = strdup(sender);
+	DD_LIST_APPEND(haptic_handle_list, info);
+
+	register_edbus_watch(sender,
+			WATCH_NAME_OWNER_CHANGED, haptic_name_owner_changed);
+
+	return info;
+}
+
+static int remove_haptic_info(struct haptic_info *info)
+{
+	dd_list *n;
+	dd_list *next;
+
+	assert(info);
+
+	unregister_edbus_watch(info->sender,
+			WATCH_NAME_OWNER_CHANGED, haptic_name_owner_changed);
+
+	DD_LIST_REMOVE(haptic_handle_list, info);
+	DD_LIST_FREE_LIST(info->handle_list);
+	free(info->sender);
+	free(info);
+
+	return 0;
+}
+
+static struct haptic_info *get_matched_haptic_info(const char *sender)
+{
+	dd_list *n;
+	struct haptic_info *info;
+	int len;
+
+	assert(sender);
+
+	len = strlen(sender) + 1;
+	DD_LIST_FOREACH(haptic_handle_list, n, info) {
+		if (!strncmp(info->sender, sender, len))
+			return info;
+	}
+
+	return NULL;
+}
+
 static DBusMessage *edbus_open_device(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
 	int index, handle, ret;
+	struct haptic_info *info;
+	const char *sender;
 
 	/* Load haptic module before booting done */
 	if (!CHECK_VALID_OPS(h_ops, ret)) {
@@ -176,8 +265,30 @@ static DBusMessage *edbus_open_device(E_DBus_Object *obj, DBusMessage *msg)
 	}
 
 	ret = h_ops->open_device(index, &handle);
-	if (ret >= 0)
-		ret = handle;
+	if (ret < 0)
+		goto exit;
+
+	sender = dbus_message_get_sender(msg);
+	if (!sender) {
+		ret = -EPERM;
+		h_ops->close_device(handle);
+		goto exit;
+	}
+
+	info = get_matched_haptic_info(sender);
+	if (!info) {
+		info = add_haptic_info(sender);
+		if (!info) {
+			_E("fail to create haptic information");
+			ret = -EPERM;
+			h_ops->close_device(handle);
+			goto exit;
+		}
+	}
+
+	DD_LIST_APPEND(info->handle_list, handle);
+
+	ret = handle;
 
 exit:
 	reply = dbus_message_new_method_return(msg);
@@ -192,6 +303,9 @@ static DBusMessage *edbus_close_device(E_DBus_Object *obj, DBusMessage *msg)
 	DBusMessage *reply;
 	unsigned int handle;
 	int ret;
+	struct haptic_info *info;
+	const char *sender;
+	int cnt;
 
 	if (!CHECK_VALID_OPS(h_ops, ret))
 		goto exit;
@@ -201,7 +315,27 @@ static DBusMessage *edbus_close_device(E_DBus_Object *obj, DBusMessage *msg)
 		goto exit;
 	}
 
+	sender = dbus_message_get_sender(msg);
+	if (!sender) {
+		_E("fail to get sender from dbus message");
+		ret = -EPERM;
+		goto exit;
+	}
+
 	ret = h_ops->close_device(handle);
+	if (ret < 0)
+		goto exit;
+
+	info = get_matched_haptic_info(sender);
+	if (!info) {
+		_E("fail to find the matched haptic info.");
+		goto exit;
+	}
+
+	DD_LIST_REMOVE(info->handle_list, handle);
+	cnt = DD_LIST_LENGTH(info->handle_list);
+	if (cnt == 0)
+		remove_haptic_info(info);
 
 exit:
 	reply = dbus_message_new_method_return(msg);
@@ -440,6 +574,22 @@ exit:
 	return reply;
 }
 
+static DBusMessage *edbus_show_handle_list(E_DBus_Object *obj, DBusMessage *msg)
+{
+	dd_list *n;
+	dd_list *elem;
+	struct haptic_info *info;
+	int cnt = 0;
+
+	_D("    sender\thandle");
+	DD_LIST_FOREACH(haptic_handle_list, n, info) {
+		for (elem = info->handle_list; elem; elem = elem->next)
+			_D("[%2d]%s\t%d", cnt++, info->sender, (int)elem->data);
+	}
+
+	return dbus_message_new_method_return(msg);
+}
+
 static unsigned char* convert_file_to_buffer(const char *file_name, int *size)
 {
 	FILE *pf;
@@ -657,6 +807,7 @@ static const struct edbus_method edbus_methods[] = {
 	{ "GetDuration",      "uay",   "i", edbus_get_duration },
 	{ "CreateEffect",    "iayi", "ayi", edbus_create_effect },
 	{ "SaveBinary",       "ays",   "i", edbus_save_binary },
+	{ "ShowHandleList",    NULL,  NULL, edbus_show_handle_list },
 	/* Add methods here */
 };
 
