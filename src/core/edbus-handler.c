@@ -81,6 +81,9 @@ static DBusConnection *conn;
 static E_DBus_Connection *edbus_conn;
 static DBusPendingCall *edbus_request_name;
 
+static DBusHandlerResult message_filter(DBusConnection *connection,
+		DBusMessage *message, void *data);
+
 static int register_edbus_interface(struct edbus_object *object)
 {
 	if (!object) {
@@ -281,9 +284,22 @@ static void print_watch_item(void)
 		_D("watch sender : %s, deleted : %d",
 				watch->sender, watch->deleted);
 		DD_LIST_FOREACH(watch->func_list, e, finfo)
-			_D("\tfunc : %x, deleted : %d",
+			_D("\tfunc : %p, deleted : %d",
 					finfo->func, finfo->deleted);
 	}
+}
+
+static bool get_valid_watch_item(void)
+{
+	struct watch_info *watch;
+	dd_list *elem;
+
+	DD_LIST_FOREACH(edbus_watch_list, elem, watch) {
+		if (!watch->deleted)
+			return true;
+	}
+
+	return false;
 }
 
 static void watch_idler_cb(void *data)
@@ -294,22 +310,34 @@ static void watch_idler_cb(void *data)
 	dd_list *next;
 	dd_list *elem;
 	dd_list *enext;
+	char match[256];
 
 	DD_LIST_FOREACH_SAFE(edbus_watch_list, n, next, watch) {
 		if (!watch->deleted)
 			continue;
 
+		/* remove dbus match */
+		snprintf(match, sizeof(match), NAME_OWNER_MATCH, watch->sender);
+		dbus_bus_remove_match(conn, match, NULL);
+
+		_I("%s is not watched by dbus!", watch->sender);
+
 		/* remove watch func list */
 		DD_LIST_FOREACH_SAFE(watch->func_list, elem, enext, finfo)
 			free(finfo);
+
+		/* remove watch item */
 		DD_LIST_FREE_LIST(watch->func_list);
 		DD_LIST_REMOVE_LIST(edbus_watch_list, n);
 		free(watch->sender);
 		free(watch);
 	}
+
+	/* if the last request, remove message filter */
+	if (!get_valid_watch_item())
+		dbus_connection_remove_filter(conn, message_filter, NULL);
 }
 
-static int remove_watch_item(struct watch_info *watch);
 static DBusHandlerResult message_filter(DBusConnection *connection,
 		DBusMessage *message, void *data)
 {
@@ -360,7 +388,7 @@ static DBusHandlerResult message_filter(DBusConnection *connection,
 	}
 
 	/* no interest in this item anymore */
-	remove_watch_item(watch);
+	watch->deleted = true;
 
 	print_watch_item();
 	add_idle_request(watch_idler_cb, NULL);
@@ -385,19 +413,6 @@ static struct watch_info *get_matched_watch_item(const char *sender)
 	}
 
 	return NULL;
-}
-
-static bool get_valid_watch_item(void)
-{
-	struct watch_info *watch;
-	dd_list *elem;
-
-	DD_LIST_FOREACH(edbus_watch_list, elem, watch) {
-		if (!watch->deleted)
-			return true;
-	}
-
-	return false;
 }
 
 static struct watch_info *add_watch_item(const char *sender)
@@ -444,7 +459,7 @@ static struct watch_info *add_watch_item(const char *sender)
 
 	/* Add watch to watch list */
 	DD_LIST_APPEND(edbus_watch_list, watch);
-
+	_I("%s is watched by dbus!", sender);
 	return watch;
 
 out:
@@ -454,25 +469,6 @@ out:
 	}
 
 	return NULL;
-}
-
-static int remove_watch_item(struct watch_info *watch)
-{
-	char match[256];
-
-	if (!watch)
-		return -EINVAL;
-
-	snprintf(match, sizeof(match), NAME_OWNER_MATCH, watch->sender);
-	dbus_bus_remove_match(conn, match, NULL);
-
-	watch->deleted = true;
-
-	/* if the last request, remove message filter */
-	if (!get_valid_watch_item())
-		dbus_connection_remove_filter(conn, message_filter, NULL);
-
-	return 0;
 }
 
 int register_edbus_watch(const char *sender,
@@ -520,12 +516,11 @@ int register_edbus_watch(const char *sender,
 	/* add callback function to the watch list */
 	DD_LIST_APPEND(watch->func_list, finfo);
 
-	print_watch_item();
-	_I("%s is watched by dbus!", sender);
+	_I("register watch func(%p) of %s", func, sender);
 	return 0;
 out:
 	if (isnew)
-		remove_watch_item(watch);
+		watch->deleted = true;
 
 	return -EPERM;
 }
@@ -559,10 +554,9 @@ int unregister_edbus_watch(const char *sender,
 
 	/* if it is the last item */
 	if (!matched)
-		remove_watch_item(watch);
+		watch->deleted = true;
 
-	print_watch_item();
-	_I("%s is not watched by dbus!", sender);
+	_I("unregister watch func(%p) of %s", func, sender);
 	return 0;
 }
 
@@ -573,7 +567,7 @@ static void unregister_edbus_watch_all(void)
 	struct watch_info *watch;
 
 	DD_LIST_FOREACH_SAFE(edbus_watch_list, n, next, watch)
-		remove_watch_item(watch);
+		watch->deleted = true;
 
 	add_idle_request(watch_idler_cb, NULL);
 }
