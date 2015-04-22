@@ -118,6 +118,7 @@ static void cradle_exit(void *data)
 static struct extcon_ops cradle_extcon_ops = {
 	.name   = EXTCON_CABLE_DOCK,
 	.init   = cradle_init,
+	.exit   = cradle_exit,
 	.update = cradle_update,
 };
 
