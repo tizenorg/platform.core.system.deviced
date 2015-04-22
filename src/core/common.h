@@ -135,6 +135,7 @@ int get_exec_pid(const char *execpath);
 int get_cmdline_name(pid_t pid, char *cmdline, size_t cmdline_size);
 int is_vip(int pid);
 int run_child(int argc, const char *argv[]);
+int run_child_without_wait(int argc, const char *argv[]);
 int remove_dir(const char *path, int del_dir);
 int sys_check_node(char *path);
 int sys_get_int(char *fname, int *val);
