@@ -99,3 +99,30 @@ int run_child(int argc, const char *argv[])
 
 	return r;
 }
+
+int run_child_without_wait(int argc, const char *argv[])
+{
+	pid_t pid;
+	int r;
+	FILE *fp;
+
+	if (!argv)
+		return -EINVAL;
+
+	fp = fopen(argv[0], "r");
+	if (fp == NULL) {
+		_E("fail %s (%d)", argv[0], errno);
+		return -errno;
+	}
+	fclose(fp);
+
+	pid = fork();
+	if (pid < 0)
+		r = -errno;
+	else if (pid == 0)
+		child(argc, argv);
+	else
+		r = pid;
+
+	return r;
+}
