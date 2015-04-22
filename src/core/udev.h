@@ -22,17 +22,12 @@
 
 #include <libudev.h>
 
-#define UDEV			"kernel"
-
 #define UDEV_CHANGE		"change"
 #define UDEV_ADD		"add"
 #define UDEV_REMOVE		"remove"
 
 #define UDEV_DEVPATH		"DEVPATH"
 #define UDEV_DEVTYPE		"DEVTYPE"
-
-#define UDEV_MONITOR_SIZE	(10*1024)
-#define UDEV_MONITOR_SIZE_LARGE (128*1024*1024)
 
 /* battery device */
 #define POWER_SUBSYSTEM		"power_supply"
@@ -87,5 +82,8 @@ struct uevent_handler {
 
 int register_kernel_uevent_control(const struct uevent_handler *uh);
 int unregister_kernel_uevent_control(const struct uevent_handler *uh);
+
+int register_udev_uevent_control(const struct uevent_handler *uh);
+int unregister_udev_uevent_control(const struct uevent_handler *uh);
 
 #endif /* __UDEV_H__ */
