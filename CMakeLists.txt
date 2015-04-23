@@ -21,6 +21,9 @@ SET(CONFDIR "/etc/${PROJECT_NAME}")
 SET(VERSION 0.1.0)
 
 SET(SRCS
+	src/block/block.c
+	src/block/ext4.c
+	src/block/vfat.c
 	src/core/common.c
 	src/core/config-parser.c
 	src/control/control.c
@@ -67,13 +70,6 @@ IF(TIZEN_HALL)
 SET(SRCS ${SRCS}
 	src/gpio/hall.c)
 ENDIF(TIZEN_HALL)
-
-SET(SRCS ${SRCS}
-	src/mmc/config.c
-	src/mmc/mmc-handler.c
-	src/mmc/vfat.c
-	src/mmc/ext4.c
-	)
 
 IF(TIZEN_SIM)
 SET(SRCS ${SRCS}
