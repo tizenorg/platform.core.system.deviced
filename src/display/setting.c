@@ -109,13 +109,13 @@ int get_setting_brightness(int *level)
 	return vconf_get_int(VCONFKEY_SETAPPL_LCD_BRIGHTNESS, level);
 }
 
-int get_dim_timeout(int *dim_timeout)
+void get_dim_timeout(int *dim_timeout)
 {
 	int vconf_timeout, on_timeout, val, ret;
 
 	if (custom_dim_timeout > 0) {
 		*dim_timeout = custom_dim_timeout;
-		return 0;
+		return;
 	}
 
 	ret = vconf_get_int(setting_keys[SETTING_TO_NORMAL], &vconf_timeout);
@@ -134,11 +134,9 @@ int get_dim_timeout(int *dim_timeout)
 		val = LCD_MAX_DIM_TIMEOUT;
 
 	*dim_timeout = val;
-
-	return 0;
 }
 
-int get_run_timeout(int *timeout)
+void get_run_timeout(int *timeout)
 {
 	int dim_timeout = -1;
 	int vconf_timeout = -1;
@@ -147,7 +145,7 @@ int get_run_timeout(int *timeout)
 
 	if (custom_normal_timeout > 0) {
 		*timeout = custom_normal_timeout;
-		return 0;
+		return;
 	}
 
 	ret = vconf_get_int(setting_keys[SETTING_TO_NORMAL], &vconf_timeout);
@@ -161,17 +159,13 @@ int get_run_timeout(int *timeout)
 	else
 		on_timeout = SEC_TO_MSEC(vconf_timeout);
 
-	if (on_timeout < 0)
-		return -ERANGE;
-
 	if (on_timeout == 0) {
 		*timeout = on_timeout;
-		return 0;
+		return;
 	}
 
 	get_dim_timeout(&dim_timeout);
 	*timeout = on_timeout - dim_timeout;
-	return 0;
 }
 
 int set_custom_lcdon_timeout(int timeout)
