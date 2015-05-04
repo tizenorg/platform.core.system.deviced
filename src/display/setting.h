@@ -70,18 +70,16 @@ extern int exit_setting();
  *
  * @internal
  * @param[out] timeout timeout variable pointer
- * @return 0 : success, -1 : error
  */
-extern int get_run_timeout(int *timeout);
+void get_run_timeout(int *timeout);
 
 /*
  * get LCD dim state timeout from environment variable.
  *
  * @internal
  * @param[out] dim_timeout timeout variable pointer
- * @return 0 : success, negative value : error
  */
-extern int get_dim_timeout(int *dim_timeout);
+void get_dim_timeout(int *dim_timeout);
 /*
  * get USB connection status from SLP-setting SLP_SETTING_USB_STATUS
  *
