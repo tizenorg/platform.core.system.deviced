@@ -595,17 +595,11 @@ static int get_lcd_timeout_from_settings(void)
 {
 	int i;
 	int val = 0;
-	int ret = -1;
-	char *buf;
 
 	for (i = 0; i < S_END; i++) {
 		switch (states[i].state) {
 		case S_NORMAL:
-			ret = get_run_timeout(&val);
-			if (ret != 0) {
-				buf = getenv("PM_TO_NORMAL");
-				val = (buf ? atoi(buf) : DEFAULT_NORMAL_TIMEOUT);
-			}
+			get_run_timeout(&val);
 			break;
 		case S_LCDDIM:
 			get_dim_timeout(&val);
@@ -667,12 +661,7 @@ static void update_display_time(void)
 	}
 
 	/* default setting */
-	ret = get_run_timeout(&run_timeout);
-	if (ret < 0 || run_timeout < 0) {
-		_E("Can not get run timeout. set default %d ms",
-		    DEFAULT_NORMAL_TIMEOUT);
-		run_timeout = DEFAULT_NORMAL_TIMEOUT;
-	}
+	get_run_timeout(&run_timeout);
 
 	/* for sdk
 	 * if the run_timeout is zero, it regards AlwaysOn state
@@ -1693,6 +1682,7 @@ static int default_action(int timeout)
 			    PROP_POWER_WAKEUP_COUNT, &wakeup_count) < 0)
 				_E("wakeup count read error");
 
+			_D("wakeup count : %d", wakeup_count);
 			if (wakeup_count < 0) {
 				_I("Wakup Event! Can not enter suspend mode.");
 				goto go_lcd_off;
