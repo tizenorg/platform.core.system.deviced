@@ -179,6 +179,9 @@ Haptic Device manager library for device control (devel)
 
 %prep
 %setup -q
+
+%build
+CFLAGS+=" -fgnu89-inline "
 %ifarch %{arm}
 %define ARCH arm
 %else
@@ -209,8 +212,6 @@ export CFLAGS+=" -DX11_SUPPORT"
 	-DTIZEN_USB:BOOL=ON \
 %endif
 	#eol
-
-%build
 cp %{SOURCE1} .
 cp %{SOURCE2} .
 cp %{SOURCE3} .
