@@ -34,6 +34,7 @@
 #define PM_MAX_BRIGHTNESS       100
 #define PM_MIN_BRIGHTNESS       1
 #define PM_DEFAULT_BRIGHTNESS	60
+#define PM_DIM_BRIGHTNESS	0
 
 #define PM_LCD_POWER_ON		0
 #define PM_LCD_POWER_OFF	3
@@ -80,12 +81,12 @@ struct _backlight_ops {
 
 struct _power_ops {
 	int (*suspend)(void);
-	int (*pre_suspend)(void);
-	int (*post_resume)(void);
 	int (*power_lock)(void);
 	int (*power_unlock)(void);
 	int (*get_power_lock_support)(void);
 	int (*check_wakeup_src)(void);
+	int (*get_wakeup_count)(int *cnt);
+	int (*set_wakeup_count)(int cnt);
 };
 
 extern struct _backlight_ops backlight_ops;

@@ -82,7 +82,6 @@ static enum device_ops_status status = DEVICE_OPS_STATUS_UNINIT;
 int pm_cur_state;
 int pm_old_state;
 Ecore_Timer *timeout_src_id;
-static int pre_suspend_flag = false;
 int system_wakeup_flag = false;
 static unsigned int custom_normal_timeout = 0;
 static unsigned int custom_dim_timeout = 0;
@@ -705,10 +704,6 @@ void lcd_on_direct(enum device_flags flags)
 	    && pm_cur_state == S_SLEEP)
 		power_ops.power_lock();
 
-	if (pre_suspend_flag == true) {
-		power_ops.post_resume();
-		pre_suspend_flag = false;
-	}
 #ifdef MICRO_DD
 	_D("lcd is on directly");
 	gettimeofday(&lcdon_tv, NULL);
@@ -1625,13 +1620,9 @@ static int default_action(int timeout)
 		 * normal state : backlight on and restore
 		 * the previous brightness
 		 */
-		if (pm_old_state == S_LCDOFF || pm_old_state == S_SLEEP) {
-			if (pre_suspend_flag == true) {
-				power_ops.post_resume();
-				pre_suspend_flag = false;
-			}
+		if (pm_old_state == S_LCDOFF || pm_old_state == S_SLEEP)
 			check_lock_screen();
-		} else if (pm_old_state == S_LCDDIM)
+		else if (pm_old_state == S_LCDDIM)
 			backlight_ops.update();
 
 		if (check_lcd_on() == true)
@@ -1657,11 +1648,6 @@ static int default_action(int timeout)
 			/* lcd off state : turn off the backlight */
 			if (backlight_ops.get_lcd_power() != PM_LCD_POWER_OFF)
 				lcd_off_procedure();
-
-			if (pre_suspend_flag == false) {
-				pre_suspend_flag = true;
-				power_ops.pre_suspend();
-			}
 		}
 
 		if (backlight_ops.get_lcd_power() != PM_LCD_POWER_OFF
@@ -1678,8 +1664,7 @@ static int default_action(int timeout)
 
 		if (!power_ops.get_power_lock_support()) {
 			/* sleep state : set system mode to SUSPEND */
-			if (device_get_property(DEVICE_TYPE_POWER,
-			    PROP_POWER_WAKEUP_COUNT, &wakeup_count) < 0)
+			if (power_ops.get_wakeup_count(&wakeup_count) < 0)
 				_E("wakeup count read error");
 
 			if (wakeup_count < 0) {
@@ -1687,8 +1672,7 @@ static int default_action(int timeout)
 				goto go_lcd_off;
 			}
 
-			if (device_set_property(DEVICE_TYPE_POWER,
-			    PROP_POWER_WAKEUP_COUNT, wakeup_count) < 0) {
+			if (power_ops.set_wakeup_count(wakeup_count) < 0) {
 				_E("wakeup count write error");
 				goto go_lcd_off;
 			}
