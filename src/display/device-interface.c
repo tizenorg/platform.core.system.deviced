@@ -69,12 +69,7 @@ static struct display_device *display_dev;
 
 static int bl_onoff(int on)
 {
-	if (!display_dev || !display_dev->set_state) {
-		_E("there is no display device");
-		return -ENOENT;
-	}
-
-	return display_dev->set_state(on);
+	return dpms_set_power(on);
 }
 
 static int bl_brt(int brightness, int delay)
@@ -158,15 +153,10 @@ out:
 
 static int get_lcd_power(void)
 {
-	enum display_state state;
+	enum dpms_state state;
 	int ret;
 
-	if (!display_dev || !display_dev->get_state) {
-		_E("there is no display device");
-		return -ENOENT;
-	}
-
-	ret = display_dev->get_state(&state);
+	ret = dpms_get_power(&state);
 	if (ret < 0)
 		return ret;
 
@@ -227,8 +217,8 @@ static int backlight_on(enum device_flags flags)
 	_D("LCD on %x", flags);
 
 	for (i = 0; i < PM_LCD_RETRY_CNT; i++) {
-		ret = bl_onoff(DISPLAY_ON);
-		if (get_lcd_power() == DISPLAY_ON) {
+		ret = bl_onoff(DPMS_ON);
+		if (get_lcd_power() == DPMS_ON) {
 #ifdef ENABLE_PM_LOG
 			pm_history_save(PM_LOG_LCD_ON, pm_cur_state);
 #endif
@@ -262,8 +252,8 @@ static int backlight_off(enum device_flags flags)
 
 	for (i = 0; i < PM_LCD_RETRY_CNT; i++) {
 		usleep(30000);
-		ret = bl_onoff(DISPLAY_OFF);
-		if (get_lcd_power() == DISPLAY_OFF) {
+		ret = bl_onoff(DPMS_OFF);
+		if (get_lcd_power() == DPMS_OFF) {
 #ifdef ENABLE_PM_LOG
 			pm_history_save(PM_LOG_LCD_OFF, pm_cur_state);
 #endif
@@ -369,9 +359,9 @@ static int backlight_standby(int force)
 {
 	int ret = -1;
 
-	if ((get_lcd_power() == DISPLAY_ON) || force) {
+	if ((get_lcd_power() == DPMS_ON) || force) {
 		_I("LCD standby");
-		ret = bl_onoff(DISPLAY_STANDBY);
+		ret = bl_onoff(DPMS_STANDBY);
 	}
 
 	return ret;
