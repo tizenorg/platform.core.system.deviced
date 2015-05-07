@@ -202,7 +202,7 @@ static inline bool switch_on_lcd(void)
 	if (current_state_in_on())
 		return false;
 
-	if (backlight_ops.get_lcd_power() == PM_LCD_POWER_ON)
+	if (backlight_ops.get_lcd_power() == DPMS_ON)
 		return false;
 
 	broadcast_lcdon_by_powerkey();
@@ -217,7 +217,7 @@ static inline void switch_off_lcd(void)
 	if (!current_state_in_on())
 		return;
 
-	if (backlight_ops.get_lcd_power() == PM_LCD_POWER_OFF)
+	if (backlight_ops.get_lcd_power() == DPMS_OFF)
 		return;
 
 	broadcast_lcdoff_by_powerkey();
@@ -281,7 +281,7 @@ static int decide_lcdoff(void)
 {
 	/* It's not needed if it's already LCD off state */
 	if (!current_state_in_on() &&
-	    backlight_ops.get_lcd_power() != PM_LCD_POWER_ON)
+	    backlight_ops.get_lcd_power() != DPMS_ON)
 		return false;
 
 	/*

@@ -36,9 +36,6 @@
 #define PM_DEFAULT_BRIGHTNESS	60
 #define PM_DIM_BRIGHTNESS	0
 
-#define PM_LCD_POWER_ON		0
-#define PM_LCD_POWER_OFF	3
-
 #define PM_LCD_RETRY_CNT	3
 
 #define DISP_INDEX_SHIFT	16
@@ -91,6 +88,16 @@ struct _power_ops {
 
 extern struct _backlight_ops backlight_ops;
 extern struct _power_ops power_ops;
+
+enum dpms_state {
+	DPMS_ON,       /* In use */
+	DPMS_STANDBY,  /* Blanked, low power */
+	DPMS_SUSPEND,  /* Blanked, lower power */
+	DPMS_OFF,      /* Shut off, awaiting activity */
+};
+
+int dpms_set_power(enum dpms_state state);
+int dpms_get_power(enum dpms_state *state);
 
 #endif
 

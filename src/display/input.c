@@ -103,18 +103,18 @@ static inline void process_event(struct libinput_event *ev)
 static Eina_Bool input_handler(void *data, Ecore_Fd_Handler *fd_handler)
 {
 	struct libinput_event *ev;
-	struct libinput *li = (struct libinput *)data;
+	struct libinput *input = (struct libinput *)data;
 
-	if (!li)
+	if (!input)
 		return ECORE_CALLBACK_RENEW;
 
-	libinput_dispatch(li);
+	libinput_dispatch(input);
 
-	while ((ev = libinput_get_event(li))) {
+	while ((ev = libinput_get_event(input))) {
 		process_event(ev);
 
 		libinput_event_destroy(ev);
-		libinput_dispatch(li);
+		libinput_dispatch(input);
 	}
 
 	return ECORE_CALLBACK_RENEW;
@@ -185,7 +185,7 @@ int init_input(int (*callback)(int , PMMsg * ))
 	}
 
 	/* add to poll handler */
-	efd = ecore_main_fd_handler_add(fd, ECORE_FD_READ|ECORE_FD_ERROR,
+	efd = ecore_main_fd_handler_add(fd, ECORE_FD_READ,
 			input_handler,
 			(void *)((intptr_t)li), NULL, NULL);
 	if (!efd) {

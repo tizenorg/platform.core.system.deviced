@@ -723,7 +723,7 @@ void lcd_on_direct(enum device_flags flags)
 
 static inline bool check_lcd_on(void)
 {
-	if (backlight_ops.get_lcd_power() != PM_LCD_POWER_ON)
+	if (backlight_ops.get_lcd_power() != DPMS_ON)
 		return true;
 
 	return false;
@@ -778,7 +778,7 @@ static int proc_change_state(unsigned int cond, pid_t pid)
 		if (check_lcd_on() == true)
 			lcd_on_direct(LCD_ON_BY_EVENT);
 	} else if (next_state == S_LCDOFF) {
-		if (backlight_ops.get_lcd_power() != PM_LCD_POWER_OFF)
+		if (backlight_ops.get_lcd_power() != DPMS_OFF)
 			lcd_off_procedure();
 	}
 
@@ -1646,11 +1646,11 @@ static int default_action(int timeout)
 		if (pm_old_state != S_SLEEP && pm_old_state != S_LCDOFF) {
 			stop_lock_timer();
 			/* lcd off state : turn off the backlight */
-			if (backlight_ops.get_lcd_power() != PM_LCD_POWER_OFF)
+			if (backlight_ops.get_lcd_power() != DPMS_OFF)
 				lcd_off_procedure();
 		}
 
-		if (backlight_ops.get_lcd_power() != PM_LCD_POWER_OFF
+		if (backlight_ops.get_lcd_power() != DPMS_OFF
 		    || lcd_paneloff_mode)
 			lcd_off_procedure();
 		break;
@@ -1659,7 +1659,7 @@ static int default_action(int timeout)
 		if (pm_old_state != S_SLEEP && pm_old_state != S_LCDOFF)
 			stop_lock_timer();
 
-		if (backlight_ops.get_lcd_power() != PM_LCD_POWER_OFF)
+		if (backlight_ops.get_lcd_power() != DPMS_OFF)
 			lcd_off_procedure();
 
 		if (!power_ops.get_power_lock_support()) {
@@ -1875,7 +1875,7 @@ static int update_setting(int key_idx, int val)
 		/* LCD on if lock screen show before waiting time */
 		if (pm_cur_state == S_NORMAL &&
 		    val == VCONFKEY_IDLE_LOCK &&
-		    backlight_ops.get_lcd_power() != PM_LCD_POWER_ON)
+		    backlight_ops.get_lcd_power() != DPMS_ON)
 			lcd_on_procedure(LCD_NORMAL, LCD_ON_BY_EVENT);
 		stop_lock_timer();
 		update_display_time();
