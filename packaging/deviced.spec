@@ -4,6 +4,8 @@
 
 #These options are DEACTIVATED by default.
 %bcond_with x
+%bcond_with wayland
+
 %bcond_with buzzer
 %bcond_with hall
 %bcond_with sim
@@ -33,6 +35,7 @@ BuildRequires:  pkgconfig(dlog)
 BuildRequires:  pkgconfig(syspopup-caller)
 %if %{with x}
 BuildRequires:  pkgconfig(x11)
+BuildRequires:  pkgconfig(xext)
 %endif
 BuildRequires:  pkgconfig(udev)
 BuildRequires:  pkgconfig(device-node)
@@ -185,14 +188,19 @@ Haptic Device manager library for device control (devel)
 %define ARCH emulator
 %endif
 
+%define DPMS
 %if %{with x}
-export CFLAGS+=" -DX11_SUPPORT"
+%define DPMS x
+%endif
+%if %{with wayland}
+%define DPMS wayland
 %endif
 
 %cmake . \
 	-DTZ_SYS_ETC=%TZ_SYS_ETC \
 	-DCMAKE_INSTALL_PREFIX=%{_prefix} \
 	-DARCH=%{ARCH} \
+	-DDPMS=%{DPMS} \
 %if %{with buzzer}
 	-DTIZEN_BUZZER:BOOL=ON \
 %endif

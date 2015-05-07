@@ -92,5 +92,15 @@ struct _power_ops {
 extern struct _backlight_ops backlight_ops;
 extern struct _power_ops power_ops;
 
+enum dpms_state {
+	DPMS_ON,       /* In use */
+	DPMS_STANDBY,  /* Blanked, low power */
+	DPMS_SUSPEND,  /* Blanked, lower power */
+	DPMS_OFF,      /* Shut off, awaiting activity */
+};
+
+int dpms_set_power(enum dpms_state state);
+int dpms_get_power(enum dpms_state *state);
+
 #endif
 
