@@ -91,6 +91,15 @@ SET(SRCS ${SRCS}
 	src/display/setting.c
 	src/display/input.c
 )
+
+IF("${DPMS}" STREQUAL "x")
+SET(SRCS ${SRCS}
+	src/display/dpms-x.c)
+ELSEIF("${DPMS}" STREQUAL "wayland")
+SET(SRCS ${SRCS}
+	src/display/dpms-wayland.c)
+ENDIF()
+
 ENDIF(TIZEN_DISPLAY)
 
 SET(SRCS ${SRCS}
@@ -124,11 +133,12 @@ SET(PKG_MODULES
 	libinput
 )
 
-IF(X11_SUPPORT)
+IF("${DPMS}" STREQUAL "x")
 SET(PKG_MODULES ${PKG_MODULES}
-	ecore-x
+	x11
+	xext
 )
-ENDIF(X11_SUPPORT)
+ENDIF()
 
 INCLUDE(FindPkgConfig)
 pkg_check_modules(pkgs REQUIRED ${PKG_MODULES})
