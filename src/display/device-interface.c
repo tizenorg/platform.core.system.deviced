@@ -463,6 +463,9 @@ int display_service_load(void)
 	struct hw_info *info;
 	int r;
 
+	if (display_dev)
+		return 0;
+
 	r = hw_get_info(DISPLAY_HARDWARE_DEVICE_ID,
 			(const struct hw_info **)&info);
 	if (r < 0) {
@@ -497,6 +500,7 @@ int display_service_free(void)
 	assert(info);
 
 	info->close((struct hw_common *)display_dev);
+	display_dev = NULL;
 
 	return 0;
 }

@@ -2323,6 +2323,9 @@ static int display_start(enum device_flags flags)
 	if (status == DEVICE_OPS_STATUS_START)
 		return -EALREADY;
 
+	if (display_probe(NULL) < 0)
+		return -EPERM;
+
 	display_init(NULL);
 
 	return 0;
