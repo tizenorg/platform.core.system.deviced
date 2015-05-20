@@ -78,7 +78,7 @@ static int display_changed(void *data)
 		return 0;
 
 	hdmi = hdmi_extcon_ops.status;
-	if (hdmi) {
+	if (hdmi == 0) {
 		pm_lock_internal(getpid(), LCD_DIM, STAY_CUR_STATE, 0);
 		_I("hdmi is connected! dim lock is on.");
 	}
