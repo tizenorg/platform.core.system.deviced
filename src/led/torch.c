@@ -32,6 +32,8 @@
 #define LED_MAX_BRIGHTNESS      100
 #define GET_BRIGHTNESS(x)       (((x) >> 24) & 0xFF)
 
+#define SIGNAL_FLASH_STATE "ChangeFlashState"
+
 static struct led_device *led_dev;
 static struct led_state led_state = {
 	.type = LED_TYPE_MANUAL,
@@ -39,6 +41,18 @@ static struct led_state led_state = {
 	.duty_on = 0,
 	.duty_off = 0,
 };
+
+static void flash_state_broadcast(int val)
+{
+	char *arr[1];
+	char str_state[32];
+
+	snprintf(str_state, sizeof(str_state), "%d", val);
+	arr[0] = str_state;
+
+	broadcast_edbus_signal(DEVICED_PATH_LED, DEVICED_INTERFACE_LED,
+			SIGNAL_FLASH_STATE, "i", arr);
+}
 
 static DBusMessage *edbus_get_brightness(E_DBus_Object *obj, DBusMessage *msg)
 {
@@ -109,6 +123,9 @@ static DBusMessage *edbus_set_brightness(E_DBus_Object *obj, DBusMessage *msg)
 		goto error;
 
 	memcpy(&led_state, &tmp, sizeof(led_state));
+
+	/* flash status broadcast */
+	flash_state_broadcast(val);
 
 	/* if enable is ON, noti will be show or hide */
 	if (enable) {
