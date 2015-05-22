@@ -143,6 +143,13 @@ error:
 }
 
 static const struct edbus_method edbus_methods[] = {
+	/**
+	 * GetBrightnessForCamera is for camera library.
+	 * Currently they do not have a daemon for camera,
+	 * but they need to get camera brightness value without led priv.
+	 * It's a temporary solution on Tizen 2.4 and will be removed asap.
+	 */
+	{ "GetBrightnessForCamera", NULL,   "i", edbus_get_brightness },
 	{ "GetBrightness",    NULL,   "i", edbus_get_brightness },
 	{ "GetMaxBrightness", NULL,   "i", edbus_get_max_brightness },
 	{ "SetBrightness",    "ii",   "i", edbus_set_brightness },
