@@ -433,6 +433,30 @@ out:
 	return reply;
 }
 
+static DBusMessage *request_reboot(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	char *str;
+	int ret;
+
+	if (!dbus_message_get_args(msg, NULL,
+		    DBUS_TYPE_STRING, &str, DBUS_TYPE_INVALID)) {
+		_E("there is no message");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	_I("reboot command : %s", str);
+	ret = power_execute(POWER_REBOOT);
+
+out:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+	return reply;
+}
+
 void powerdown_ap(void *data)
 {
 	_I("Power off");
@@ -450,6 +474,8 @@ void restart_ap(void *data)
 static const struct edbus_method edbus_methods[] = {
 	{ POWER_REBOOT, "si", "i", dbus_power_handler },
 	{ PWROFF_POPUP, "si", "i", dbus_power_handler },
+	/* be linked to device_power_reboot() public API. */
+	{ "Reboot",      "s", "i", request_reboot },
 	/* Add methods here */
 };
 
