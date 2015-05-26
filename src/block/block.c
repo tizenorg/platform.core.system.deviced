@@ -151,6 +151,35 @@ static void broadcast_block_info(enum block_dev_operation op,
 	}
 }
 
+static bool check_primary_partition(const char *devnode)
+{
+	char str[PATH_MAX];
+	char str2[PATH_MAX];
+	int len;
+	int i;
+
+	/* if no partition */
+	if (!fnmatch("*/mmcblk[1-9]", devnode, 0) ||
+	    !fnmatch("*/sd[a-z]", devnode, 0))
+		return true;
+
+	snprintf(str, sizeof(str), "%s", devnode);
+
+	len = strlen(str);
+	str[len - 1] = '\0';
+
+	for (i = 1; i < 9; ++i) {
+		snprintf(str2, sizeof(str2), "%s%d", str, i);
+		if (access(str2, R_OK) == 0)
+			break;
+	}
+
+	if (!strncmp(devnode, str2, strlen(str2) + 1))
+		return true;
+
+	return false;
+}
+
 /* Whole data in struct block_data should be freed. */
 static struct block_data *make_block_data(const char *devnode,
 		const char *syspath,
@@ -185,6 +214,7 @@ static struct block_data *make_block_data(const char *devnode,
 	}
 	if (readonly)
 		data->readonly = atoi(readonly);
+	data->primary = check_primary_partition(devnode);
 
 	/* TODO should we know block dev type? */
 	if (!fnmatch(MMC_PATH, devnode, 0))
@@ -981,6 +1011,8 @@ static void show_block_device_list(void)
 		_D("\tMount state: %s",
 				(data->state == BLOCK_MOUNT ?
 				 "mount" : "unmount"));
+		_D("\tPrimary: %s",
+				(data->primary ? "true" : "false"));
 		_D("\tRemove: %s", (bdev->deleted ? "true" : "false"));
 	}
 }
