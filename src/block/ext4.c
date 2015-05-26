@@ -151,7 +151,7 @@ static int ext4_format(const char *devpath)
 	return run_child(argc, ext4_arg);
 }
 
-static const struct mmc_fs_ops ext4_ops = {
+static const struct block_fs_ops ext4_ops = {
 	.type = FS_TYPE_EXT4,
 	.name = "ext4",
 	.match = ext4_match,

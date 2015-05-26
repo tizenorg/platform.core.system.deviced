@@ -1,7 +1,7 @@
 /*
  * deviced
  *
- * Copyright (c) 2012 - 2015 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2015 Samsung Electronics Co., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the License);
  * you may not use this file except in compliance with the License.
@@ -23,13 +23,17 @@
 #include <stdbool.h>
 #include "core/common.h"
 
-enum mmc_fs_type {
+#define SMACKFS_MOUNT_OPT   "smackfsroot=*,smackfsdef=*"
+
+#define RETRY_COUNT         10
+
+enum block_fs_type {
 	FS_TYPE_VFAT = 0,
 	FS_TYPE_EXT4,
 };
 
-struct mmc_fs_ops {
-	enum mmc_fs_type type;
+struct block_fs_ops {
+	enum block_fs_type type;
 	const char *name;
 	bool (*match) (const char *);
 	int (*check) (const char *);
@@ -45,8 +49,8 @@ struct fs_check {
 	char magic[4];
 };
 
-void add_fs(const struct mmc_fs_ops *fs);
-void remove_fs(const struct mmc_fs_ops *fs);
+void add_fs(const struct block_fs_ops *fs);
+void remove_fs(const struct block_fs_ops *fs);
 
 enum block_device_type {
 	BLOCK_SCSI_DEV,
@@ -56,6 +60,11 @@ enum block_device_type {
 enum mount_state {
 	BLOCK_UNMOUNT,
 	BLOCK_MOUNT,
+};
+
+enum unmount_operation {
+	UNMOUNT_NORMAL,
+	UNMOUNT_FORCE,
 };
 
 struct block_data {
@@ -70,7 +79,31 @@ struct block_data {
 	enum mount_state state;
 };
 
-#define SMACKFS_MOUNT_OPT   "smackfsroot=*,smackfsdef=*"
-#define RETRY_COUNT         10
+struct block_dev_ops {
+	const char *name;
+	enum block_device_type block_type;
+	void (*mount) (struct block_data *data, int result);
+	void (*unmount) (struct block_data *data, int result);
+	void (*format) (struct block_data *data, int result);
+	void (*insert) (struct block_data *data);
+	void (*remove) (struct block_data *data);
+};
+
+void add_block_dev(const struct block_dev_ops *ops);
+void remove_block_dev(const struct block_dev_ops *ops);
+
+#define BLOCK_DEVICE_OPS_REGISTER(dev) \
+static void __CONSTRUCTOR__ block_dev_init(void) \
+{ \
+	add_block_dev(dev); \
+} \
+static void __DESTRUCTOR__ block_dev_exit(void) \
+{ \
+	remove_block_dev(dev); \
+}
+
+int mount_block_device(const char *devnode);
+int unmount_block_device(const char *devnode,
+		enum unmount_operation option);
 
 #endif /* __BLOCK_H__ */
