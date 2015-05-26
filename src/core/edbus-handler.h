@@ -40,6 +40,8 @@ static inline DBusMessage *make_reply_message(DBusMessage *msg, int ret)
 	return reply;
 }
 
+E_DBus_Object *register_edbus_object(const char *object_path, void *data);
+void unregister_edbus_object(E_DBus_Object *object);
 int register_edbus_interface_and_method(const char *path,
 		const char *interface,
 		const struct edbus_method *edbus_methods, int size);

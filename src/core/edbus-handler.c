@@ -84,6 +84,32 @@ static DBusPendingCall *edbus_request_name;
 static DBusHandlerResult message_filter(DBusConnection *connection,
 		DBusMessage *message, void *data);
 
+E_DBus_Object *register_edbus_object(const char *object_path, void *data)
+{
+	E_DBus_Object *object;
+
+	if (!object_path) {
+		_E("invalid parameter");
+		return NULL;
+	}
+
+	object = e_dbus_object_add(edbus_conn, object_path, data);
+	if (!object) {
+		_E("fail to add object for %s", object_path);
+		return NULL;
+	}
+
+	return object;
+}
+
+void unregister_edbus_object(E_DBus_Object *object)
+{
+	if (!object)
+		return;
+
+	e_dbus_object_free(object);
+}
+
 static int register_edbus_interface(struct edbus_object *object)
 {
 	if (!object) {
