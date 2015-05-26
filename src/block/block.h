@@ -78,6 +78,7 @@ struct block_data {
 	bool readonly;
 	char *mount_point;
 	enum mount_state state;
+	bool primary;   /* the first partition */
 };
 
 struct block_dev_ops {
