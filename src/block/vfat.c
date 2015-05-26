@@ -129,7 +129,7 @@ static int vfat_format(const char *devpath)
 	return run_child(argc, vfat_arg);
 }
 
-static const struct mmc_fs_ops vfat_ops = {
+static const struct block_fs_ops vfat_ops = {
 	.type = FS_TYPE_VFAT,
 	.name = "vfat",
 	.match = vfat_match,

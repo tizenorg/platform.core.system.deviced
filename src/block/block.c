@@ -53,19 +53,23 @@
 
 #define UNMOUNT_RETRY	5
 
+enum block_dev_operation {
+	BLOCK_DEV_MOUNT,
+	BLOCK_DEV_UNMOUNT,
+	BLOCK_DEV_FORMAT,
+	BLOCK_DEV_INSERT,
+	BLOCK_DEV_REMOVE,
+};
+
 struct block_device {
 	int deleted;
 	pthread_mutex_t mutex;
 	struct block_data *data;
 };
 
-enum unmount_operation {
-	UNMOUNT_NORMAL,
-	UNMOUNT_FORCE,
-};
-
 static dd_list *fs_head;
 static dd_list *block_dev_list;
+static dd_list *block_ops_list;
 static bool smack;
 
 static void __CONSTRUCTOR__ smack_check(void)
@@ -87,19 +91,19 @@ static void __CONSTRUCTOR__ smack_check(void)
 	fclose(fp);
 }
 
-void add_fs(const struct mmc_fs_ops *fs)
+void add_fs(const struct block_fs_ops *fs)
 {
 	DD_LIST_APPEND(fs_head, (void *)fs);
 }
 
-void remove_fs(const struct mmc_fs_ops *fs)
+void remove_fs(const struct block_fs_ops *fs)
 {
 	DD_LIST_REMOVE(fs_head, (void *)fs);
 }
 
-const struct mmc_fs_ops *find_fs(enum mmc_fs_type type)
+const struct block_fs_ops *find_fs(enum block_fs_type type)
 {
-	struct mmc_fs_ops *fs;
+	struct block_fs_ops *fs;
 	dd_list *elem;
 
 	DD_LIST_FOREACH(fs_head, elem, fs) {
@@ -107,6 +111,38 @@ const struct mmc_fs_ops *find_fs(enum mmc_fs_type type)
 			return fs;
 	}
 	return NULL;
+}
+
+void add_block_dev(const struct block_dev_ops *ops)
+{
+	DD_LIST_APPEND(block_ops_list, (void *)ops);
+}
+
+void remove_block_dev(const struct block_dev_ops *ops)
+{
+	DD_LIST_REMOVE(block_ops_list, (void *)ops);
+}
+
+static void broadcast_block_info(enum block_dev_operation op,
+		struct block_data *data, int result)
+{
+	struct block_dev_ops *ops;
+	dd_list *elem;
+
+	DD_LIST_FOREACH(block_ops_list, elem, ops) {
+		if (ops->block_type != data->block_type)
+			continue;
+		if (op == BLOCK_DEV_MOUNT)
+			ops->mount(data, result);
+		else if (op == BLOCK_DEV_UNMOUNT)
+			ops->unmount(data, result);
+		else if (op == BLOCK_DEV_FORMAT)
+			ops->format(data, result);
+		else if (op == BLOCK_DEV_INSERT)
+			ops->insert(data);
+		else if (op == BLOCK_DEV_REMOVE)
+			ops->remove(data);
+	}
 }
 
 /* Whole data in struct block_data should be freed. */
@@ -178,6 +214,17 @@ static struct block_device *make_block_device(struct block_data *data)
 	return bdev;
 }
 
+static void free_block_device(struct block_device *bdev)
+{
+	if (!bdev)
+		return;
+
+	pthread_mutex_lock(&bdev->mutex);
+	free_block_data(bdev->data);
+	pthread_mutex_unlock(&bdev->mutex);
+	free(bdev);
+}
+
 static struct block_device *find_block_device(const char *devnode)
 {
 	struct block_device *bdev;
@@ -224,7 +271,7 @@ static bool check_rw_mount(const char *szPath)
 
 static int block_mount(struct block_data *data)
 {
-	struct mmc_fs_ops *fs;
+	struct block_fs_ops *fs;
 	dd_list *elem;
 	int r;
 	int len;
@@ -245,7 +292,7 @@ static int block_mount(struct block_data *data)
 	/* check matched file system */
 	if (!data->fs_usage ||
 	    strncmp(data->fs_usage, FILESYSTEM,
-			sizeof(FILESYSTEM)) != 0) {
+		    sizeof(FILESYSTEM)) != 0) {
 		r = -ENODEV;
 		goto out;
 	}
@@ -284,7 +331,6 @@ static void *mount_start(void *arg)
 {
 	struct block_device *bdev = (struct block_device *)arg;
 	struct block_data *data;
-	struct storage_info *info;
 	int r;
 
 	assert(bdev);
@@ -312,18 +358,28 @@ out:
 	_I("%s result : %s, %d", __func__, data->devnode, r);
 	pthread_mutex_unlock(&bdev->mutex);
 
+	/* Broadcast to mmc and usb storage module */
+	broadcast_block_info(BLOCK_DEV_MOUNT, data, r);
+
 	return NULL;
 }
 
-static int mount_block_device(struct block_device *bdev)
+int mount_block_device(const char *devnode)
 {
+	struct block_device *bdev;
 	struct block_data *data;
 	pthread_t th;
 	int r;
 
-	if (!bdev && !bdev->data) {
+	if (!devnode) {
 		_E("invalid parameter");
 		return -EINVAL;
+	}
+
+	bdev = find_block_device(devnode);
+	if (!bdev || !bdev->data) {
+		_E("fail to find block data for %s", devnode);
+		return -ENODEV;
 	}
 
 	data = bdev->data;
@@ -343,7 +399,7 @@ static int mount_block_device(struct block_device *bdev)
 }
 
 static int block_unmount(struct block_data *data,
-	   enum unmount_operation option)
+		enum unmount_operation option)
 {
 	int r, retry = 0;
 
@@ -402,15 +458,22 @@ out:
 	return r;
 }
 
-static int unmount_block_device(struct block_device *bdev,
+int unmount_block_device(const char *devnode,
 		enum unmount_operation option)
 {
+	struct block_device *bdev;
 	struct block_data *data;
 	int r;
 
-	if (!bdev && !bdev->data) {
-		_E("invalid argument");
+	if (!devnode) {
+		_E("invalid parameter");
 		return -EINVAL;
+	}
+
+	bdev = find_block_device(devnode);
+	if (!bdev || !bdev->data) {
+		_E("fail to find block data for %s", devnode);
+		return -ENODEV;
 	}
 
 	data = bdev->data;
@@ -435,6 +498,9 @@ static int unmount_block_device(struct block_device *bdev,
 out:
 	_I("%s result : %s, %d", __func__, data->devnode, r);
 	pthread_mutex_unlock(&bdev->mutex);
+
+	/* Broadcast to mmc and usb storage module */
+	broadcast_block_info(BLOCK_DEV_UNMOUNT, data, r);
 
 	return r;
 }
@@ -548,7 +614,11 @@ static int add_block_device(struct udev_device *dev, const char *devnode)
 	 */
 	DD_LIST_APPEND(block_dev_list, bdev);
 
-	ret = mount_block_device(bdev);
+	/* Broadcast to mmc and usb storage module */
+	broadcast_block_info(BLOCK_DEV_INSERT, bdev->data, 0);
+
+	/* mount automatically */
+	ret = mount_block_device(devnode);
 	if (ret < 0) {
 		_E("fail to mount block device for %s", devnode);
 		return ret;
@@ -568,9 +638,12 @@ static int remove_block_device(struct udev_device *dev, const char *devnode)
 		return -ENODEV;
 	}
 
-	r = unmount_block_device(bdev, UNMOUNT_NORMAL);
+	r = unmount_block_device(devnode, UNMOUNT_NORMAL);
 	if (r < 0)
 		_E("fail to unmount block device for %s", devnode);
+
+	/* Broadcast to mmc and usb storage module */
+	broadcast_block_info(BLOCK_DEV_REMOVE, bdev->data, 0);
 
 	/* check deleted */
 	bdev->deleted = true;
@@ -621,7 +694,7 @@ static int block_init_from_udev_enumerate(void)
 			continue;
 
 		if (fnmatch(MMC_PATH, syspath, 0) &&
-			fnmatch(SCSI_PATH, syspath, 0))
+		    fnmatch(SCSI_PATH, syspath, 0))
 			continue;
 
 		devnode = udev_device_get_devnode(dev);
@@ -677,14 +750,22 @@ static void show_block_device_list(void)
 static void remove_whole_block_device(void)
 {
 	struct block_device *bdev;
+	struct block_data *data;
 	dd_list *elem;
 	dd_list *next;
+	int r;
 
 	DD_LIST_FOREACH_SAFE(block_dev_list, elem, next, bdev) {
-		unmount_block_device(bdev, UNMOUNT_NORMAL);
+		data = bdev->data;
+		if (!data)
+			continue;
+		r = unmount_block_device(data->devnode, UNMOUNT_NORMAL);
+		if (r < 0)
+			_E("fail to unmount block device for %s",
+					data->devnode);
+
 		DD_LIST_REMOVE_LIST(block_dev_list, elem);
-		free_block_data(bdev->data);
-		free(bdev);
+		free_block_device(bdev);
 	}
 }
 
@@ -697,10 +778,7 @@ static int remove_unmountable_blocks(void *user_data)
 	DD_LIST_FOREACH_SAFE(block_dev_list, elem, next, bdev) {
 		if (bdev->deleted) {
 			DD_LIST_REMOVE_LIST(block_dev_list, elem);
-			pthread_mutex_lock(&bdev->mutex);
-			free_block_data(bdev->data);
-			pthread_mutex_unlock(&bdev->mutex);
-			free(bdev);
+			free_block_device(bdev);
 		}
 	}
 	return 0;
@@ -751,8 +829,6 @@ static const struct edbus_method edbus_methods[] = {
 
 static void block_init(void *data)
 {
-	struct block_dev_ops *dev;
-	dd_list *elem;
 	int ret;
 
 	ret = register_edbus_interface_and_method(DEVICED_PATH_BLOCK,
