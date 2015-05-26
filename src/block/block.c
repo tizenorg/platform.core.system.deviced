@@ -67,6 +67,12 @@ struct block_device {
 	struct block_data *data;
 };
 
+struct format_data {
+	struct block_device *bdev;
+	char *fs_type;
+	enum unmount_operation option;
+};
+
 static dd_list *fs_head;
 static dd_list *block_dev_list;
 static dd_list *block_ops_list;
@@ -147,6 +153,7 @@ static void broadcast_block_info(enum block_dev_operation op,
 
 /* Whole data in struct block_data should be freed. */
 static struct block_data *make_block_data(const char *devnode,
+		const char *syspath,
 		const char *fs_usage,
 		const char *fs_type,
 		const char *fs_version,
@@ -162,6 +169,8 @@ static struct block_data *make_block_data(const char *devnode,
 
 	if (devnode)
 		data->devnode = strdup(devnode);
+	if (syspath)
+		data->syspath = strdup(syspath);
 	if (fs_usage)
 		data->fs_usage = strdup(fs_usage);
 	if (fs_type)
@@ -193,12 +202,58 @@ static void free_block_data(struct block_data *data)
 	if (!data)
 		return;
 	free(data->devnode);
+	free(data->syspath);
 	free(data->fs_usage);
 	free(data->fs_type);
 	free(data->fs_version);
 	free(data->fs_uuid_enc);
 	free(data->mount_point);
 	free(data);
+}
+
+static int update_block_data(struct block_data *data,
+		const char *fs_usage,
+		const char *fs_type,
+		const char *fs_version,
+		const char *fs_uuid_enc,
+		const char *readonly)
+{
+	const char *str;
+
+	if (!data)
+		return -EINVAL;
+
+	free(data->fs_usage);
+	data->fs_usage = NULL;
+	if (fs_usage)
+		data->fs_usage = strdup(fs_usage);
+
+	free(data->fs_type);
+	data->fs_type = NULL;
+	if (fs_type)
+		data->fs_type = strdup(fs_type);
+
+	free(data->fs_version);
+	data->fs_version = NULL;
+	if (fs_version)
+		data->fs_version = strdup(fs_version);
+
+	free(data->fs_uuid_enc);
+	data->fs_uuid_enc = NULL;
+	free(data->mount_point);
+	data->mount_point = NULL;
+	if (fs_uuid_enc) {
+		data->fs_uuid_enc = strdup(fs_uuid_enc);
+		str = tzplatform_mkpath(TZ_SYS_STORAGE, fs_uuid_enc);
+		if (str)
+			data->mount_point = strdup(str);
+	}
+
+	data->readonly = false;
+	if (readonly)
+		data->readonly = atoi(readonly);
+
+	return 0;
 }
 
 static struct block_device *make_block_device(struct block_data *data)
@@ -267,6 +322,42 @@ static bool check_rw_mount(const char *szPath)
 			return false;
 	}
 	return true;
+}
+
+static int retrieve_udev_device(struct block_data *data)
+{
+	struct udev *udev;
+	struct udev_device *dev;
+	int r;
+
+	if (!data)
+		return -EINVAL;
+
+	udev = udev_new();
+	if (!udev) {
+		_E("fail to create udev library context");
+		return -EPERM;
+	}
+
+	dev = udev_device_new_from_syspath(udev, data->syspath);
+	if (!dev) {
+		_E("fail to create new udev device");
+		udev_unref(udev);
+		return -EPERM;
+	}
+
+	r = update_block_data(data,
+			udev_device_get_property_value(dev, "ID_FS_USAGE"),
+			udev_device_get_property_value(dev, "ID_FS_TYPE"),
+			udev_device_get_property_value(dev, "ID_FS_VERSION"),
+			udev_device_get_property_value(dev, "ID_FS_UUID_ENC"),
+			udev_device_get_sysattr_value(dev, "ro"));
+	if (r < 0)
+		_E("fail to update block data for %s", data->devnode);
+
+	udev_device_unref(dev);
+	udev_unref(udev);
+	return r;
 }
 
 static int block_mount(struct block_data *data)
@@ -505,6 +596,151 @@ out:
 	return r;
 }
 
+static int block_format(struct block_data *data,
+		const char *fs_type)
+{
+	const struct block_fs_ops *fs;
+	dd_list *elem;
+	int len;
+	int r;
+
+	if (!data || !data->devnode || !data->mount_point)
+		return -EINVAL;
+
+	if (!fs_type)
+		fs_type = data->fs_type;
+
+	fs = NULL;
+	len = strlen(fs_type);
+	DD_LIST_FOREACH(fs_head, elem, fs) {
+		if (!strncmp(fs->name, fs_type, len))
+			break;
+	}
+
+	if (!fs) {
+		_E("not supported file system(%s)", fs_type);
+		return -ENOTSUP;
+	}
+
+	_I("format path : %s", data->devnode);
+	fs->check(data->devnode);
+	r = fs->format(data->devnode);
+	if (r < 0) {
+		_E("fail to format block data for %s", data->devnode);
+		goto out;
+	}
+
+	/* need to update the partition data.
+	 * It can be changed in doing format. */
+	retrieve_udev_device(data);
+
+out:
+	return r;
+}
+
+/* runs in thread */
+static void *format_start(void *arg)
+{
+	struct format_data *fdata = (struct format_data *)arg;
+	struct block_device *bdev;
+	struct block_data *data;
+	int r;
+	int t;
+
+	assert(fdata);
+	assert(fdata->bdev);
+	assert(fdata->bdev->data);
+
+	bdev = fdata->bdev;
+	data = bdev->data;
+
+	_I("Format Start : (%s -> %s)",
+			data->devnode, data->mount_point);
+
+	pthread_mutex_lock(&bdev->mutex);
+
+	if (data->state == BLOCK_MOUNT) {
+		r = block_unmount(data, fdata->option);
+		if (r < 0) {
+			_E("fail to unmount %s device : %d", data->devnode, r);
+			goto out;
+		}
+		data->state = BLOCK_UNMOUNT;
+	}
+
+	r = block_format(data, fdata->fs_type);
+	if (r < 0)
+		_E("fail to format %s device : %d", data->devnode, r);
+
+	/* mount block device even if format is failed */
+	t = block_mount(data);
+	if (t != -EROFS && t < 0) {
+		_E("fail to mount %s device : %d", data->devnode, t);
+		goto out;
+	}
+
+	if (t == -EROFS)
+		data->readonly = true;
+
+	data->state = BLOCK_MOUNT;
+
+out:
+	_I("%s result : %s, %d", __func__, data->devnode, r);
+	pthread_mutex_unlock(&bdev->mutex);
+
+	/* Broadcast to mmc and usb storage module */
+	broadcast_block_info(BLOCK_DEV_FORMAT, data, r);
+
+	free(fdata);
+
+	return NULL;
+}
+
+int format_block_device(const char *devnode,
+		const char *fs_type,
+		enum unmount_operation option)
+{
+	struct block_device *bdev;
+	struct block_data *data;
+	struct format_data *fdata;
+	pthread_t th;
+	int r;
+
+	if (!devnode) {
+		_E("invalid parameter");
+		return -EINVAL;
+	}
+
+	bdev = find_block_device(devnode);
+	if (!bdev || !bdev->data) {
+		_E("fail to find block data for %s", devnode);
+		return -ENODEV;
+	}
+
+	data = bdev->data;
+	fdata = malloc(sizeof(struct format_data));
+	if (!fdata) {
+		_E("fail to allocate format data for %s", data->devnode);
+		return -EPERM;
+	}
+
+	fdata->bdev = bdev;
+	if (fs_type)
+		fdata->fs_type = strdup(fs_type);
+	else
+		fdata->fs_type = NULL;
+	fdata->option = option;
+
+	r = pthread_create(&th, NULL, format_start, fdata);
+	if (r != 0) {
+		_E("fail to create thread for %s", data->devnode);
+		return -EPERM;
+	}
+
+	pthread_detach(th);
+	return 0;
+}
+
 static bool disk_is_partitioned_by_kernel(struct udev_device *dev)
 {
 	DIR *dp;
@@ -591,6 +827,7 @@ static int add_block_device(struct udev_device *dev, const char *devnode)
 	}
 
 	data = make_block_data(devnode,
+			udev_device_get_syspath(dev),
 			udev_device_get_property_value(dev, "ID_FS_USAGE"),
 			udev_device_get_property_value(dev, "ID_FS_TYPE"),
 			udev_device_get_property_value(dev, "ID_FS_VERSION"),
@@ -730,6 +967,7 @@ static void show_block_device_list(void)
 		if (!data)
 			continue;
 		_D("%s:", data->devnode);
+		_D("\tSyspath: %s", data->syspath);
 		_D("\tBlock type: %s",
 				(data->block_type == BLOCK_MMC_DEV ?
 				 "mmc" : "scsi"));
