@@ -51,6 +51,8 @@
 
 #define FILESYSTEM          "filesystem"
 
+#define DEV_PREFIX          "/dev/"
+
 #define UNMOUNT_RETRY	5
 
 enum block_dev_operation {
@@ -62,6 +64,7 @@ enum block_dev_operation {
 };
 
 struct block_device {
+	E_DBus_Object *object;
 	int deleted;
 	pthread_mutex_t mutex;
 	struct block_data *data;
@@ -77,6 +80,7 @@ static dd_list *fs_head;
 static dd_list *block_dev_list;
 static dd_list *block_ops_list;
 static bool smack;
+static E_DBus_Interface *iface;
 
 static void __CONSTRUCTOR__ smack_check(void)
 {
@@ -286,9 +290,54 @@ static int update_block_data(struct block_data *data,
 	return 0;
 }
 
+static E_DBus_Object *make_block_object(const char *devnode,
+		struct block_data *data)
+{
+	E_DBus_Object *object;
+	char object_path[PATH_MAX];
+	const char *name;
+
+	if (!devnode)
+		return NULL;
+
+	/* check if devnode has the /dev/ prefix */
+	if (strncmp(devnode, DEV_PREFIX, strlen(DEV_PREFIX)))
+		return NULL;
+
+	name = devnode + strlen(DEV_PREFIX);
+	snprintf(object_path, sizeof(object_path),
+			"%s/%s", DEVICED_PATH_BLOCK_DEVICES, name);
+
+	/* register block object */
+	object = register_edbus_object(object_path, data);
+	if (!object)
+		goto error;
+
+	/* attach interface to object */
+	e_dbus_object_interface_attach(object, iface);
+
+	return object;
+error:
+	unregister_edbus_object(object);
+	return NULL;
+}
+
+static void free_block_object(E_DBus_Object *object)
+{
+	if (!object)
+		return;
+
+	/* detach interface from object */
+	e_dbus_object_interface_detach(object, iface);
+	unregister_edbus_object(object);
+}
+
 static struct block_device *make_block_device(struct block_data *data)
 {
 	struct block_device *bdev;
+
+	if (!data)
+		return NULL;
 
 	bdev = calloc(1, sizeof(struct block_device));
 	if (!bdev)
@@ -296,6 +345,14 @@ static struct block_device *make_block_device(struct block_data *data)
 
 	pthread_mutex_init(&bdev->mutex, NULL);
 	bdev->data = data;
+
+	/* create block object */
+	bdev->object = make_block_object(data->devnode, data);
+	if (!bdev->object) {
+		free(bdev);
+		return NULL;
+	}
+
 	return bdev;
 }
 
@@ -307,6 +364,7 @@ static void free_block_device(struct block_device *bdev)
 	pthread_mutex_lock(&bdev->mutex);
 	free_block_data(bdev->data);
 	pthread_mutex_unlock(&bdev->mutex);
+	free_block_object(bdev->object);
 	free(bdev);
 }
 
@@ -483,6 +541,36 @@ out:
 	broadcast_block_info(BLOCK_DEV_MOUNT, data, r);
 
 	return NULL;
+}
+
+int change_mount_point(const char *devnode,
+		const char *mount_point)
+{
+	struct block_device *bdev;
+	struct block_data *data;
+	const char *str;
+
+	if (!devnode)
+		return -EINVAL;
+
+	bdev = find_block_device(devnode);
+	if (!bdev || !bdev->data) {
+		_E("fail to find block data for %s", devnode);
+		return -ENODEV;
+	}
+
+	data = bdev->data;
+	free(data->mount_point);
+	if (mount_point)
+		data->mount_point = strdup(mount_point);
+	else {
+		str = tzplatform_mkpath(TZ_SYS_STORAGE, data->fs_uuid_enc);
+		if (str)
+			data->mount_point = strdup(str);
+
+	}
+
+	return 0;
 }
 
 int mount_block_device(const char *devnode)
@@ -805,7 +893,6 @@ out:
 
 static bool check_partition(struct udev_device *dev)
 {
-	static const char *fs = "filesystem";
 	const char *devtype;
 	const char *part_table_type;
 	const char *fs_usage;
@@ -825,7 +912,8 @@ static bool check_partition(struct udev_device *dev)
 	if (part_table_type) {
 		fs_usage = udev_device_get_property_value(dev,
 				"ID_FS_USAGE");
-		if (fs_usage && strncmp(fs_usage, fs, strlen(fs) + 1) == 0) {
+		if (fs_usage &&
+		    strncmp(fs_usage, FILESYSTEM, sizeof(FILESYSTEM)) == 0) {
 			if (!disk_is_partitioned_by_kernel(dev))
 					goto out;
 		}
@@ -1081,6 +1169,71 @@ static void uevent_block_handler(struct udev_device *dev)
 	add_idle_request(remove_unmountable_blocks, NULL);
 }
 
+static DBusMessage *handle_block_mount(E_DBus_Object *obj,
+		DBusMessage *msg)
+{
+	struct block_data *data;
+	const char *object_path;
+	char *mount_point;
+	int ret = -EBADMSG;
+
+	if (!obj || !msg)
+		goto out;
+
+	ret = dbus_message_get_args(msg, NULL,
+			DBUS_TYPE_STRING, &mount_point,
+			DBUS_TYPE_INVALID);
+	if (!ret)
+		goto out;
+
+	data = e_dbus_object_data_get(obj);
+	if (!data)
+		goto out;
+
+	_D("devnode : %s, mount_point : %s", data->devnode, mount_point);
+
+	/* if requester want to use a specific mount point */
+	if (mount_point && strncmp(mount_point, "", 1) != 0) {
+		ret = change_mount_point(data->devnode, mount_point);
+		if (ret < 0) {
+			ret = -EPERM;
+			goto out;
+		}
+	}
+
+	ret = mount_block_device(data->devnode);
+out:
+	return make_reply_message(msg, ret);
+}
+
+static DBusMessage *handle_block_unmount(E_DBus_Object *obj,
+		DBusMessage *msg)
+{
+	struct block_data *data;
+	const char *object_path;
+	int option;
+	int ret = -EBADMSG;
+
+	if (!obj || !msg)
+		goto out;
+
+	ret = dbus_message_get_args(msg, NULL,
+			DBUS_TYPE_INT32, &option,
+			DBUS_TYPE_INVALID);
+	if (!ret)
+		goto out;
+
+	data = e_dbus_object_data_get(obj);
+	if (!data)
+		goto out;
+
+	_D("devnode : %s, option : %d", data->devnode, option);
+
+	ret = unmount_block_device(data->devnode, option);
+out:
+	return make_reply_message(msg, ret);
+}
+
 static DBusMessage *request_show_device_list(E_DBus_Object *obj,
 		DBusMessage *msg)
 {
@@ -1093,24 +1246,60 @@ static struct uevent_handler uh = {
 	.uevent_func = uevent_block_handler,
 };
 
-static const struct edbus_method edbus_methods[] = {
+static const struct edbus_method manager_methods[] = {
 	{ "ShowDeviceList", NULL, NULL, request_show_device_list },
 };
+
+static const struct edbus_method device_methods[] = {
+	{ "Mount",    "s",  "i", handle_block_mount },
+	{ "Unmount",  "i",  "i", handle_block_unmount },
+};
+
+static int init_block_object_iface(void)
+{
+	int i;
+	int r;
+
+	iface = e_dbus_interface_new(DEVICED_INTERFACE_BLOCK);
+	if (!iface) {
+		_E("fail to new block interface");
+		return -EPERM;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(device_methods); ++i) {
+		r = e_dbus_interface_method_add(iface,
+				device_methods[i].member,
+				device_methods[i].signature,
+				device_methods[i].reply_signature,
+				device_methods[i].func);
+		if (r < 0)
+			_E("fail to register %s to iface",
+					device_methods[i].member);
+	}
+
+	return 0;
+}
 
 static void block_init(void *data)
 {
 	int ret;
 
-	ret = register_edbus_interface_and_method(DEVICED_PATH_BLOCK,
-			DEVICED_INTERFACE_BLOCK,
-			edbus_methods, ARRAY_SIZE(edbus_methods));
+	/* register block manager object and interface */
+	ret = register_edbus_interface_and_method(DEVICED_PATH_BLOCK_MANAGER,
+			DEVICED_INTERFACE_BLOCK_MANAGER,
+			manager_methods, ARRAY_SIZE(manager_methods));
 	if (ret < 0)
 		_E("fail to init edbus interface and method(%d)", ret);
+
+	/* init block devices interface */
+	ret = init_block_object_iface();
+	if (ret < 0)
+		_E("fail to init block object iface");
 
 	/* register mmc uevent control routine */
 	ret = register_udev_uevent_control(&uh);
 	if (ret < 0)
-		_E("fail to register extcon uevent : %d", ret);
+		_E("fail to register block uevent : %d", ret);
 
 	/* register notifier */
 	register_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
@@ -1126,7 +1315,7 @@ static void block_exit(void *data)
 	/* unregister mmc uevent control routine */
 	ret = unregister_udev_uevent_control(&uh);
 	if (ret < 0)
-		_E("fail to unregister extcon uevent : %d", ret);
+		_E("fail to unregister block uevent : %d", ret);
 
 	/* remove remaining blocks */
 	remove_whole_block_device();
