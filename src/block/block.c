@@ -55,6 +55,9 @@
 
 #define UNMOUNT_RETRY	5
 
+#define BLOCK_OBJECT_ADDED      "ObjectAdded"
+#define BLOCK_OBJECT_REMOVED    "ObjectRemoved"
+
 enum block_dev_operation {
 	BLOCK_DEV_MOUNT,
 	BLOCK_DEV_UNMOUNT,
@@ -296,6 +299,7 @@ static E_DBus_Object *make_block_object(const char *devnode,
 	E_DBus_Object *object;
 	char object_path[PATH_MAX];
 	const char *name;
+	char *arr[1];
 
 	if (!devnode)
 		return NULL;
@@ -316,6 +320,13 @@ static E_DBus_Object *make_block_object(const char *devnode,
 	/* attach interface to object */
 	e_dbus_object_interface_attach(object, iface);
 
+	/* Broadcast outside with BlockManager iface */
+	arr[0] = object_path;
+	broadcast_edbus_signal(DEVICED_PATH_BLOCK_MANAGER,
+			DEVICED_INTERFACE_BLOCK_MANAGER,
+			BLOCK_OBJECT_ADDED,
+			"s", arr);
+
 	return object;
 error:
 	unregister_edbus_object(object);
@@ -324,8 +335,17 @@ error:
 
 static void free_block_object(E_DBus_Object *object)
 {
+	char *arr[1];
+
 	if (!object)
 		return;
+
+	/* Broadcast outside with BlockManager iface */
+	arr[0] = (char *)e_dbus_object_path_get(object);
+	broadcast_edbus_signal(DEVICED_PATH_BLOCK_MANAGER,
+			DEVICED_INTERFACE_BLOCK_MANAGER,
+			BLOCK_OBJECT_REMOVED,
+			"s", arr);
 
 	/* detach interface from object */
 	e_dbus_object_interface_detach(object, iface);
