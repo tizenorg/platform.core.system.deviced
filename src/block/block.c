@@ -57,6 +57,7 @@
 
 #define BLOCK_OBJECT_ADDED      "ObjectAdded"
 #define BLOCK_OBJECT_REMOVED    "ObjectRemoved"
+#define BLOCK_DEVICE_CHANGED    "DeviceChanged"
 
 enum block_dev_operation {
 	BLOCK_DEV_MOUNT,
@@ -156,6 +157,50 @@ static void broadcast_block_info(enum block_dev_operation op,
 		else if (op == BLOCK_DEV_REMOVE)
 			ops->remove(data);
 	}
+}
+
+static void signal_device_changed(struct block_device *bdev)
+{
+	struct block_data *data;
+	char *arr[11];
+	char str_block_type[32];
+	char str_readonly[32];
+	char str_state[32];
+	char str_primary[32];
+	char *str_null = "";
+	const char *object_path;
+
+	if (!bdev || !bdev->data)
+		return;
+
+	data = bdev->data;
+
+	/* Broadcast outside with Block iface */
+	snprintf(str_block_type, sizeof(str_block_type),
+			"%d", data->block_type);
+	arr[0] = str_block_type;
+	arr[1] = (data->devnode ? data->devnode : str_null);
+	arr[2] = (data->syspath ? data->syspath : str_null);
+	arr[3] = (data->fs_usage ? data->fs_usage : str_null);
+	arr[4] = (data->fs_type ? data->fs_type : str_null);
+	arr[5] = (data->fs_version ? data->fs_version : str_null);
+	arr[6] = (data->fs_uuid_enc ? data->fs_uuid_enc : str_null);
+	snprintf(str_readonly, sizeof(str_readonly),
+			"%d", data->readonly);
+	arr[7] = str_readonly;
+	arr[8] = (data->mount_point ? data->mount_point : str_null);
+	snprintf(str_state, sizeof(str_state),
+			"%d", data->state);
+	arr[9] = str_state;
+	snprintf(str_primary, sizeof(str_primary),
+			"%d", data->primary);
+	arr[10] = str_primary;
+
+	object_path = e_dbus_object_path_get(bdev->object);
+	broadcast_edbus_signal(object_path,
+			DEVICED_INTERFACE_BLOCK,
+			BLOCK_DEVICE_CHANGED,
+			"issssssisib", arr);
 }
 
 static bool check_primary_partition(const char *devnode)
@@ -560,6 +605,9 @@ out:
 	/* Broadcast to mmc and usb storage module */
 	broadcast_block_info(BLOCK_DEV_MOUNT, data, r);
 
+	/* Broadcast outside with Block iface */
+	signal_device_changed(bdev);
+
 	return NULL;
 }
 
@@ -730,6 +778,9 @@ out:
 
 	/* Broadcast to mmc and usb storage module */
 	broadcast_block_info(BLOCK_DEV_UNMOUNT, data, r);
+
+	/* Broadcast outside with Block iface */
+	signal_device_changed(bdev);
 
 	return r;
 }
@@ -1293,9 +1344,15 @@ static int init_block_object_iface(void)
 				device_methods[i].reply_signature,
 				device_methods[i].func);
 		if (r < 0)
-			_E("fail to register %s to iface",
+			_E("fail to register %s method to iface",
 					device_methods[i].member);
 	}
+
+	r = e_dbus_interface_signal_add(iface,
+			BLOCK_DEVICE_CHANGED, "issssssisib");
+	if (r < 0)
+		_E("fail to register %s signal to iface",
+				BLOCK_DEVICE_CHANGED);
 
 	return 0;
 }
