@@ -59,6 +59,8 @@ static inline void process_event(struct libinput_event *ev)
 	}
 
 	switch (libinput_event_get_type(ev)) {
+	case LIBINPUT_EVENT_DEVICE_ADDED:
+		return;
 	case LIBINPUT_EVENT_KEYBOARD_KEY:
 		k = libinput_event_get_keyboard_event(ev);
 		time = libinput_event_keyboard_get_time(k);
