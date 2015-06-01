@@ -25,8 +25,6 @@
 #define ENLIGHTENMENT_OBJECT_PATH       "/org/enlightenment/wm"
 #define ENLIGHTENMENT_INTERFACE_NAME    ENLIGHTENMENT_BUS_NAME".dpms"
 
-static int dpms = DPMS_OFF;
-
 int dpms_set_power(enum dpms_state state)
 {
 	char *arr[1];
@@ -43,15 +41,23 @@ int dpms_set_power(enum dpms_state state)
 	if (ret < 0)
 		return ret;
 
-	dpms = state;
 	return 0;
 }
 
 int dpms_get_power(enum dpms_state *state)
 {
+	int ret;
+
 	if (!state)
 		return -EINVAL;
 
-	*state = dpms;
+	ret = dbus_method_sync(ENLIGHTENMENT_BUS_NAME,
+			ENLIGHTENMENT_OBJECT_PATH,
+			ENLIGHTENMENT_INTERFACE_NAME,
+			"get", NULL, NULL);
+	if (ret < 0)
+		return ret;
+
+	*state = ret;
 	return 0;
 }
