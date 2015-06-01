@@ -353,28 +353,9 @@ static void noti_batt_full(void)
 
 static void check_power_supply(int state)
 {
-	int ret = -1;
-	int val = 0;
-	char params[BUFF_MAX];
-
 	check_lowbat_charge_device(state);
 	if (update_pm_setting)
 		update_pm_setting(SETTING_CHARGING, state);
-
-	ret = device_get_property(DEVICE_TYPE_POWER,
-		PROP_POWER_INSUSPEND_CHARGING_SUPPORT, &val);
-
-	if (ret != 0 || val == 1) {
-		_D("fail to check charger insuspend");
-		goto out;
-	}
-
-	if (state == 0)
-		pm_unlock_internal(INTERNAL_LOCK_TA, LCD_OFF, STAY_CUR_STATE);
-	else
-		pm_lock_internal(INTERNAL_LOCK_TA, LCD_OFF, STAY_CUR_STATE, 0);
-out:
-	_I("ta device %d(capacity %d)", state, battery.capacity);
 }
 
 static void update_present(enum battery_noti_status status)
