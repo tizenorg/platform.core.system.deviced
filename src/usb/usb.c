@@ -24,6 +24,7 @@
 #include "core/list.h"
 #include "core/common.h"
 #include "core/device-notifier.h"
+#include "display/poll.h"
 #include "extcon/extcon.h"
 #include "usb.h"
 
@@ -151,15 +152,20 @@ static int usb_state_changed(int status)
 	case USB_CONNECTED:
 		_I("USB cable is connected");
 		ret = usb_config_enable();
-		if (ret == 0)
-			vconf_state = VCONFKEY_SYSMAN_USB_AVAILABLE;
-		else
+		if (ret != 0) {
 			vconf_state = VCONFKEY_SYSMAN_USB_CONNECTED;
+			break;
+		}
+		vconf_state = VCONFKEY_SYSMAN_USB_AVAILABLE;
+		pm_lock_internal(INTERNAL_LOCK_USB,
+				LCD_OFF, STAY_CUR_STATE, 0);
 		break;
 	case USB_DISCONNECTED:
 		_I("USB cable is disconnected");
 		ret = usb_config_disable();
 		vconf_state = VCONFKEY_SYSMAN_USB_DISCONNECTED;
+		pm_unlock_internal(INTERNAL_LOCK_USB,
+				LCD_OFF, STAY_CUR_STATE);
 		break;
 	default:
 		_E("Invalid USB state(%d)", status);
