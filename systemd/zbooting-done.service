@@ -1,6 +1,5 @@
 [Unit]
 Description=Booting Done
-After=default.target
 
 [Service]
 Type=oneshot
