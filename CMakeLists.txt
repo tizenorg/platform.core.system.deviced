@@ -106,6 +106,7 @@ SET(SRCS ${SRCS}
 	src/led/ir.c
 	src/led/noti.c
 	src/led/torch.c
+	src/led/touch-key.c
 )
 
 SET(SRCS ${SRCS}

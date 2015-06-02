@@ -35,6 +35,7 @@
 #include "core/device-notifier.h"
 #include "core/edbus-handler.h"
 #include "power/power-handler.h"
+#include "led/touch-key.h"
 
 #include <linux/input.h>
 #ifndef KEY_SCREENLOCK
@@ -49,12 +50,7 @@
 #define PWROFF_POPUP_ACT		"pwroff-popup"
 #define USEC_PER_SEC			1000000
 #define COMBINATION_INTERVAL		0.5	/* 0.5 second */
-#define KEYBACKLIGHT_TIME_90		90	/* 1.5 second */
-#define KEYBACKLIGHT_TIME_360		360	/* 6 second */
-#define KEYBACKLIGHT_TIME_ALWAYS_ON		-1	/* always on */
-#define KEYBACKLIGHT_TIME_ALWAYS_OFF	0	/* always off */
-#define KEYBACKLIGHT_BASE_TIME		60	/* 1min = 60sec */
-#define KEYBACKLIGHT_PRESSED_TIME	15	/*  15 second */
+
 #define KEY_MAX_DELAY_TIME		700	/* ms */
 
 #define KEY_RELEASED		0
@@ -71,10 +67,6 @@
 
 #define TOUCH_RELEASE		(-1)
 
-#ifndef VCONFKEY_SETAPPL_TOUCHKEY_LIGHT_DURATION
-#define VCONFKEY_SETAPPL_TOUCHKEY_LIGHT_DURATION VCONFKEY_SETAPPL_PREFIX"/display/touchkey_light_duration"
-#endif
-
 #define GLOVE_MODE	1
 
 int __WEAK__ get_glove_state(void);
@@ -83,11 +75,9 @@ void __WEAK__ switch_glove_key(int val);
 static struct timeval pressed_time;
 static Ecore_Timer *longkey_timeout_id = NULL;
 static Ecore_Timer *combination_timeout_id = NULL;
-static Ecore_Timer *hardkey_timeout_id = NULL;
 static int cancel_lcdoff;
 static int key_combination = KEY_COMBINATION_STOP;
 static int menu_pressed = false;
-static int hardkey_duration;
 static bool touch_pressed = false;
 static int skip_lcd_off = false;
 static bool powerkey_pressed = false;
@@ -460,44 +450,6 @@ static int process_screenlock_key(struct input_event *pinput)
 	return true;
 }
 
-static void turnon_hardkey_backlight(void)
-{
-	int val, ret;
-
-	ret = device_get_property(DEVICE_TYPE_LED, PROP_LED_HARDKEY, &val);
-	if (ret < 0 || !val) {
-		/* key backlight on */
-		ret = device_set_property(DEVICE_TYPE_LED,
-		    PROP_LED_HARDKEY, STATUS_ON);
-		if (ret < 0)
-			_E("Fail to turn off key backlight!");
-	}
-}
-
-static void turnoff_hardkey_backlight(void)
-{
-	int val, ret;
-
-	ret = device_get_property(DEVICE_TYPE_LED, PROP_LED_HARDKEY, &val);
-	/* check key backlight is already off */
-	if (!ret && !val)
-		return;
-
-	/* key backlight off */
-	ret = device_set_property(DEVICE_TYPE_LED, PROP_LED_HARDKEY, STATUS_OFF);
-	if (ret < 0)
-		_E("Fail to turn off key backlight!");
-}
-
-static Eina_Bool key_backlight_expired(void *data)
-{
-	hardkey_timeout_id = NULL;
-
-	turnoff_hardkey_backlight();
-
-	return ECORE_CALLBACK_CANCEL;
-}
-
 static void sound_vibrate_hardkey(void)
 {
 	/* device notify(vibrator) */
@@ -509,8 +461,7 @@ static void sound_vibrate_hardkey(void)
 
 static void process_hardkey_backlight(struct input_event *pinput)
 {
-	float fduration;
-
+	_E("pinput->value : %d", pinput->value);
 	if (pinput->value == KEY_PRESSED) {
 		if (touch_pressed) {
 			_I("Touch is pressed, then hard key is not working!");
@@ -520,41 +471,16 @@ static void process_hardkey_backlight(struct input_event *pinput)
 		if (get_lock_screen_state() == VCONFKEY_IDLE_UNLOCK
 		    || get_lock_screen_bg_state())
 			sound_vibrate_hardkey();
-		/* release existing timer */
-		if (hardkey_timeout_id > 0) {
-			ecore_timer_del(hardkey_timeout_id);
-			hardkey_timeout_id = NULL;
-		}
-		/* if hardkey option is always off */
-		if (hardkey_duration == KEYBACKLIGHT_TIME_ALWAYS_OFF)
-			return;
-		/* turn on hardkey backlight */
-		turnon_hardkey_backlight();
-		/* start timer */
-		hardkey_timeout_id = ecore_timer_add(
-			    KEYBACKLIGHT_PRESSED_TIME,
-			    key_backlight_expired, NULL);
 
+		process_touchkey_press();
 	} else if (pinput->value == KEY_RELEASED) {
 		/* if lockscreen is idle lock */
 		if (get_lock_screen_state() == VCONFKEY_IDLE_LOCK) {
 			_D("Lock state, key backlight is off when phone is unlocked!");
 			return;
 		}
-		/* release existing timer */
-		if (hardkey_timeout_id > 0) {
-			ecore_timer_del(hardkey_timeout_id);
-			hardkey_timeout_id = NULL;
-		}
-		/* if hardkey option is always on or off */
-		if (hardkey_duration == KEYBACKLIGHT_TIME_ALWAYS_ON ||
-			hardkey_duration == KEYBACKLIGHT_TIME_ALWAYS_OFF)
-			return;
-		/* start timer */
-		fduration = (float)hardkey_duration / KEYBACKLIGHT_BASE_TIME;
-		hardkey_timeout_id = ecore_timer_add(
-			    fduration,
-			    key_backlight_expired, NULL);
+
+		process_touchkey_release();
 	}
 }
 
@@ -692,91 +618,6 @@ static int check_key_filter(void *data, int fd)
 	return 0;
 }
 
-void key_backlight_enable(bool enable)
-{
-	/* release existing timer */
-	if (hardkey_timeout_id > 0) {
-		ecore_timer_del(hardkey_timeout_id);
-		hardkey_timeout_id = NULL;
-	}
-
-	/* start timer in case of backlight enabled */
-	if (enable) {
-		/* if hardkey option is always off */
-		if (hardkey_duration == KEYBACKLIGHT_TIME_ALWAYS_OFF)
-			return;
-
-		/* turn on hardkey backlight */
-		turnon_hardkey_backlight();
-
-		/* do not create turnoff timer in case of idle lock state */
-		if (get_lock_screen_state() == VCONFKEY_IDLE_LOCK)
-			return;
-
-		/* start timer */
-		hardkey_timeout_id = ecore_timer_add(
-			    KEYBACKLIGHT_PRESSED_TIME,
-				key_backlight_expired, NULL);
-	} else {
-		/* if hardkey option is always on */
-		if (hardkey_duration == KEYBACKLIGHT_TIME_ALWAYS_ON)
-			return;
-
-		/* turn off hardkey backlight */
-		turnoff_hardkey_backlight();
-	}
-}
-
-static void hardkey_duration_cb(keynode_t *key, void *data)
-{
-	float duration;
-
-	hardkey_duration = vconf_keynode_get_int(key);
-
-	/* release existing timer */
-	if (hardkey_timeout_id > 0) {
-		ecore_timer_del(hardkey_timeout_id);
-		hardkey_timeout_id = NULL;
-	}
-
-	/* if hardkey option is always off */
-	if (hardkey_duration == KEYBACKLIGHT_TIME_ALWAYS_OFF) {
-		/* turn off hardkey backlight */
-		turnoff_hardkey_backlight();
-		return;
-	}
-
-	/* turn on hardkey backlight */
-	turnon_hardkey_backlight();
-
-	/* if hardkey option is always on */
-	if (hardkey_duration == KEYBACKLIGHT_TIME_ALWAYS_ON)
-		return;
-
-	/* start timer */
-	duration = (float)hardkey_duration / KEYBACKLIGHT_BASE_TIME;
-	hardkey_timeout_id = ecore_timer_add(
-		    duration,
-		    key_backlight_expired, NULL);
-}
-
-static int hardkey_lcd_changed_cb(void *data)
-{
-	int lcd_state;
-
-	if (!data)
-		return 0;
-
-	lcd_state = *(int*)data;
-	if (lcd_state == S_NORMAL
-	    && hardkey_duration == KEYBACKLIGHT_TIME_ALWAYS_ON) {
-		turnon_hardkey_backlight();
-		return 0;
-	}
-
-	return 0;
-}
-
 /*
  * Default capability
  * powerkey := LCDON | LCDOFF | POWEROFF
@@ -798,34 +639,15 @@ static void keyfilter_init(void)
 {
 	display_add_actor(&display_powerkey_actor);
 	display_add_actor(&display_menukey_actor);
-
-	/* get touchkey light duration setting */
-	if (vconf_get_int(VCONFKEY_SETAPPL_TOUCHKEY_LIGHT_DURATION, &hardkey_duration) < 0) {
-		_W("Fail to get VCONFKEY_SETAPPL_TOUCHKEY_LIGHT_DURATION!!");
-		hardkey_duration = KEYBACKLIGHT_TIME_90;
-	}
-
-	vconf_notify_key_changed(VCONFKEY_SETAPPL_TOUCHKEY_LIGHT_DURATION, hardkey_duration_cb, NULL);
-
-	/* register notifier */
-	register_notifier(DEVICE_NOTIFIER_LCD, hardkey_lcd_changed_cb);
-
-	/* update touchkey light duration right now */
-	if (hardkey_duration == KEYBACKLIGHT_TIME_ALWAYS_ON)
-		turnon_hardkey_backlight();
 }
 
-static void keyfilter_exit(void)
+static void key_backlight_enable(bool enable)
 {
-	/* unregister notifier */
-	unregister_notifier(DEVICE_NOTIFIER_LCD, hardkey_lcd_changed_cb);
-
-	vconf_ignore_key_changed(VCONFKEY_SETAPPL_TOUCHKEY_LIGHT_DURATION, hardkey_duration_cb);
+	process_touchkey_enable(enable);
 }
 
 static const struct display_keyfilter_ops normal_keyfilter_ops = {
 	.init			= keyfilter_init,
-	.exit			= keyfilter_exit,
 	.check			= check_key_filter,
 	.set_powerkey_ignore 	= NULL,
 	.powerkey_lcdoff	= NULL,
