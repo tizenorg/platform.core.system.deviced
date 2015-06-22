@@ -1,7 +1,7 @@
 [Unit]
 Description=System device daemon
 After=deviced-pre.service
-Requires=deviced-pre.service tizen-system-env.service
+Requires=deviced-pre.service
 
 [Service]
 EnvironmentFile=-/run/tizen-system-env
