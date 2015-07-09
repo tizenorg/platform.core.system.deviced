@@ -98,6 +98,12 @@ static dd_list *block_ops_list;
 static bool smack;
 static E_DBus_Interface *iface;
 
+static void uevent_block_handler(struct udev_device *dev);
+static struct uevent_handler uh = {
+	.subsystem = BLOCK_SUBSYSTEM,
+	.uevent_func = uevent_block_handler,
+};
+
 static void __CONSTRUCTOR__ smack_check(void)
 {
 	FILE *fp;
@@ -215,6 +221,15 @@ static void signal_device_changed(struct block_device *bdev)
 			"issssssisib", arr);
 }
 
+static const char *generate_mount_path(const char *fs_uuid_enc)
+{
+	char *str;
+	str = tzplatform_mkpath(TZ_SYS_STORAGE, fs_uuid_enc);
+	if (!str)
+		return NULL;
+	return strdup(str);
+}
+
 static bool check_primary_partition(const char *devnode)
 {
 	char str[PATH_MAX];
@@ -254,14 +269,16 @@ static struct block_data *make_block_data(const char *devnode,
 		const char *readonly)
 {
 	struct block_data *data;
-	const char *str;
+
+	/* devnode is unique value so it should exist. */
+	if (!devnode)
+		return NULL;
 
 	data = calloc(1, sizeof(struct block_data));
 	if (!data)
 		return NULL;
 
-	if (devnode)
-		data->devnode = strdup(devnode);
+	data->devnode = strdup(devnode);
 	if (syspath)
 		data->syspath = strdup(syspath);
 	if (fs_usage)
@@ -272,9 +289,7 @@ static struct block_data *make_block_data(const char *devnode,
 		data->fs_version = strdup(fs_version);
 	if (fs_uuid_enc) {
 		data->fs_uuid_enc = strdup(fs_uuid_enc);
-		str = tzplatform_mkpath(TZ_SYS_STORAGE, fs_uuid_enc);
-		if (str)
-			data->mount_point = strdup(str);
+		data->mount_point = generate_mount_path(fs_uuid_enc);
 	}
 	if (readonly)
 		data->readonly = atoi(readonly);
@@ -312,8 +327,6 @@ static int update_block_data(struct block_data *data,
 		const char *fs_uuid_enc,
 		const char *readonly)
 {
-	const char *str;
-
 	if (!data)
 		return -EINVAL;
 
@@ -338,9 +351,7 @@ static int update_block_data(struct block_data *data,
 	data->mount_point = NULL;
 	if (fs_uuid_enc) {
 		data->fs_uuid_enc = strdup(fs_uuid_enc);
-		str = tzplatform_mkpath(TZ_SYS_STORAGE, fs_uuid_enc);
-		if (str)
-			data->mount_point = strdup(str);
+		data->mount_point = generate_mount_path(fs_uuid_enc);
 	}
 
 	data->readonly = false;
@@ -628,7 +639,6 @@ int change_mount_point(const char *devnode,
 {
 	struct block_device *bdev;
 	struct block_data *data;
-	const char *str;
 
 	if (!devnode)
 		return -EINVAL;
@@ -643,12 +653,8 @@ int change_mount_point(const char *devnode,
 	free(data->mount_point);
 	if (mount_point)
 		data->mount_point = strdup(mount_point);
-	else {
-		str = tzplatform_mkpath(TZ_SYS_STORAGE, data->fs_uuid_enc);
-		if (str)
-			data->mount_point = strdup(str);
-
-	}
+	else
+		data->mount_point = generate_mount_path(data->fs_uuid_enc);
 
 	return 0;
 }
@@ -1419,11 +1425,6 @@ static DBusMessage *request_get_device_list(E_DBus_Object *obj,
 out:
 	return reply;
 }
-
-static struct uevent_handler uh = {
-	.subsystem = BLOCK_SUBSYSTEM,
-	.uevent_func = uevent_block_handler,
-};
 
 static const struct edbus_method manager_methods[] = {
 	{ "ShowDeviceList", NULL, NULL, request_show_device_list },
