@@ -1081,7 +1081,7 @@ static int remove_block_device(struct udev_device *dev, const char *devnode)
 		return -ENODEV;
 	}
 
-	r = unmount_block_device(devnode, UNMOUNT_NORMAL);
+	r = unmount_block_device(devnode, UNMOUNT_FORCE);
 	if (r < 0)
 		_E("fail to unmount block device for %s", devnode);
 
