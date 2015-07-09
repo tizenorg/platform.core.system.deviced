@@ -84,11 +84,11 @@ struct block_data {
 struct block_dev_ops {
 	const char *name;
 	enum block_device_type block_type;
-	void (*mount) (struct block_data *data, int result);
-	void (*unmount) (struct block_data *data, int result);
-	void (*format) (struct block_data *data, int result);
-	void (*insert) (struct block_data *data);
-	void (*remove) (struct block_data *data);
+	void (*mounted) (struct block_data *data, int result);
+	void (*unmounted) (struct block_data *data, int result);
+	void (*formatted) (struct block_data *data, int result);
+	void (*inserted) (struct block_data *data);
+	void (*removed) (struct block_data *data);
 };
 
 void add_block_dev(const struct block_dev_ops *ops);

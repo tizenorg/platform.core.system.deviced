@@ -151,15 +151,15 @@ static void broadcast_block_info(enum block_dev_operation op,
 		if (ops->block_type != data->block_type)
 			continue;
 		if (op == BLOCK_DEV_MOUNT)
-			ops->mount(data, result);
+			ops->mounted(data, result);
 		else if (op == BLOCK_DEV_UNMOUNT)
-			ops->unmount(data, result);
+			ops->unmounted(data, result);
 		else if (op == BLOCK_DEV_FORMAT)
-			ops->format(data, result);
+			ops->formatted(data, result);
 		else if (op == BLOCK_DEV_INSERT)
-			ops->insert(data);
+			ops->inserted(data);
 		else if (op == BLOCK_DEV_REMOVE)
-			ops->remove(data);
+			ops->removed(data);
 	}
 }
 
