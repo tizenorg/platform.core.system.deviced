@@ -305,6 +305,7 @@ systemctl daemon-reload
 %{_bindir}/deviced-pre.sh
 %{_bindir}/deviced
 %{_bindir}/movi_format.sh
+%{_sysconfdir}/deviced/block.conf
 %{_sysconfdir}/deviced/usb-setting.conf
 %{_sysconfdir}/deviced/usb-operation.conf
 %{_bindir}/mmc-smack-label

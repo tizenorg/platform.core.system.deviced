@@ -34,6 +34,7 @@
 #include <tzplatform_config.h>
 
 #include "core/log.h"
+#include "core/config-parser.h"
 #include "core/device-notifier.h"
 #include "core/devices.h"
 #include "core/udev.h"
@@ -63,6 +64,8 @@
 #define BLOCK_TYPE_SCSI         "scsi"
 #define BLOCK_TYPE_ALL          "all"
 
+#define BLOCK_CONF_FILE         "/etc/deviced/block.conf"
+
 enum block_dev_operation {
 	BLOCK_DEV_MOUNT,
 	BLOCK_DEV_UNMOUNT,
@@ -83,6 +86,10 @@ struct format_data {
 	char *fs_type;
 	enum unmount_operation option;
 };
+
+static struct block_conf {
+	bool multimount;
+} block_conf[BLOCK_MMC_DEV + 1];
 
 static dd_list *fs_head;
 static dd_list *block_dev_list;
@@ -666,6 +673,12 @@ int mount_block_device(const char *devnode)
 	data = bdev->data;
 	if (data->state == BLOCK_MOUNT) {
 		_I("%s is already mounted", data->devnode);
+		return 0;
+	}
+
+	if (!block_conf[data->block_type].multimount &&
+	    !data->primary) {
+		_I("Not support multi mount by config info");
 		return 0;
 	}
 
@@ -1449,9 +1462,35 @@ static int init_block_object_iface(void)
 	return 0;
 }
 
+static int load_config(struct parse_result *result, void *user_data)
+{
+	int index;
+
+	if (MATCH(result->section, "Block"))
+		return 0;
+
+	if (MATCH(result->section, "SCSI"))
+		index = BLOCK_SCSI_DEV;
+	else if (MATCH(result->section, "MMC"))
+		index = BLOCK_MMC_DEV;
+	else
+		return -EINVAL;
+
+	if (MATCH(result->name, "Multimount"))
+		block_conf[index].multimount =
+			(MATCH(result->value, "yes") ? true : false);
+
+	return 0;
+}
+
 static void block_init(void *data)
 {
 	int ret;
+
+	/* load config */
+	ret = config_parse(BLOCK_CONF_FILE, load_config, NULL);
+	if (ret < 0)
+		_E("fail to load %s, Use default value", BLOCK_CONF_FILE);
 
 	/* register block manager object and interface */
 	ret = register_edbus_interface_and_method(DEVICED_PATH_BLOCK_MANAGER,
