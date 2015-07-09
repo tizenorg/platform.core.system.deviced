@@ -59,6 +59,10 @@
 #define BLOCK_OBJECT_REMOVED    "ObjectRemoved"
 #define BLOCK_DEVICE_CHANGED    "DeviceChanged"
 
+#define BLOCK_TYPE_MMC          "mmc"
+#define BLOCK_TYPE_SCSI         "scsi"
+#define BLOCK_TYPE_ALL          "all"
+
 enum block_dev_operation {
 	BLOCK_DEV_MOUNT,
 	BLOCK_DEV_UNMOUNT,
@@ -1159,7 +1163,7 @@ static void show_block_device_list(void)
 		_D("\tSyspath: %s", data->syspath);
 		_D("\tBlock type: %s",
 				(data->block_type == BLOCK_MMC_DEV ?
-				 "mmc" : "scsi"));
+				 BLOCK_TYPE_MMC : BLOCK_TYPE_SCSI));
 		_D("\tFs type: %s", data->fs_type);
 		_D("\tFs usage: %s", data->fs_usage);
 		_D("\tFs version: %s", data->fs_version);
@@ -1312,6 +1316,93 @@ static DBusMessage *request_show_device_list(E_DBus_Object *obj,
 	return dbus_message_new_method_return(msg);
 }
 
+static DBusMessage *request_get_device_list(E_DBus_Object *obj,
+		DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessageIter aiter, piter;
+	DBusMessage *reply;
+	struct block_device *bdev;
+	struct block_data *data;
+	dd_list *elem;
+	char *type = NULL;
+	int ret = -EBADMSG;
+	char *str_null = "";
+	int block_type;
+
+	reply = dbus_message_new_method_return(msg);
+
+	ret = dbus_message_get_args(msg, NULL,
+			DBUS_TYPE_STRING, &type,
+			DBUS_TYPE_INVALID);
+	if (!ret) {
+		_E("Failed to get args");
+		goto out;
+	}
+
+	if (!type) {
+		_E("Delivered type is NULL");
+		goto out;
+	}
+
+	_D("Block (%s) device list is requested", type);
+
+	if (!strncmp(type, BLOCK_TYPE_SCSI, sizeof(BLOCK_TYPE_SCSI)))
+		block_type = BLOCK_SCSI_DEV;
+	else if (!strncmp(type, BLOCK_TYPE_MMC, sizeof(BLOCK_TYPE_MMC)))
+		block_type = BLOCK_MMC_DEV;
+	else if (!strncmp(type, BLOCK_TYPE_ALL, sizeof(BLOCK_TYPE_ALL)))
+		block_type = -1;
+	else {
+		_E("Invalid type (%s) is requested", type);
+		goto out;
+	}
+
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY, "(issssssisib)", &aiter);
+
+	DD_LIST_FOREACH(block_dev_list, elem, bdev) {
+		data = bdev->data;
+		if (!data)
+			continue;
+
+		switch (block_type) {
+		case BLOCK_SCSI_DEV:
+		case BLOCK_MMC_DEV:
+			if (data->block_type != block_type)
+				continue;
+			break;
+		default:
+			break;
+		}
+
+		dbus_message_iter_open_container(&aiter, DBUS_TYPE_STRUCT, NULL, &piter);
+		dbus_message_iter_append_basic(&piter, DBUS_TYPE_INT32, &(data->block_type));
+		dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
+				data->devnode ? &(data->devnode) : &str_null);
+		dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
+				data->syspath ? &(data->syspath) : &str_null);
+		dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
+				data->fs_usage ? &(data->fs_usage) : &str_null);
+		dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
+				data->fs_type ? &(data->fs_type) : &str_null);
+		dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
+				data->fs_version ? &(data->fs_version) : &str_null);
+		dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
+				data->fs_uuid_enc ? &(data->fs_uuid_enc) : &str_null);
+		dbus_message_iter_append_basic(&piter, DBUS_TYPE_INT32, &(data->readonly));
+		dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
+				data->mount_point ? &(data->mount_point) : &str_null);
+		dbus_message_iter_append_basic(&piter, DBUS_TYPE_INT32, &(data->state));
+		dbus_message_iter_append_basic(&piter, DBUS_TYPE_BOOLEAN, &(data->primary));
+		dbus_message_iter_close_container(&aiter, &piter);
+	}
+	dbus_message_iter_close_container(&iter, &aiter);
+
+out:
+	return reply;
+}
+
 static struct uevent_handler uh = {
 	.subsystem = BLOCK_SUBSYSTEM,
 	.uevent_func = uevent_block_handler,
@@ -1319,6 +1410,7 @@ static struct uevent_handler uh = {
 
 static const struct edbus_method manager_methods[] = {
 	{ "ShowDeviceList", NULL, NULL, request_show_device_list },
+	{ "GetDeviceList", "s", "a(issssssisib)", request_get_device_list },
 };
 
 static const struct edbus_method device_methods[] = {
