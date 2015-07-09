@@ -30,6 +30,7 @@
 #include <sys/statfs.h>
 #include <stdbool.h>
 #include <pthread.h>
+#include <time.h>
 #include <assert.h>
 #include <tzplatform_config.h>
 
@@ -696,6 +697,7 @@ static int block_unmount(struct block_data *data,
 		enum unmount_operation option)
 {
 	int r, retry = 0;
+	struct timespec time = {0,};
 
 	if (!data || !data->mount_point)
 		return -EINVAL;
@@ -738,7 +740,8 @@ static int block_unmount(struct block_data *data,
 		}
 
 		/* it takes some seconds til other app completely clean up */
-		usleep(500*1000);
+		time.tv_nsec = 500 * NANO_SECOND_MULTIPLIER;
+		nanosleep(&time, NULL);
 
 		r = mmc_check_and_unmount(data->mount_point);
 		if (!r)
@@ -950,6 +953,7 @@ int format_block_device(const char *devnode,
 static bool disk_is_partitioned_by_kernel(struct udev_device *dev)
 {
 	DIR *dp;
+	struct dirent entry;
 	struct dirent *dir;
 	const char *syspath;
 	bool ret = false;
@@ -965,7 +969,7 @@ static bool disk_is_partitioned_by_kernel(struct udev_device *dev)
 	}
 
 	/* TODO compare devname and d_name */
-	while ((dir = readdir(dp)) != NULL) {
+	while (readdir_r(dp, &entry, &dir) == 0 && dir != NULL) {
 		if (!fnmatch(MMC_PARTITION_PATH, dir->d_name, 0) ||
 		    !fnmatch(SCSI_PARTITION_PATH, dir->d_name, 0)) {
 			ret = true;

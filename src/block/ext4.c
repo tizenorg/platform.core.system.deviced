@@ -25,6 +25,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <errno.h>
+#include <time.h>
 
 #include "core/common.h"
 #include "core/devices.h"
@@ -62,7 +63,7 @@ static bool ext4_match(const char *devpath)
 
 	fd = open(devpath, O_RDONLY);
 	if (fd < 0) {
-		_E("failed to open fd(%s) : %s", devpath, strerror(errno));
+		_E("failed to open fd(%s) : %d", devpath, errno);
 		return false;
 	}
 
@@ -75,7 +76,7 @@ static bool ext4_match(const char *devpath)
 	if (r < 0)
 		goto error;
 
-	_I("mmc search magic : 0x%2x, 0x%2x", buf[0],buf[1]);
+	_I("mmc search magic : 0x%2x, 0x%2x", buf[0], buf[1]);
 	if (memcmp(buf, ext4_info.magic, ext4_info.magic_sz))
 		goto error;
 
@@ -125,6 +126,7 @@ static int check_smack_popup(void)
 static int ext4_mount(bool smack, const char *devpath, const char *mount_point)
 {
 	int r, retry = RETRY_COUNT;
+	struct timespec time = {0,};
 
 	do {
 		r = mount(devpath, mount_point, "ext4", 0, NULL);
@@ -137,7 +139,8 @@ static int ext4_mount(bool smack, const char *devpath, const char *mount_point)
 			return 0;
 		}
 		_I("mount fail : r = %d, err = %d", r, errno);
-		usleep(100000);
+		time.tv_nsec = 100 * NANO_SECOND_MULTIPLIER;
+		nanosleep(&time, NULL);
 	} while (r < 0 && errno == ENOENT && retry-- > 0);
 
 	return -errno;

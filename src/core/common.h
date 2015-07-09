@@ -97,6 +97,8 @@
 #define USEC_TO_MSEC(x)		((double)x/1000)
 #endif
 
+#define NANO_SECOND_MULTIPLIER  1000000 /* 1ms = 1,000,000 nsec */
+
 #ifndef safe_free
 #define safe_free(x) safe_free_memory((void**)&(x))
 #endif

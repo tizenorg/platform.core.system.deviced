@@ -22,6 +22,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <errno.h>
+#include <time.h>
 
 #include "core/common.h"
 #include "core/log.h"
@@ -102,6 +103,7 @@ static int vfat_mount(bool smack, const char *devpath, const char *mount_point)
 {
 	char options[NAME_MAX];
 	int r, retry = RETRY_COUNT;
+	struct timespec time = {0,};
 
 	if (smack)
 		snprintf(options, sizeof(options), "%s,%s", FS_VFAT_MOUNT_OPT, SMACKFS_MOUNT_OPT);
@@ -115,7 +117,8 @@ static int vfat_mount(bool smack, const char *devpath, const char *mount_point)
 			return 0;
 		}
 		_I("mount fail : r = %d, err = %d", r, errno);
-		usleep(100000);
+		time.tv_nsec = 100 * NANO_SECOND_MULTIPLIER;
+		nanosleep(&time, NULL);
 	} while (r < 0 && errno == ENOENT && retry-- > 0);
 
 	return -errno;
