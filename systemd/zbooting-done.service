@@ -1,5 +1,6 @@
 [Unit]
 Description=Booting Done
+After=display-manager.service
 
 [Service]
 Type=oneshot
