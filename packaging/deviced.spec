@@ -1,21 +1,41 @@
 
-#These options are ACTIVATED by default.
-%bcond_without display
-
 #These options are DEACTIVATED by default.
 %bcond_with x
 %bcond_with wayland
 
-%bcond_with buzzer
-%bcond_with hall
-%bcond_with sim
-%bcond_with usb
+# display, extcon, power, usb are always enable
+%define battery_module off
+%define block_module off
+%define display_module on
+%define extcon_module on
+%define haptic_module off
+%define led_module off
+%define power_module on
+%define telephony_module off
+%define usb_module on
+%define usbhost_module off
+
+%if "%{?profile}" == "mobile"
+%define battery_module on
+%define block_module on
+%define haptic_module on
+%define led_module on
+%define telephony_module on
+%endif
+%if "%{?profile}" == "wearable"
+%define battery_module on
+%define haptic_module on
+%define telephony_module on
+%endif
+%if "%{?profile}" == "tv"
+%define block_module on
+%endif
 
 Name:       deviced
 Summary:    Deviced
 Version:    1.0.0
 Release:    1
-Group:      Framework/system
+Group:      System/Management
 License:    Apache-2.0
 Source0:    %{name}-%{version}.tar.gz
 Source1:    deviced.manifest
@@ -27,34 +47,31 @@ Source6:    devman.manifest
 
 BuildRequires:  cmake
 BuildRequires:  libattr-devel
+BuildRequires:  gettext-devel
 BuildRequires:  pkgconfig(ecore)
 BuildRequires:  pkgconfig(vconf)
-BuildRequires:  pkgconfig(tapi)
-BuildRequires:  pkgconfig(edbus)
 BuildRequires:  pkgconfig(dlog)
-BuildRequires:  pkgconfig(syspopup-caller)
+BuildRequires:  pkgconfig(device-node)
+BuildRequires:  pkgconfig(edbus)
+BuildRequires:  pkgconfig(capi-base-common)
+BuildRequires:  pkgconfig(libudev)
+BuildRequires:  pkgconfig(libtzplatform-config)
+BuildRequires:  pkgconfig(notification)
+BuildRequires:  pkgconfig(hwcommon)
+%if %{?display_module} == on
 %if %{with x}
 BuildRequires:  pkgconfig(x11)
 BuildRequires:  pkgconfig(xext)
 %endif
-BuildRequires:  pkgconfig(udev)
-BuildRequires:  pkgconfig(device-node)
-BuildRequires:  pkgconfig(libsmack)
-BuildRequires:  pkgconfig(sensor)
-BuildRequires:	gettext
-BuildRequires:  pkgconfig(libsystemd-daemon)
-BuildRequires:  pkgconfig(capi-base-common)
-BuildRequires:	pkgconfig(dbus-1)
-BuildRequires:  pkgconfig(libtzplatform-config)
-BuildRequires:  pkgconfig(notification)
-BuildRequires:  pkgconfig(hwcommon)
 BuildRequires:  pkgconfig(libinput)
+BuildRequires:  pkgconfig(sensor)
+%endif
+%if %{?telephony_module} == on
+BuildRequires:  pkgconfig(tapi)
+%endif
 
 %{?systemd_requires}
-Requires(preun): /usr/bin/systemctl
-Requires(post): /usr/bin/systemctl
 Requires(post): /usr/bin/vconftool
-Requires(postun): /usr/bin/systemctl
 
 %description
 deviced
@@ -67,7 +84,7 @@ Group:      main
 deviced daemon.
 
 %package tools
-Summary:  deviced tools
+Summary:  Deviced tools
 Group:    System/Utilities
 Requires: %{name} = %{version}-%{release}
 
@@ -188,7 +205,7 @@ Haptic Device manager library for device control (devel)
 %define ARCH emulator
 %endif
 
-%define DPMS
+%define DPMS none
 %if %{with x}
 %define DPMS x
 %endif
@@ -201,21 +218,17 @@ Haptic Device manager library for device control (devel)
 	-DCMAKE_INSTALL_PREFIX=%{_prefix} \
 	-DARCH=%{ARCH} \
 	-DDPMS=%{DPMS} \
-%if %{with buzzer}
-	-DTIZEN_BUZZER:BOOL=ON \
-%endif
-%if %{with display}
-	-DTIZEN_DISPLAY:BOOL=ON \
-%endif
-%if %{with hall}
-	-DTIZEN_HALL:BOOL=ON \
-%endif
-%if %{with sim}
-	-DTIZEN_SIM:BOOL=ON \
-%endif
-%if %{with usb}
-	-DTIZEN_USB:BOOL=ON \
-%endif
+	-DPROFILE=%{profile} \
+	-DBATTERY_MODULE=%{battery_module} \
+	-DBLOCK_MODULE=%{block_module} \
+	-DDISPLAY_MODULE=%{display_module} \
+	-DEXTCON_MODULE=%{extcon_module} \
+	-DHAPTIC_MODULE=%{haptic_module} \
+	-DLED_MODULE=%{led_module} \
+	-DPOWER_MODULE=%{power_module} \
+	-DTELEPHONY_MODULE=%{telephony_module} \
+	-DUSB_MODULE=%{usb_module} \
+	-DUSBHOST_MODULE=%{usbhost_module} \
 	#eol
 
 %build
@@ -266,13 +279,13 @@ vconftool set -t int memory/pm/current_brt 60 -i -g "$users_gid"
 systemctl daemon-reload
 if [ "$1" == "1" ]; then
     systemctl restart deviced.service
-	systemctl restart zbooting-done.service
+    systemctl restart zbooting-done.service
 fi
 
 %preun
 if [ "$1" == "0" ]; then
     systemctl stop deviced.service
-	systemctl stop zbooting-done.service
+    systemctl stop zbooting-done.service
 fi
 
 %postun
@@ -305,14 +318,6 @@ systemctl daemon-reload
 %{_bindir}/deviced-pre.sh
 %{_bindir}/deviced
 %{_bindir}/movi_format.sh
-%{_sysconfdir}/deviced/block.conf
-%{_sysconfdir}/deviced/usb-setting.conf
-%{_sysconfdir}/deviced/usb-operation.conf
-%{_bindir}/mmc-smack-label
-%{_bindir}/fsck_msdosfs
-%{_bindir}/newfs_msdos
-%{_datadir}/license/fsck_msdosfs
-%{_datadir}/license/newfs_msdos
 %{_unitdir}/multi-user.target.wants/deviced.service
 %{_unitdir}/sockets.target.wants/deviced.socket
 %{_unitdir}/graphical.target.wants/zbooting-done.service
@@ -320,16 +325,30 @@ systemctl daemon-reload
 %{_unitdir}/deviced.socket
 %{_unitdir}/deviced-pre.service
 %{_unitdir}/zbooting-done.service
+%if %{?block_module} == on
+%{_bindir}/mmc-smack-label
+%{_bindir}/fsck_msdosfs
+%{_bindir}/newfs_msdos
+%{_datadir}/license/fsck_msdosfs
+%{_datadir}/license/newfs_msdos
+%config %{_sysconfdir}/deviced/block.conf
+%endif
+%if %{?usb_module} == on
+%config %{_sysconfdir}/deviced/usb-setting.conf
+%config %{_sysconfdir}/deviced/usb-operation.conf
+%endif
 
 %files tools
 %manifest %{name}.manifest
 %{_bindir}/devicectl
+%if %{?usb_module} == on
 %{_bindir}/direct_set_debug.sh
+%endif
 
 %files -n libdeviced
+%manifest deviced.manifest
 %defattr(-,root,root,-)
 %{_libdir}/libdeviced.so.*
-%manifest deviced.manifest
 
 %files -n libdeviced-devel
 %defattr(-,root,root,-)
