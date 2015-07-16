@@ -11,6 +11,39 @@ ELSEIF("${ARCH}" STREQUAL "arm")
 ENDIF()
 
 ########################################################
+# Deviced Macros
+########################################################
+MACRO(ADD_SOURCE DIR OUT)
+	FILE(GLOB ALL_SRCS "${DIR}/*.c")
+	FOREACH(SRC ${ALL_SRCS})
+		IF(NOT ${SRC} MATCHES "ivi|mobile|wearable|tv|none")
+			SET(D_SRCS ${D_SRCS} ${SRC})
+		ENDIF()
+	ENDFOREACH()
+	FILE(GLOB S_SRCS "${DIR}/*-${PROFILE}.c")
+	IF(DEFINED S_SRCS)
+		SET(D_SRCS ${D_SRCS} ${S_SRCS})
+	ENDIF()
+	SET(${OUT} ${D_SRCS})
+ENDMACRO()
+
+MACRO(INSTALL_CONF DIR CONF)
+	SET(T_CONF ${DIR}/${CONF}-${PROFILE}.conf)
+	SET(E_CONF ${DIR}/${CONF}-emul-${PROFILE}.conf)
+	IF(USE_EMULATOR AND EXISTS ${E_CONF})
+		SET(T_CONF ${E_CONF})
+	ENDIF()
+	IF(NOT EXISTS ${T_CONF})
+		SET(T_CONF ${DIR}/${CONF}.conf)
+	ENDIF()
+	IF(DEFINED T_CONF)
+		INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/${T_CONF}
+			DESTINATION /etc/deviced
+			RENAME ${CONF}.conf)
+	ENDIF()
+ENDMACRO()
+
+########################################################
 # Deviced CMakeLists.txt
 ########################################################
 SET(PREFIX ${CMAKE_INSTALL_PREFIX})
@@ -21,12 +54,9 @@ SET(CONFDIR "/etc/${PROJECT_NAME}")
 SET(VERSION 0.1.0)
 
 SET(SRCS
-	src/block/block.c
-	src/block/ext4.c
-	src/block/vfat.c
+	src/control/control.c
 	src/core/common.c
 	src/core/config-parser.c
-	src/control/control.c
 	src/core/device-idler.c
 	src/core/device-notifier.c
 	src/core/devices.c
@@ -37,83 +67,59 @@ SET(SRCS
 	src/core/main.c
 	src/core/sig-handler.c
 	src/core/udev.c
-	src/extcon/cradle.c
-	src/extcon/earjack.c
-	src/extcon/extcon.c
-	src/extcon/hdmi.c
-	src/gpio/gpio.c
 	src/power/power-handler.c
 	src/proc/cpu-info.c
 	src/proc/proc-handler.c
 	src/time/time-handler.c
 )
 
-SET(SRCS ${SRCS}
-	src/usb/usb.c
-	src/usb/usb-default.c
-	src/usb/usb-host.c
-)
-
-IF(TIZEN_BUZZER)
-SET(SRCS ${SRCS}
-	src/gpio/buzzer.c)
-ENDIF(TIZEN_BUZZER)
-
-SET(SRCS ${SRCS}
-	src/battery/battery-time.c
-	src/battery/config.c
-	src/battery/lowbat-handler.c
-	src/battery/power-supply.c
-   )
-
-IF(TIZEN_HALL)
-SET(SRCS ${SRCS}
-	src/gpio/hall.c)
-ENDIF(TIZEN_HALL)
-
-IF(TIZEN_SIM)
-SET(SRCS ${SRCS}
-	src/gpio/sim.c)
-ENDIF(TIZEN_SIM)
-
-IF(TIZEN_DISPLAY)
-SET(SRCS ${SRCS}
-	src/display/auto-brightness.c
-	src/display/brightness.c
-	src/display/core.c
-	src/display/device-interface.c
-	src/display/display-actor.c
-	src/display/display-dbus.c
-	src/display/display-ops.c
-	src/display/key-filter.c
-	src/display/lock-detector.c
-	src/display/poll.c
-	src/display/setting.c
-	src/display/input.c
-)
-
-IF("${DPMS}" STREQUAL "x")
-SET(SRCS ${SRCS}
-	src/display/dpms-x.c)
-ELSEIF("${DPMS}" STREQUAL "wayland")
-SET(SRCS ${SRCS}
-	src/display/dpms-wayland.c)
+IF(BATTERY_MODULE STREQUAL on)
+	ADD_SOURCE(src/battery BATTERY_SRCS)
+	SET(SRCS ${SRCS} ${BATTERY_SRCS})
 ENDIF()
 
-ENDIF(TIZEN_DISPLAY)
+IF(BLOCK_MODULE STREQUAL on)
+	ADD_SOURCE(src/block BLOCK_SRCS)
+	SET(SRCS ${SRCS} ${BLOCK_SRCS})
+ENDIF()
 
-SET(SRCS ${SRCS}
-	src/led/ir.c
-	src/led/noti.c
-	src/led/torch.c
-	src/led/touch-key.c
-)
+IF(EXTCON_MODULE STREQUAL on)
+	ADD_SOURCE(src/extcon EXTCON_SRCS)
+	SET(SRCS ${SRCS} ${EXTCON_SRCS})
+ENDIF()
 
-SET(SRCS ${SRCS}
-	src/haptic/haptic.c
-	src/haptic/external.c
-	src/haptic/standard.c
-	src/haptic/emulator.c)
+IF(HAPTIC_MODULE STREQUAL on)
+	ADD_SOURCE(src/haptic HAPTIC_SRCS)
+	SET(SRCS ${SRCS} ${HAPTIC_SRCS})
+ENDIF()
+
+IF(LED_MODULE STREQUAL on)
+	ADD_SOURCE(src/led LED_SRCS)
+	SET(SRCS ${SRCS} ${LED_SRCS})
+ENDIF()
+
+IF(DISPLAY_MODULE STREQUAL on)
+	ADD_SOURCE(src/display DISPLAY_SRCS)
+	SET(SRCS ${SRCS} ${DISPLAY_SRCS})
+
+	IF("${DPMS}" STREQUAL "x")
+		SET(SRCS ${SRCS} src/display/dpms-x-none.c)
+	ELSEIF("${DPMS}" STREQUAL "wayland")
+		SET(SRCS ${SRCS} src/display/dpms-wayland-none.c)
+	ENDIF()
+ENDIF()
+
+# usb client
+IF(${USB_MODULE} STREQUAL on)
+	ADD_SOURCE(src/usb USB_SRCS)
+	SET(SRCS ${SRCS} ${USB_SRCS})
+ENDIF()
+
+# usb host
+IF(${USBHOST_MODULE} STREQUAL on)
+	ADD_SOURCE(src/usbhost USBHOST_SRCS)
+	SET(SRCS ${SRCS} ${USBHOST_SRCS})
+ENDIF()
 
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -124,21 +130,22 @@ SET(PKG_MODULES
 	edbus
 	vconf
 	dlog
+	libudev
 	device-node
 	capi-base-common
-	sensor
-	tapi
 	libtzplatform-config
 	notification
 	hwcommon
-	libinput
 )
 
-IF("${DPMS}" STREQUAL "x")
-SET(PKG_MODULES ${PKG_MODULES}
-	x11
-	xext
-)
+IF(DISPLAY_MODULE STREQUAL on)
+	IF("${DPMS}" STREQUAL "x")
+		SET(PKG_MODULES ${PKG_MODULES} x11 xext)
+	ENDIF()
+	SET(PKG_MODULES ${PKG_MODULES} libinput sensor)
+ENDIF()
+IF(TELEPHONY_MODULE STREQUAL on)
+	SET(PKG_MODULES ${PKG_MODULES} tapi)
 ENDIF()
 
 INCLUDE(FindPkgConfig)
@@ -151,7 +158,6 @@ ENDFOREACH(flag)
 SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} -fvisibility=hidden")
 SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} -g -fno-omit-frame-pointer -finstrument-functions")
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${EXTRA_CFLAGS} -lrt")
-MESSAGE("FLAGS: ${CMAKE_C_FLAGS}")
 
 ADD_DEFINITIONS("-DPREFIX=\"${CMAKE_INSTALL_PREFIX}\"")
 ADD_DEFINITIONS("-DFACTORYFS=\"$ENV{FACTORYFS}\"")
@@ -167,7 +173,7 @@ ENDIF()
 ADD_DEFINITIONS("-DDEBUG")
 
 ADD_EXECUTABLE(${PROJECT_NAME} ${SRCS})
-TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${pkgs_LDFLAGS} "-ldl" "-lm" "-ludev" "-ledbus" shared)
+TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${pkgs_LDFLAGS} "-ldl" "-lm" shared)
 INSTALL(TARGETS ${PROJECT_NAME} DESTINATION bin)
 
 INSTALL(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/deviced/ DESTINATION include/${PROJECT_NAME}
@@ -175,31 +181,39 @@ INSTALL(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/deviced/ DESTINATION include/$
 		PATTERN "*_doc.h" EXCLUDE
 		PATTERN "*.h")
 
-CONFIGURE_FILE(${PROJECT_NAME}.pc.in ${PROJECT_NAME}.pc @ONLY)
-INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.pc DESTINATION ${LIB_INSTALL_DIR}/pkgconfig)
+IF(BLOCK_MODULE STREQUAL on)
+	INSTALL_CONF(src/block block)
+	INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/scripts/mmc-smack-label DESTINATION bin)
+ENDIF()
+
+# USB connection
+IF(${USB_MODULE} STREQUAL on)
+	INSTALL_CONF(src/usb usb-setting)
+	INSTALL_CONF(src/usb usb-operation)
+
+	# USB (Manual setting)
+	INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/scripts/direct_set_debug.sh DESTINATION bin)
+ENDIF()
 
 INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/scripts/deviced-pre.sh DESTINATION bin)
+INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/scripts/movi_format.sh DESTINATION bin)
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/scripts/deviced.conf DESTINATION /etc/dbus-1/system.d)
-INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/scripts/movi_format.sh DESTINATION bin)
-INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/block/block.conf DESTINATION /etc/deviced)
-INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/usb/usb-setting.conf DESTINATION /etc/deviced)
-INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/usb/usb-operation.conf DESTINATION /etc/deviced)
-INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/scripts/mmc-smack-label DESTINATION bin)
-INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/fsck-msdos/LICENSE DESTINATION share/license RENAME fsck_msdosfs)
 
-# USB (Manual setting)
-INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/scripts/direct_set_debug.sh DESTINATION bin)
+CONFIGURE_FILE(${PROJECT_NAME}.pc.in ${PROJECT_NAME}.pc @ONLY)
+INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.pc DESTINATION ${LIB_INSTALL_DIR}/pkgconfig)
 
 INSTALL(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/systemd/ DESTINATION lib/systemd/system
 		FILES_MATCHING
 		PATTERN "*.service"
 		PATTERN "*.socket")
 
-ADD_SUBDIRECTORY(src)
+ADD_SUBDIRECTORY(src/shared)
 ADD_SUBDIRECTORY(src/libdeviced)
-ADD_SUBDIRECTORY(src/fsck-msdos)
-ADD_SUBDIRECTORY(src/newfs-msdos)
 ADD_SUBDIRECTORY(src/devicectl)
+IF(BLOCK_MODULE STREQUAL on)
+	ADD_SUBDIRECTORY(src/fsck-msdos)
+	ADD_SUBDIRECTORY(src/newfs-msdos)
+ENDIF()
 ADD_SUBDIRECTORY(src/libsysman)
 ADD_SUBDIRECTORY(src/libslp-pm)
 ADD_SUBDIRECTORY(src/libhaptic)
