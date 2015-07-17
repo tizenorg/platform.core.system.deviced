@@ -325,6 +325,9 @@ systemctl daemon-reload
 %{_unitdir}/deviced.socket
 %{_unitdir}/deviced-pre.service
 %{_unitdir}/zbooting-done.service
+%if %{?battery_module} == on
+%config %{_sysconfdir}/deviced/battery.conf
+%endif
 %if %{?block_module} == on
 %{_bindir}/mmc-smack-label
 %{_bindir}/fsck_msdosfs

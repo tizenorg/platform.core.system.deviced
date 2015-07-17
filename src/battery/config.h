@@ -24,11 +24,7 @@
 #define BATTERY_NORMAL   BATTERY_FULL
 #define BATTERY_WARNING  15
 #define BATTERY_CRITICAL 5
-#ifdef MICRO_DD
-#define BATTERY_POWEROFF 3
-#else
 #define BATTERY_POWEROFF 1
-#endif
 #define BATTERY_REALOFF  0
 
 void battery_config_load(struct battery_config_info *info);

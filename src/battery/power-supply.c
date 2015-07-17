@@ -26,62 +26,59 @@
 #include "core/device-notifier.h"
 #include "core/udev.h"
 #include "core/log.h"
+#include "core/config-parser.h"
 #include "display/poll.h"
 #include "display/setting.h"
 #include "proc/proc-handler.h"
-#include "core/config-parser.h"
 #include "power-supply.h"
+#include "battery.h"
 
-#define BUFF_MAX		255
+#define BATTERY_NAME        "battery"
+#define CHARGEFULL_NAME     "Full"
+#define CHARGENOW_NAME      "Charging"
+#define DISCHARGE_NAME      "Discharging"
+#define NOTCHARGE_NAME      "Not charging"
+#define OVERHEAT_NAME       "Overheat"
+#define TEMPCOLD_NAME       "Cold"
+#define OVERVOLT_NAME       "Over voltage"
 
-#define SIGNAL_CHARGEERR_RESPONSE	"ChargeErrResponse"
-#define SIGNAL_TEMP_GOOD		"TempGood"
+#define BUFF_MAX            255
 
-#define ABNORMAL_CHECK_TIMER_INTERVAL	60
+#define SIGNAL_CHARGEERR_RESPONSE "ChargeErrResponse"
+#define SIGNAL_TEMP_GOOD          "TempGood"
 
-#define METHOD_FULL_NOTI_ON		"BatteryFullNotiOn"
-#define METHOD_FULL_NOTI_OFF	"BatteryFullNotiOff"
-#define METHOD_CHARGE_NOTI_ON	"BatteryChargeNotiOn"
+#define ABNORMAL_CHECK_TIMER_INTERVAL 60
+
+#define METHOD_FULL_NOTI_ON   "BatteryFullNotiOn"
+#define METHOD_FULL_NOTI_OFF  "BatteryFullNotiOff"
+#define METHOD_CHARGE_NOTI_ON "BatteryChargeNotiOn"
 
 #define SIOP_DISABLE	"memory/private/sysman/siop_disable"
 
 #define RETRY_MAX 5
-#define BATTERY_CHECK_TIMER_INTERVAL	(0.5)
-
-#ifdef MICRO_DD
-#define DEVICE_NOTIFIER "/usr/bin/sys_device_noti"
-#define BATT_CHARGE_NOTI "0"
-#define BATT_FULL_NOTI   "2"
-#endif
-
-#define BATTERY_NAME		"battery"
-#define CHARGEFULL_NAME	"Full"
-#define CHARGENOW_NAME		"Charging"
-#define DISCHARGE_NAME		"Discharging"
-#define NOTCHARGE_NAME		"Not charging"
-#define OVERHEAT_NAME		"Overheat"
-#define TEMPCOLD_NAME		"Cold"
-#define OVERVOLT_NAME		"Over voltage"
+#define BATTERY_CHECK_TIMER_INTERVAL (0.5)
 
 enum power_supply_init_type {
-	POWER_SUPPLY_NOT_READY = 0,
+	POWER_SUPPLY_NOT_READY   = 0,
 	POWER_SUPPLY_INITIALIZED = 1,
 };
 
 static void uevent_power_handler(struct udev_device *dev);
-static struct uevent_handler uh = {
-	.subsystem = POWER_SUBSYSTEM,
+static const struct uevent_handler uh = {
+	.subsystem   = POWER_SUBSYSTEM,
 	.uevent_func = uevent_power_handler,
 };
 
 struct battery_status battery;
-static Ecore_Timer *power_timer = NULL;
-static Ecore_Timer *abnormal_timer = NULL;
+static int noti_id;
+static Ecore_Timer *power_timer;
+static Ecore_Timer *abnormal_timer;
 extern int battery_power_off_act(void *data);
 
 static void pm_check_and_change(int bInserted)
 {
 	static int old = -1;
+
 	if (old != bInserted) {
 		old = bInserted;
 		pm_change_internal(getpid(), LCD_NORMAL);
@@ -91,7 +88,6 @@ static void pm_check_and_change(int bInserted)
 static int check_lowbat_charge_device(int bInserted)
 {
 	static int bChargeDeviceInserted = 0;
-	int val = -1;
 	int bat_state = -1;
 	int ret = -1;
 	char *value;
@@ -147,12 +143,6 @@ static void abnormal_popup_timer_init(void)
 	_I("delete health timer");
 }
 
-static void health_status_broadcast(void)
-{
-	broadcast_edbus_signal(DEVICED_PATH_BATTERY, DEVICED_INTERFACE_BATTERY,
-	    SIGNAL_TEMP_GOOD, NULL, NULL);
-}
-
 static void health_timer_reset(void)
 {
 	abnormal_timer = NULL;
@@ -186,8 +176,6 @@ static void abnormal_popup_edbus_signal_handler(void *data, DBusMessage *msg)
 	if (abnormal_timer == NULL)
 		_E("Fail to add abnormal check timer");
 }
-
-static int noti_id;
 
 static void full_noti_cb(void *data, DBusMessage *msg, DBusError *err)
 {
@@ -240,7 +228,7 @@ static int send_full_noti(enum charge_full_type state)
 
 	switch (state) {
 	case CHARGING_FULL:
-		for (retry = RETRY_MAX; retry > 0 ;retry--) {
+		for (retry = RETRY_MAX; retry > 0; retry--) {
 			ret = dbus_method_async_with_reply(POPUP_BUS_NAME,
 					POPUP_PATH_BATTERY,
 					POPUP_INTERFACE_BATTERY,
@@ -258,7 +246,7 @@ static int send_full_noti(enum charge_full_type state)
 			return -EPERM;
 		snprintf(str_id, sizeof(str_id), "%d", noti_id);
 		arr[0] = str_id;
-		for (retry = RETRY_MAX; retry > 0 ;retry--) {
+		for (retry = RETRY_MAX; retry > 0; retry--) {
 			ret = dbus_method_async(POPUP_BUS_NAME,
 					POPUP_PATH_BATTERY,
 					POPUP_INTERFACE_BATTERY,
@@ -276,12 +264,12 @@ static int send_full_noti(enum charge_full_type state)
 	return ret;
 }
 
-int send_charge_noti(void)
+static int send_charge_noti(void)
 {
 	int ret = 0;
 	int retry;
 
-	for (retry = RETRY_MAX; retry > 0 ;retry--) {
+	for (retry = RETRY_MAX; retry > 0; retry--) {
 		ret = dbus_method_async(POPUP_BUS_NAME,
 				POPUP_PATH_BATTERY,
 				POPUP_INTERFACE_BATTERY,
@@ -296,11 +284,11 @@ int send_charge_noti(void)
 	return ret;
 }
 
-void battery_noti(enum battery_noti_type type, enum battery_noti_status status)
+static void battery_noti(enum battery_noti_type type, enum battery_noti_status status)
 {
 	static int charge = CHARGER_DISCHARGING;
 	static int full = CHARGING_NOT_FULL;
-	int ret, i;
+	int ret;
 
 	if (type == DEVICE_NOTI_BATT_FULL && status == DEVICE_NOTI_ON &&
 	    full == CHARGING_NOT_FULL) {
@@ -327,10 +315,30 @@ void battery_noti(enum battery_noti_type type, enum battery_noti_status status)
 	charge = battery.charge_now;
 }
 
+void power_supply_broadcast(char *sig, int status)
+{
+	static int old;
+	static char sig_old[32];
+	char *arr[1];
+	char str_status[32];
+
+	if (strcmp(sig_old, sig) == 0 && old == status)
+		return;
+
+	_D("%s %d", sig, status);
+
+	old = status;
+	snprintf(sig_old, sizeof(sig_old), "%s", sig);
+	snprintf(str_status, sizeof(str_status), "%d", status);
+	arr[0] = str_status;
+
+	broadcast_edbus_signal(DEVICED_PATH_BATTERY, DEVICED_INTERFACE_BATTERY,
+			sig, "i", arr);
+}
+
 static void noti_batt_full(void)
 {
-	char params[BUFF_MAX];
-	static int bat_full_noti = 0;
+	static int bat_full_noti;
 	int r_disturb, s_disturb, r_block, s_block;
 
 	r_disturb = vconf_get_int("memory/shealth/sleep/do_not_disturb", &s_disturb);
@@ -473,87 +481,24 @@ static void check_online(void)
 	}
 }
 
-void power_supply(void *data)
-{
-	int ret;
-	int status = POWER_SUPPLY_STATUS_DISCHARGING;
-	static struct battery_status old;
-
-	if (old.charge_now != battery.charge_now || battery.charge_now == CHARGER_ABNORMAL) {
-		vconf_set_int(VCONFKEY_SYSMAN_BATTERY_CHARGE_NOW, battery.charge_now);
-		power_supply_broadcast(CHARGE_NOW_SIGNAL, battery.charge_now);
-	}
-
-	if (old.online != battery.online ||
-	    old.charge_now != battery.charge_now ||
-	    old.charge_full != battery.charge_full) {
-		switch (battery.charge_now)
-		{
-		case CHARGER_ABNORMAL:
-			status = POWER_SUPPLY_STATUS_NOT_CHARGING;
-			break;
-		case CHARGER_DISCHARGING:
-			if (battery.charge_full == CHARGING_FULL)
-				status = POWER_SUPPLY_STATUS_FULL;
-			else
-				status = POWER_SUPPLY_STATUS_DISCHARGING;
-			break;
-		case CHARGER_CHARGING:
-			status = POWER_SUPPLY_STATUS_CHARGING;
-			break;
-		}
-	}
-
-	lowbat_monitor(data);
-	check_online();
-	if (old.charge_full != battery.charge_full) {
-		noti_batt_full();
-	}
-
-	old.capacity = battery.capacity;
-	old.online = battery.online;
-	old.charge_now = battery.charge_now;
-	old.charge_full = battery.charge_full;
-
-	check_battery_status();
-	device_notify(DEVICE_NOTIFIER_POWER_SUPPLY, NULL);
-}
-
-void power_supply_broadcast(char *sig, int status)
-{
-	static int old = 0;
-	static char sig_old[32];
-	char *arr[1];
-	char str_status[32];
-
-	if (strcmp(sig_old, sig) == 0 && old == status)
-		return;
-
-	_D("%s %d", sig, status);
-
-	old = status;
-	snprintf(sig_old, sizeof(sig_old), "%s", sig);
-	snprintf(str_status, sizeof(str_status), "%d", status);
-	arr[0] = str_status;
-
-	broadcast_edbus_signal(DEVICED_PATH_BATTERY, DEVICED_INTERFACE_BATTERY,
-			sig, "i", arr);
-}
-
 static void check_charge_status(const char *env_value)
 {
 	if (env_value == NULL)
 		return;
-	if (strncmp(env_value, CHARGEFULL_NAME , sizeof(CHARGEFULL_NAME)) == 0) {
+	if (strncmp(env_value, CHARGEFULL_NAME,
+				sizeof(CHARGEFULL_NAME)) == 0) {
 		battery.charge_full = CHARGING_FULL;
 		battery.charge_now = CHARGER_DISCHARGING;
-	} else if (strncmp(env_value, CHARGENOW_NAME, sizeof(CHARGENOW_NAME)) == 0) {
+	} else if (strncmp(env_value, CHARGENOW_NAME,
+				sizeof(CHARGENOW_NAME)) == 0) {
 		battery.charge_full = CHARGING_NOT_FULL;
 		battery.charge_now = CHARGER_CHARGING;
-	} else if (strncmp(env_value, DISCHARGE_NAME, sizeof(DISCHARGE_NAME)) == 0) {
+	} else if (strncmp(env_value, DISCHARGE_NAME,
+				sizeof(DISCHARGE_NAME)) == 0) {
 		battery.charge_full = CHARGING_NOT_FULL;
 		battery.charge_now = CHARGER_DISCHARGING;
-	} else if (strncmp(env_value, NOTCHARGE_NAME, sizeof(NOTCHARGE_NAME)) == 0) {
+	} else if (strncmp(env_value, NOTCHARGE_NAME,
+				sizeof(NOTCHARGE_NAME)) == 0) {
 		battery.charge_full = CHARGING_NOT_FULL;
 		battery.charge_now = CHARGER_ABNORMAL;
 	} else {
@@ -570,15 +515,18 @@ static void check_health_status(const char *env_value)
 		battery.ovp = OVP_NORMAL;
 		return;
 	}
-	if (strncmp(env_value, OVERHEAT_NAME, sizeof(OVERHEAT_NAME)) == 0) {
+	if (strncmp(env_value, OVERHEAT_NAME,
+				sizeof(OVERHEAT_NAME)) == 0) {
 		battery.health = HEALTH_BAD;
 		battery.temp = TEMP_HIGH;
 		battery.ovp = OVP_NORMAL;
-	} else if (strncmp(env_value, TEMPCOLD_NAME, sizeof(TEMPCOLD_NAME)) == 0) {
+	} else if (strncmp(env_value, TEMPCOLD_NAME,
+				sizeof(TEMPCOLD_NAME)) == 0) {
 		battery.health = HEALTH_BAD;
 		battery.temp = TEMP_LOW;
 		battery.ovp = OVP_NORMAL;
-	} else if (strncmp(env_value, OVERVOLT_NAME, sizeof(OVERVOLT_NAME)) == 0) {
+	} else if (strncmp(env_value, OVERVOLT_NAME,
+				sizeof(OVERVOLT_NAME)) == 0) {
 		battery.health = HEALTH_GOOD;
 		battery.temp = TEMP_LOW;
 		battery.ovp = OVP_ABNORMAL;
@@ -612,13 +560,39 @@ static void check_capacity_status(const char *env_value)
 	battery.capacity = atoi(env_value);
 }
 
+static void power_supply(void *data)
+{
+	static struct battery_status old;
+
+	if (old.charge_now != battery.charge_now || battery.charge_now == CHARGER_ABNORMAL) {
+		vconf_set_int(VCONFKEY_SYSMAN_BATTERY_CHARGE_NOW, battery.charge_now);
+		power_supply_broadcast(CHARGE_NOW_SIGNAL, battery.charge_now);
+	}
+
+	lowbat_monitor(data);
+	check_online();
+	if (old.charge_full != battery.charge_full) {
+		noti_batt_full();
+	}
+
+	old.capacity = battery.capacity;
+	old.online = battery.online;
+	old.charge_now = battery.charge_now;
+	old.charge_full = battery.charge_full;
+
+	check_battery_status();
+	device_notify(DEVICE_NOTIFIER_POWER_SUPPLY, NULL);
+}
+
 static void uevent_power_handler(struct udev_device *dev)
 {
 	struct udev_list_entry *list_entry;
-	const char *env_name, *env_value;
+	const char *env_name;
+	const char *env_value;
 	bool matched = false;
 
-	udev_list_entry_foreach(list_entry, udev_device_get_properties_list_entry(dev)) {
+	udev_list_entry_foreach(list_entry,
+			udev_device_get_properties_list_entry(dev)) {
 		env_name = udev_list_entry_get_name(list_entry);
 		if (!env_name)
 			continue;
@@ -627,7 +601,8 @@ static void uevent_power_handler(struct udev_device *dev)
 			env_value = udev_list_entry_get_value(list_entry);
 			if (!env_value)
 				continue;
-			if (!strncmp(env_value, BATTERY_NAME, sizeof(BATTERY_NAME))) {
+			if (!strncmp(env_value, BATTERY_NAME,
+						sizeof(BATTERY_NAME))) {
 				matched = true;
 				break;
 			}
@@ -635,7 +610,7 @@ static void uevent_power_handler(struct udev_device *dev)
 	}
 
 	if (!matched)
-		return 0;
+		return;
 
 	env_value = udev_device_get_property_value(dev, CHARGE_STATUS);
 	check_charge_status(env_value);
@@ -650,59 +625,14 @@ static void uevent_power_handler(struct udev_device *dev)
 
 	battery_noti(DEVICE_NOTI_BATT_CHARGE, DEVICE_NOTI_ON);
 	power_supply(&battery.capacity);
-
-	return 0;
-}
-
-static int load_uevent(struct parse_result *result, void *user_data)
-{
-	struct battery_status *info = user_data;
-
-	if (!info)
-		return -EINVAL;
-
-	if (MATCH(result->name, CHARGE_STATUS)) {
-		if (strstr(result->value, "Charging")) {
-			info->charge_now = CHARGER_CHARGING;
-			info->charge_full = CHARGING_NOT_FULL;
-		} else if (strstr(result->value, "Discharging")) {
-			info->charge_now = CHARGER_DISCHARGING;
-			info->charge_full = CHARGING_NOT_FULL;
-		} else if (strstr(result->value, "Full")) {
-			info->charge_now = CHARGER_DISCHARGING;
-			info->charge_full = CHARGING_FULL;
-		} else if (strstr(result->value, "Not charging")) {
-			info->charge_now = CHARGER_ABNORMAL;
-			info->charge_full = CHARGING_NOT_FULL;
-		}
-	}
-	else if (MATCH(result->name, CAPACITY))
-		info->capacity = atoi(result->value);
-	return 0;
-}
-
-static void power_load_uevent(void)
-{
-	int ret;
-	static int initialized = POWER_SUPPLY_NOT_READY;
-
-	if (initialized == POWER_SUPPLY_INITIALIZED)
-		return;
-	ret = config_parse(POWER_SUPPLY_UEVENT, load_uevent, &battery);
-	if (ret < 0)
-		_E("Failed to load %s, %d Use default value!", POWER_SUPPLY_UEVENT, ret);
-	else
-		initialized = POWER_SUPPLY_INITIALIZED;
 }
 
 static void power_supply_status_init(void)
 {
-	int ret, val;
 	static int charge_now = -1;
 	static int charge_full = -1;
 	static int capacity = -1;
 
-	power_load_uevent();
 	battery.health = HEALTH_GOOD;
 	battery.ovp = OVP_NORMAL;
 	battery.present = PRESENT_NORMAL;
@@ -736,18 +666,18 @@ static Eina_Bool power_supply_update(void *data)
 	return EINA_TRUE;
 }
 
-void power_supply_timer_start(void)
+static void power_supply_timer_start(void)
 {
 	_D("battery init timer during booting");
 	power_timer = ecore_timer_add(BATTERY_CHECK_TIMER_INTERVAL,
 				power_supply_update, NULL);
 	if (power_timer == NULL)
-	    _E("fail to add battery init timer during booting");
+		_E("fail to add battery init timer during booting");
 }
 
-void power_supply_timer_stop(void)
+static void power_supply_timer_stop(void)
 {
-    _D("battery init timer during booting");
+	_D("battery init timer during booting");
 	if (!power_timer)
 		return;
 	ecore_timer_del(power_timer);
@@ -857,14 +787,14 @@ static DBusMessage *dbus_get_health(E_DBus_Object *obj, DBusMessage *msg)
 	return reply;
 }
 
-static DBusMessage *dbus_battery_handler(E_DBus_Object *obj, DBusMessage *msg)
+static DBusMessage *dbus_power_supply_handler(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusError err;
 	DBusMessageIter iter;
 	DBusMessage *reply;
 	pid_t pid;
-	int ret;
-	int argc, opt;
+	int ret = 0;
+	int argc;
 	char *type_str;
 	char *argv[5];
 
@@ -927,12 +857,105 @@ static const struct edbus_method edbus_methods[] = {
 	{ CHARGE_CAPACITY_LAW_SIGNAL, NULL, "i", dbus_get_percent_raw },
 	{ CHARGE_FULL_SIGNAL,         NULL, "i", dbus_is_full },
 	{ CHARGE_HEALTH_SIGNAL,       NULL, "i", dbus_get_health },
-	{ POWER_SUBSYSTEM,       "sisssss", "i", dbus_battery_handler },
+	{ POWER_SUBSYSTEM,       "sisssss", "i", dbus_power_supply_handler },
 };
 
-int power_supply_init(void *data)
+static int booting_done(void *data)
+{
+	static int done;
+
+	if (data == NULL)
+		return done;
+	done = *(int *)data;
+	if (done == 0)
+		return done;
+
+	_I("booting done");
+
+	power_supply_timer_stop();
+
+	/* for simple noti change cb */
+	power_supply_status_init();
+	power_supply(NULL);
+
+	return done;
+}
+
+static int display_changed(void *data)
+{
+	if (battery.charge_now == CHARGER_ABNORMAL &&
+	    battery.health == HEALTH_BAD)
+		pm_lock_internal(INTERNAL_LOCK_POPUP, LCD_DIM, STAY_CUR_STATE, 0);
+
+	return 0;
+}
+
+static int load_uevent(struct parse_result *result, void *user_data)
+{
+	struct battery_status *info = user_data;
+
+	if (!info)
+		return -EINVAL;
+
+	if (MATCH(result->name, CHARGE_STATUS)) {
+		if (strstr(result->value, "Charging")) {
+			info->charge_now = CHARGER_CHARGING;
+			info->charge_full = CHARGING_NOT_FULL;
+		} else if (strstr(result->value, "Discharging")) {
+			info->charge_now = CHARGER_DISCHARGING;
+			info->charge_full = CHARGING_NOT_FULL;
+		} else if (strstr(result->value, "Full")) {
+			info->charge_now = CHARGER_DISCHARGING;
+			info->charge_full = CHARGING_FULL;
+		} else if (strstr(result->value, "Not charging")) {
+			info->charge_now = CHARGER_ABNORMAL;
+			info->charge_full = CHARGING_NOT_FULL;
+		}
+	} else if (MATCH(result->name, CAPACITY))
+		info->capacity = atoi(result->value);
+	return 0;
+}
+
+static int power_supply_probe(void *data)
+{
+	/**
+	 * find power-supply class.
+	 * if there is no power-supply class,
+	 * deviced does not activate a battery module.
+	 */
+	if (access(POWER_PATH, R_OK) != 0) {
+		/**
+		 * Set battery vconf as -ENOTSUP
+		 * These vconf key used by runtime-info and capi-system-device.
+		 */
+		vconf_set_int(VCONFKEY_SYSMAN_CHARGER_STATUS, -ENOTSUP);
+		vconf_set_int(VCONFKEY_SYSMAN_BATTERY_CHARGE_NOW, -ENOTSUP);
+		vconf_set_int(VCONFKEY_SYSMAN_BATTERY_LEVEL_STATUS, -ENOTSUP);
+
+		_E("there is no power-supply class");
+		return -ENODEV;
+	}
+
+	return 0;
+}
+
+static void power_supply_init(void *data)
 {
 	int ret;
+
+	ret = config_parse(POWER_SUPPLY_UEVENT, load_uevent, &battery);
+	if (ret < 0)
+		_E("Failed to load %s, %d Use default value!",
+				POWER_SUPPLY_UEVENT, ret);
+
+	/* process check battery timer until booting done */
+	power_supply_timer_start();
+
+	/* register power subsystem */
+	register_kernel_uevent_control(&uh);
+
+	register_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
+	register_notifier(DEVICE_NOTIFIER_LCD, display_changed);
 
 	ret = register_edbus_interface_and_method(DEVICED_PATH_BATTERY,
 			DEVICED_INTERFACE_BATTERY,
@@ -945,19 +968,22 @@ int power_supply_init(void *data)
 			abnormal_popup_edbus_signal_handler);
 	if (ret < 0)
 		_E("fail to init edbus signal(%d)", ret);
-
-	/* register power subsystem */
-	register_kernel_uevent_control(&uh);
-
-	/* for simple noti change cb */
-	power_supply_status_init();
-	power_supply(NULL);
-	return ret;
 }
 
-int power_supply_exit(void *data)
+static void power_supply_exit(void *data)
 {
+	unregister_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
+	unregister_notifier(DEVICE_NOTIFIER_LCD, display_changed);
+
 	/* unregister power subsystem */
 	unregister_kernel_uevent_control(&uh);
-	return 0;
 }
+
+static const struct device_ops power_supply_ops = {
+	.name     = "power_supply",
+	.probe    = power_supply_probe,
+	.init     = power_supply_init,
+	.exit     = power_supply_exit,
+};
+
+DEVICE_OPS_REGISTER(&power_supply_ops)

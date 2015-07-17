@@ -79,6 +79,8 @@ struct battery_status {
 
 extern struct battery_status battery;
 
+void power_supply_broadcast(char *sig, int status);
+
 /* Battery functions */
 void lowbat_monitor(void *data);
 
@@ -90,8 +92,4 @@ void lowbat_monitor(void *data);
 #define CHARGE_HEALTH_SIGNAL       "GetHealth"
 #define CHARGE_FULL_SIGNAL         "IsFull"
 
-int power_supply_init(void *data);
-void power_supply_timer_start(void);
-void power_supply_timer_stop(void);
-void power_supply_broadcast(char *sig, int status);
 #endif /* __POWER_SUPPLY_H__ */

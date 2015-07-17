@@ -36,12 +36,11 @@
 #include "display/setting.h"
 #include "display/poll.h"
 #include "core/edbus-handler.h"
-#include "power-supply.h"
 #include "power/power-handler.h"
+#include "power-supply.h"
 
 #define CHARGE_POWERSAVE_FREQ_ACT	"charge_powersave_freq_act"
 #define CHARGE_RELEASE_FREQ_ACT		"charge_release_freq_act"
-
 
 #define BATTERY_CHARGING	65535
 #define BATTERY_UNKNOWN		-1
@@ -69,7 +68,6 @@ struct lowbat_process_entry {
 static int cur_bat_state = BATTERY_UNKNOWN;
 static int cur_bat_capacity = -1;
 
-static int lowbat_freq = -1;
 static struct battery_config_info battery_info = {
 	.normal   = BATTERY_NORMAL,
 	.warning  = BATTERY_WARNING,
@@ -78,8 +76,8 @@ static struct battery_config_info battery_info = {
 	.realoff  = BATTERY_REALOFF,
 };
 
-static dd_list *lpe = NULL;
-static int scenario_count = 0;
+static dd_list *lpe;
+static int scenario_count;
 
 static int lowbat_initialized(void *data)
 {
@@ -156,7 +154,7 @@ static int power_execute(void)
 
 static int booting_done(void *data)
 {
-	static int done = 0;
+	static int done;
 
 	if (data == NULL)
 		goto out;
@@ -165,8 +163,6 @@ static int booting_done(void *data)
 		goto out;
 	_I("booting done");
 
-	power_supply_timer_stop();
-	power_supply_init(NULL);
 out:
 	return done;
 }
@@ -272,11 +268,6 @@ int battery_charge_err_ovp_act(void *data)
 	return 0;
 }
 
-static int battery_charge_act(void *data)
-{
-	return 0;
-}
-
 static void lowbat_scenario_init(void)
 {
 	lowbat_add_scenario(battery_info.normal, battery_info.warning, battery_warning_low_act);
@@ -307,18 +298,16 @@ static void change_lowbat_level(int bat_percent)
 		return;
 	}
 
-
-	if (bat_percent > BATTERY_LEVEL_CHECK_FULL) {
+	if (bat_percent > BATTERY_LEVEL_CHECK_FULL)
 		now = VCONFKEY_SYSMAN_BAT_LEVEL_FULL;
-	} else if (bat_percent > BATTERY_LEVEL_CHECK_HIGH) {
+	else if (bat_percent > BATTERY_LEVEL_CHECK_HIGH)
 		now = VCONFKEY_SYSMAN_BAT_LEVEL_HIGH;
-	} else if (bat_percent > BATTERY_LEVEL_CHECK_LOW) {
+	else if (bat_percent > BATTERY_LEVEL_CHECK_LOW)
 		now = VCONFKEY_SYSMAN_BAT_LEVEL_LOW;
-	} else if (bat_percent > BATTERY_LEVEL_CHECK_CRITICAL) {
+	else if (bat_percent > BATTERY_LEVEL_CHECK_CRITICAL)
 		now = VCONFKEY_SYSMAN_BAT_LEVEL_CRITICAL;
-	} else {
+	else
 		now = VCONFKEY_SYSMAN_BAT_LEVEL_EMPTY;
-	}
 
 	if (prev != now)
 		vconf_set_int(VCONFKEY_SYSMAN_BATTERY_LEVEL_STATUS, now);
@@ -329,13 +318,9 @@ static int lowbat_process(int bat_percent, void *ad)
 	int new_bat_capacity;
 	int new_bat_state;
 	int vconf_state = -1;
-	int i, ret = 0;
+	int ret = 0;
 	int status = -1;
 	bool low_bat = false;
-	bool full_bat = false;
-#ifdef MICRO_DD
-	int extreme = 0;
-#endif
 	int result = 0;
 	int lock = -1;
 
@@ -384,7 +369,6 @@ static int lowbat_process(int bat_percent, void *ad)
 			if (battery.charge_full) {
 				if (vconf_state != VCONFKEY_SYSMAN_BAT_FULL)
 					status = VCONFKEY_SYSMAN_BAT_FULL;
-				full_bat = true;
 			} else {
 				if (vconf_state != VCONFKEY_SYSMAN_BAT_NORMAL)
 					status = VCONFKEY_SYSMAN_BAT_NORMAL;
@@ -407,16 +391,11 @@ static int lowbat_process(int bat_percent, void *ad)
 		result = -EIO;
 		goto exit;
 	}
-#ifdef MICRO_DD
-	if (vconf_get_int(VCONFKEY_PM_KEY_IGNORE, &extreme) == 0 && extreme == TRUE &&
-	    (status > VCONFKEY_SYSMAN_BAT_POWER_OFF && status <= VCONFKEY_SYSMAN_BAT_FULL))
-		if (vconf_set_int(VCONFKEY_PM_KEY_IGNORE, FALSE) == 0)
-			_I("release key ignore");
-#endif
+
 	if (new_bat_capacity <= battery_info.warning)
 		low_bat = true;
 
-	device_notify(DEVICE_NOTIFIER_LOWBAT, (void*)low_bat);
+	device_notify(DEVICE_NOTIFIER_LOWBAT, (void *)low_bat);
 
 	if (cur_bat_state == new_bat_state && new_bat_state > battery_info.realoff)
 		goto exit;
@@ -474,56 +453,25 @@ static int lowbat_monitor_init(void *data)
 	int status = 1;
 
 	lowbat_initialized(&status);
+
+	/* it's called just this once. */
 	unregister_notifier(DEVICE_NOTIFIER_POWER_SUPPLY, lowbat_monitor_init);
+
+	/* load battery configuration file */
 	battery_config_load(&battery_info);
-	_I("%d %d %d %d %d", battery_info.normal, battery_info.warning,
+	_I("battery conf %d %d %d %d %d", battery_info.normal, battery_info.warning,
 		battery_info.critical, battery_info.poweroff, battery_info.realoff);
+
 	lowbat_scenario_init();
 	check_lowbat_percent(&battery.capacity);
 	lowbat_process(battery.capacity, NULL);
 	return 0;
 }
 
-static int display_changed(void *data)
-{
-	if (battery.charge_now == CHARGER_ABNORMAL &&
-	    battery.health == HEALTH_BAD)
-		pm_lock_internal(INTERNAL_LOCK_POPUP, LCD_DIM, STAY_CUR_STATE, 0);
-
-	return 0;
-}
-
-static int lowbat_probe(void *data)
-{
-	/**
-	 * find power-supply class.
-	 * if there is no power-supply class,
-	 * deviced does not activate a battery module.
-	 */
-	if (access(POWER_PATH, R_OK) != 0) {
-		/**
-		 * Set battery vconf as -ENOTSUP
-		 * These vconf key used by runtime-info and capi-system-device.
-		 */
-		vconf_set_int(VCONFKEY_SYSMAN_CHARGER_STATUS, -ENOTSUP);
-		vconf_set_int(VCONFKEY_SYSMAN_BATTERY_CHARGE_NOW, -ENOTSUP);
-		vconf_set_int(VCONFKEY_SYSMAN_BATTERY_LEVEL_STATUS, -ENOTSUP);
-
-		_E("there is no power-supply class");
-		return -ENODEV;
-	}
-
-	return 0;
-}
-
 static void lowbat_init(void *data)
 {
-	/* process check battery timer until booting done */
-	power_supply_timer_start();
-
 	register_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
 	register_notifier(DEVICE_NOTIFIER_POWER_SUPPLY, lowbat_monitor_init);
-	register_notifier(DEVICE_NOTIFIER_LCD, display_changed);
 }
 
 static void lowbat_exit(void *data)
@@ -532,15 +480,10 @@ static void lowbat_exit(void *data)
 
 	lowbat_initialized(&status);
 	unregister_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
-	unregister_notifier(DEVICE_NOTIFIER_LCD, display_changed);
-
-	/* exit power supply */
-	power_supply_exit(NULL);
 }
 
 static const struct device_ops lowbat_device_ops = {
 	.name     = "lowbat",
-	.probe    = lowbat_probe,
 	.init     = lowbat_init,
 	.exit     = lowbat_exit,
 };
