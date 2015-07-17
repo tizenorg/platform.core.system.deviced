@@ -27,6 +27,7 @@
 #include "core/common.h"
 #include "core/devices.h"
 #include "core/log.h"
+#include "core/edbus-handler.h"
 #include "display/setting.h"
 
 #define CHARGING_STATE(x)	((x) & CHRGR_FLAG)
@@ -37,6 +38,9 @@
 #define MAX_COUNT_CHARGING	(10)
 #define PRINT_ALL_BATT_NODE(x)	/*print_all_batt_node(x)*/
 #define POLLING_TIME		(30)	/* seconds */
+
+#define SIGNAL_TIMETOFULL	"TimeToFull"
+#define SIGNAL_TIMETOEMPTY	"TimeToEmpty"
 
 int (*get_battery_capacity_cb)(void);
 
@@ -69,6 +73,8 @@ static int full_capacity;
 static int old_capacity;
 static int charging_state;
 extern int system_wakeup_flag;
+static int time_to_full = -1;
+static int time_to_empty = -1;
 
 static int get_battery_capacity(void)
 {
@@ -254,6 +260,21 @@ static float update_factor(enum state_b b_index)
 	return total_factor;
 }
 
+static void broadcast_battery_time(char *signal, int time)
+{
+	char *param[1];
+	char buf[10];
+
+	if (!signal)
+		return;
+
+	snprintf(buf, 10, "%d", time);
+	param[0] = buf;
+
+	broadcast_edbus_signal(DEVICED_PATH_BATTERY, DEVICED_INTERFACE_BATTERY,
+	    signal, "i", param);
+}
+
 static void update_time(enum state_a a_index, int seconds)
 {
 	if (a_index < 0 || a_index >= A_END)
@@ -264,12 +285,12 @@ static void update_time(enum state_a a_index, int seconds)
 
 	switch (a_index) {
 	case A_TIMETOFULL:
-		vconf_set_int(VCONFKEY_PM_BATTERY_TIMETOFULL,
-			seconds);
+		broadcast_battery_time(SIGNAL_TIMETOFULL, seconds);
+		time_to_full = seconds;
 		break;
 	case A_TIMETOEMPTY:
-		vconf_set_int(VCONFKEY_PM_BATTERY_TIMETOEMPTY,
-			seconds);
+		broadcast_battery_time(SIGNAL_TIMETOEMPTY, seconds);
+		time_to_empty = seconds;
 		break;
 	default:
 		break;
@@ -400,8 +421,55 @@ static void end_battinfo_gathering(void)
 	del_all_batt_node(B_CHARGING);
 }
 
+static DBusMessage *dbus_get_timetofull(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int val;
+
+	val = time_to_full;
+
+	_D("get time %d", val);
+
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &val);
+	return reply;
+}
+
+static DBusMessage *dbus_get_timetoempty(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int val;
+
+	val = time_to_empty;
+
+	_D("get time %d", val);
+
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &val);
+	return reply;
+}
+
+static const struct edbus_method edbus_methods[] = {
+	{ SIGNAL_TIMETOFULL,   NULL, "i", dbus_get_timetofull },
+	{ SIGNAL_TIMETOEMPTY,  NULL, "i", dbus_get_timetoempty },
+	/* Add methods here */
+};
+
 static void battery_init(void *data)
 {
+	int ret;
+
+	/* init dbus interface */
+	ret = register_edbus_interface_and_method(DEVICED_PATH_BATTERY,
+			DEVICED_INTERFACE_BATTERY,
+			edbus_methods, ARRAY_SIZE(edbus_methods));
+	if (ret < 0)
+		_E("fail to init edbus interface and method(%d)", ret);
+
 	start_battinfo_gathering(POLLING_TIME);
 }
 

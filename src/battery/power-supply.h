@@ -81,9 +81,6 @@ extern struct battery_status battery;
 
 void power_supply_broadcast(char *sig, int status);
 
-/* Battery functions */
-void lowbat_monitor(void *data);
-
 #define CHARGER_STATUS_SIGNAL      "ChargerStatus"
 #define CHARGE_NOW_SIGNAL          "ChargeNow"
 #define CHARGE_LEVEL_SIGNAL        "BatteryStatusLow"

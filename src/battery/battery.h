@@ -30,12 +30,15 @@
 #define LOWBAT_OPT_CHARGEERR		3
 #define LOWBAT_OPT_CHECK		4
 
+#define METHOD_NAME_MAX			32
 struct battery_config_info {
 	int normal;
 	int warning;
 	int critical;
 	int poweroff;
 	int realoff;
+	char warning_method[METHOD_NAME_MAX];
+	char critical_method[METHOD_NAME_MAX];
 };
 
 int battery_charge_err_low_act(void *data);

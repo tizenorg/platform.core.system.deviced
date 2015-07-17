@@ -53,10 +53,15 @@
 #define METHOD_FULL_NOTI_OFF  "BatteryFullNotiOff"
 #define METHOD_CHARGE_NOTI_ON "BatteryChargeNotiOn"
 
-#define SIOP_DISABLE	"memory/private/sysman/siop_disable"
+#define CHARGE_SIOP_DISABLE_SIGNAL "SiopDisable"
 
 #define RETRY_MAX 5
 #define BATTERY_CHECK_TIMER_INTERVAL (0.5)
+
+enum siop_disable_status_type {
+	SIOP_ENABLE  = 0,
+	SIOP_DISABLE = 1,
+};
 
 enum power_supply_init_type {
 	POWER_SUPPLY_NOT_READY   = 0,
@@ -69,64 +74,39 @@ static const struct uevent_handler uh = {
 	.uevent_func = uevent_power_handler,
 };
 
+static int siop_disable = SIOP_ENABLE;
 struct battery_status battery;
 static int noti_id;
 static Ecore_Timer *power_timer;
 static Ecore_Timer *abnormal_timer;
-extern int battery_power_off_act(void *data);
+
+static int booting_done(void *data);
+
+static void lowbat_execute(void *data)
+{
+	static const struct device_ops *lowbat_ops;
+
+	FIND_DEVICE_VOID(lowbat_ops, "lowbat");
+	device_execute(lowbat_ops, data);
+}
 
 static void pm_check_and_change(int bInserted)
 {
 	static int old = -1;
 
-	if (old != bInserted) {
-		old = bInserted;
-		pm_change_internal(getpid(), LCD_NORMAL);
-	}
-}
-
-static int check_lowbat_charge_device(int bInserted)
-{
-	static int bChargeDeviceInserted = 0;
-	int bat_state = -1;
-	int ret = -1;
-	char *value;
-
-	pm_check_and_change(bInserted);
-	if (bInserted == 1) {
-		if (battery.charge_now)
-			bChargeDeviceInserted = 1;
-		return 0;
-	} else if (bInserted == 0) {
-		if (!battery.charge_now && bChargeDeviceInserted == 1) {
-			bChargeDeviceInserted = 0;
-			//low bat popup during charging device removing
-			if (vconf_get_int(VCONFKEY_SYSMAN_BATTERY_STATUS_LOW, &bat_state) == 0) {
-				if(bat_state < VCONFKEY_SYSMAN_BAT_NORMAL
-						|| bat_state == VCONFKEY_SYSMAN_BAT_REAL_POWER_OFF) {
-
-					if(bat_state == VCONFKEY_SYSMAN_BAT_REAL_POWER_OFF)
-						value = "Poweroff";
-					else
-						value = "Warning";
-					_I("%s %s", "lowbat", value);
-					ret = manage_notification("Low battery", value);
-					if (ret == -1)
-						return -1;
-				}
-			} else {
-				_E("failed to get vconf key");
-				return -1;
-			}
-		}
-		return 0;
-	}
-	return -1;
+	if (old == bInserted)
+		return;
+	old = bInserted;
+	pm_change_internal(getpid(), LCD_NORMAL);
 }
 
 static int changed_battery_cf(enum present_type status)
 {
 	int ret;
+
+	if (status != PRESENT_ABNORMAL)
+		return 0;
+
 	ret = manage_notification("Battery disconnect", "Battery disconnect");
 	if (ret < 0)
 		return -1;
@@ -143,6 +123,13 @@ static void abnormal_popup_timer_init(void)
 	_I("delete health timer");
 }
 
+static void health_status_broadcast(void)
+{
+	broadcast_edbus_signal(DEVICED_PATH_BATTERY, DEVICED_INTERFACE_BATTERY,
+	    SIGNAL_TEMP_GOOD, NULL, NULL);
+}
+
+
 static void health_timer_reset(void)
 {
 	abnormal_timer = NULL;
@@ -156,7 +143,8 @@ static Eina_Bool health_timer_cb(void *data)
 		return EINA_FALSE;
 
 	_I("popup - Battery health status is not good");
-	vconf_set_int(SIOP_DISABLE, 1);
+	siop_disable = SIOP_DISABLE;
+	device_notify(DEVICE_NOTIFIER_BATTERY_HEALTH, (void *)HEALTH_BAD);
 	pm_change_internal(getpid(), LCD_NORMAL);
 	pm_lock_internal(INTERNAL_LOCK_POPUP, LCD_DIM, STAY_CUR_STATE, 0);
 	if (battery.temp == TEMP_LOW)
@@ -197,7 +185,7 @@ static void full_noti_cb(void *data, DBusMessage *msg, DBusError *err)
 	_D("Inserted battery full noti : %d", noti_id);
 }
 
-static int check_noti(void)
+static int check_power_supply_noti(void)
 {
 #ifdef MICRO_DD
 	int r_disturb, s_disturb, r_block, s_block;
@@ -221,7 +209,7 @@ static int send_full_noti(enum charge_full_type state)
 	char str_id[32];
 	char *arr[1];
 
-	noti = check_noti();
+	noti = check_power_supply_noti();
 
 	if (!noti)
 		return noti;
@@ -284,35 +272,30 @@ static int send_charge_noti(void)
 	return ret;
 }
 
-static void battery_noti(enum battery_noti_type type, enum battery_noti_status status)
+static void power_supply_noti(enum battery_noti_type type, enum battery_noti_status status)
 {
-	static int charge = CHARGER_DISCHARGING;
+	static int charger = CHARGER_DISCHARGING;
 	static int full = CHARGING_NOT_FULL;
 	int ret;
 
-	if (type == DEVICE_NOTI_BATT_FULL && status == DEVICE_NOTI_ON &&
-	    full == CHARGING_NOT_FULL) {
-		if (charge == CHARGER_DISCHARGING)
+	if (type == DEVICE_NOTI_BATT_CHARGE) {
+		if (status == DEVICE_NOTI_ON && charger == CHARGER_DISCHARGING) {
 			send_charge_noti();
-		ret = send_full_noti(CHARGING_FULL);
-		if (ret == 0)
-			full = CHARGING_FULL;
-	} else if (type == DEVICE_NOTI_BATT_FULL && status == DEVICE_NOTI_OFF &&
-	    full == CHARGING_FULL) {
-		ret = send_full_noti(CHARGING_NOT_FULL);
-		if (ret == 0)
-			full = CHARGING_NOT_FULL;
-	} else if (type == DEVICE_NOTI_BATT_CHARGE &&
-	    battery.charge_now == CHARGER_CHARGING &&
-	    charge == CHARGER_DISCHARGING) {
-		if (full == CHARGING_FULL) {
+			charger = CHARGER_CHARGING;
+		} else if (status == DEVICE_NOTI_OFF && charger == CHARGER_CHARGING) {
+			charger = CHARGER_DISCHARGING;
+		}
+	} else if (type == DEVICE_NOTI_BATT_FULL) {
+		if (status == DEVICE_NOTI_ON && full == CHARGING_NOT_FULL) {
+			ret = send_full_noti(CHARGING_FULL);
+			if (ret == 0)
+				full = CHARGING_FULL;
+		} else if (status == DEVICE_NOTI_OFF && full == CHARGING_FULL) {
 			ret = send_full_noti(CHARGING_NOT_FULL);
 			if (ret == 0)
 				full = CHARGING_NOT_FULL;
 		}
-		send_charge_noti();
 	}
-	charge = battery.charge_now;
 }
 
 void power_supply_broadcast(char *sig, int status)
@@ -339,29 +322,32 @@ void power_supply_broadcast(char *sig, int status)
 static void noti_batt_full(void)
 {
 	static int bat_full_noti;
-	int r_disturb, s_disturb, r_block, s_block;
+	int noti;
 
-	r_disturb = vconf_get_int("memory/shealth/sleep/do_not_disturb", &s_disturb);
-	r_block = vconf_get_bool("db/setting/blockmode_wearable", &s_block);
 	if (!battery.charge_full && bat_full_noti == 1) {
-		battery_noti(DEVICE_NOTI_BATT_FULL, DEVICE_NOTI_OFF);
+		power_supply_noti(DEVICE_NOTI_BATT_FULL, DEVICE_NOTI_OFF);
 		bat_full_noti = 0;
+		/* off the full charge state */
+		device_notify(DEVICE_NOTIFIER_FULLBAT, (void *)false);
 	}
 	if (battery.charge_full && bat_full_noti == 0) {
-		battery_noti(DEVICE_NOTI_BATT_FULL, DEVICE_NOTI_ON);
+		power_supply_noti(DEVICE_NOTI_BATT_FULL, DEVICE_NOTI_ON);
 		bat_full_noti = 1;
 		/* turn on LCD, if battery is full charged */
-		if ((r_disturb != 0 && r_block != 0) ||
-		    (s_disturb == 0 && s_block == 0))
-			pm_change_internal(getpid(), LCD_NORMAL);
+		noti = check_power_supply_noti();
+		if (noti)
+			pm_change_internal(INTERNAL_LOCK_BATTERY_FULL,
+				LCD_NORMAL);
 		else
 			_I("block LCD");
+		/* on the full charge state */
+		device_notify(DEVICE_NOTIFIER_FULLBAT, (void *)true);
 	}
 }
 
 static void check_power_supply(int state)
 {
-	check_lowbat_charge_device(state);
+	pm_check_and_change(state);
 	if (update_pm_setting)
 		update_pm_setting(SETTING_CHARGING, state);
 }
@@ -376,10 +362,15 @@ static void update_present(enum battery_noti_status status)
 	_I("charge %d present %d", battery.charge_now, battery.present);
 	old = status;
 	pm_change_internal(getpid(), LCD_NORMAL);
-	if (status == DEVICE_NOTI_ON)
+	if (status == DEVICE_NOTI_ON) {
 		present = PRESENT_ABNORMAL;
-	else
+		device_notify(DEVICE_NOTIFIER_BATTERY_PRESENT, (void *)PRESENT_ABNORMAL);
+		pm_lock_internal(INTERNAL_LOCK_POPUP, LCD_DIM, STAY_CUR_STATE, 0);
+	} else {
 		present = PRESENT_NORMAL;
+		device_notify(DEVICE_NOTIFIER_BATTERY_PRESENT, (void *)PRESENT_NORMAL);
+		pm_unlock_internal(INTERNAL_LOCK_POPUP, LCD_DIM, PM_SLEEP_MARGIN);
+	}
 	changed_battery_cf(present);
 }
 
@@ -392,23 +383,21 @@ static void update_health(enum battery_noti_status status)
 	_I("charge %d health %d", battery.charge_now, battery.health);
 	old = status;
 
-	if (status == DEVICE_NOTI_ON) {
-		_I("silent health popup");
-		return;
-	}
-
 	pm_change_internal(getpid(), LCD_NORMAL);
 	if (status == DEVICE_NOTI_ON) {
 		_I("popup - Battery health status is not good");
-		vconf_set_int(SIOP_DISABLE, 1);
+		siop_disable = SIOP_DISABLE;
+		device_notify(DEVICE_NOTIFIER_BATTERY_HEALTH, (void *)HEALTH_BAD);
 		pm_lock_internal(INTERNAL_LOCK_POPUP, LCD_DIM, STAY_CUR_STATE, 0);
 		if (battery.temp == TEMP_LOW)
 			battery_charge_err_low_act(NULL);
 		else if (battery.temp == TEMP_HIGH)
 			battery_charge_err_high_act(NULL);
 	} else {
-		vconf_set_int(SIOP_DISABLE, 0);
+		siop_disable = SIOP_ENABLE;
+		device_notify(DEVICE_NOTIFIER_BATTERY_HEALTH, (void *)HEALTH_GOOD);
 		pm_unlock_internal(INTERNAL_LOCK_POPUP, LCD_DIM, PM_SLEEP_MARGIN);
+		health_status_broadcast();
 		abnormal_popup_timer_init();
 	}
 }
@@ -422,6 +411,10 @@ static void update_ovp(enum battery_noti_status status)
 	_I("charge %d ovp %d", battery.charge_now, battery.ovp);
 	old = status;
 	pm_change_internal(getpid(), LCD_NORMAL);
+	if (status == DEVICE_NOTI_ON)
+		device_notify(DEVICE_NOTIFIER_BATTERY_OVP, (void *)OVP_ABNORMAL);
+	else
+		device_notify(DEVICE_NOTIFIER_BATTERY_OVP, (void *)OVP_NORMAL);
 }
 
 static void check_battery_status(void)
@@ -560,7 +553,7 @@ static void check_capacity_status(const char *env_value)
 	battery.capacity = atoi(env_value);
 }
 
-static void power_supply(void *data)
+static void process_power_supply(void *data)
 {
 	static struct battery_status old;
 
@@ -569,11 +562,15 @@ static void power_supply(void *data)
 		power_supply_broadcast(CHARGE_NOW_SIGNAL, battery.charge_now);
 	}
 
-	lowbat_monitor(data);
+	if (!(old.online == battery.online &&
+	    old.charge_now == battery.charge_now &&
+	    old.charge_full == battery.charge_full))
+		return;
+
+	lowbat_execute(data);
 	check_online();
-	if (old.charge_full != battery.charge_full) {
+	if (old.charge_full != battery.charge_full)
 		noti_batt_full();
-	}
 
 	old.capacity = battery.capacity;
 	old.online = battery.online;
@@ -582,6 +579,7 @@ static void power_supply(void *data)
 
 	check_battery_status();
 	device_notify(DEVICE_NOTIFIER_POWER_SUPPLY, NULL);
+	device_notify(DEVICE_NOTIFIER_BATTERY_CHARGING, &battery.charge_now);
 }
 
 static void uevent_power_handler(struct udev_device *dev)
@@ -590,6 +588,7 @@ static void uevent_power_handler(struct udev_device *dev)
 	const char *env_name;
 	const char *env_value;
 	bool matched = false;
+	int ret;
 
 	udev_list_entry_foreach(list_entry,
 			udev_device_get_properties_list_entry(dev)) {
@@ -623,8 +622,15 @@ static void uevent_power_handler(struct udev_device *dev)
 	env_value = udev_device_get_property_value(dev, CAPACITY);
 	check_capacity_status(env_value);
 
-	battery_noti(DEVICE_NOTI_BATT_CHARGE, DEVICE_NOTI_ON);
-	power_supply(&battery.capacity);
+	ret = booting_done(NULL);
+	if (ret) {
+		if (battery.online > POWER_SUPPLY_TYPE_BATTERY)
+			power_supply_noti(DEVICE_NOTI_BATT_CHARGE, DEVICE_NOTI_ON);
+		else
+			power_supply_noti(DEVICE_NOTI_BATT_CHARGE, DEVICE_NOTI_OFF);
+	}
+
+	process_power_supply(&battery.capacity);
 }
 
 static void power_supply_status_init(void)
@@ -652,8 +658,10 @@ static void power_supply_status_init(void)
 		vconf_set_int(VCONFKEY_SYSMAN_BATTERY_CHARGE_NOW, battery.charge_now);
 		power_supply_broadcast(CHARGE_NOW_SIGNAL, battery.charge_now);
 	}
-	if (capacity != battery.capacity)
+	if (capacity != battery.capacity) {
 		vconf_set_int(VCONFKEY_SYSMAN_BATTERY_CAPACITY, battery.capacity);
+		power_supply_broadcast(CHARGE_CAPACITY_SIGNAL, battery.capacity);
+	}
 
 	charge_now = battery.charge_now;
 	charge_full = battery.charge_full;
@@ -787,6 +795,20 @@ static DBusMessage *dbus_get_health(E_DBus_Object *obj, DBusMessage *msg)
 	return reply;
 }
 
+static DBusMessage *dbus_get_siop_disable_status(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int ret;
+
+	ret = siop_disable;
+
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+	return reply;
+}
+
 static DBusMessage *dbus_power_supply_handler(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusError err;
@@ -839,8 +861,13 @@ static DBusMessage *dbus_power_supply_handler(E_DBus_Object *obj, DBusMessage *m
 		battery.ovp,
 		battery.present,
 		battery.temp);
-	battery_noti(DEVICE_NOTI_BATT_CHARGE, DEVICE_NOTI_ON);
-	power_supply(&battery.capacity);
+
+	if (battery.online > POWER_SUPPLY_TYPE_BATTERY)
+		power_supply_noti(DEVICE_NOTI_BATT_CHARGE, DEVICE_NOTI_ON);
+	else
+		power_supply_noti(DEVICE_NOTI_BATT_CHARGE, DEVICE_NOTI_OFF);
+
+	process_power_supply(&battery.capacity);
 out:
 	reply = dbus_message_new_method_return(msg);
 	dbus_message_iter_init_append(reply, &iter);
@@ -857,6 +884,7 @@ static const struct edbus_method edbus_methods[] = {
 	{ CHARGE_CAPACITY_LAW_SIGNAL, NULL, "i", dbus_get_percent_raw },
 	{ CHARGE_FULL_SIGNAL,         NULL, "i", dbus_is_full },
 	{ CHARGE_HEALTH_SIGNAL,       NULL, "i", dbus_get_health },
+	{ CHARGE_SIOP_DISABLE_SIGNAL, NULL, "i", dbus_get_siop_disable_status },
 	{ POWER_SUBSYSTEM,       "sisssss", "i", dbus_power_supply_handler },
 };
 
@@ -876,17 +904,18 @@ static int booting_done(void *data)
 
 	/* for simple noti change cb */
 	power_supply_status_init();
-	power_supply(NULL);
+	process_power_supply(NULL);
 
 	return done;
 }
 
 static int display_changed(void *data)
 {
-	if (battery.charge_now == CHARGER_ABNORMAL &&
-	    battery.health == HEALTH_BAD)
-		pm_lock_internal(INTERNAL_LOCK_POPUP, LCD_DIM, STAY_CUR_STATE, 0);
-
+	if (battery.charge_now != CHARGER_ABNORMAL)
+		return 0;
+	if (battery.health != HEALTH_BAD && battery.present != PRESENT_ABNORMAL)
+		return 0;
+	pm_lock_internal(INTERNAL_LOCK_POPUP, LCD_DIM, STAY_CUR_STATE, 0);
 	return 0;
 }
 
