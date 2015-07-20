@@ -88,6 +88,12 @@ struct format_data {
 	enum unmount_operation option;
 };
 
+struct pipe_data {
+	enum block_dev_operation op;
+	struct block_device *bdev;
+	int result;
+};
+
 static struct block_conf {
 	bool multimount;
 } block_conf[BLOCK_MMC_DEV + 1];
@@ -96,6 +102,8 @@ static dd_list *fs_head;
 static dd_list *block_dev_list;
 static dd_list *block_ops_list;
 static bool smack;
+static int pfds[2];
+static Ecore_Fd_Handler *phandler;
 static E_DBus_Interface *iface;
 
 static void uevent_block_handler(struct udev_device *dev);
@@ -473,6 +481,92 @@ static struct block_device *find_block_device(const char *devnode)
 	return NULL;
 }
 
+static int pipe_trigger(enum block_dev_operation op,
+		struct block_device *bdev, int result)
+{
+	static pthread_mutex_t pmutex = PTHREAD_MUTEX_INITIALIZER;
+	struct pipe_data pdata = { op, bdev, result };
+	int n;
+
+	_D("op : %d, bdev : %p, result : %d",
+			pdata.op, pdata.bdev, pdata.result);
+
+	pthread_mutex_lock(&pmutex);
+
+	n = write(pfds[1], &pdata, sizeof(struct pipe_data));
+
+	pthread_mutex_unlock(&pmutex);
+
+	return (n != sizeof(struct pipe_data)) ? -EPERM : 0;
+}
+
+static Eina_Bool pipe_cb(void *data, Ecore_Fd_Handler *fdh)
+{
+	struct pipe_data pdata = {0,};
+	int fd;
+	int n;
+
+	if (ecore_main_fd_handler_active_get(fdh, ECORE_FD_ERROR)) {
+		_E("an error has occured. Ignore it.");
+		goto out;
+	}
+
+	fd = ecore_main_fd_handler_fd_get(fdh);
+	if (!fd) {
+		_E("fail to get fd");
+		goto out;
+	}
+
+	n = read(fd, &pdata, sizeof(pdata));
+	if (n != sizeof(pdata) || !pdata.bdev) {
+		_E("fail to read struct pipe data");
+		goto out;
+	}
+
+	_D("op : %d, bdev : %p, result : %d",
+			pdata.op, pdata.bdev, pdata.result);
+
+	/* Broadcast to mmc and usb storage module */
+	broadcast_block_info(pdata.op, pdata.bdev->data, pdata.result);
+
+	/* Broadcast outside with Block iface */
+	signal_device_changed(pdata.bdev);
+
+out:
+	return ECORE_CALLBACK_RENEW;
+
+}
+
+static int pipe_init(void)
+{
+	int ret;
+
+	ret = pipe2(pfds, O_NONBLOCK | O_CLOEXEC);
+	if (ret == -1)
+		return -errno;
+
+	phandler = ecore_main_fd_handler_add(pfds[0],
+			ECORE_FD_READ | ECORE_FD_ERROR,
+			pipe_cb, NULL, NULL, NULL);
+	if (!phandler)
+		return -EPERM;
+
+	return 0;
+}
+
+static void pipe_exit(void)
+{
+	if (phandler) {
+		ecore_main_fd_handler_del(phandler);
+		phandler = NULL;
+	}
+
+	if (pfds[0])
+		close(pfds[0]);
+	if (pfds[1])
+		close(pfds[1]);
+}
+
 static int mmc_check_and_unmount(const char *path)
 {
 	int ret = 0;
@@ -625,11 +719,9 @@ out:
 	_I("%s result : %s, %d", __func__, data->devnode, r);
 	pthread_mutex_unlock(&bdev->mutex);
 
-	/* Broadcast to mmc and usb storage module */
-	broadcast_block_info(BLOCK_DEV_MOUNT, data, r);
-
-	/* Broadcast outside with Block iface */
-	signal_device_changed(bdev);
+	r = pipe_trigger(BLOCK_DEV_MOUNT, bdev, r);
+	if (r < 0)
+		_E("fail to trigger pipe");
 
 	return NULL;
 }
@@ -903,8 +995,9 @@ out:
 	_I("%s result : %s, %d", __func__, data->devnode, r);
 	pthread_mutex_unlock(&bdev->mutex);
 
-	/* Broadcast to mmc and usb storage module */
-	broadcast_block_info(BLOCK_DEV_FORMAT, data, r);
+	r = pipe_trigger(BLOCK_DEV_FORMAT, bdev, r);
+	if (r < 0)
+		_E("fail to trigger pipe");
 
 	free(fdata);
 
@@ -1509,6 +1602,11 @@ static void block_init(void *data)
 	if (ret < 0)
 		_E("fail to init block object iface");
 
+	/* init pipe */
+	ret = pipe_init();
+	if (ret < 0)
+		_E("fail to init pipe");
+
 	/* register mmc uevent control routine */
 	ret = register_udev_uevent_control(&uh);
 	if (ret < 0)
@@ -1524,6 +1622,9 @@ static void block_exit(void *data)
 
 	/* unregister notifier */
 	unregister_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
+
+	/* exit pipe */
+	pipe_exit();
 
 	/* unregister mmc uevent control routine */
 	ret = unregister_udev_uevent_control(&uh);
