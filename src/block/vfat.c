@@ -18,6 +18,7 @@
 
 
 #include <stdio.h>
+#include <sys/mount.h>
 #include <limits.h>
 #include <fcntl.h>
 #include <string.h>

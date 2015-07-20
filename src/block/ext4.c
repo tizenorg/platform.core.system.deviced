@@ -19,6 +19,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/mount.h>
 #include <limits.h>
 #include <vconf.h>
 #include <signal.h>
@@ -29,6 +30,7 @@
 
 #include "core/common.h"
 #include "core/devices.h"
+#include "core/launch.h"
 #include "core/log.h"
 #include "block.h"
 

@@ -21,11 +21,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <sys/mount.h>
 #include <sys/statvfs.h>
+#include <fnmatch.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <dirent.h>
 #include <sys/statfs.h>
 #include <stdbool.h>
@@ -36,6 +37,7 @@
 
 #include "core/log.h"
 #include "core/config-parser.h"
+#include "core/device-idler.h"
 #include "core/device-notifier.h"
 #include "core/devices.h"
 #include "core/udev.h"
@@ -231,7 +233,7 @@ static void signal_device_changed(struct block_device *bdev)
 
 static char *generate_mount_path(const char *fs_uuid_enc)
 {
-	char *str;
+	const char *str;
 	str = tzplatform_mkpath(TZ_SYS_STORAGE, fs_uuid_enc);
 	if (!str)
 		return NULL;
@@ -1205,7 +1207,6 @@ static int block_init_from_udev_enumerate(void)
 	struct udev_device *dev;
 	const char *syspath;
 	const char *devnode;
-	int ret;
 
 	udev = udev_new();
 	if (!udev) {
@@ -1318,7 +1319,7 @@ static void remove_whole_block_device(void)
 	}
 }
 
-static int remove_unmountable_blocks(void *user_data)
+static void remove_unmountable_blocks(void *user_data)
 {
 	struct block_device *bdev;
 	dd_list *elem;
@@ -1330,7 +1331,6 @@ static int remove_unmountable_blocks(void *user_data)
 			free_block_device(bdev);
 		}
 	}
-	return 0;
 }
 
 static void uevent_block_handler(struct udev_device *dev)
@@ -1364,7 +1364,6 @@ static DBusMessage *handle_block_mount(E_DBus_Object *obj,
 		DBusMessage *msg)
 {
 	struct block_data *data;
-	const char *object_path;
 	char *mount_point;
 	int ret = -EBADMSG;
 
@@ -1401,7 +1400,6 @@ static DBusMessage *handle_block_unmount(E_DBus_Object *obj,
 		DBusMessage *msg)
 {
 	struct block_data *data;
-	const char *object_path;
 	int option;
 	int ret = -EBADMSG;
 
