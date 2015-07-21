@@ -38,7 +38,7 @@ static Ecore_Idler *idl;
 int register_notifier(enum device_notifier_type status, int (*func)(void *data))
 {
 	dd_list *n;
-	struct device_notifier *data, *notifier;
+	struct device_notifier *notifier;
 
 	_I("%d, %x", status, func);
 

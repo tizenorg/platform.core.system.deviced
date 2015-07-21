@@ -19,7 +19,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <limits.h>
 #include <unistd.h>
 #include <signal.h>
@@ -42,7 +43,7 @@ static int parent(pid_t pid)
 		else if (WIFSTOPPED(status))
 			_I("%d stopped by signal %d", pid, WSTOPSIG(status));
 	} else
-		_I("%d waitpid() failed : %s", pid, strerror(errno));
+		_I("%d waitpid() failed : %d", pid, errno);
 
 	return -EAGAIN;
 }
@@ -63,7 +64,7 @@ int run_child(int argc, const char *argv[])
 {
 	pid_t pid;
 	struct sigaction act, oldact;
-	int r;
+	int r = 0;
 	FILE *fp;
 
 	if (!argv)
@@ -71,7 +72,7 @@ int run_child(int argc, const char *argv[])
 
 	fp = fopen(argv[0], "r");
 	if (fp == NULL) {
-		_E("fail %s (%s)", argv[0], strerror(errno));
+		_E("fail %s (%d)", argv[0], errno);
 		return -errno;
 	}
 	fclose(fp);

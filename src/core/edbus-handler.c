@@ -27,9 +27,9 @@
 
 #define EDBUS_INIT_RETRY_COUNT 5
 #define NAME_OWNER_CHANGED "NameOwnerChanged"
-#define NAME_OWNER_MATCH "type='signal',sender='org.freedesktop.DBus',\
-	path='/org/freedesktop/DBus',interface='org.freedesktop.DBus',\
-	member='NameOwnerChanged',arg0='%s'"
+#define NAME_OWNER_MATCH "type='signal',sender='org.freedesktop.DBus'," \
+	"path='/org/freedesktop/DBus',interface='org.freedesktop.DBus'," \
+	"member='NameOwnerChanged',arg0='%s'"
 
 /* -1 is a default timeout value, it's converted to 25*1000 internally. */
 #define DBUS_REPLY_TIMEOUT	(-1)
@@ -41,8 +41,8 @@ struct edbus_list {
 };
 
 static struct edbus_object {
-	const char *path;
-	const char *interface;
+	char *path;
+	char *interface;
 	E_DBus_Object *obj;
 	E_DBus_Interface *iface;
 } edbus_objects[] = {
@@ -52,11 +52,8 @@ static struct edbus_object {
 	{ DEVICED_PATH_STORAGE, DEVICED_INTERFACE_STORAGE, NULL, NULL },
 	{ DEVICED_PATH_PROCESS, DEVICED_INTERFACE_PROCESS, NULL, NULL },
 	{ DEVICED_PATH_KEY    , DEVICED_INTERFACE_KEY    , NULL, NULL },
-	{ DEVICED_PATH_CPU    , DEVICED_INTERFACE_CPU    , NULL, NULL },
 	{ DEVICED_PATH_SYSNOTI, DEVICED_INTERFACE_SYSNOTI, NULL, NULL },
 	{ DEVICED_PATH_USB    , DEVICED_INTERFACE_USB    , NULL, NULL },
-	{ DEVICED_PATH_GPIO, DEVICED_INTERFACE_GPIO, NULL, NULL},
-	{ DEVICED_PATH_HDMICEC, DEVICED_INTERFACE_HDMICEC, NULL, NULL},
 	/* Add new object & interface here*/
 };
 
@@ -648,7 +645,7 @@ int register_edbus_interface_and_method(const char *path,
 	if (!obj) {
 		obj = malloc(sizeof(struct edbus_object));
 		if (!obj) {
-			_E("fail to allocate %s interface(%d)", path, ret);
+			_E("fail to allocate %s interface", path);
 			return -ENOMEM;
 		}
 

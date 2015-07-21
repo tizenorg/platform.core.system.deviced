@@ -55,7 +55,6 @@ static void prepare_exec(void)
 {
 	int i;
 	int maxfd;
-	FILE *fp;
 
 	maxfd = getdtablesize();
 	for (i = 3; i < maxfd; i++)
@@ -63,7 +62,6 @@ static void prepare_exec(void)
 
 	for (i = 0; i < _NSIG; i++)
 		signal(i, SIG_DFL);
-
 }
 
 static int parse_cmd(const char *cmdline, char **argv, int max_args)
@@ -89,32 +87,32 @@ static int parse_cmd(const char *cmdline, char **argv, int max_args)
 			escape = 0;
 		} else {
 			switch (*p) {
-				case '\\':
-					escape = 1;
-					break;
-				case '"':
-					if (squote)
-						*bufp++ = *p;
-					else
-						dquote = !dquote;
-					break;
-				case '\'':
-					if (dquote)
-						*bufp++ = *p;
-					else
-						squote = !squote;
-					break;
-				case ' ':
-					if (!squote && !dquote) {
-						*bufp = '\0';
-						if (nargs < max_args)
-							argv[nargs++] = strdup(buf);
-						bufp = buf;
-						break;
-					}
-				default:
+			case '\\':
+				escape = 1;
+				break;
+			case '"':
+				if (squote)
 					*bufp++ = *p;
+				else
+					dquote = !dquote;
+				break;
+			case '\'':
+				if (dquote)
+					*bufp++ = *p;
+				else
+					squote = !squote;
+				break;
+			case ' ':
+				if (!squote && !dquote) {
+					*bufp = '\0';
+					if (nargs < max_args)
+						argv[nargs++] = strdup(buf);
+					bufp = buf;
 					break;
+				}
+			default:
+				*bufp++ = *p;
+				break;
 			}
 		}
 		p++;
@@ -149,7 +147,7 @@ int launch_app_with_nice(const char *file, char *const argv[], pid_t *pid, int _
 	_pid = fork();
 
 	if (_pid == -1) {
-		_E("fork error: %s", strerror(errno));
+		_E("fork error: %d", errno);
 		/* keep errno */
 		return -1;
 	}
@@ -166,12 +164,12 @@ int launch_app_with_nice(const char *file, char *const argv[], pid_t *pid, int _
 	ret = nice(_nice);
 
 	if (ret == -1 && errno != 0)
-		_E("nice error: %s", strerror(errno));
+		_E("nice error: %d", errno);
 
 	ret = execvp(file, argv);
 
 	/* If failed... */
-	_E("exec. error: %s", strerror(errno));
+	_E("exec. error: %s", errno);
 	return -2;
 }
 
@@ -215,7 +213,8 @@ int launch_if_noexist(const char *execpath, const char *arg, ...)
 		errno = EINVAL;
 		return -1;
 	}
-	if (pid = get_exec_pid(execpath) > 0)
+	pid = get_exec_pid(execpath);
+	if (pid > 0)
 		return pid;
 
 	va_start(argptr, arg);
@@ -238,7 +237,6 @@ int launch_if_noexist(const char *execpath, const char *arg, ...)
 	}
 
 	snprintf(buf, buf_size, "%s %s", execpath, arg);
-	//pid = launch_app_cmd_with_nice(buf, nice_value, flag);
 	pid = launch_app_cmd_with_nice(buf, nice_value);
 	if (pid == -2)
 		exit(EXIT_FAILURE);
@@ -277,13 +275,11 @@ int launch_evenif_exist(const char *execpath, const char *arg, ...)
 	buf_size = strlen(execpath) + strlen(arg) + 10;
 	buf = malloc(buf_size);
 	if (buf == NULL) {
-		// Do something for not enought memory error
 		_E("Malloc failed");
 		return -1;
 	}
 
 	snprintf(buf, buf_size, "%s %s", execpath, arg);
-	//pid = launch_app_cmd_with_nice(buf, nice_value, flag);
 	pid = launch_app_cmd_with_nice(buf, nice_value);
 	if (pid == -2)
 		exit(EXIT_FAILURE);
@@ -307,7 +303,8 @@ int launch_after_kill_if_exist(const char *execpath, const char *arg, ...)
 		return -1;
 	}
 
-	if ((exist_pid = get_exec_pid(execpath)) > 0)
+	exist_pid = get_exec_pid(execpath);
+	if (exist_pid > 0)
 		kill(exist_pid, SIGTERM);
 
 	va_start(argptr, arg);
@@ -331,7 +328,6 @@ int launch_after_kill_if_exist(const char *execpath, const char *arg, ...)
 	}
 
 	snprintf(buf, buf_size, "%s %s", execpath, arg);
-	//pid = launch_app_cmd_with_nice(buf, nice_value, flag);
 	pid = launch_app_cmd_with_nice(buf, nice_value);
 	if (pid == -2)		/* It means that the 'execvp' return -1 */
 		exit(EXIT_FAILURE);
