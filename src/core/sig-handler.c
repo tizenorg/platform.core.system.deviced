@@ -20,10 +20,8 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <vconf.h>
+
 #include "log.h"
-#include "edbus-handler.h"
-#include "display/poll.h"
 #include "devices.h"
 #include "common.h"
 

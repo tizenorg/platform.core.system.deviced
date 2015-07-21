@@ -1,7 +1,7 @@
 /*
  * deviced
  *
- * Copyright (c) 2012 - 2013 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2012 - 2015 Samsung Electronics Co., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the License);
  * you may not use this file except in compliance with the License.
@@ -270,8 +270,6 @@ static int device_change_poweroff(void *data)
 
 static void udev_init(void *data)
 {
-	int ret;
-
 	register_notifier(DEVICE_NOTIFIER_POWEROFF, device_change_poweroff);
 
 	if (uevent_control_start(KERNEL, &kevent) != 0)

@@ -84,7 +84,7 @@ static int stop_device(char **args)
 	if (!args[1])
 		return -EINVAL;
 
-	printf("start %s device!\n", args[1]);
+	printf("stop %s device!\n", args[1]);
 
 	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
 		    devices[arg_id].path, devices[arg_id].iface,
@@ -178,6 +178,8 @@ static int enable_device(char **args)
 		return -EBADMSG;
 
 	dbus_message_unref(msg);
+
+	return 0;
 }
 
 static int disable_device(char **args)
@@ -199,6 +201,8 @@ static int disable_device(char **args)
 		return -EBADMSG;
 
 	dbus_message_unref(msg);
+
+	return 0;
 }
 
 static const struct action {

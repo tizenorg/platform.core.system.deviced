@@ -80,8 +80,8 @@ struct siop_data {
 	int rear;
 };
 
-static int siop = 0;
-static int mode = 0;
+static int siop;
+static int mode;
 static int siop_domain = SIOP_POSITIVE;
 
 enum siop_scenario {
@@ -89,16 +89,16 @@ enum siop_scenario {
 	MODE_LCD = 1,
 };
 #ifdef NOUSE
-typedef struct _node {
+struct Node {
 	pid_t pid;
-	struct _node *next;
-} Node;
+	struct Node *next;
+};
 
-static Node *head = NULL;
+static struct Node *head;
 
-static Node *find_node(pid_t pid)
+static struct Node *find_node(pid_t pid)
 {
-	Node *t = head;
+	struct Node *t = head;
 
 	while (t != NULL) {
 		if (t->pid == pid)
@@ -108,11 +108,11 @@ static Node *find_node(pid_t pid)
 	return t;
 }
 
-static Node *add_node(pid_t pid)
+static struct Node *add_node(pid_t pid)
 {
-	Node *n;
+	struct Node *n;
 
-	n = (Node *) malloc(sizeof(Node));
+	n = (struct Node *) malloc(sizeof(struct Node));
 	if (n == NULL) {
 		_E("Not enough memory, add cond. fail");
 		return NULL;
@@ -125,10 +125,10 @@ static Node *add_node(pid_t pid)
 	return n;
 }
 
-static int del_node(Node *n)
+static int del_node(struct Node *n)
 {
-	Node *t;
-	Node *prev;
+	struct Node *t;
+	struct Node *prev;
 
 	if (n == NULL)
 		return 0;
@@ -160,10 +160,10 @@ static void siop_level_action(int level)
 {
 	int val = SIOP_CTRL_LEVEL(level);
 	static int old;
-	static int siop_level = 0;
-	static int rear_level = 0;
-	static int initialized = 0;
-	static int domain = 0;
+	static int siop_level;
+	static int rear_level;
+	static int initialized;
+	static int domain;
 	char *arr[1];
 	char str_level[32];
 
@@ -204,8 +204,6 @@ static int siop_changed(int argc, char **argv)
 	int siop_level = 0;
 	int rear_level = 0;
 	int level;
-	int siop_disable;
-	int ret;
 
 	if (argc != 2 || argv[0] == NULL) {
 		_E("fail to check value");
@@ -222,7 +220,6 @@ static int siop_changed(int argc, char **argv)
 		siop_domain = SIOP_POSITIVE;
 	siop_level = siop_domain * level;
 
-check_rear:
 	if (argv[1] == NULL)
 		goto out;
 
@@ -252,7 +249,7 @@ static void memcg_move_group(int pid, int oom_score_adj)
 {
 	char buf[100];
 	FILE *f;
-	int ret, size;
+	int size;
 	char exe_name[PATH_MAX];
 
 	if (get_cmdline_name(pid, exe_name, PATH_MAX) != 0) {
@@ -271,9 +268,9 @@ static void memcg_move_group(int pid, int oom_score_adj)
 	f = fopen(buf, "w");
 	if (f == NULL)
 		return;
-	size = sprintf(buf, "%d", pid);
+	size = snprintf(buf, sizeof(buf), "%d", pid);
 	if (fwrite(buf, size, 1, f) != 1)
-		_E("fwrite cgroup tasks : %d\n", pid);;
+		_E("fwrite cgroup tasks : %d", pid);
 	fclose(f);
 }
 
@@ -346,7 +343,9 @@ int set_oom_score_adj_action(int argc, char **argv)
 
 	if (argc < 2)
 		return -1;
-	if ((pid = atoi(argv[0])) < 0 || (new_oom_score_adj = atoi(argv[1])) <= -20)
+	pid = atoi(argv[0]);
+	new_oom_score_adj = atoi(argv[1]);
+	if (pid < 0 || new_oom_score_adj <= -20)
 		return -1;
 
 	_I("OOMADJ_SET : pid %d, new_oom_score_adj %d", pid, new_oom_score_adj);
@@ -371,10 +370,11 @@ int set_active_action(int argc, char **argv)
 
 	if (argc < 1)
 		return -1;
-	if ((pid = atoi(argv[0])) < 0)
+	pid = atoi(argv[0]);
+	if (pid < 0)
 		return -1;
-
-	if (get_oom_score_adj(pid, &oom_score_adj) < 0)
+	ret = get_oom_score_adj(pid, &oom_score_adj);
+	if (ret < 0)
 		return -1;
 
 	switch (oom_score_adj) {
@@ -393,7 +393,7 @@ int set_active_action(int argc, char **argv)
 		ret = set_oom_score_adj((pid_t) pid, OOMADJ_BACKGRD_LOCKED);
 		break;
 	default:
-		if(oom_score_adj > OOMADJ_BACKGRD_UNLOCKED) {
+		if (oom_score_adj > OOMADJ_BACKGRD_UNLOCKED) {
 			ret = set_oom_score_adj((pid_t) pid, OOMADJ_BACKGRD_LOCKED);
 		} else {
 			_E("Unknown oom_score_adj value (%d) !", oom_score_adj);
@@ -412,10 +412,12 @@ int set_inactive_action(int argc, char **argv)
 
 	if (argc < 1)
 		return -1;
-	if ((pid = atoi(argv[0])) < 0)
+	pid = atoi(argv[0]);
+	if (pid < 0)
 		return -1;
 
-	if (get_oom_score_adj(pid, &oom_score_adj) < 0)
+	ret = get_oom_score_adj(pid, &oom_score_adj);
+	if (ret < 0)
 		return -1;
 
 	switch (oom_score_adj) {
@@ -434,7 +436,7 @@ int set_inactive_action(int argc, char **argv)
 		ret = set_oom_score_adj((pid_t) pid, OOMADJ_BACKGRD_UNLOCKED);
 		break;
 	default:
-		if(oom_score_adj > OOMADJ_BACKGRD_UNLOCKED) {
+		if (oom_score_adj > OOMADJ_BACKGRD_UNLOCKED) {
 			ret = 0;
 		} else {
 			_E("Unknown oom_score_adj value (%d) !", oom_score_adj);
@@ -453,7 +455,8 @@ int set_process_action(int argc, char **argv)
 
 	if (argc < 1)
 		return -1;
-	if ((pid = atoi(argv[0])) < 0)
+	pid = atoi(argv[0]);
+	if (pid < 0)
 		return -1;
 
 	return ret;
@@ -466,7 +469,8 @@ int set_process_group_action(int argc, char **argv)
 
 	if (argc != 2)
 		return -1;
-	if ((pid = atoi(argv[0])) < 0)
+	pid = atoi(argv[0]);
+	if (pid < 0)
 		return -1;
 
 	if (strncmp(argv[1], PROCESS_VIP, strlen(PROCESS_VIP)) == 0)
@@ -477,43 +481,8 @@ int set_process_group_action(int argc, char **argv)
 	if (ret == 0)
 		_I("%s : pid %d", argv[1], pid);
 	else
-		_E("fail to set %s : pid %d",argv[1], pid);
+		_E("fail to set %s : pid %d", argv[1], pid);
 	return 0;
-}
-
-void check_siop_disable_process(int pid, char *default_name)
-{
-	int oom_score_adj;
-	char exe_name[PATH_MAX];
-	if (pid <= 0)
-		return;
-
-	if (get_oom_score_adj(pid, &oom_score_adj) < 0) {
-		_E("fail to get adj value of pid: %d (%d)", pid);
-		return;
-	}
-
-	if (get_cmdline_name(pid, exe_name, PATH_MAX) != 0) {
-		_E("fail to check cmdline: %d (%s)", pid, default_name);
-		return;
-	}
-
-	if (strncmp(exe_name, default_name, strlen(default_name)) != 0) {
-		return;
-	}
-
-	switch (oom_score_adj) {
-	case OOMADJ_FOREGRD_LOCKED:
-	case OOMADJ_FOREGRD_UNLOCKED:
-		siop_level_action(0);
-		vconf_set_int(VCONFKEY_INTERNAL_PRIVATE_SIOP_DISABLE, 1);
-		return;
-	case OOMADJ_BACKGRD_LOCKED:
-	case OOMADJ_BACKGRD_UNLOCKED:
-	case OOMADJ_SU:
-		vconf_set_int(VCONFKEY_INTERNAL_PRIVATE_SIOP_DISABLE, 0);
-	}
-	return;
 }
 
 static DBusMessage *dbus_proc_handler(E_DBus_Object *obj, DBusMessage *msg)
@@ -725,11 +694,11 @@ static const struct edbus_method edbus_methods[] = {
 
 static int proc_booting_done(void *data)
 {
-	static int done = 0;
+	static int done;
 
 	if (data == NULL)
 		goto out;
-	done = *(int*)data;
+	done = *(int *)data;
 	if (vconf_notify_key_changed(VCONFKEY_PM_STATE, (void *)siop_mode_lcd, NULL) < 0)
 		_E("Vconf notify key chaneged failed: KEY(%s)", VCONFKEY_PM_STATE);
 	siop_mode_lcd(NULL, NULL);
@@ -739,12 +708,10 @@ out:
 
 static int process_execute(void *data)
 {
-	struct siop_data* key_data = (struct siop_data *)data;
+	struct siop_data *key_data = (struct siop_data *)data;
 	int siop_level = 0;
 	int rear_level = 0;
 	int level;
-	int siop_disable;
-	int ret;
 	int booting_done;
 
 	booting_done = proc_booting_done(NULL);
@@ -761,7 +728,6 @@ static int process_execute(void *data)
 		siop_domain = SIOP_POSITIVE;
 	siop_level = siop_domain * level;
 
-check_rear:
 	level = key_data->rear;
 	rear_level = level;
 

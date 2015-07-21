@@ -1,7 +1,7 @@
 /*
  * deviced
  *
- * Copyright (c) 2012 - 2013 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2012 - 2015 Samsung Electronics Co., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the License);
  * you may not use this file except in compliance with the License.
@@ -22,28 +22,28 @@
 
 #include <libudev.h>
 
-#define UDEV_CHANGE		"change"
-#define UDEV_ADD		"add"
-#define UDEV_REMOVE		"remove"
+#define UDEV_CHANGE             "change"
+#define UDEV_ADD                "add"
+#define UDEV_REMOVE             "remove"
 
-#define UDEV_DEVPATH		"DEVPATH"
-#define UDEV_DEVTYPE		"DEVTYPE"
+#define UDEV_DEVPATH            "DEVPATH"
+#define UDEV_DEVTYPE            "DEVTYPE"
 
 /* battery device */
-#define POWER_SUBSYSTEM		"power_supply"
-#define POWER_PATH			"/sys/class/power_supply/battery"
-#define POWER_SUPPLY_UEVENT POWER_PATH"/uevent"
-#define CAPACITY			"POWER_SUPPLY_CAPACITY"
-#define CHARGE_FULL			"POWER_SUPPLY_CHARGE_FULL"
-#define CHARGE_NOW			"POWER_SUPPLY_CHARGE_NOW"
-#define CHARGE_HEALTH		"POWER_SUPPLY_HEALTH"
-#define CHARGE_PRESENT		"POWER_SUPPLY_PRESENT"
-#define CHARGE_NAME			"POWER_SUPPLY_NAME"
-#define CHARGE_STATUS		"POWER_SUPPLY_STATUS"
-#define CHARGE_ONLINE		"POWER_SUPPLY_ONLINE"
+#define POWER_SUBSYSTEM         "power_supply"
+#define POWER_PATH              "/sys/class/power_supply/battery"
+#define POWER_SUPPLY_UEVENT     POWER_PATH"/uevent"
+#define CAPACITY                "POWER_SUPPLY_CAPACITY"
+#define CHARGE_FULL             "POWER_SUPPLY_CHARGE_FULL"
+#define CHARGE_NOW              "POWER_SUPPLY_CHARGE_NOW"
+#define CHARGE_HEALTH           "POWER_SUPPLY_HEALTH"
+#define CHARGE_PRESENT          "POWER_SUPPLY_PRESENT"
+#define CHARGE_NAME             "POWER_SUPPLY_NAME"
+#define CHARGE_STATUS           "POWER_SUPPLY_STATUS"
+#define CHARGE_ONLINE           "POWER_SUPPLY_ONLINE"
 
 /* extcon */
-#define EXTCON_SUBSYSTEM	"extcon"
+#define EXTCON_SUBSYSTEM        "extcon"
 
 /* usb */
 #define USB_SUBSYSTEM           "usb"

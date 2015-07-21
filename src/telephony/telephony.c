@@ -41,8 +41,8 @@
 
 #define POWER_RESTART		5
 
-static TapiHandle *tapi_handle = NULL;
-static Ecore_Timer *poweroff_timer_id = NULL;
+static TapiHandle *tapi_handle;
+static Ecore_Timer *poweroff_timer_id;
 
 static Eina_Bool telephony_powerdown_ap_internal(void *data)
 {
@@ -71,7 +71,7 @@ static Eina_Bool telephony_restart_ap_by_force(void *data)
 
 static void powerdown_res_cb(TapiHandle *handle, int result, void *data, void *user_data)
 {
-	_D("poweroff command request : %d",result);
+	_D("poweroff command request : %d", result);
 }
 
 static Eina_Bool telephony_powerdown_ap_by_force(void *data)
@@ -92,7 +92,7 @@ static int telephony_start(enum device_flags flags)
 		_I("already initialized");
 		return 0;
 	}
-	if (vconf_get_bool(VCONFKEY_TELEPHONY_READY,&ready) != 0 || ready != 1) {
+	if (vconf_get_bool(VCONFKEY_TELEPHONY_READY, &ready) != 0 || ready != 1) {
 		_E("fail to get %s(%d)", VCONFKEY_TELEPHONY_READY, ready);
 		return -EINVAL;
 	}
@@ -179,7 +179,7 @@ static void telephony_exit(void *data)
 static void telephony_flight_mode_on(TapiHandle *handle, int result, void *data, void *user_data)
 {
 	int ret;
-	int bCurFlightMode = 0;
+	bool bCurFlightMode;
 
 	if (result != TAPI_POWER_FLIGHT_MODE_ENTER) {
 		_E("flight mode enter failed %d", result);
@@ -196,7 +196,7 @@ static void telephony_flight_mode_on(TapiHandle *handle, int result, void *data,
 static void telephony_flight_mode_off(TapiHandle *handle, int result, void *data, void *user_data)
 {
 	int ret;
-	int bCurFlightMode = 0;
+	bool bCurFlightMode;
 
 	if (result != TAPI_POWER_FLIGHT_MODE_LEAVE) {
 		_E("flight mode leave failed %d", result);
@@ -232,7 +232,7 @@ static int telephony_execute(void *data)
 				telephony_flight_mode_on, NULL);
 	}
 	if (err != TAPI_API_SUCCESS)
-		_E("FlightMode tel api action failed %d",err);
+		_E("FlightMode tel api action failed %d", err);
 
 	return 0;
 }

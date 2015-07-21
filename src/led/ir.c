@@ -63,7 +63,7 @@ static void ir_init(void *data)
 			DEVICED_INTERFACE_LED,
 			edbus_methods, ARRAY_SIZE(edbus_methods));
 	if (ret < 0)
-		_E("fail to init edbus method(%d)", ret);
+		_E("fail to init edbus interfce and method(%d)", ret);
 }
 
 static const struct device_ops irled_device_ops = {

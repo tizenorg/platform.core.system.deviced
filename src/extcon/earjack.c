@@ -51,6 +51,8 @@ static int earjack_update(int status)
 	earjack_send_broadcast(status);
 	if (status != 0)
 		pm_change_internal(getpid(), LCD_NORMAL);
+
+	return 0;
 }
 
 static struct extcon_ops earjack_extcon_ops = {

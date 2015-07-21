@@ -104,7 +104,7 @@ static int set_usb_configuration(char *idproduct, char *fconf, char *sconf)
 	usb_confs[3].value = fconf;
 	usb_confs[4].value = sconf;
 
-	for (i = 0 ; i < ARRAY_SIZE(usb_confs) ; i++) {
+	for (i = 0; i < ARRAY_SIZE(usb_confs); i++) {
 		ret = write_sysfs(usb_confs[i].path, usb_confs[i].value);
 		if (ret < 0) {
 			printf("usb setting fails (%s), (%s)\n", usb_confs[i].path, usb_confs[i].value);
@@ -183,7 +183,6 @@ static int run_cmd(char *cmd)
 static int load_sdb(void)
 {
 	int ret;
-	char *cmd[ARG_MAX];
 
 	ret = set_usb_configuration("6860", "mtp", "mtp,acm,sdb");
 	if (ret < 0)

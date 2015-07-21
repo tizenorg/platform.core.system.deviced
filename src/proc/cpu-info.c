@@ -65,15 +65,16 @@ static int read_from_file(const char *path, char *buf, size_t size)
 	return 0;
 }
 
-static int get_revision(char *rev)
+static int get_revision(char *rev, int len)
 {
 	char buf[FILE_BUFF_MAX];
 	char *tag;
 	char *start, *ptr;
+	char *saveptr;
 	long rev_num;
 	const int radix = 16;
 
-	if (rev == NULL) {
+	if (rev == NULL || len <= 0) {
 		_E("Invalid argument !\n");
 		return -1;
 	}
@@ -95,14 +96,18 @@ static int get_revision(char *rev)
 		return -1;
 	}
 
-	start ++;
-	ptr = strtok(start, END_DELIMITER);
+	start++;
+	ptr = strtok_r(start, END_DELIMITER, &saveptr);
+	if (!ptr) {
+		_E("fail to extract tokens");
+		return -1;
+	}
 	ptr += strlen(ptr);
-	ptr -=2;
+	ptr -= 2;
 
 	memset(rev, 0x00, REVISION_SIZE);
 	rev_num = strtol(ptr, NULL, radix);
-	sprintf(rev, "%d", rev_num);
+	snprintf(rev, len, "%ld", rev_num);
 
 	return 0;
 }
@@ -117,7 +122,7 @@ static DBusMessage *dbus_revision_handler(E_DBus_Object *obj, DBusMessage *msg)
 
 	if (ret != NOT_INITIALIZED)
 		goto out;
-	ret = get_revision(rev);
+	ret = get_revision(rev, sizeof(rev));
 	if (ret == 0)
 		ret = strtol(rev, &ptr, CONVERT_TYPE);
 out:

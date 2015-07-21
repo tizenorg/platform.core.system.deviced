@@ -33,21 +33,23 @@
 #include <errno.h>
 #include <poll.h>
 #include <mntent.h>
-#include "log.h"
 #include <notification.h>
 
-#define PERMANENT_DIR		"/tmp/permanent"
-#define VIP_DIR			"/tmp/vip"
-#define BUFF_MAX 255
+#include "log.h"
+#include "common.h"
+
+#define PERMANENT_DIR   "/tmp/permanent"
+#define VIP_DIR         "/tmp/vip"
+#define BUFF_MAX        255
 
 /**
  * Opens "/proc/$pid/oom_score_adj" file for w/r;
  * Return: FILE pointer or NULL
  */
-FILE * open_proc_oom_score_adj_file(int pid, const char *mode)
+FILE *open_proc_oom_score_adj_file(int pid, const char *mode)
 {
-        char buf[32];
-        FILE *fp;
+	char buf[32];
+	FILE *fp;
 
 	snprintf(buf, sizeof(buf), "/proc/%d/oom_score_adj", pid);
 	fp = fopen(buf, mode);
@@ -57,6 +59,7 @@ FILE * open_proc_oom_score_adj_file(int pid, const char *mode)
 int get_exec_pid(const char *execpath)
 {
 	DIR *dp;
+	struct dirent entry;
 	struct dirent *dentry;
 	int pid = -1, fd;
 	int ret;
@@ -69,7 +72,11 @@ int get_exec_pid(const char *execpath)
 		return -1;
 	}
 
-	while ((dentry = readdir(dp)) != NULL) {
+	while (1) {
+		ret = readdir_r(dp, &entry, &dentry);
+		if (ret != 0 || dentry == NULL)
+			break;
+
 		if (!isdigit(dentry->d_name[0]))
 			continue;
 
@@ -113,6 +120,9 @@ int get_cmdline_name(pid_t pid, char *cmdline, size_t cmdline_size)
 
 	ret = read(fd, buf, PATH_MAX);
 	close(fd);
+	if (ret < 0)
+		return -1;
+
 	buf[PATH_MAX] = '\0';
 
 	filename = strrchr(buf, '/');
@@ -149,33 +159,37 @@ int is_vip(int pid)
 static int remove_dir_internal(int fd)
 {
 	DIR *dir;
+	struct dirent entry;
 	struct dirent *de;
 	int subfd, ret = 0;
 
 	dir = fdopendir(fd);
 	if (!dir)
 		return -1;
-	while ((de = readdir(dir))) {
+	while (1) {
+		ret = readdir_r(dir, &entry, &de);
+		if (ret != 0 || de == NULL)
+			break;
 		if (de->d_type == DT_DIR) {
 			if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
 				continue;
 			subfd = openat(fd, de->d_name, O_RDONLY | O_DIRECTORY);
 			if (subfd < 0) {
-				_SE("Couldn't openat %s: %s\n", de->d_name, strerror(errno));
+				_SE("Couldn't openat %s: %d\n", de->d_name, errno);
 				ret = -1;
 				continue;
 			}
-			if (remove_dir_internal(subfd)) {
+			if (remove_dir_internal(subfd))
 				ret = -1;
-			}
+
 			close(subfd);
 			if (unlinkat(fd, de->d_name, AT_REMOVEDIR) < 0) {
-				_SE("Couldn't unlinkat %s: %s\n", de->d_name, strerror(errno));
+				_SE("Couldn't unlinkat %s: %d\n", de->d_name, errno);
 				ret = -1;
 			}
 		} else {
 			if (unlinkat(fd, de->d_name, 0) < 0) {
-				_SE("Couldn't unlinkat %s: %s\n", de->d_name, strerror(errno));
+				_SE("Couldn't unlinkat %s: %d\n", de->d_name, errno);
 				ret = -1;
 			}
 		}
@@ -184,7 +198,7 @@ static int remove_dir_internal(int fd)
 	return ret;
 }
 
-int remove_dir(char *path, int del_dir)
+int remove_dir(const char *path, int del_dir)
 {
 	int fd, ret = 0;
 
@@ -192,7 +206,7 @@ int remove_dir(char *path, int del_dir)
 		return -1;
 	fd = open(path, O_RDONLY | O_NONBLOCK | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
 	if (fd < 0) {
-		_SE("Couldn't opendir %s: %s\n", path, strerror(errno));
+		_SE("Couldn't opendir %s: %d\n", path, errno);
 		return -errno;
 	}
 	ret = remove_dir_internal(fd);
@@ -200,7 +214,7 @@ int remove_dir(char *path, int del_dir)
 
 	if (del_dir) {
 		if (rmdir(path)) {
-			_SE("Couldn't rmdir %s: %s\n", path, strerror(errno));
+			_SE("Couldn't rmdir %s: %d\n", path, errno);
 			ret = -1;
 		}
 	}
@@ -316,7 +330,7 @@ int sys_set_str(char *fname, char *val)
 	return r;
 }
 
-int terminate_process(const char* partition, bool force)
+int terminate_process(const char *partition, bool force)
 {
 	const char *argv[7] = {"/sbin/fuser", "-m", "-k", "-S", NULL, NULL, NULL};
 	int argc;
@@ -330,17 +344,20 @@ int terminate_process(const char* partition, bool force)
 	return run_child(argc, argv);
 }
 
-int mount_check(const char* path)
+int mount_check(const char *path)
 {
 	int ret = false;
-	struct mntent* mnt;
-	const char* table = "/etc/mtab";
-	FILE* fp;
+	struct mntent *mnt;
+	const char *table = "/etc/mtab";
+	FILE *fp;
 
 	fp = setmntent(table, "r");
 	if (!fp)
 		return ret;
-	while (mnt=getmntent(fp)) {
+	while (1) {
+		mnt = getmntent(fp);
+		if (mnt == NULL)
+			break;
 		if (!strcmp(mnt->mnt_dir, path)) {
 			ret = true;
 			break;

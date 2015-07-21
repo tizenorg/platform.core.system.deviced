@@ -26,6 +26,7 @@
 #include "core/devices.h"
 #include "core/device-notifier.h"
 #include "display/core.h"
+#include "display/setting.h"
 
 #define KEYBACKLIGHT_TIME_90            90	/* 1.5 second */
 #define KEYBACKLIGHT_TIME_360           360	/* 6 second */

@@ -313,7 +313,7 @@ systemctl daemon-reload
 
 %files -n deviced
 %manifest %{name}.manifest
-%license LICENSE.Apache-2.0
+%license LICENSE
 %config %{_sysconfdir}/dbus-1/system.d/deviced.conf
 %{_bindir}/deviced-pre.sh
 %{_bindir}/deviced

@@ -116,6 +116,8 @@ extern int get_charging_status(int *val);
  */
 extern int get_lowbatt_status(int *val);
 
+int get_lock_screen_state(void);
+
 /*
  * @}
  */

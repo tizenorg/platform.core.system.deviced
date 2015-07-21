@@ -88,7 +88,7 @@ int add_idle_request(void (*func)(void *data), void *data)
 
 	req = calloc(1, sizeof(struct device_request));
 	if (!req) {
-		_E("fail to allocate request : %s", strerror(errno));
+		_E("fail to allocate request : %d", errno);
 		return -errno;
 	}
 

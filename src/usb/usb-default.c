@@ -102,8 +102,6 @@ static int load_setting_config(struct parse_result *result, void *user_data)
 
 static int load_base_config(struct parse_result *result, void *user_data)
 {
-	unsigned int len;
-
 	if (!result)
 		return -EINVAL;
 

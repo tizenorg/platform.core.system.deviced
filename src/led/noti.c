@@ -30,7 +30,7 @@ static int noti_h;
 
 int ongoing_show(void)
 {
-	int ret, ret_val;
+	int ret_val;
 
 	if (noti_h > 0) {
 		_D("already ongoing noti show : handle(%d)", noti_h);
@@ -52,7 +52,7 @@ int ongoing_clear(void)
 {
 	char str_h[32];
 	char *arr[1];
-	int ret, ret_val;
+	int ret_val;
 
 	if (noti_h <= 0) {
 		_D("already ongoing noti clear");

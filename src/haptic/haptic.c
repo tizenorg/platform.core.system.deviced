@@ -22,6 +22,7 @@
 #include <dlfcn.h>
 #include <assert.h>
 #include <vconf.h>
+#include <time.h>
 
 #include "core/log.h"
 #include "core/list.h"
@@ -89,12 +90,12 @@ static int remove_haptic_info(struct haptic_info *info);
 
 void add_haptic(const struct haptic_ops *ops)
 {
-	DD_LIST_APPEND(h_head, (void*)ops);
+	DD_LIST_APPEND(h_head, (void *)ops);
 }
 
 void remove_haptic(const struct haptic_ops *ops)
 {
-	DD_LIST_REMOVE(h_head, (void*)ops);
+	DD_LIST_REMOVE(h_head, (void *)ops);
 }
 
 static int haptic_module_load(void)
@@ -206,9 +207,6 @@ static struct haptic_info *add_haptic_info(const char *sender)
 
 static int remove_haptic_info(struct haptic_info *info)
 {
-	dd_list *n;
-	dd_list *next;
-
 	assert(info);
 
 	unregister_edbus_watch(info->sender, haptic_name_owner_changed);
@@ -545,7 +543,7 @@ static DBusMessage *edbus_save_binary(E_DBus_Object *obj, DBusMessage *msg)
 	DBusMessageIter iter;
 	DBusMessage *reply;
 	unsigned char *data;
-	unsigned char *path;
+	char *path;
 	int size, ret;
 
 	if (!CHECK_VALID_OPS(h_ops, ret))
@@ -584,53 +582,6 @@ static DBusMessage *edbus_show_handle_list(E_DBus_Object *obj, DBusMessage *msg)
 	return dbus_message_new_method_return(msg);
 }
 
-static unsigned char* convert_file_to_buffer(const char *file_name, int *size)
-{
-	FILE *pf;
-	long file_size;
-	unsigned char *pdata = NULL;
-
-	if (!file_name)
-		return NULL;
-
-	/* Get File Stream Pointer */
-	pf = fopen(file_name, "rb");
-	if (!pf) {
-		_E("fopen failed : %s", strerror(errno));
-		return NULL;
-	}
-
-	if (fseek(pf, 0, SEEK_END))
-		goto error;
-
-	file_size = ftell(pf);
-	if (fseek(pf, 0, SEEK_SET))
-		goto error;
-
-	if (file_size < 0)
-		goto error;
-
-	pdata = (unsigned char*)malloc(file_size);
-	if (!pdata)
-		goto error;
-
-	if (fread(pdata, 1, file_size, pf) != file_size)
-		goto err_free;
-
-	fclose(pf);
-	*size = file_size;
-	return pdata;
-
-err_free:
-	free(pdata);
-
-error:
-	fclose(pf);
-
-	_E("failed to convert file to buffer (%s)", strerror(errno));
-	return NULL;
-}
-
 static int haptic_internal_init(void)
 {
 	int r;
@@ -649,8 +600,7 @@ static int haptic_internal_exit(void)
 
 static int haptic_hardkey_changed_cb(void *data)
 {
-	int size, level, status, e_handle, ret;
-	unsigned char *buf;
+	int level, status, e_handle, ret;
 
 	if (!CHECK_VALID_OPS(h_ops, ret)) {
 		ret = haptic_module_load();
@@ -691,6 +641,7 @@ static int haptic_hardkey_changed_cb(void *data)
 static int haptic_poweroff_cb(void *data)
 {
 	int e_handle, ret;
+	struct timespec time = {0,};
 
 	if (!CHECK_VALID_OPS(h_ops, ret)) {
 		ret = haptic_module_load();
@@ -710,7 +661,8 @@ static int haptic_poweroff_cb(void *data)
 	}
 
 	/* sleep for vibration */
-	usleep(POWER_OFF_VIB_DURATION*1000);
+	time.tv_nsec = POWER_OFF_VIB_DURATION * NANO_SECOND_MULTIPLIER;
+	nanosleep(&time, NULL);
 	return 0;
 }
 
@@ -729,10 +681,13 @@ static void sound_capturing_cb(keynode_t *key, void *data)
 
 static int parse_section(struct parse_result *result, void *user_data, int index)
 {
-	struct haptic_config *conf = (struct haptic_config*)user_data;
+	struct haptic_config *conf = (struct haptic_config *)user_data;
 
-	assert(result);
-	assert(result->section && result->name && result->value);
+	if (!result)
+		return 0;
+
+	if (!result->section || !result->name || !result->value)
+		return 0;
 
 	if (MATCH(result->name, "level")) {
 		conf->level = atoi(result->value);
@@ -752,10 +707,10 @@ static int parse_section(struct parse_result *result, void *user_data, int index
 
 static int haptic_load_config(struct parse_result *result, void *user_data)
 {
-	struct haptic_config *conf = (struct haptic_config*)user_data;
+	struct haptic_config *conf = (struct haptic_config *)user_data;
 	char name[NAME_MAX];
 	int ret;
-	static int index = 0;
+	static int index;
 
 	if (!result)
 		return 0;

@@ -141,7 +141,7 @@ int remove_dir(const char *path, int del_dir);
 int sys_check_node(char *path);
 int sys_get_int(char *fname, int *val);
 int sys_set_int(char *fname, int val);
-int terminate_process(const char* partition, bool force);
+int terminate_process(const char *partition, bool force);
 int mount_check(const char* path);
 void print_time(const char *prefix);
 int manage_notification(char *title, char *content);

@@ -107,7 +107,6 @@ static int extcon_parsing_value(const char *value)
 {
 	char *s, *p;
 	char name[NAME_MAX];
-	struct extcon_ops *dev;
 
 	if (!value)
 		return -EINVAL;
@@ -160,7 +159,8 @@ static int extcon_load_uevent(struct parse_result *result, void *user_data)
 static int get_extcon_init_state(void)
 {
 	DIR *dir;
-	struct dirent *entry;
+	struct dirent entry;
+	struct dirent *result;
 	char node[BUF_MAX];
 	int ret;
 
@@ -172,11 +172,11 @@ static int get_extcon_init_state(void)
 	}
 
 	ret = -ENOENT;
-	while ((entry = readdir(dir))) {
-		if (entry->d_name[0] == '.')
+	while (readdir_r(dir, &entry, &result) == 0 && result != NULL) {
+		if (result->d_name[0] == '.')
 			continue;
 		snprintf(node, sizeof(node), "%s/%s/state",
-				EXTCON_PATH, entry->d_name);
+				EXTCON_PATH, result->d_name);
 		_I("checking node (%s)", node);
 		if (access(node, F_OK) != 0)
 			continue;
@@ -261,6 +261,17 @@ out:
 	return make_reply_message(msg, ret);
 }
 
+static struct uevent_handler uh = {
+	.subsystem = EXTCON_SUBSYSTEM,
+	.uevent_func = uevent_extcon_handler,
+};
+
+static const struct edbus_method edbus_methods[] = {
+	{ "GetStatus", "s",  "i", dbus_get_extcon_status },
+	{ "enable",    "s", NULL, dbus_enable_device },  /* for devicectl */
+	{ "disable",   "s", NULL, dbus_disable_device }, /* for devicectl */
+};
+
 static int extcon_probe(void *data)
 {
 	/**
@@ -276,17 +287,6 @@ static int extcon_probe(void *data)
 	return 0;
 }
 
-static struct uevent_handler uh = {
-	.subsystem = EXTCON_SUBSYSTEM,
-	.uevent_func = uevent_extcon_handler,
-};
-
-static const struct edbus_method edbus_methods[] = {
-	{ "GetStatus", "s",  "i", dbus_get_extcon_status },
-	{ "enable",    "s", NULL, dbus_enable_device },  /* for devicectl */
-	{ "disable",   "s", NULL, dbus_disable_device }, /* for devicectl */
-};
-
 static void extcon_init(void *data)
 {
 	int ret;
@@ -296,6 +296,7 @@ static void extcon_init(void *data)
 	if (!extcon_list)
 		return;
 
+	/* initialize extcon devices */
 	DD_LIST_FOREACH(extcon_list, l, dev) {
 		_I("[extcon] init (%s)", dev->name);
 		if (dev->init)
@@ -312,6 +313,7 @@ static void extcon_init(void *data)
 	if (ret < 0)
 		_E("fail to init extcon nodes : %d", ret);
 
+	/* register extcon object first */
 	ret = register_edbus_interface_and_method(DEVICED_PATH_EXTCON,
 			DEVICED_INTERFACE_EXTCON,
 			edbus_methods, ARRAY_SIZE(edbus_methods));
@@ -330,6 +332,7 @@ static void extcon_exit(void *data)
 	if (ret < 0)
 		_E("fail to unregister extcon uevent : %d", ret);
 
+	/* deinitialize extcon devices */
 	DD_LIST_FOREACH(extcon_list, l, dev) {
 		_I("[extcon] deinit (%s)", dev->name);
 		if (dev->exit)

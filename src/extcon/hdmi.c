@@ -49,9 +49,6 @@ static void hdmi_send_broadcast(int status)
 
 static int hdmi_update(int status)
 {
-	int val;
-	int ret;
-
 	_I("jack - hdmi changed %d", status);
 	pm_change_internal(getpid(), LCD_NORMAL);
 	vconf_set_int(VCONFKEY_SYSMAN_HDMI, status);
@@ -68,7 +65,7 @@ static int hdmi_update(int status)
 static int display_changed(void *data)
 {
 	enum state_t state;
-	int hdmi = 0;
+	int hdmi;
 
 	if (!data)
 		return 0;
@@ -79,7 +76,7 @@ static int display_changed(void *data)
 
 	hdmi = hdmi_extcon_ops.status;
 	if (hdmi == 0) {
-		pm_lock_internal(getpid(), LCD_DIM, STAY_CUR_STATE, 0);
+		pm_lock_internal(INTERNAL_LOCK_HDMI, LCD_DIM, STAY_CUR_STATE, 0);
 		_I("hdmi is connected! dim lock is on.");
 	}
 	return 0;

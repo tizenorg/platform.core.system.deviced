@@ -66,10 +66,10 @@
 static const char default_rtc0[] = "/dev/rtc0";
 static const char default_rtc1[] = "/dev/rtc1";
 
-static const time_t default_time = 2147483645; // max(32bit) -3sec
-static Ecore_Fd_Handler *tfdh = NULL; // tfd change noti
+static const time_t default_time = 2147483645; /* max(32bit) -3sec */
+static Ecore_Fd_Handler *tfdh; /* tfd change noti */
 
-static Eina_Bool tfd_cb(void *data, Ecore_Fd_Handler * fd_handler);
+static Eina_Bool tfd_cb(void *data, Ecore_Fd_Handler *fd_handler);
 static int timerfd_check_stop(int fd);
 static int timerfd_check_start(void);
 
@@ -146,7 +146,6 @@ int handle_date(char *str)
 {
 	long int tmp = 0;
 	time_t timet = 0;
-	time_t before = 0;
 
 	if (str == NULL)
 		return -1;
@@ -211,23 +210,25 @@ static void time_changed_broadcast(void)
 static int timerfd_check_start(void)
 {
 	int tfd;
+	int ret;
 	struct itimerspec tmr;
 
-	if ((tfd = timerfd_create(CLOCK_REALTIME,TFD_NONBLOCK|TFD_CLOEXEC)) == -1) {
+	tfd = timerfd_create(CLOCK_REALTIME, TFD_NONBLOCK|TFD_CLOEXEC);
+	if (tfd == -1) {
 		_E("error timerfd_create() %d", errno);
 		tfdh = NULL;
 		return -1;
 	}
 
-	tfdh = ecore_main_fd_handler_add(tfd,ECORE_FD_READ,tfd_cb,NULL,NULL,NULL);
+	tfdh = ecore_main_fd_handler_add(tfd, ECORE_FD_READ, tfd_cb, NULL, NULL, NULL);
 	if (!tfdh) {
 		_E("error ecore_main_fd_handler_add");
 		return -1;
 	}
 	memset(&tmr, 0, sizeof(tmr));
 	tmr.it_value.tv_sec = default_time;
-
-	if (timerfd_settime(tfd,TFD_TIMER_ABSTIME|TFD_TIMER_CANCELON_SET,&tmr,NULL) < 0) {
+	ret = timerfd_settime(tfd, TFD_TIMER_ABSTIME|TFD_TIMER_CANCELON_SET, &tmr, NULL);
+	if (ret < 0) {
 		_E("error timerfd_settime() %d", errno);
 		return -1;
 	}
@@ -240,30 +241,32 @@ static int timerfd_check_stop(int tfd)
 		ecore_main_fd_handler_del(tfdh);
 		tfdh = NULL;
 	}
-	if (tfd >=0) {
+	if (tfd >= 0) {
 		close(tfd);
 		tfd = -1;
 	}
 	return 0;
 }
 
-static Eina_Bool tfd_cb(void *data, Ecore_Fd_Handler * fd_handler)
+static Eina_Bool tfd_cb(void *data, Ecore_Fd_Handler *fd_handler)
 {
 	int tfd = -1;
 	u_int64_t ticks;
 	int ret = -1;
 
-	if (!ecore_main_fd_handler_active_get(fd_handler,ECORE_FD_READ)) {
+	ret = ecore_main_fd_handler_active_get(fd_handler, ECORE_FD_READ);
+	if (!ret) {
 		_E("error ecore_main_fd_handler_get()");
 		goto out;
 	}
 
-	if((tfd = ecore_main_fd_handler_fd_get(fd_handler)) == -1) {
+	tfd = ecore_main_fd_handler_fd_get(fd_handler);
+	if (tfd == -1) {
 		_E("error ecore_main_fd_handler_fd_get()");
 		goto out;
 	}
 
-	ret = read(tfd,&ticks,sizeof(ticks));
+	ret = read(tfd, &ticks, sizeof(ticks));
 	if (ret < 0 && errno == ECANCELED) {
 		vconf_set_int(VCONFKEY_SYSMAN_STIME, VCONFKEY_SYSMAN_STIME_CHANGED);
 		time_changed_broadcast();
@@ -336,9 +339,10 @@ static int time_lcd_changed_cb(void *data)
 	int tfd = -1;
 
 	if (!data)
-		return 0;
+		goto out;
 
-	lcd_state = *(int*)data;
+	lcd_state = *(int *)data;
+
 	if (lcd_state < S_LCDOFF)
 		goto restart;
 
@@ -369,9 +373,8 @@ static void time_init(void *data)
 	if (ret < 0)
 		_E("fail to init edbus method(%d)", ret);
 
-	if (timerfd_check_start() == -1) {
+	if (timerfd_check_start() == -1)
 		_E("fail system time change detector init");
-	}
 	register_notifier(DEVICE_NOTIFIER_LCD, time_lcd_changed_cb);
 }
 

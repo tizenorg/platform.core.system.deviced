@@ -45,13 +45,13 @@ static bool is_valid(void)
 
 	dlopen_handle = dlopen(HAPTIC_MODULE_PATH, RTLD_NOW);
 	if (!dlopen_handle) {
-		_E("dlopen failed: %s", dlerror());
+		_E("dlopen failed");
 		goto error;
 	}
 
 	get_haptic_plugin_interface = dlsym(dlopen_handle, "get_haptic_plugin_interface");
 	if (!get_haptic_plugin_interface) {
-		_E("dlsym failed : %s", dlerror());
+		_E("dlsym failed");
 		goto error;
 	}
 
@@ -70,7 +70,7 @@ error:
 		dlopen_handle = NULL;
 	}
 
-	_E("Do not support external haptic device");
+	_I("Do not support external haptic device");
 	return false;
 }
 

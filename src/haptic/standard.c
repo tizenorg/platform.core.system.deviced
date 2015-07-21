@@ -57,17 +57,6 @@ static int ff_fd;
 static dd_list *ff_list;
 static char ff_path[PATH_MAX];
 
-/* for debug */
-static void print_list(void)
-{
-	struct ff_info *temp;
-	dd_list *elem;
-	int i = 0;
-
-	DD_LIST_FOREACH(ff_list, elem, temp)
-		_D("[%d] %x", i++, temp);
-}
-
 static bool check_valid_handle(struct ff_info *info)
 {
 	struct ff_info *temp;
@@ -444,7 +433,7 @@ static int get_device_state(int device_index, int *effect_state)
 {
 	struct ff_info *info;
 	dd_list *elem;
-	int n, status = false;
+	int status = false;
 
 	if (!effect_state)
 		return -EINVAL;

@@ -84,8 +84,6 @@ static int get_control_handler(int argc, char **argv)
 	int i;
 	int pid;
 	int device;
-	bool enable;
-	int ret;
 	const struct device_ops *dev_ops = NULL;
 
 	_I("argc : %d", argc);

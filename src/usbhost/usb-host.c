@@ -148,7 +148,7 @@ static int add_usbhost_list(struct udev_device *dev, const char *devpath)
 	/* allocate new usbhost device */
 	usbhost = calloc(1, sizeof(struct usbhost_device));
 	if (!usbhost) {
-		_E("fail to allocate usbhost memory : %s", strerror(errno));
+		_E("fail to allocate usbhost memory : %d", errno);
 		return -errno;
 	}
 
