@@ -562,11 +562,6 @@ static void process_power_supply(void *data)
 		power_supply_broadcast(CHARGE_NOW_SIGNAL, battery.charge_now);
 	}
 
-	if (!(old.online == battery.online &&
-	    old.charge_now == battery.charge_now &&
-	    old.charge_full == battery.charge_full))
-		return;
-
 	lowbat_execute(data);
 	check_online();
 	if (old.charge_full != battery.charge_full)
@@ -633,12 +628,35 @@ static void uevent_power_handler(struct udev_device *dev)
 	process_power_supply(&battery.capacity);
 }
 
+static int lowbat_read(int *val)
+{
+	int r;
+
+	if (!val)
+		return -EINVAL;
+
+	r = sys_get_int("/sys/class/power_supply/battery/capacity", val);
+	if (r < 0)
+		return r;
+
+	return 0;
+}
+
 static void power_supply_status_init(void)
 {
 	static int charge_now = -1;
 	static int charge_full = -1;
 	static int capacity = -1;
+	int pct;
+	int r;
 
+	r = lowbat_read(&pct);
+	if (r < 0) {
+		_E("fail to read capacity data : %d", r);
+		return;
+	}
+
+	battery.capacity = pct;
 	battery.health = HEALTH_GOOD;
 	battery.ovp = OVP_NORMAL;
 	battery.present = PRESENT_NORMAL;

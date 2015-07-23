@@ -413,8 +413,8 @@ static DBusMessage *edbus_setbrightness(E_DBus_Object *obj, DBusMessage *msg)
 	}
 
 	if (autobrt == SETTING_BRIGHTNESS_AUTOMATIC_ON) {
-		_D("auto_brightness state is ON, can not change the brightness value");
-		ret = 0;
+		_E("auto_brightness state is ON, can not change the brightness value");
+		ret = -EPERM;
 		goto error;
 	}
 
@@ -1006,10 +1006,7 @@ static void sim_signal_handler(void *data, DBusMessage *msg)
 	}
 
 	if (val != SIM_CARD_NOT_PRESENT) {
-		/* change setting : autobrightness on */
 		state = true;
-		vconf_set_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT,
-		    SETTING_BRIGHTNESS_AUTOMATIC_ON);
 		vconf_set_int(VCONFKEY_SETAPPL_LCD_BRIGHTNESS,
 		    PM_DEFAULT_BRIGHTNESS);
 		_I("SIM card is inserted at first!");
