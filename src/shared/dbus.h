@@ -35,6 +35,13 @@
  */
 
 /*
+ * DBus daemon
+ */
+#define DBUS_BUS_NAME                       "org.freedesktop.DBus"
+#define DBUS_OBJECT_PATH                    "/org/freedesktop/DBus"
+#define DBUS_INTERFACE_NAME                 DBUS_BUS_NAME
+
+/*
  * Device daemon
  */
 #define DEVICED_BUS_NAME                    "org.tizen.system.deviced"

@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <dbus/dbus.h>
 #include <shared/dbus.h>
 #include <core/common.h>
@@ -99,9 +100,7 @@ static int stop_device(char **args)
 
 static int dump_mode(char **args)
 {
-	DBusError err;
-	DBusMessage *msg;
-	int ret, val;
+	int ret;
 	char *arr[1];
 
 	if (!args[1] || !args[2] || !args[3])
@@ -110,37 +109,120 @@ static int dump_mode(char **args)
 	printf("%s (%s %s)!\n", args[1], args[2], args[3]);
 
 	arr[0] = args[3];
-	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
+	ret = dbus_method_async(DEVICED_BUS_NAME,
 		    devices[arg_id].path, devices[arg_id].iface,
 		    "Dumpmode", "s", arr);
-	if (!msg)
-		return -EBADMSG;
+	if (ret < 0)
+		printf("failed to set dump mode (%d)", ret);
 
-	dbus_error_init(&err);
-
-	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &val, DBUS_TYPE_INVALID);
-	if (!ret) {
-		printf("no message : [%s:%s]", err.name, err.message);
-		dbus_error_free(&err);
-		val = -ENOMSG;
-	}
-
-	dbus_message_unref(msg);
-	return val;
+	return ret;
 }
 
 static int save_log(char **args)
 {
-	DBusMessage *msg;
+	int ret;
 
 	if (!args[1])
 		return -EINVAL;
 
 	printf("save log %s device!\n", args[1]);
 
-	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
+	ret = dbus_method_async(DEVICED_BUS_NAME,
 		    devices[arg_id].path, devices[arg_id].iface,
 		    "SaveLog", NULL, NULL);
+	if (ret < 0)
+		printf("failed to save log (%d)", ret);
+
+	return ret;
+}
+
+static void get_pname(pid_t pid, char *pname)
+{
+	char buf[PATH_MAX];
+	int cmdline, r;
+
+	snprintf(buf, PATH_MAX, "/proc/%d/cmdline", pid);
+	cmdline = open(buf, O_RDONLY);
+	if (cmdline < 0) {
+		pname[0] = '\0';
+		return;
+	}
+
+	r = read(cmdline, pname, PATH_MAX);
+	if ((r >= 0) && (r < PATH_MAX))
+		pname[r] = '\0';
+	else
+		pname[0] = '\0';
+
+	close(cmdline);
+}
+
+static int save_dbus_name(char **args)
+{
+	DBusMessage *msg;
+	unsigned char **list;
+	int ret, size, i;
+	pid_t pid;
+	char *arr[1];
+	char pname[PATH_MAX];
+
+	if (!args[1])
+		return -EINVAL;
+
+	printf("save dbus name!\n");
+
+	msg = dbus_method_sync_with_reply(DBUS_BUS_NAME,
+	    DBUS_OBJECT_PATH, DBUS_INTERFACE_NAME,
+	    "ListNames", NULL, NULL);
+	if (!msg) {
+		printf("failed to get list names");
+		return -EBADMSG;
+	}
+
+	ret = dbus_message_get_args(msg, NULL, DBUS_TYPE_ARRAY,
+	    DBUS_TYPE_STRING, &list, &size, DBUS_TYPE_INVALID);
+	dbus_message_unref(msg);
+	if (!ret) {
+		printf("invalid list name arguments!");
+		return -EINVAL;
+	}
+
+	printf("%d connections\n", size);
+
+	for (i = 0; i < size; i++) {
+		arr[0] = list[i];
+		msg = dbus_method_sync_with_reply(DBUS_BUS_NAME,
+		    DBUS_OBJECT_PATH, DBUS_INTERFACE_NAME,
+		    "GetConnectionUnixProcessID", "s", arr);
+		if (!msg)
+			continue;
+
+		ret = dbus_message_get_args(msg, NULL, DBUS_TYPE_UINT32,
+		    &pid, DBUS_TYPE_INVALID);
+		dbus_message_unref(msg);
+		if (!ret)
+			continue;
+
+		get_pname(pid, pname);
+		printf("%6d  %6s  %s\n", pid, list[i], pname);
+
+	}
+
+	return 0;
+}
+
+static int device_list(char **args)
+{
+	DBusMessage *msg;
+
+	if (!args[1])
+		return -EINVAL;
+
+	printf("print %s to dlog!\n", args[1]);
+
+	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
+		    devices[arg_id].path, devices[arg_id].iface,
+		    "DeviceList", NULL, NULL);
 	if (!msg)
 		return -EBADMSG;
 
@@ -219,6 +301,8 @@ static const struct action {
 	{ DEVICE_DISPLAY,   "savelog",         3, save_log,          ""            },
 	{ DEVICE_USB,       "set",             4, set_usb_mode,      "[sdb|ssh]"   },
 	{ DEVICE_USB,       "unset",           4, unset_usb_mode,    "[sdb|ssh]"   },
+	{ DEVICE_CORE,      "dbusname",        3, save_dbus_name,    ""            },
+	{ DEVICE_CORE,      "devicelist",      3, device_list,       ""            },
 	{ DEVICE_EXTCON,    "enable",          4, enable_device,     "[USB|HEADPHONE|HDMI|DOCK]" },
 	{ DEVICE_EXTCON,    "disable",         4, disable_device,    "[USB|HEADPHONE|HDMI|DOCK]" },
 };

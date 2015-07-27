@@ -70,6 +70,7 @@ BuildRequires:  pkgconfig(sensor)
 BuildRequires:  pkgconfig(tapi)
 %endif
 
+Requires: %{name}-tools = %{version}-%{release}
 %{?systemd_requires}
 Requires(post): /usr/bin/vconftool
 
@@ -86,7 +87,6 @@ deviced daemon.
 %package tools
 Summary:  Deviced tools
 Group:    System/Utilities
-Requires: %{name} = %{version}-%{release}
 
 %description tools
 Deviced helper programs

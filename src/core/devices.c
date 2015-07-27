@@ -23,6 +23,7 @@
 #include "list.h"
 #include "common.h"
 #include "devices.h"
+#include "edbus-handler.h"
 
 static const struct device_ops default_ops = {
 	.name = "default-ops",
@@ -62,10 +63,27 @@ int check_default(const struct device_ops *dev)
 	return (dev == &default_ops);
 }
 
+static DBusMessage *edbus_device_list(E_DBus_Object *obj, DBusMessage *msg)
+{
+	dd_list *elem;
+	const struct device_ops *dev;
+
+	_I("device list!");
+	DD_LIST_FOREACH(dev_head, elem, dev)
+		_I("%s", dev->name);
+
+	return dbus_message_new_method_return(msg);
+}
+
+static const struct edbus_method edbus_methods[] = {
+	{ "DeviceList",          NULL,        NULL,        edbus_device_list },
+};
+
 void devices_init(void *data)
 {
 	dd_list *elem, *elem_n;
 	const struct device_ops *dev;
+	int ret;
 
 	DD_LIST_FOREACH_SAFE(dev_head, elem, elem_n, dev) {
 		if (dev->probe && dev->probe(data) != 0) {
@@ -78,6 +96,11 @@ void devices_init(void *data)
 		if (dev->init)
 			dev->init(data);
 	}
+
+	ret = register_edbus_method(DEVICED_PATH_CORE,
+		    edbus_methods, ARRAY_SIZE(edbus_methods));
+	if (ret < 0)
+		_E("Failed to register edbus method! %d", ret);
 }
 
 void devices_exit(void *data)
