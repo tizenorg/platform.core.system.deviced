@@ -20,8 +20,13 @@
 #ifndef __TOUCH_KEY_H__
 #define __TOUCH_KEY_H__
 
-void process_touchkey_press(void);
-void process_touchkey_release(void);
-void process_touchkey_enable(bool enable);
+#define TOUCHLED_NAME   "touchled"
+
+enum touchled_opt {
+	TOUCHLED_PRESS,
+	TOUCHLED_RELEASE,
+	TOUCHLED_DIRECT_ON,
+	TOUCHLED_DIRECT_OFF,
+};
 
 #endif

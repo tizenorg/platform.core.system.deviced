@@ -81,6 +81,7 @@ static int menu_pressed = false;
 static bool touch_pressed = false;
 static int skip_lcd_off = false;
 static bool powerkey_pressed = false;
+static struct device_ops *touchled;
 
 static inline int current_state_in_on(void)
 {
@@ -461,6 +462,8 @@ static void sound_vibrate_hardkey(void)
 
 static void process_hardkey_backlight(struct input_event *pinput)
 {
+	int opt;
+
 	_E("pinput->value : %d", pinput->value);
 	if (pinput->value == KEY_PRESSED) {
 		if (touch_pressed) {
@@ -472,7 +475,10 @@ static void process_hardkey_backlight(struct input_event *pinput)
 		    || get_lock_screen_bg_state())
 			sound_vibrate_hardkey();
 
-		process_touchkey_press();
+		if (touchled && touchled->execute) {
+			opt = TOUCHLED_PRESS;
+			touchled->execute(&opt);
+		}
 	} else if (pinput->value == KEY_RELEASED) {
 		/* if lockscreen is idle lock */
 		if (get_lock_screen_state() == VCONFKEY_IDLE_LOCK) {
@@ -480,7 +486,10 @@ static void process_hardkey_backlight(struct input_event *pinput)
 			return;
 		}
 
-		process_touchkey_release();
+		if (touchled && touchled->execute) {
+			opt = TOUCHLED_RELEASE;
+			touchled->execute(&opt);
+		}
 	}
 }
 
@@ -639,11 +648,23 @@ static void keyfilter_init(void)
 {
 	display_add_actor(&display_powerkey_actor);
 	display_add_actor(&display_menukey_actor);
+
+	touchled = find_device(TOUCHLED_NAME);
 }
 
 static void key_backlight_enable(bool enable)
 {
-	process_touchkey_enable(enable);
+	int opt;
+
+	if (!touchled || !touchled->execute)
+		return;
+
+	if (enable)
+		opt = TOUCHLED_DIRECT_ON;
+	else
+		opt = TOUCHLED_DIRECT_OFF;
+
+	touchled->execute(&opt);
 }
 
 static const struct display_keyfilter_ops normal_keyfilter_ops = {

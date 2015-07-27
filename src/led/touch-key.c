@@ -27,6 +27,7 @@
 #include "core/device-notifier.h"
 #include "display/core.h"
 #include "display/setting.h"
+#include "touch-key.h"
 
 #define KEYBACKLIGHT_TIME_90            90	/* 1.5 second */
 #define KEYBACKLIGHT_TIME_360           360	/* 6 second */
@@ -79,7 +80,7 @@ static Eina_Bool key_backlight_expired(void *data)
 	return ECORE_CALLBACK_CANCEL;
 }
 
-void process_touchkey_press(void)
+static void process_touchkey_press(void)
 {
 	/* release existing timer */
 	if (hardkey_timeout_id > 0) {
@@ -97,7 +98,7 @@ void process_touchkey_press(void)
 		    key_backlight_expired, NULL);
 }
 
-void process_touchkey_release(void)
+static void process_touchkey_release(void)
 {
 	float fduration;
 
@@ -117,7 +118,7 @@ void process_touchkey_release(void)
 		    key_backlight_expired, NULL);
 }
 
-void process_touchkey_enable(bool enable)
+static void process_touchkey_enable(bool enable)
 {
 	/* release existing timer */
 	if (hardkey_timeout_id > 0) {
@@ -281,11 +282,34 @@ static void touchled_exit(void *data)
 	touchled_service_free();
 }
 
+static int touchled_execute(void *data)
+{
+	int opt;
+
+	if (!data)
+		return -EINVAL;
+
+	opt = *(int *)data;
+	if (opt == TOUCHLED_PRESS)
+		process_touchkey_press();
+	else if (opt == TOUCHLED_RELEASE)
+		process_touchkey_release();
+	else if (opt == TOUCHLED_DIRECT_ON)
+		process_touchkey_enable(true);
+	else if (opt == TOUCHLED_DIRECT_OFF)
+		process_touchkey_enable(false);
+	else
+		return -EINVAL;
+
+	return 0;
+}
+
 static const struct device_ops touchled_device_ops = {
-	.name     = "touchled",
+	.name     = TOUCHLED_NAME,
 	.probe    = touchled_probe,
 	.init     = touchled_init,
 	.exit     = touchled_exit,
+	.execute  = touchled_execute,
 };
 
 DEVICE_OPS_REGISTER(&touchled_device_ops)
