@@ -1604,6 +1604,7 @@ static int default_action(int timeout)
 	if (pm_cur_state != pm_old_state && pm_cur_state != S_SLEEP) {
 		if (power_ops.get_power_lock_support())
 			power_ops.power_lock();
+		set_setting_pmstate(pm_cur_state);
 		device_notify(DEVICE_NOTIFIER_LCD, &pm_cur_state);
 	}
 
