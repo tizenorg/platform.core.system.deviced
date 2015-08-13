@@ -137,6 +137,7 @@ SET(PKG_MODULES
 	libudev
 	device-node
 	capi-base-common
+	dbus-1
 	gio-2.0
 	libtzplatform-config
 	notification
