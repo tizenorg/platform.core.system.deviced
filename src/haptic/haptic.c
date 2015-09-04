@@ -179,7 +179,7 @@ static void haptic_name_owner_changed(const char *sender, void *data)
 		return;
 
 	for (n = info->handle_list; n; n = n->next) {
-		handle = n->data;
+		handle = (int)n->data;
 		h_ops->stop_device(handle);
 		h_ops->close_device(handle);
 	}

@@ -2,6 +2,7 @@
 #These options are DEACTIVATED by default.
 %bcond_with x
 %bcond_with wayland
+%bcond_with emulator
 
 # display, extcon, power, usb are always enable
 %define battery_module off
@@ -202,10 +203,10 @@ Haptic Device manager library for device control (devel)
 
 %prep
 %setup -q
-%ifarch %{arm}
-%define ARCH arm
-%else
+%if %{with emulator}
 %define ARCH emulator
+%else
+%define ARCH arm
 %endif
 
 %define DPMS none

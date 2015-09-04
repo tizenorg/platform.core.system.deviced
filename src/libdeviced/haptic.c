@@ -297,7 +297,7 @@ API int haptic_vibrate_monotone_with_detail(haptic_device_h device_handle,
 	if (ret < 0)
 		return HAPTIC_ERROR_OPERATION_FAILED;
 
-	if (effect_handle >= 0)
+	if (effect_handle)
 		*effect_handle = (haptic_effect_h)ret;
 
 	return HAPTIC_ERROR_NONE;
