@@ -194,9 +194,6 @@ static int setting_cb(keynode_t *key_nodes, void *data)
 	keynode_t *tmp = key_nodes;
 	int index;
 
-	if (!data)
-		return -EINVAL;
-
 	index = (int)((intptr_t)data);
 	if (index > SETTING_END) {
 		_E("Unknown setting key: %s, idx=%d",
