@@ -231,10 +231,17 @@ static void signal_device_changed(struct block_device *bdev)
 			"issssssisib", arr);
 }
 
-static char *generate_mount_path(const char *fs_uuid_enc)
+static char *generate_mount_path(struct block_data *data)
 {
 	const char *str;
-	str = tzplatform_mkpath(TZ_SYS_STORAGE, fs_uuid_enc);
+
+        /* For libstorage API
+	 * If it's a primary partition and mmc device,
+         * use /opt/storage/sdcard as mount point. */
+        if (data != NULL && data->primary && data->block_type == BLOCK_MMC_DEV)
+		str = tzplatform_mkpath(TZ_SYS_STORAGE, "sdcard");
+	else
+		str = tzplatform_mkpath(TZ_SYS_STORAGE, data->fs_uuid_enc);
 	if (!str)
 		return NULL;
 	return strdup(str);
@@ -297,10 +304,8 @@ static struct block_data *make_block_data(const char *devnode,
 		data->fs_type = strdup(fs_type);
 	if (fs_version)
 		data->fs_version = strdup(fs_version);
-	if (fs_uuid_enc) {
+	if (fs_uuid_enc)
 		data->fs_uuid_enc = strdup(fs_uuid_enc);
-		data->mount_point = generate_mount_path(fs_uuid_enc);
-	}
 	if (readonly)
 		data->readonly = atoi(readonly);
 	data->primary = check_primary_partition(devnode);
@@ -312,6 +317,8 @@ static struct block_data *make_block_data(const char *devnode,
 		data->block_type = BLOCK_SCSI_DEV;
 	else
 		data->block_type = -1;
+
+	data->mount_point = generate_mount_path(data);
 
 	return data;
 }
@@ -359,14 +366,14 @@ static int update_block_data(struct block_data *data,
 	data->fs_uuid_enc = NULL;
 	free(data->mount_point);
 	data->mount_point = NULL;
-	if (fs_uuid_enc) {
+	if (fs_uuid_enc)
 		data->fs_uuid_enc = strdup(fs_uuid_enc);
-		data->mount_point = generate_mount_path(fs_uuid_enc);
-	}
 
 	data->readonly = false;
 	if (readonly)
 		data->readonly = atoi(readonly);
+
+	data->mount_point = generate_mount_path(data);
 
 	return 0;
 }
@@ -748,7 +755,7 @@ int change_mount_point(const char *devnode,
 	if (mount_point)
 		data->mount_point = strdup(mount_point);
 	else
-		data->mount_point = generate_mount_path(data->fs_uuid_enc);
+		data->mount_point = generate_mount_path(data);
 
 	return 0;
 }
