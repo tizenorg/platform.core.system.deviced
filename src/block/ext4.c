@@ -129,9 +129,10 @@ static int ext4_mount(bool smack, const char *devpath, const char *mount_point)
 {
 	int r, retry = RETRY_COUNT;
 	struct timespec time = {0,};
+	unsigned long mountflags = 0;
 
 	do {
-		r = mount(devpath, mount_point, "ext4", 0, NULL);
+		r = mount(devpath, mount_point, "ext4", mountflags, NULL);
 		if (!r) {
 			_I("Mounted mmc card [ext4]");
 			if (smack) {
@@ -143,7 +144,9 @@ static int ext4_mount(bool smack, const char *devpath, const char *mount_point)
 		_I("mount fail : r = %d, err = %d", r, errno);
 		time.tv_nsec = 100 * NANO_SECOND_MULTIPLIER;
 		nanosleep(&time, NULL);
-	} while (r < 0 && errno == ENOENT && retry-- > 0);
+		if (r < 0 && errno == EROFS)
+			mountflags |= MS_RDONLY;
+	} while (r < 0 && (errno == ENOENT || errno == EROFS) && retry-- > 0);
 
 	return -errno;
 }
