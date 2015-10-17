@@ -256,30 +256,6 @@ rm -rf %{buildroot}
 #memory type vconf key init
 users_gid=$(getent group %{TZ_SYS_USER_GROUP} | cut -f3 -d':')
 
-vconftool set -t int memory/sysman/usbhost_status -1 -i
-vconftool set -t int memory/sysman/mmc -1 -i
-vconftool set -t int memory/sysman/earjack_key 0 -i
-vconftool set -t int memory/sysman/charger_status -1 -i
-vconftool set -t int memory/sysman/charge_now -1 -i
-vconftool set -t int memory/sysman/battery_status_low -1 -i
-vconftool set -t int memory/sysman/battery_capacity -1 -i
-vconftool set -t int memory/sysman/usb_status -1 -i
-vconftool set -t int memory/sysman/earjack -1 -i
-vconftool set -t int memory/sysman/mmc_mount -1 -i
-vconftool set -t int memory/sysman/mmc_format -1 -i
-vconftool set -t int memory/sysman/mmc_format_progress 0 -i
-vconftool set -t int memory/sysman/power_off 0 -g "$users_gid" -i -f
-vconftool set -t int memory/sysman/battery_level_status -1 -i
-vconftool set -t int memory/sysman/hdmi 0 -i
-vconftool set -t int memory/sysman/stime_changed 0 -i
-
-vconftool set -t int memory/pm/state 0 -i -g "$users_gid"
-vconftool set -t int memory/pm/battery_timetofull -1 -i
-vconftool set -t int memory/pm/battery_timetoempty -1 -i
-vconftool set -t int memory/pm/custom_brightness_status 0 -i -g "$users_gid"
-vconftool set -t bool memory/pm/brt_changed_lpm 0 -i
-vconftool set -t int memory/pm/current_brt 60 -i -g "$users_gid"
-
 systemctl daemon-reload
 if [ "$1" == "1" ]; then
     systemctl restart deviced.service
