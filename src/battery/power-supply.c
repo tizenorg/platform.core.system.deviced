@@ -459,13 +459,13 @@ static void check_online(void)
 {
 	static int old_online;
 
-	if (battery.online > POWER_SUPPLY_TYPE_BATTERY &&
+	if (battery.online == POWER_SUPPLY_ONLINE &&
 	    old_online == VCONFKEY_SYSMAN_CHARGER_DISCONNECTED) {
 		old_online = VCONFKEY_SYSMAN_CHARGER_CONNECTED;
 		vconf_set_int(VCONFKEY_SYSMAN_CHARGER_STATUS, old_online);
 		power_supply_broadcast(CHARGER_STATUS_SIGNAL, old_online);
 		check_power_supply(old_online);
-	} else if (battery.online <= POWER_SUPPLY_TYPE_BATTERY &&
+	} else if (battery.online == POWER_SUPPLY_OFFLINE &&
 	    old_online == VCONFKEY_SYSMAN_CHARGER_CONNECTED) {
 		old_online = VCONFKEY_SYSMAN_CHARGER_DISCONNECTED;
 		vconf_set_int(VCONFKEY_SYSMAN_CHARGER_STATUS, old_online);
@@ -535,6 +535,8 @@ static void check_online_status(const char *env_value)
 	if (env_value == NULL)
 		return;
 	battery.online = atoi(env_value);
+	// From the kernel driver, the kernel driver return 0 (OFFLINE) or 1 (ONLINE) for POWER_SUPPLY_PROP_ONLINE
+	_I("battery charge online status - %d", battery.online);
 }
 
 static void check_present_status(const char *env_value)
@@ -619,7 +621,7 @@ static void uevent_power_handler(struct udev_device *dev)
 
 	ret = booting_done(NULL);
 	if (ret) {
-		if (battery.online > POWER_SUPPLY_TYPE_BATTERY)
+		if (battery.online == POWER_SUPPLY_ONLINE )
 			power_supply_noti(DEVICE_NOTI_BATT_CHARGE, DEVICE_NOTI_ON);
 		else
 			power_supply_noti(DEVICE_NOTI_BATT_CHARGE, DEVICE_NOTI_OFF);
@@ -880,7 +882,7 @@ static DBusMessage *dbus_power_supply_handler(E_DBus_Object *obj, DBusMessage *m
 		battery.present,
 		battery.temp);
 
-	if (battery.online > POWER_SUPPLY_TYPE_BATTERY)
+	if (battery.online == POWER_SUPPLY_ONLINE)
 		power_supply_noti(DEVICE_NOTI_BATT_CHARGE, DEVICE_NOTI_ON);
 	else
 		power_supply_noti(DEVICE_NOTI_BATT_CHARGE, DEVICE_NOTI_OFF);

@@ -500,8 +500,15 @@ static int lowbat_process(int bat_percent, void *ad)
 
 	device_notify(DEVICE_NOTIFIER_LOWBAT, (void *)low_bat);
 
-	if (battery.online == POWER_SUPPLY_TYPE_UNKNOWN)
+	// below code is totally wrong.
+	//
+	// if (battery.online == POWER_SUPPLY_TYPE_UNKNOWN)
+	//
+	// Linux kernel give the "POWER_SUPPLY_TYPE" with "POWER_SUPPLY_NAME"
+	// Thus, I changed this code to check offline
+	if (battery.online == POWER_SUPPLY_ONLINE)
 		goto exit;
+
 	if (cur_bat_state == new_bat_state &&
 	    online == battery.online)
 		goto exit;
