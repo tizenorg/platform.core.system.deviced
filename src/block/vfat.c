@@ -105,6 +105,7 @@ static int vfat_mount(bool smack, const char *devpath, const char *mount_point)
 	char options[NAME_MAX];
 	int r, retry = RETRY_COUNT;
 	struct timespec time = {0,};
+	unsigned long mountflags = 0;
 
 	if (smack)
 		snprintf(options, sizeof(options), "%s,%s", FS_VFAT_MOUNT_OPT, SMACKFS_MOUNT_OPT);
@@ -112,7 +113,7 @@ static int vfat_mount(bool smack, const char *devpath, const char *mount_point)
 		snprintf(options, sizeof(options), "%s", FS_VFAT_MOUNT_OPT);
 
 	do {
-		r = mount(devpath, mount_point, "vfat", 0, options);
+		r = mount(devpath, mount_point, "vfat", mountflags, options);
 		if (!r) {
 			_I("Mounted mmc card [vfat]");
 			return 0;
@@ -120,7 +121,9 @@ static int vfat_mount(bool smack, const char *devpath, const char *mount_point)
 		_I("mount fail : r = %d, err = %d", r, errno);
 		time.tv_nsec = 100 * NANO_SECOND_MULTIPLIER;
 		nanosleep(&time, NULL);
-	} while (r < 0 && errno == ENOENT && retry-- > 0);
+		if (r < 0 && errno == EROFS)
+			mountflags |= MS_RDONLY;
+	} while (r < 0 && (errno == ENOENT || errno == EROFS) && retry-- > 0);
 
 	return -errno;
 }
