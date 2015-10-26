@@ -942,6 +942,20 @@ error:
 	return reply;
 }
 
+static DBusMessage *edbus_getcustombrightness(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int status = 0;
+
+	status = backlight_ops.get_custom_status();
+
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &status);
+	return reply;
+}
+
 static const struct edbus_method edbus_methods[] = {
 	{ "start",           NULL,  NULL, edbus_start },
 	{ "stop",            NULL,  NULL, edbus_stop },
@@ -972,6 +986,8 @@ static const struct edbus_method edbus_methods[] = {
 	{ "StayTouchScreenOff","i",  "i", edbus_staytouchscreenoff },
 	{ "LCDPanelOffMode",  "i",   "i", edbus_lcdpaneloffmode },
 	{ "ActorControl",   "sii",   "i", edbus_actorcontrol },
+	{ "CustomBrightness", NULL,  "i", edbus_getcustombrightness },
+	{ "CurrentBrightness", NULL, "i", edbus_getbrightness }, /* deprecated. It is remained for tizen 2.4 */
 	/* Add methods here */
 };
 
