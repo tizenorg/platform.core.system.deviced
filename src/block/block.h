@@ -79,6 +79,7 @@ struct block_data {
 	char *mount_point;
 	enum mount_state state;
 	bool primary;   /* the first partition */
+	int flags;
 };
 
 struct block_dev_ops {
@@ -103,5 +104,73 @@ static void __DESTRUCTOR__ block_dev_exit(void) \
 { \
 	remove_block_dev(dev); \
 }
+
+enum block_flags {
+	FLAG_NONE        = 0,
+	UNMOUNT_UNSAFE   = 1 << 0,
+	FS_BROKEN        = 1 << 1,
+	FS_EMPTY         = 1 << 2,
+	FS_NOT_SUPPORTED = 1 << 3,
+	MOUNT_READONLY   = 1 << 4,
+};
+
+/* a: struct block_data
+ * b: enum block_flags  */
+#define BLOCK_FLAG_SET(a, b) \
+	do { \
+		if (a) { \
+			(((a)->flags) |= (b)); \
+		} \
+	} while (0)
+
+#define BLOCK_FLAG_UNSET(a, b) \
+	do { \
+		if (a) { \
+			(((a)->flags) &= ~(b)); \
+		} \
+	} while (0)
+
+#define BLOCK_IS_FLAG_SET(a, b) \
+	((a) ? ((((a)->flags) & (b)) ? true : false) : false)
+
+#define BLOCK_FLAG_CLEAR_ALL(a) \
+	do { \
+		if (a) { \
+			((a)->flags) = FLAG_NONE; \
+		} \
+	} while (0)
+
+#define BLOCK_FLAG_MOUNT_CLEAR(a) \
+	do { \
+		BLOCK_FLAG_UNSET((a), FS_BROKEN); \
+		BLOCK_FLAG_UNSET((a), FS_EMPTY); \
+		BLOCK_FLAG_UNSET((a), FS_NOT_SUPPORTED); \
+		BLOCK_FLAG_UNSET((a), MOUNT_READONLY); \
+	} while (0)
+
+#define BLOCK_FLAG_UNMOUNT_CLEAR(a) \
+	do { \
+		BLOCK_FLAG_UNSET((a), UNMOUNT_UNSAFE); \
+	} while (0)
+
+#define BLOCK_GET_MOUNT_FLAGS(a, c) \
+	do { \
+		(c) = (a)->flags; \
+		(c) &= ~UNMOUNT_UNSAFE; \
+	} while (0)
+
+#define BLOCK_GET_UNMOUNT_FLAGS(a, c) \
+	do { \
+		(c) = 0; \
+		if (BLOCK_IS_FLAG_SET((a), UNMOUNT_UNSAFE)) \
+			(c) |= UNMOUNT_UNSAFE; \
+	} while (0)
+
+#define BLOCK_GET_FORMAT_FLAGS(a, c) \
+	do { \
+		(c) = 0; \
+		if (BLOCK_IS_FLAG_SET((a), FS_NOT_SUPPORTED)) \
+			(c) |= FS_NOT_SUPPORTED; \
+	} while (0)
 
 #endif /* __BLOCK_H__ */

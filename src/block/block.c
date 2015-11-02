@@ -65,6 +65,7 @@
 #define BLOCK_OBJECT_ADDED      "ObjectAdded"
 #define BLOCK_OBJECT_REMOVED    "ObjectRemoved"
 #define BLOCK_DEVICE_CHANGED    "DeviceChanged"
+#define BLOCK_DEVICE_CHANGED_2  "DeviceChanged2"
 
 #define BLOCK_TYPE_MMC          "mmc"
 #define BLOCK_TYPE_SCSI         "scsi"
@@ -207,21 +208,38 @@ static void broadcast_block_info(enum block_dev_operation op,
 	}
 }
 
-static void signal_device_changed(struct block_device *bdev)
+static void signal_device_changed(struct block_device *bdev,
+		enum block_dev_operation op)
 {
 	struct block_data *data;
-	char *arr[11];
+	char *arr[12];
 	char str_block_type[32];
 	char str_readonly[32];
 	char str_state[32];
 	char str_primary[32];
+	char str_flags[32];
 	char *str_null = "";
 	const char *object_path;
+	int flags;
 
 	if (!bdev || !bdev->data)
 		return;
 
 	data = bdev->data;
+
+	switch (op) {
+	case BLOCK_DEV_MOUNT:
+		BLOCK_GET_MOUNT_FLAGS(data, flags);
+		break;
+	case BLOCK_DEV_UNMOUNT:
+		BLOCK_GET_UNMOUNT_FLAGS(data, flags);
+		break;
+	case BLOCK_DEV_FORMAT:
+		BLOCK_GET_FORMAT_FLAGS(data, flags);
+		break;
+	default:
+		return;
+	}
 
 	/* Broadcast outside with Block iface */
 	snprintf(str_block_type, sizeof(str_block_type),
@@ -243,6 +261,8 @@ static void signal_device_changed(struct block_device *bdev)
 	snprintf(str_primary, sizeof(str_primary),
 			"%d", data->primary);
 	arr[10] = str_primary;
+	snprintf(str_flags, sizeof(str_flags), "%d", flags);
+	arr[11] = str_flags;
 
 	object_path = e_dbus_object_path_get(bdev->object);
 	if (!object_path) {
@@ -253,6 +273,10 @@ static void signal_device_changed(struct block_device *bdev)
 			DEVICED_INTERFACE_BLOCK,
 			BLOCK_DEVICE_CHANGED,
 			"issssssisib", arr);
+	broadcast_edbus_signal(object_path,
+			DEVICED_INTERFACE_BLOCK,
+			BLOCK_DEVICE_CHANGED_2,
+			"issssssisibi", arr);
 }
 
 static char *generate_mount_path(struct block_data *data)
@@ -350,6 +374,7 @@ static struct block_data *make_block_data(const char *devnode,
 		data->block_type = -1;
 
 	data->mount_point = generate_mount_path(data);
+	BLOCK_FLAG_CLEAR_ALL(data);
 
 	return data;
 }
@@ -407,6 +432,7 @@ static int update_block_data(struct block_data *data,
 	if (readonly)
 		data->readonly = atoi(readonly);
 
+	BLOCK_FLAG_MOUNT_CLEAR(data);
 
 	return 0;
 }
@@ -644,7 +670,7 @@ static Eina_Bool pipe_cb(void *data, Ecore_Fd_Handler *fdh)
 	/* Broadcast outside with Block iface */
 	if (pdata.op != BLOCK_DEV_INSERT &&
 		pdata.op != BLOCK_DEV_REMOVE)
-		signal_device_changed(pdata.bdev);
+		signal_device_changed(pdata.bdev, pdata.op);
 
 	if (pdata.op == BLOCK_DEV_REMOVE) {
 		pthread_mutex_lock(&glob_mutex);
@@ -784,6 +810,7 @@ static int block_mount(struct block_data *data)
 
 	if (!data->fs_type) {
 		_E("There is no file system");
+		BLOCK_FLAG_SET(data, FS_EMPTY);
 		r = -ENODATA;
 		goto out;
 	}
@@ -797,11 +824,16 @@ static int block_mount(struct block_data *data)
 
 	if (!fs) {
 		_E("Not supported file system (%s)", data->fs_type);
+		BLOCK_FLAG_SET(data, FS_NOT_SUPPORTED);
 		r = -ENOTSUP;
 		goto out;
 	}
 
 	r = fs->mount(smack, data->devnode, data->mount_point);
+
+	if (r == -EIO)
+		BLOCK_FLAG_SET(data, FS_BROKEN);
+
 	if (r < 0)
 		goto out;
 
@@ -835,8 +867,10 @@ static int mount_start(struct block_device *bdev)
 		goto out;
 	}
 
-	if (r == -EROFS)
+	if (r == -EROFS) {
 		data->readonly = true;
+		BLOCK_FLAG_SET(data, MOUNT_READONLY);
+	}
 
 	data->state = BLOCK_MOUNT;
 
@@ -999,6 +1033,8 @@ static int unmount_block_device(struct block_device *bdev,
 		goto out;
 	}
 
+	BLOCK_FLAG_MOUNT_CLEAR(data);
+
 out:
 	_I("%s result : %s, %d", __func__, data->devnode, r);
 
@@ -1030,6 +1066,7 @@ static int block_format(struct block_data *data,
 	}
 
 	if (!fs) {
+		BLOCK_FLAG_SET(data, FS_NOT_SUPPORTED);
 		_E("not supported file system(%s)", fs_type);
 		return -ENOTSUP;
 	}
@@ -1551,6 +1588,8 @@ static int remove_block_device(struct udev_device *dev, const char *devnode)
 		return -ENODEV;
 	}
 
+	BLOCK_FLAG_SET(bdev->data, UNMOUNT_UNSAFE);
+
 	DD_LIST_REMOVE(block_dev_list, bdev);
 
 	pthread_mutex_lock(&glob_mutex);
@@ -1921,6 +1960,44 @@ static int add_device_to_iter(struct block_data *data, DBusMessageIter *iter)
 	return 0;
 }
 
+static int add_device_to_iter_2(struct block_data *data, DBusMessageIter *iter)
+{
+	DBusMessageIter piter;
+	char *str_null = "";
+
+	if (!data || !iter)
+		return -EINVAL;
+
+	dbus_message_iter_open_container(iter, DBUS_TYPE_STRUCT, NULL, &piter);
+	dbus_message_iter_append_basic(&piter, DBUS_TYPE_INT32,
+			&(data->block_type));
+	dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
+			data->devnode ? &(data->devnode) : &str_null);
+	dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
+			data->syspath ? &(data->syspath) : &str_null);
+	dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
+			data->fs_usage ? &(data->fs_usage) : &str_null);
+	dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
+			data->fs_type ? &(data->fs_type) : &str_null);
+	dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
+			data->fs_version ? &(data->fs_version) : &str_null);
+	dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
+			data->fs_uuid_enc ? &(data->fs_uuid_enc) : &str_null);
+	dbus_message_iter_append_basic(&piter, DBUS_TYPE_INT32,
+			&(data->readonly));
+	dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
+			data->mount_point ? &(data->mount_point) : &str_null);
+	dbus_message_iter_append_basic(&piter, DBUS_TYPE_INT32,
+			&(data->state));
+	dbus_message_iter_append_basic(&piter, DBUS_TYPE_BOOLEAN,
+			&(data->primary));
+	dbus_message_iter_append_basic(&piter, DBUS_TYPE_INT32,
+			&(data->flags));
+	dbus_message_iter_close_container(iter, &piter);
+
+	return 0;
+}
+
 static DBusMessage *get_device_info(E_DBus_Object *obj,
 		DBusMessage *msg)
 {
@@ -1941,6 +2018,31 @@ static DBusMessage *get_device_info(E_DBus_Object *obj,
 
 	dbus_message_iter_init_append(reply, &iter);
 	add_device_to_iter(data, &iter);
+
+out:
+	return reply;
+}
+
+static DBusMessage *get_device_info_2(E_DBus_Object *obj,
+		DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	struct block_data *data;
+
+	if (!obj || !msg)
+		return NULL;
+
+	reply = dbus_message_new_method_return(msg);
+	if (!reply)
+		goto out;
+
+	data = e_dbus_object_data_get(obj);
+	if (!data)
+		goto out;
+
+	dbus_message_iter_init_append(reply, &iter);
+	add_device_to_iter_2(data, &iter);
 
 out:
 	return reply;
@@ -2020,9 +2122,77 @@ out:
 	return reply;
 }
 
+static DBusMessage *request_get_device_list_2(E_DBus_Object *obj,
+		DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessageIter aiter;
+	DBusMessage *reply;
+	struct block_device *bdev;
+	struct block_data *data;
+	dd_list *elem;
+	char *type = NULL;
+	int ret = -EBADMSG;
+	int block_type;
+
+	reply = dbus_message_new_method_return(msg);
+
+	ret = dbus_message_get_args(msg, NULL,
+			DBUS_TYPE_STRING, &type,
+			DBUS_TYPE_INVALID);
+	if (!ret) {
+		_E("Failed to get args");
+		goto out;
+	}
+
+	if (!type) {
+		_E("Delivered type is NULL");
+		goto out;
+	}
+
+	_D("Block (%s) device list is requested", type);
+
+	if (!strncmp(type, BLOCK_TYPE_SCSI, sizeof(BLOCK_TYPE_SCSI)))
+		block_type = BLOCK_SCSI_DEV;
+	else if (!strncmp(type, BLOCK_TYPE_MMC, sizeof(BLOCK_TYPE_MMC)))
+		block_type = BLOCK_MMC_DEV;
+	else if (!strncmp(type, BLOCK_TYPE_ALL, sizeof(BLOCK_TYPE_ALL)))
+		block_type = -1;
+	else {
+		_E("Invalid type (%s) is requested", type);
+		goto out;
+	}
+
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY, "(issssssisibi)", &aiter);
+
+	DD_LIST_FOREACH(block_dev_list, elem, bdev) {
+		data = bdev->data;
+		if (!data)
+			continue;
+
+		switch (block_type) {
+		case BLOCK_SCSI_DEV:
+		case BLOCK_MMC_DEV:
+			if (data->block_type != block_type)
+				continue;
+			break;
+		default:
+			break;
+		}
+
+		add_device_to_iter_2(data, &aiter);
+	}
+	dbus_message_iter_close_container(&iter, &aiter);
+
+out:
+	return reply;
+}
+
 static const struct edbus_method manager_methods[] = {
 	{ "ShowDeviceList", NULL, NULL, request_show_device_list },
-	{ "GetDeviceList", "s", "a(issssssisib)", request_get_device_list },
+	{ "GetDeviceList" , "s", "a(issssssisib)" , request_get_device_list },
+	{ "GetDeviceList2", "s", "a(issssssisibi)", request_get_device_list_2 },
 };
 
 static const struct edbus_method device_methods[] = {
@@ -2030,6 +2200,7 @@ static const struct edbus_method device_methods[] = {
 	{ "Unmount",  "i",  "i", handle_block_unmount },
 	{ "Format",   "i",  "i", handle_block_format },
 	{ "GetDeviceInfo"  , NULL, "(issssssisib)" , get_device_info },
+	{ "GetDeviceInfo2" , NULL, "(issssssisibi)", get_device_info_2 },
 };
 
 static int init_block_object_iface(void)
@@ -2059,6 +2230,12 @@ static int init_block_object_iface(void)
 	if (r < 0)
 		_E("fail to register %s signal to iface",
 				BLOCK_DEVICE_CHANGED);
+
+	r = e_dbus_interface_signal_add(iface,
+			BLOCK_DEVICE_CHANGED_2, "issssssisibi");
+	if (r < 0)
+		_E("fail to register %s signal to iface",
+				BLOCK_DEVICE_CHANGED_2);
 
 	return 0;
 }
