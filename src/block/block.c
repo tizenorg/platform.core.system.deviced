@@ -436,7 +436,6 @@ static E_DBus_Object *make_block_object(const char *devnode,
 			"%s/%s", DEVICED_PATH_BLOCK_DEVICES, name);
 
 	len = strlen(devnode) + 1;
-
 	time.tv_nsec = TIMEOUT_MAKE_OBJECT * NANO_SECOND_MULTIPLIER; /* 500ms */
 	do {
 		found = false;
@@ -1086,6 +1085,26 @@ out:
 		_E("fail to trigger pipe");
 
 	return r;
+}
+
+static struct format_data *get_format_data(
+		const char *fs_type, enum unmount_operation option)
+{
+	struct format_data *fdata;
+
+	fdata = (struct format_data *)malloc(sizeof(struct format_data));
+	if (!fdata) {
+		_E("fail to allocate format data");
+		return NULL;
+	}
+
+	if (fs_type)
+		fdata->fs_type = strdup(fs_type);
+	else
+		fdata->fs_type = NULL;
+	fdata->option = option;
+
+	return fdata;
 }
 
 static void release_format_data(struct format_data *data)
@@ -1799,6 +1818,134 @@ out:
 	return make_reply_message(msg, ret);
 }
 
+static DBusMessage *handle_block_format(E_DBus_Object *obj,
+		DBusMessage *msg)
+{
+	struct block_device *bdev;
+	struct block_data *data;
+	struct format_data *fdata;
+	int option;
+	int ret = -EBADMSG;
+	int prev_state;
+
+	if (!obj || !msg)
+		goto out;
+
+	ret = dbus_message_get_args(msg, NULL,
+			DBUS_TYPE_INT32, &option,
+			DBUS_TYPE_INVALID);
+	if (!ret)
+		goto out;
+
+	data = e_dbus_object_data_get(obj);
+	if (!data)
+		goto out;
+
+	_D("devnode : %s, option : %d", data->devnode, option);
+
+	bdev = find_block_device(data->devnode);
+	if (!bdev) {
+		_E("Failed to find (%s) in the device list", data->devnode);
+		goto out;
+	}
+
+	fdata = get_format_data(NULL, option);
+	if (!fdata) {
+		_E("Failed to get format data");
+		goto out;
+	}
+
+	prev_state =  data->state;
+	if (prev_state == BLOCK_MOUNT) {
+		ret = add_operation(bdev, BLOCK_DEV_UNMOUNT, NULL, (void *)UNMOUNT_FORCE);
+		if (ret < 0) {
+			_E("Failed to add operation (unmount %s)", data->devnode);
+			release_format_data(fdata);
+			goto out;
+		}
+	}
+
+	ret = add_operation(bdev, BLOCK_DEV_FORMAT, msg, (void *)fdata);
+	if (ret < 0) {
+		_E("Failed to add operation (format %s)", data->devnode);
+		release_format_data(fdata);
+	}
+
+	/* Maintain previous state of mount/unmount */
+	if (prev_state == BLOCK_MOUNT) {
+		if (add_operation(bdev, BLOCK_DEV_MOUNT, NULL, NULL) < 0) {
+			_E("Failed to add operation (mount %s)", data->devnode);
+			goto out;
+		}
+	}
+
+	return NULL;
+
+out:
+	return make_reply_message(msg, ret);
+}
+
+static int add_device_to_iter(struct block_data *data, DBusMessageIter *iter)
+{
+	DBusMessageIter piter;
+	char *str_null = "";
+
+	if (!data || !iter)
+		return -EINVAL;
+
+	dbus_message_iter_open_container(iter, DBUS_TYPE_STRUCT, NULL, &piter);
+	dbus_message_iter_append_basic(&piter, DBUS_TYPE_INT32,
+			&(data->block_type));
+	dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
+			data->devnode ? &(data->devnode) : &str_null);
+	dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
+			data->syspath ? &(data->syspath) : &str_null);
+	dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
+			data->fs_usage ? &(data->fs_usage) : &str_null);
+	dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
+			data->fs_type ? &(data->fs_type) : &str_null);
+	dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
+			data->fs_version ? &(data->fs_version) : &str_null);
+	dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
+			data->fs_uuid_enc ? &(data->fs_uuid_enc) : &str_null);
+	dbus_message_iter_append_basic(&piter, DBUS_TYPE_INT32,
+			&(data->readonly));
+	dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
+			data->mount_point ? &(data->mount_point) : &str_null);
+	dbus_message_iter_append_basic(&piter, DBUS_TYPE_INT32,
+			&(data->state));
+	dbus_message_iter_append_basic(&piter, DBUS_TYPE_BOOLEAN,
+			&(data->primary));
+	dbus_message_iter_close_container(iter, &piter);
+
+	return 0;
+}
+
+static DBusMessage *get_device_info(E_DBus_Object *obj,
+		DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	struct block_data *data;
+
+	if (!obj || !msg)
+		return NULL;
+
+	reply = dbus_message_new_method_return(msg);
+	if (!reply)
+		goto out;
+
+	data = e_dbus_object_data_get(obj);
+	if (!data)
+		goto out;
+
+	dbus_message_iter_init_append(reply, &iter);
+	add_device_to_iter(data, &iter);
+
+out:
+	return reply;
+}
+
 static DBusMessage *request_show_device_list(E_DBus_Object *obj,
 		DBusMessage *msg)
 {
@@ -1810,14 +1957,13 @@ static DBusMessage *request_get_device_list(E_DBus_Object *obj,
 		DBusMessage *msg)
 {
 	DBusMessageIter iter;
-	DBusMessageIter aiter, piter;
+	DBusMessageIter aiter;
 	DBusMessage *reply;
 	struct block_device *bdev;
 	struct block_data *data;
 	dd_list *elem;
 	char *type = NULL;
 	int ret = -EBADMSG;
-	char *str_null = "";
 	int block_type;
 
 	reply = dbus_message_new_method_return(msg);
@@ -1866,26 +2012,7 @@ static DBusMessage *request_get_device_list(E_DBus_Object *obj,
 			break;
 		}
 
-		dbus_message_iter_open_container(&aiter, DBUS_TYPE_STRUCT, NULL, &piter);
-		dbus_message_iter_append_basic(&piter, DBUS_TYPE_INT32, &(data->block_type));
-		dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
-				data->devnode ? &(data->devnode) : &str_null);
-		dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
-				data->syspath ? &(data->syspath) : &str_null);
-		dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
-				data->fs_usage ? &(data->fs_usage) : &str_null);
-		dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
-				data->fs_type ? &(data->fs_type) : &str_null);
-		dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
-				data->fs_version ? &(data->fs_version) : &str_null);
-		dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
-				data->fs_uuid_enc ? &(data->fs_uuid_enc) : &str_null);
-		dbus_message_iter_append_basic(&piter, DBUS_TYPE_INT32, &(data->readonly));
-		dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
-				data->mount_point ? &(data->mount_point) : &str_null);
-		dbus_message_iter_append_basic(&piter, DBUS_TYPE_INT32, &(data->state));
-		dbus_message_iter_append_basic(&piter, DBUS_TYPE_BOOLEAN, &(data->primary));
-		dbus_message_iter_close_container(&aiter, &piter);
+		add_device_to_iter(data, &aiter);
 	}
 	dbus_message_iter_close_container(&iter, &aiter);
 
@@ -1901,6 +2028,8 @@ static const struct edbus_method manager_methods[] = {
 static const struct edbus_method device_methods[] = {
 	{ "Mount",    "s",  "i", handle_block_mount },
 	{ "Unmount",  "i",  "i", handle_block_unmount },
+	{ "Format",   "i",  "i", handle_block_format },
+	{ "GetDeviceInfo"  , NULL, "(issssssisib)" , get_device_info },
 };
 
 static int init_block_object_iface(void)
