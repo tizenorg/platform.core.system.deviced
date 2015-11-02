@@ -104,14 +104,4 @@ static void __DESTRUCTOR__ block_dev_exit(void) \
 	remove_block_dev(dev); \
 }
 
-/* if mount_point is null, the user defined mount point removed */
-int change_mount_point(const char *devnode, const char *mount_point);
-int mount_block_device(const char *devnode);
-int unmount_block_device(const char *devnode,
-		enum unmount_operation option);
-/* if fs_type is null, it will use the exisiting fs type */
-int format_block_device(const char *devnode,
-		const char *fs_type,
-		enum unmount_operation option);
-
 #endif /* __BLOCK_H__ */

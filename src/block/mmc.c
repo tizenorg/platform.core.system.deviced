@@ -19,6 +19,8 @@
 
 #include <stdlib.h>
 #include <vconf.h>
+#include <sys/types.h>
+#include <attr/xattr.h>
 
 #include "core/log.h"
 #include "core/common.h"
@@ -59,8 +61,6 @@ static void mmc_mount(struct block_data *data, int result)
 
 static void mmc_unmount(struct block_data *data, int result)
 {
-	int val;
-
 	/* Only the primary partition is valid. */
 	if (!data || !data->primary)
 		return;

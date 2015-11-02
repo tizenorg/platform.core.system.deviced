@@ -34,6 +34,8 @@ typedef GList dd_list;
 	g_list_length(a)
 #define DD_LIST_NTH(a, b)			\
 	g_list_nth_data(a, b)
+#define DD_LIST_FIND(a, b)		\
+	g_list_find(a, (gpointer)b)
 #define DD_LIST_FREE_LIST(a)        \
 	g_list_free(a)
 #define DD_LIST_FOREACH(head, elem, node)	\
