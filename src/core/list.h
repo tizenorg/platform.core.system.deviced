@@ -29,7 +29,7 @@ typedef GList dd_list;
 #define DD_LIST_REMOVE(a, b)		\
 	a = g_list_remove(a, (gpointer)b)
 #define DD_LIST_REMOVE_LIST(a, b) \
-	a = g_list_remove_link(a, b)
+	a = g_list_delete_link(a, b)
 #define DD_LIST_LENGTH(a)			\
 	g_list_length(a)
 #define DD_LIST_NTH(a, b)			\
