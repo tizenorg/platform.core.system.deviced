@@ -332,7 +332,7 @@ int sys_set_str(char *fname, char *val)
 
 int terminate_process(const char *partition, bool force)
 {
-	const char *argv[7] = {"/sbin/fuser", "-m", "-k", "-S", NULL, NULL, NULL};
+	const char *argv[7] = {"/sbin/fuser", "-m", "-k", "-s", NULL, NULL, NULL};
 	int argc;
 
 	if (force)
