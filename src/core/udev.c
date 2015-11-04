@@ -261,6 +261,61 @@ int unregister_udev_uevent_control(const struct uevent_handler *uh)
 	return unregister_uevent_control(&uevent, uh);
 }
 
+static DBusMessage *dbus_udev_handler(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusError err;
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	pid_t pid;
+	int ret = 0;
+	int argc;
+	char *type_str;
+	char *argv;
+
+	dbus_error_init(&err);
+
+	if (!dbus_message_get_args(msg, &err,
+		    DBUS_TYPE_STRING, &type_str,
+		    DBUS_TYPE_INT32, &argc,
+		    DBUS_TYPE_STRING, &argv, DBUS_TYPE_INVALID)) {
+		_E("there is no message");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (argc < 0) {
+		_E("message is invalid!");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	pid = get_edbus_sender_pid(msg);
+	if (kill(pid, 0) == -1) {
+		_E("%d process does not exist, dbus ignored!", pid);
+		ret = -ESRCH;
+		goto out;
+	}
+
+	if (strncmp(argv, "start", strlen("start")) == 0) {
+		uevent_control_start(KERNEL, &kevent);
+		uevent_control_start(UDEV, &uevent);
+	} else if (strncmp(argv, "stop", strlen("stop")) == 0) {
+		uevent_control_stop(&kevent);
+		uevent_control_stop(&uevent);
+	}
+
+out:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+
+	return reply;
+}
+
+static const struct edbus_method edbus_methods[] = {
+	{ UDEV,   "sis",     "i", dbus_udev_handler },
+};
+
 static int device_change_poweroff(void *data)
 {
 	uevent_control_stop(&kevent);
@@ -270,7 +325,14 @@ static int device_change_poweroff(void *data)
 
 static void udev_init(void *data)
 {
+	int ret;
+
 	register_notifier(DEVICE_NOTIFIER_POWEROFF, device_change_poweroff);
+
+	ret = register_edbus_method(DEVICED_PATH_SYSNOTI,
+			edbus_methods, ARRAY_SIZE(edbus_methods));
+	if (ret < 0)
+		_E("fail to init edbus method(%d)", ret);
 
 	if (uevent_control_start(KERNEL, &kevent) != 0)
 		_E("fail uevent kernel control init");
