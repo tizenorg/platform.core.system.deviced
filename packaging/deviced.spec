@@ -362,8 +362,8 @@ systemctl daemon-reload
 %config %{_sysconfdir}/deviced/storage.conf
 %endif
 %if %{?usb_module} == on
-%config %{_sysconfdir}/deviced/usb-setting.conf
-%config %{_sysconfdir}/deviced/usb-operation.conf
+%config %{_sysconfdir}/deviced/legacy-gadget-setting.conf
+%config %{_sysconfdir}/deviced/legacy-gadget-operation.conf
 %endif
 
 %{_unitdir}/sdb-prestart.service
