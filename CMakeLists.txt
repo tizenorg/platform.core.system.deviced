@@ -127,7 +127,8 @@ ENDIF()
 # usb client
 IF(${USB_MODULE} STREQUAL on)
 	ADD_SOURCE(src/usb USB_SRCS)
-	SET(SRCS ${SRCS} ${USB_SRCS})
+	ADD_SOURCE(src/usb/slp-gadget USB_SLP_GADGET_SRCS)
+	SET(SRCS ${SRCS} ${USB_SRCS} ${USB_SLP_GADGET_SRCS})
 ENDIF()
 
 # usb host
@@ -219,8 +220,8 @@ ENDIF()
 
 # USB connection
 IF(${USB_MODULE} STREQUAL on)
-	INSTALL_CONF(src/usb usb-setting)
-	INSTALL_CONF(src/usb usb-operation)
+	INSTALL_CONF(src/usb/slp-gadget slp-gadget-setting)
+	INSTALL_CONF(src/usb/slp-gadget slp-gadget-operation)
 
 	# USB (Manual setting)
 	INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/scripts/direct_set_debug.sh DESTINATION bin)

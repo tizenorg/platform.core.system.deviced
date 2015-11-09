@@ -24,10 +24,10 @@
 #include "core/common.h"
 #include "core/config-parser.h"
 #include "core/launch.h"
-#include "usb.h"
+#include "usb/usb.h"
 
-#define USB_SETTING     "/etc/deviced/usb-setting.conf"
-#define USB_OPERATION   "/etc/deviced/usb-operation.conf"
+#define SLP_GADGET_SETTING     "/etc/deviced/slp-gadget-setting.conf"
+#define SLP_GADGET_OPERATION   "/etc/deviced/slp-gadget-operation.conf"
 
 #define SECTION_BASE    "BASE"
 #define KEY_ROOTPATH    "rootpath"
@@ -153,7 +153,7 @@ static int load_operation_config(struct parse_result *result, void *user_data)
 	return ret;
 }
 
-static int usb_execute_operation(char *type, char *name)
+static int execute_operation(char *type, char *name)
 {
 	int ret;
 	struct oper_data data;
@@ -167,7 +167,7 @@ static int usb_execute_operation(char *type, char *name)
 	data.name = name;
 	data.type = type;
 
-	ret = config_parse(USB_OPERATION,
+	ret = config_parse(SLP_GADGET_OPERATION,
 			load_operation_config, &data);
 	if (ret < 0)
 		_E("Failed to load usb operation (%d)", ret);
@@ -175,7 +175,7 @@ static int usb_execute_operation(char *type, char *name)
 	return ret;
 }
 
-static int usb_load_configuration(char *enable)
+static int change_config_state(char *enable)
 {
 	int ret;
 	static char buf[BUF_MAX];
@@ -194,78 +194,78 @@ static int usb_load_configuration(char *enable)
 	return ret;
 }
 
-static int usb_update_configuration(char *name)
+static int update_configuration(char *name)
 {
 	if (!name)
 		name = config_default;
 
-	return config_parse(USB_SETTING,
+	return config_parse(SLP_GADGET_SETTING,
 			load_setting_config, name);
 }
 
-static int usb_init(char *name)
+static int slp_gadget_init(char *name)
 {
 	int ret;
 
 	ret = config_parse(USB_SETTING,
-			load_base_config, name);
+			   load_base_config, name);
 	if (ret < 0) {
 		_E("Failed to get base information(%d)", ret);
 		return ret;
 	}
 
-	ret = usb_update_configuration(name);
+	ret = update_configuration(name);
 	if (ret < 0)
 		_E("Failed to update usb configuration(%d)", ret);
 
 	return ret;
 }
 
-static int usb_enable(char *name)
+static int slp_gadget_enable(char *name)
 {
 	int ret;
 
-	ret = usb_load_configuration(CONFIG_DISABLE);
+	ret = change_config_state(CONFIG_DISABLE);
 	if (ret < 0) {
 		_E("Failed to disable usb config");
 		return ret;
 	}
 
-	ret = usb_load_configuration(CONFIG_ENABLE);
+	ret = change_config_state(CONFIG_ENABLE);
 	if (ret < 0) {
 		_E("Failed to enable usb config");
 		return ret;
 	}
 
-	return usb_execute_operation(name, KEY_START);
+	return execute_operation(name, KEY_START);
 }
 
-static int usb_disable(char *name)
+static int slp_gadget_disable(char *name)
 {
-	return usb_execute_operation(name, KEY_STOP);
+	return execute_operation(name, KEY_STOP);
 }
 
-static const struct usb_config_plugin_ops default_plugin = {
-	.init      = usb_init,
-	.enable    = usb_enable,
-	.disable   = usb_disable,
+static const struct usb_config_plugin_ops slp_gadget_plugin = {
+	.init      = slp_gadget_init,
+	.enable    = slp_gadget_enable,
+	.disable   = slp_gadget_disable,
 };
 
-static bool usb_valid(void)
+static bool slp_gadget_is_valid(void)
 {
 	/* TODO
 	 * add checking default config valid condition */
 	return true;
 }
 
-static const struct usb_config_plugin_ops *usb_load(void)
+static const struct usb_config_plugin_ops *slp_gadget_load(void)
 {
-	return &default_plugin;
+	return &slp_gadget_plugin;
 }
 
-static const struct usb_config_ops usb_config_default_ops = {
-	.is_valid  = usb_valid,
-	.load      = usb_load,
+static const struct usb_config_ops usb_config_slp_gadget_ops = {
+	.is_valid  = slp_gadget_is_valid,
+	.load      = slp_gadget_load,
 };
 
-USB_CONFIG_OPS_REGISTER(&usb_config_default_ops)
+USB_CONFIG_OPS_REGISTER(&usb_config_slp_gadget_ops)
