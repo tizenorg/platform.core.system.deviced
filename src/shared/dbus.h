@@ -135,6 +135,10 @@
 #define DEVICED_PATH_HDMICEC                    DEVICED_OBJECT_PATH"/HdmiCec"
 #define DEVICED_INTERFACE_HDMICEC               DEVICED_INTERFACE_NAME".HdmiCec"
 
+/* Tzip service: Archive file system */
+#define DEVICED_PATH_TZIP                    DEVICED_OBJECT_PATH"/Tzip"
+#define DEVICED_INTERFACE_TZIP               DEVICED_INTERFACE_NAME".Tzip"
+
 /*
  * Resource daemon
  */
