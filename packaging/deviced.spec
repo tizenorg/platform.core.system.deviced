@@ -13,6 +13,7 @@
 %define led_module off
 %define power_module on
 %define telephony_module off
+%define tzip_module on
 %define usb_module on
 %define usbhost_module off
 
@@ -30,6 +31,7 @@
 %endif
 %if "%{?profile}" == "tv"
 %define block_module on
+%define tzip_module off
 %endif
 
 Name:       deviced
@@ -72,6 +74,10 @@ BuildRequires:  pkgconfig(sensor)
 %endif
 %if %{?telephony_module} == on
 BuildRequires:  pkgconfig(tapi)
+%endif
+%if %{?tzip_module} == on
+BuildRequires:	pkgconfig(fuse)
+BuildRequires:	pkgconfig(minizip)
 %endif
 
 Requires: %{name}-tools = %{version}-%{release}
@@ -231,6 +237,7 @@ Haptic Device manager library for device control (devel)
 	-DLED_MODULE=%{led_module} \
 	-DPOWER_MODULE=%{power_module} \
 	-DTELEPHONY_MODULE=%{telephony_module} \
+	-DTZIP_MODULE=%{tzip_module} \
 	-DUSB_MODULE=%{usb_module} \
 	-DUSBHOST_MODULE=%{usbhost_module} \
 	#eol
