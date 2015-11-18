@@ -254,6 +254,70 @@ int dbus_method_sync_timeout(const char *dest, const char *path,
 	return result;
 }
 
+int dbus_method_sync_pairs(const char *dest, const char *path,
+		const char *interface, const char *method,
+		int num, va_list args)
+{
+	DBusConnection *conn;
+	DBusMessage *msg;
+	DBusMessage *reply;
+	DBusMessageIter iter;
+	DBusMessageIter aiter, piter;
+	DBusError err;
+	int ret, result, i;
+	char *key, *value;
+
+	conn = dbus_bus_get(DBUS_BUS_SYSTEM, NULL);
+	if (!conn) {
+		_E("dbus_bus_get error");
+		return -EPERM;
+	}
+
+	msg = dbus_message_new_method_call(dest, path, interface, method);
+	if (!msg) {
+		_E("dbus_message_new_method_call(%s:%s-%s)",
+			path, interface, method);
+		return -EBADMSG;
+	}
+
+	dbus_message_iter_init_append(msg, &iter);
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY, "{ss}", &aiter);
+
+	for (i = 0 ; i < num ; i = i + 2) {
+		key = va_arg(args, char *);
+		value = va_arg(args, char *);
+		_I("key(%s), value(%s)", key, value);
+		dbus_message_iter_open_container(&aiter, DBUS_TYPE_DICT_ENTRY, NULL, &piter);
+		dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING, &key);
+		dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING, &value);
+		dbus_message_iter_close_container(&aiter, &piter);
+	}
+
+	dbus_message_iter_close_container(&iter, &aiter);
+
+	dbus_error_init(&err);
+
+	reply = dbus_connection_send_with_reply_and_block(conn, msg, DBUS_REPLY_TIMEOUT, &err);
+	dbus_message_unref(msg);
+	if (!reply) {
+		_E("dbus_connection_send error(%s:%s) %s %s:%s-%s",
+			err.name, err.message, dest, path, interface, method);
+		dbus_error_free(&err);
+		return -ECOMM;
+	}
+
+	ret = dbus_message_get_args(reply, &err, DBUS_TYPE_INT32, &result, DBUS_TYPE_INVALID);
+	dbus_message_unref(reply);
+	if (!ret) {
+		_E("no message : [%s:%s] %s %s:%s-%s",
+			err.name, err.message, dest, path, interface, method);
+		dbus_error_free(&err);
+		return -ENOMSG;
+	}
+
+	return result;
+}
+
 int dbus_method_async(const char *dest, const char *path,
 		const char *interface, const char *method,
 		const char *sig, char *param[])

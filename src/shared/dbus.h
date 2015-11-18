@@ -21,6 +21,7 @@
 #define __DBUS_H__
 
 #include <dbus/dbus.h>
+#include <stdarg.h>
 
 /*
  * Template
@@ -159,9 +160,9 @@
 /* LED */
 #define POPUP_PATH_LED                      POPUP_OBJECT_PATH"/Led"
 #define POPUP_INTERFACE_LED                 POPUP_INTERFACE_NAME".Led"
-/* TICKER */
-#define POPUP_PATH_TICKER                   POPUP_OBJECT_PATH"/Ticker"
-#define POPUP_INTERFACE_TICKER              POPUP_INTERFACE_NAME".Ticker"
+/* Notification */
+#define POPUP_PATH_NOTI                     POPUP_OBJECT_PATH"/Noti"
+#define POPUP_INTERFACE_NOTI                POPUP_INTERFACE_NAME".Noti"
 /* Power off */
 #define POPUP_PATH_POWEROFF                 POPUP_OBJECT_PATH"/Poweroff"
 #define POPUP_INTERFACE_POWEROFF            POPUP_INTERFACE_NAME".Poweroff"
@@ -234,6 +235,10 @@ int dbus_method_sync(const char *dest, const char *path,
 int dbus_method_sync_timeout(const char *dest, const char *path,
 		const char *interface, const char *method,
 		const char *sig, char *param[], int timeout);
+
+int dbus_method_sync_pairs(const char *dest, const char *path,
+		const char *interface, const char *method,
+		int num, va_list args);
 
 int dbus_method_async(const char *dest, const char *path,
 		const char *interface, const char *method,

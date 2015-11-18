@@ -1,7 +1,7 @@
 /*
  * deviced
  *
- * Copyright (c) 2012 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2012 - 2015 Samsung Electronics Co., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the License);
  * you may not use this file except in compliance with the License.
@@ -23,36 +23,12 @@
 #include "core/edbus-handler.h"
 #include "core/common.h"
 
-enum apps_enable_type{
-	APPS_DISABLE = 0,
-	APPS_ENABLE = 1,
-};
+#define APP_POWEROFF "poweroff"
+#define APP_DEFAULT  "system"
+#define APP_KEY_TYPE "_SYSPOPUP_CONTENT_"
 
-#define APPS_OPS_REGISTER(dev)	\
-static void __CONSTRUCTOR__ module_init(void)	\
-{	\
-	add_apps(dev);	\
-}	\
-static void __DESTRUCTOR__ module_exit(void)	\
-{	\
-	remove_apps(dev);	\
-}
-
-struct apps_data {
-	const char *name;
-	void *data;
-};
-
-struct apps_ops {
-	const char *name;
-	void (*init) (void);
-	void (*exit) (void);
-	int (*launch)(void *data);
-	int (*terminate)(void *data);
-};
-
-void add_apps(const struct apps_ops *dev);
-void remove_apps(const struct apps_ops *dev);
+int launch_system_app(char *type, int num, ...);
+int launch_message_post(char *type);
 
 #endif /* __APPS_H__ */
 

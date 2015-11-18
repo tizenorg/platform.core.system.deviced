@@ -1,7 +1,7 @@
 /*
  * deviced
  *
- * Copyright (c) 2012 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2012 - 2015 Samsung Electronics Co., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the License);
  * you may not use this file except in compliance with the License.
@@ -16,78 +16,73 @@
  * limitations under the License.
  */
 
-#include <vconf.h>
+#include <stdarg.h>
 #include "core/log.h"
+#include "core/common.h"
 #include "apps.h"
-#include "core/devices.h"
-#include "core/list.h"
+#include "core/edbus-handler.h"
 
-static dd_list *apps_head = NULL;
+#define POPUP_METHOD "PopupLaunch"
 
-void add_apps(const struct apps_ops *dev)
-{
-	_I("add %s", dev->name);
-	DD_LIST_APPEND(apps_head, (void*)dev);
-}
-
-void remove_apps(const struct apps_ops *dev)
-{
-	DD_LIST_REMOVE(apps_head, (void*)dev);
-}
-
-static void apps_init(void *data)
-{
-	const struct apps_ops*dev;
-	dd_list *elem;
-	struct apps_data *input_data;
-	static int initialized =0;
-
-	if (!initialized) {
-		DD_LIST_FOREACH(apps_head, elem, dev) {
-			_D("[%s] initialize", dev->name);
-			if (dev->init)
-				dev->init();
-		}
-		initialized = 1;
-		return;
-	}
-
-	input_data = (struct apps_data *)data;
-	if (input_data == NULL || input_data->name == NULL)
-		return;
-
-	DD_LIST_FOREACH(apps_head, elem, dev) {
-		if (!strncmp(dev->name, (char *)input_data->name, strlen(dev->name))) {
-			if (dev->launch)
-				dev->launch(data);
-			break;
-		}
-	}
-}
-
-static void apps_exit(void *data)
-{
-	const struct apps_ops*dev;
-	dd_list *elem;
-	struct apps_data *input_data;
-
-	input_data = (struct apps_data *)data;
-	if (input_data == NULL || input_data->name == NULL)
-		return;
-
-	DD_LIST_FOREACH(apps_head, elem, dev) {
-		if (!strncmp(dev->name, (char *)input_data->name, strlen(dev->name))) {
-			if (dev->terminate)
-				dev->terminate(data);
-			break;
-		}
-	}
-}
-
-static const struct device_ops apps_device_ops = {
-	.name     = "apps",
-	.init     = apps_init,
-	.exit     = apps_exit,
+static const struct app_dbus_match {
+	const char *type;
+	const char *bus;
+	const char *path;
+	const char *iface;
+	const char *method;
+} app_match[] = {
+	{ APP_DEFAULT , POPUP_BUS_NAME, POPUP_PATH_SYSTEM  , POPUP_INTERFACE_SYSTEM  , POPUP_METHOD },
+	{ APP_POWEROFF, POPUP_BUS_NAME, POPUP_PATH_POWEROFF, POPUP_INTERFACE_POWEROFF, POPUP_METHOD },
 };
 
-DEVICE_OPS_REGISTER(&apps_device_ops)
+int launch_system_app(char *type, int num, ...)
+{
+	char *app_type;
+	va_list args;
+	int i, match, ret;
+
+	if (type)
+		app_type = type;
+	else
+		app_type = APP_DEFAULT;
+
+	match = -1;
+	for (i = 0 ; i < ARRAY_SIZE(app_match) ; i++) {
+		if (strncmp(app_type, app_match[i].type, strlen(app_type)))
+			continue;
+		match = i;
+		break;
+	}
+	if (match < 0) {
+		_E("Failed to find app matched (%s)", app_type);
+		return -EINVAL;
+	}
+
+	va_start(args, num);
+
+	ret = dbus_method_sync_pairs(app_match[match].bus,
+			app_match[match].path,
+			app_match[match].iface,
+			app_match[match].method,
+			num, args);
+
+	va_end(args);
+
+	return ret;
+}
+
+int launch_message_post(char *type)
+{
+	char *param[1];
+
+	if (!type)
+		return -EINVAL;
+
+	param[0] = type;
+
+	return dbus_method_sync(POPUP_BUS_NAME,
+			POPUP_PATH_NOTI,
+			POPUP_INTERFACE_NOTI,
+			"MessagePostOn",
+			"s", param);
+}
