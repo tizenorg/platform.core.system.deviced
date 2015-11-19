@@ -17,6 +17,9 @@
 %define usb_module on
 %define usbhost_module off
 
+#Just For debugging
+%define sdb_prestart on
+
 %if "%{?profile}" == "mobile"
 %define battery_module on
 %define block_module on
@@ -32,6 +35,7 @@
 %if "%{?profile}" == "tv"
 %define block_module on
 %define tzip_module off
+%define sdb_prestart off
 %endif
 
 Name:       deviced
@@ -258,6 +262,9 @@ rm -rf %{buildroot}
 %install_service multi-user.target.wants deviced.service
 %install_service sockets.target.wants deviced.socket
 %install_service graphical.target.wants zbooting-done.service
+%if %{?sdb_prestart} == on
+%install_service basic.target.wants sdb-prestart.service
+%endif
 
 %post
 #memory type vconf key init
@@ -326,6 +333,11 @@ systemctl daemon-reload
 %if %{?usb_module} == on
 %config %{_sysconfdir}/deviced/usb-setting.conf
 %config %{_sysconfdir}/deviced/usb-operation.conf
+%endif
+
+%if %{?sdb_prestart} == on
+%{_unitdir}/sdb-prestart.service
+%{_unitdir}/basic.target.wants/sdb-prestart.service
 %endif
 
 %files tools
