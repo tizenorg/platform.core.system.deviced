@@ -18,7 +18,7 @@
 %define usbhost_module off
 
 #Just For debugging
-%define sdb_prestart on
+%define sdb_prestart off
 
 %if "%{?profile}" == "mobile"
 %define battery_module on
@@ -26,16 +26,17 @@
 %define haptic_module on
 %define led_module on
 %define telephony_module on
+%define sdb_prestart on
 %endif
 %if "%{?profile}" == "wearable"
 %define battery_module on
 %define haptic_module on
 %define telephony_module on
+%define sdb_prestart on
 %endif
 %if "%{?profile}" == "tv"
 %define block_module on
 %define tzip_module off
-%define sdb_prestart off
 %endif
 
 Name:       deviced
@@ -335,8 +336,8 @@ systemctl daemon-reload
 %config %{_sysconfdir}/deviced/usb-operation.conf
 %endif
 
-%if %{?sdb_prestart} == on
 %{_unitdir}/sdb-prestart.service
+%if %{?sdb_prestart} == on
 %{_unitdir}/basic.target.wants/sdb-prestart.service
 %endif
 
