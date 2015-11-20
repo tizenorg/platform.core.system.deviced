@@ -26,13 +26,11 @@
 %define haptic_module on
 %define led_module on
 %define telephony_module on
-%define sdb_prestart on
 %endif
 %if "%{?profile}" == "wearable"
 %define battery_module on
 %define haptic_module on
 %define telephony_module on
-%define sdb_prestart on
 %endif
 %if "%{?profile}" == "tv"
 %define block_module on
@@ -266,6 +264,12 @@ rm -rf %{buildroot}
 %install_service basic.target.wants sdb-prestart.service
 %endif
 
+%define tizen_target_name TM1
+%if "%{?tizen_target_name}" == "TM1"
+mkdir -p %{buildroot}%{_prefix}/lib/udev/rules.d/
+install -m 644 rules/99-deviced-sdb-enable.rules %{buildroot}%{_prefix}/lib/udev/rules.d/
+%endif
+
 %post
 #memory type vconf key init
 users_gid=$(getent group %{TZ_SYS_USER_GROUP} | cut -f3 -d':')
@@ -338,6 +342,10 @@ systemctl daemon-reload
 %{_unitdir}/sdb-prestart.service
 %if %{?sdb_prestart} == on
 %{_unitdir}/basic.target.wants/sdb-prestart.service
+%endif
+
+%if "%{?tizen_target_name}" == "TM1"
+%{_prefix}/lib/udev/rules.d/99-deviced-sdb-enable.rules
 %endif
 
 %files tools

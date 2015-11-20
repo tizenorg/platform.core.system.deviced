@@ -17,7 +17,7 @@ unload_usb_gadget() {
 }
 
 sdb_set() {
-	load_usb_gadget "6860" "sdb" "acm,sdb"
+	load_usb_gadget "6860" "sdb" ""
 	/usr/bin/systemctl start sdbd.service
 	echo "SDB enabled"
 }
