@@ -20,7 +20,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <string.h>
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -60,7 +59,7 @@ static unsigned char *convert_file_to_buffer(const char *file_name, int *size)
 	/* Get File Stream Pointer */
 	pf = fopen(file_name, "rb");
 	if (!pf) {
-		_E("fopen failed : %s", strerror(errno));
+		_E("fopen failed : %d", errno);
 		return NULL;
 	}
 
@@ -91,7 +90,7 @@ err_free:
 error:
 	fclose(pf);
 
-	_E("failed to convert file to buffer (%s)", strerror(errno));
+	_E("failed to convert file to buffer (%d)", errno);
 	return NULL;
 }
 
@@ -102,25 +101,25 @@ static int save_data(const unsigned char *data, int size, const char *file_path)
 
 	file = fopen(file_path, "wb+");
 	if (file == NULL) {
-		_E("To open file is failed : %s", strerror(errno));
+		_E("To open file is failed : %d", errno);
 		return -1;
 	}
 
 	if (fwrite(data, 1, size, file) != size) {
-		_E("To write file is failed : %s", strerror(errno));
+		_E("To write file is failed : %d", errno);
 		fclose(file);
 		return -1;
 	}
 
 	fd = fileno(file);
 	if (fd < 0) {
-		_E("To get file descriptor is failed : %s", strerror(errno));
+		_E("To get file descriptor is failed : %d", errno);
 		fclose(file);
 		return -1;
 	}
 
 	if (fsync(fd) < 0) {
-		_E("To be synchronized with the disk is failed : %s", strerror(errno));
+		_E("To be synchronized with the disk is failed : %d", errno);
 		fclose(file);
 		return -1;
 	}
