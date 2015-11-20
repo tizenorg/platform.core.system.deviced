@@ -13,7 +13,7 @@
 %define led_module off
 %define power_module on
 %define telephony_module off
-%define tzip_module on
+%define tzip_module off
 %define usb_module on
 %define usbhost_module off
 
@@ -36,7 +36,6 @@
 %endif
 %if "%{?profile}" == "tv"
 %define block_module on
-%define tzip_module off
 %endif
 
 Name:       deviced
