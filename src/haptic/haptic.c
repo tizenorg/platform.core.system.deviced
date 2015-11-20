@@ -43,7 +43,7 @@
 #define HARDKEY_VIB_ITERATION		1
 #define HARDKEY_VIB_FEEDBACK		3
 #define HARDKEY_VIB_PRIORITY		2
-#define HARDKEY_VIB_DURATION		300
+#define HARDKEY_VIB_DURATION		30
 #define HAPTIC_FEEDBACK_STEP		20
 #define DEFAULT_FEEDBACK_LEVEL		3
 
@@ -60,6 +60,7 @@
 #endif
 
 #define CHECK_VALID_OPS(ops, r)		((ops) ? true : !(r = -ENODEV))
+#define RETRY_CNT	3
 
 struct haptic_info {
 	char *sender;
@@ -79,6 +80,7 @@ static bool haptic_disabled;
 struct haptic_config {
 	int level;
 	int *level_arr;
+	int sound_capture;
 };
 
 static struct haptic_config haptic_conf;
@@ -689,7 +691,9 @@ static int parse_section(struct parse_result *result, void *user_data, int index
 	if (!result->section || !result->name || !result->value)
 		return 0;
 
-	if (MATCH(result->name, "level")) {
+	if (MATCH(result->name, "sound_capture")) {
+		conf->sound_capture = atoi(result->value);
+	} else if (MATCH(result->name, "level")) {
 		conf->level = atoi(result->value);
 		conf->level_arr = calloc(sizeof(int), conf->level);
 		if (!conf->level_arr) {
@@ -793,7 +797,8 @@ static void haptic_init(void *data)
 	register_notifier(DEVICE_NOTIFIER_POWEROFF_HAPTIC, haptic_poweroff_cb);
 
 	/* add watch for sound capturing value */
-	vconf_notify_key_changed(VCONFKEY_RECORDER_STATE, sound_capturing_cb, NULL);
+	if (haptic_conf.sound_capture)
+		vconf_notify_key_changed(VCONFKEY_RECORDER_STATE, sound_capturing_cb, NULL);
 }
 
 static void haptic_exit(void *data)
@@ -803,7 +808,8 @@ static void haptic_exit(void *data)
 	int r;
 
 	/* remove watch */
-	vconf_ignore_key_changed(VCONFKEY_RECORDER_STATE, sound_capturing_cb);
+	if (haptic_conf.sound_capture)
+		vconf_ignore_key_changed(VCONFKEY_RECORDER_STATE, sound_capturing_cb);
 
 	/* unregister notifier for below each event */
 	unregister_notifier(DEVICE_NOTIFIER_TOUCH_HARDKEY, haptic_hardkey_changed_cb);
