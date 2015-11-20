@@ -158,6 +158,7 @@ static Eina_Bool timer_cb(void *data)
 static int ff_find_device(void)
 {
 	DIR *dir;
+	struct dirent entry;
 	struct dirent *dent;
 	char ev_path[PATH_MAX];
 	unsigned long features[1+FF_MAX/sizeof(unsigned long)];
@@ -167,7 +168,11 @@ static int ff_find_device(void)
 	if (!dir)
 		return -errno;
 
-	while ((dent = readdir(dir))) {
+	while (1) {
+		ret = readdir_r(dir, &entry, &dent);
+		if (ret != 0 || dent == NULL)
+			break;
+
 		if (dent->d_type == DT_DIR ||
 			!strstr(dent->d_name, "event"))
 			continue;
@@ -332,7 +337,7 @@ static int open_device(int device_index, int *device_handle)
 		/* open ff driver */
 		ff_fd = open(ff_path, O_RDWR);
 		if (!ff_fd) {
-			_E("Failed to open %s : %s", ff_path, strerror(errno));
+			_E("Failed to open %s : %d", ff_path, errno);
 			return -errno;
 		}
 	}
@@ -340,7 +345,7 @@ static int open_device(int device_index, int *device_handle)
 	/* allocate memory */
 	info = calloc(sizeof(struct ff_info), 1);
 	if (!info) {
-		_E("Failed to allocate memory : %s", strerror(errno));
+		_E("Failed to allocate memory : %d", errno);
 		return -errno;
 	}
 
