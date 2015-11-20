@@ -1,0 +1,2 @@
+SUBSYSTEM=="switch", ENV{SWITCH_NAME}=="usb_cable", ENV{SWITCH_STATE}=="1", RUN+="/usr/bin/direct_set_debug.sh --sdb-set"
+SUBSYSTEM=="switch", ENV{SWITCH_NAME}=="usb_cable", ENV{SWITCH_STATE}=="0", RUN+="/usr/bin/direct_set_debug.sh --sdb-unset"
