@@ -46,16 +46,62 @@
 #define LONG(x) ((x)/BITS_PER_LONG)
 #define test_bit(bit, array)    ((array[LONG(bit)] >> OFF(bit)) & 1)
 
+#define MAX_DATA 16
+#define FF_INFO_MAGIC 0xDEADFEED
+
+struct ff_info_header {
+	unsigned int magic;
+	int iteration;
+	int ff_info_data_count;
+};
+
+struct ff_info_data {
+	int type;/* play, stop etc */
+	int magnitude; /* strength */
+	int length; /* in ms for stop, play*/
+};
+
+struct ff_info_buffer {
+	struct ff_info_header header;
+	struct ff_info_data data[MAX_DATA];
+};
 
 struct ff_info {
-	unsigned int id;
+	int handle;
 	Ecore_Timer *timer;
 	struct ff_effect effect;
+	struct ff_info_buffer *ffinfobuffer;
+	int currentindex;
 };
 
 static int ff_fd;
 static dd_list *ff_list;
+static dd_list *handle_list;
 static char ff_path[PATH_MAX];
+static int unique_number;
+
+struct ff_info *read_from_list(int handle)
+{
+	struct ff_info *temp;
+	dd_list *elem;
+
+	DD_LIST_FOREACH(ff_list, elem, temp) {
+		if (temp->handle == handle)
+			return temp;
+	}
+	return NULL;
+}
+
+/* for debug */
+static void print_list(void)
+{
+	struct ff_info *temp;
+	dd_list *elem;
+	int i = 0;
+
+	DD_LIST_FOREACH(ff_list, elem, temp)
+		_D("[%d] %x", i++, temp);
+}
 
 static bool check_valid_handle(struct ff_info *info)
 {
@@ -72,10 +118,25 @@ static bool check_valid_handle(struct ff_info *info)
 	return true;
 }
 
+static bool check_fd(int *fd)
+{
+	int ffd;
+
+	if (*fd > 0)
+		return true;
+
+	ffd = open(ff_path, O_RDWR);
+	if (!ffd)
+		return false;
+
+	*fd = ffd;
+	return true;
+}
+
 static int ff_stop(int fd, struct ff_effect *effect);
 static Eina_Bool timer_cb(void *data)
 {
-	struct ff_info *info = (struct ff_info*)data;
+	struct ff_info *info = (struct ff_info *)data;
 
 	if (!info)
 		return ECORE_CALLBACK_CANCEL;
@@ -136,7 +197,7 @@ static int ff_find_device(void)
 		if (test_bit(FF_RUMBLE, features))
 			_D("%s type : rumble", ev_path);
 
-		if (test_bit(FF_PERIODIC, features)) {
+		if (test_bit(FF_RUMBLE, features)) {
 			memcpy(ff_path, ev_path, strlen(ev_path));
 			close(fd);
 			closedir(dir);
@@ -155,23 +216,13 @@ static int ff_init_effect(struct ff_effect *effect)
 	if (!effect)
 		return -EINVAL;
 
-	/* initialize member variables in effect struct */
-	effect->type = FF_PERIODIC;
+	/*Only rumble supported as of now*/
+	effect->type = FF_RUMBLE;
+	effect->replay.length = 0;
+	effect->replay.delay = 10;
 	effect->id = -1;
-	effect->u.periodic.waveform = FF_SQUARE;
-	effect->u.periodic.period = 0.1*0x100;	/* 0.1 second */
-	effect->u.periodic.magnitude = 0;	/* temporary value */
-	effect->u.periodic.offset = 0;
-	effect->u.periodic.phase = 0;
-	effect->direction = 0x4000;	/* Along X axis */
-	effect->u.periodic.envelope.attack_length = 0;
-	effect->u.periodic.envelope.attack_level = 0;
-	effect->u.periodic.envelope.fade_length = 0;
-	effect->u.periodic.envelope.fade_level = 0;
-	effect->trigger.button = 0;
-	effect->trigger.interval = 0;
-	effect->replay.length = 0;		/* temporary value */
-	effect->replay.delay = 0;
+	effect->u.rumble.strong_magnitude = 0x100;
+	effect->u.rumble.weak_magnitude = 0x50;
 
 	return 0;
 }
@@ -198,21 +249,32 @@ static int ff_set_effect(struct ff_effect *effect, int length, int level)
 static int ff_play(int fd, struct ff_effect *effect)
 {
 	struct input_event play;
+	int ret;
 
-	if (fd < 0 || !effect)
+	if (fd < 0 || !effect) {
+		if (fd < 0)
+			_E("fail to check fd");
+		else
+			_E("fail to check effect");
 		return -EINVAL;
+	}
 
 	/* upload an effect */
-	if (ioctl(fd, EVIOCSFF, effect) == -1)
+	if (ioctl(fd, EVIOCSFF, effect) == -1) {
+		_E("fail to ioctl");
 		return -errno;
+	}
 
 	/* play vibration*/
 	play.type = EV_FF;
 	play.code = effect->id;
 	play.value = 1; /* 1 : PLAY, 0 : STOP */
 
-	if (write(fd, (const void*)&play, sizeof(play)) == -1)
+	ret = write(fd, (const void *)&play, sizeof(play));
+	if (ret == -1) {
+		_E("fail to write");
 		return -errno;
+	}
 
 	return 0;
 }
@@ -220,6 +282,7 @@ static int ff_play(int fd, struct ff_effect *effect)
 static int ff_stop(int fd, struct ff_effect *effect)
 {
 	struct input_event stop;
+	int ret;
 
 	if (fd < 0)
 		return -EINVAL;
@@ -228,8 +291,8 @@ static int ff_stop(int fd, struct ff_effect *effect)
 	stop.type = EV_FF;
 	stop.code = effect->id;
 	stop.value = 0; /* 1 : PLAY, 0 : STOP */
-
-	if (write(fd, (const void*)&stop, sizeof(stop)) == -1)
+	ret = write(fd, (const void *)&stop, sizeof(stop));
+	if (ret == -1)
 		return -errno;
 
 	/* removing an effect from the device */
@@ -240,29 +303,6 @@ static int ff_stop(int fd, struct ff_effect *effect)
 	effect->id = -1;
 
 	return 0;
-}
-
-static int create_unique_id(void)
-{
-	static int i = 0;
-	return i++;		/* TODO: overflow */
-}
-
-static struct ff_info *get_element_from_list(int id)
-{
-	dd_list *elem;
-	struct ff_info *info;
-
-	if (id < 0)
-		return NULL;
-
-	/* find matched element */
-	DD_LIST_FOREACH(ff_list, elem, info) {
-		if (info->id == id)
-			return info;
-	}
-
-	return NULL;
 }
 
 /* START: Haptic Module APIs */
@@ -279,6 +319,8 @@ static int open_device(int device_index, int *device_handle)
 {
 	struct ff_info *info;
 	int n;
+	bool found = false;
+	dd_list *elem;
 
 	if (!device_handle)
 		return -EINVAL;
@@ -302,16 +344,26 @@ static int open_device(int device_index, int *device_handle)
 		return -errno;
 	}
 
-	/* create unique id */
-	info->id = create_unique_id();
-
 	/* initialize ff_effect structure */
 	ff_init_effect(&info->effect);
 
+	if (unique_number == INT_MAX)
+		unique_number = 0;
+
+	while (found != true) {
+		++unique_number;
+		elem = DD_LIST_FIND(handle_list, unique_number);
+		if (!elem)
+			found = true;
+	}
+
+	info->handle = unique_number;
+
 	/* add info to local list */
 	DD_LIST_APPEND(ff_list, info);
+	DD_LIST_APPEND(handle_list, info->handle);
 
-	*device_handle = info->id;
+	*device_handle = info->handle;
 	return 0;
 }
 
@@ -320,9 +372,15 @@ static int close_device(int device_handle)
 	struct ff_info *info;
 	int r, n;
 
-	info = get_element_from_list(device_handle);
+	info = read_from_list(device_handle);
 	if (!info)
 		return -EINVAL;
+
+	if (!check_valid_handle(info))
+		return -EINVAL;
+
+	if (!check_fd(&ff_fd))
+		return -ENODEV;
 
 	/* stop vibration */
 	r = ff_stop(ff_fd, &info->effect);
@@ -331,10 +389,14 @@ static int close_device(int device_handle)
 
 	/* unregister existing timer */
 	if (r >= 0 && info->timer) {
+		_D("device handle %d is closed and timer deleted", device_handle);
 		ecore_timer_del(info->timer);
 		info->timer = NULL;
 	}
 
+	DD_LIST_REMOVE(handle_list, info->handle);
+
+	safe_free(info->ffinfobuffer);
 	/* remove info from local list */
 	DD_LIST_REMOVE(ff_list, info);
 	safe_free(info);
@@ -356,15 +418,33 @@ static int vibrate_monotone(int device_handle, int duration, int feedback, int p
 	struct ff_info *info;
 	int ret;
 
-	info = get_element_from_list(device_handle);
-	if (!info)
+	info = read_from_list(device_handle);
+	if (!info) {
+		_E("fail to check list");
 		return -EINVAL;
+	}
+
+	if (!check_valid_handle(info)) {
+		_E("fail to check handle");
+		return -EINVAL;
+	}
+
+	if (!check_fd(&ff_fd))
+		return -ENODEV;
 
 	/* Zero(0) is the infinitely vibration value */
 	if (duration == HAPTIC_MODULE_DURATION_UNLIMITED)
 		duration = 0;
 
+	/* unregister existing timer */
+	if (info->timer) {
+		ff_stop(ff_fd, &info->effect);
+		ecore_timer_del(info->timer);
+		info->timer = NULL;
+	}
+
 	/* set effect as per arguments */
+	ff_init_effect(&info->effect);
 	ret = ff_set_effect(&info->effect, duration, feedback);
 	if (ret < 0) {
 		_E("failed to set effect(duration:%d, feedback:%d) : %d",
@@ -375,15 +455,9 @@ static int vibrate_monotone(int device_handle, int duration, int feedback, int p
 	/* play effect as per arguments */
 	ret = ff_play(ff_fd, &info->effect);
 	if (ret < 0) {
-		_E("failed to play haptic effect(id:%d) : %d",
-				info->effect.id, ret);
+		_E("failed to play haptic effect(fd:%d id:%d) : %d",
+				ff_fd, info->effect.id, ret);
 		return ret;
-	}
-
-	/* unregister existing timer */
-	if (info->timer) {
-		ecore_timer_del(info->timer);
-		info->timer = NULL;
 	}
 
 	/* register timer */
@@ -393,17 +467,121 @@ static int vibrate_monotone(int device_handle, int duration, int feedback, int p
 			_E("Failed to add timer callback");
 	}
 
-	_D("effect id : %d", info->effect.id);
+	_D("device handle %d effect id : %d %dms", device_handle, info->effect.id, duration);
 	if (effect_handle)
 		*effect_handle = info->effect.id;
 
 	return 0;
 }
 
+static Eina_Bool _buffer_play(void *cbdata)
+{
+	struct ff_info *info = (struct ff_info *)cbdata;
+	struct ff_info_header *header = &info->ffinfobuffer->header;
+	struct ff_info_data   *data = info->ffinfobuffer->data;
+	int index = info->currentindex;
+	int play_type = (index < header->ff_info_data_count) ? data[index].type : 0;
+	int length = (index < header->ff_info_data_count) ? data[index].length : 1;
+	int ret;
+
+	ff_set_effect(&info->effect, length, 1);
+	if (play_type != 0) {
+		_D("Going to play for %d ms", length);
+		ret = ff_play(ff_fd, &info->effect);
+		if (ret < 0)
+			_D("Failed to play the effect %d", ret);
+	} else {
+		_D("Going to stop for %d ms", length);
+		ret = ff_stop(ff_fd, &info->effect);
+		if (ret < 0)
+			_D("Failed to stop the effect %d", ret);
+	}
+
+	if (info->currentindex < header->ff_info_data_count) {
+		info->currentindex++;
+		info->timer = ecore_timer_add(length/1000.0f, _buffer_play, info);
+	} else {
+		--header->iteration;
+		if (header->iteration > 0) {
+			info->currentindex = 0;
+			info->timer = ecore_timer_add(0.0, _buffer_play, info);
+		} else
+			info->timer = NULL;
+	}
+
+	return ECORE_CALLBACK_CANCEL;
+}
+
+static void print_buffer(const unsigned char *vibe_buffer)
+{
+	struct ff_info_buffer fb;
+	int i = 0;
+	memcpy(&fb.header, vibe_buffer, sizeof(struct ff_info_header));
+	memcpy(&fb.data, (unsigned char *)vibe_buffer+sizeof(struct ff_info_header),
+			sizeof(struct ff_info_data) * fb.header.ff_info_data_count);
+	_D("\nMagic %x\niteration %d\ncount %d\n", fb.header.magic,
+			fb.header.iteration, fb.header.ff_info_data_count);
+
+	for (i = 0; i < fb.header.ff_info_data_count; i++)
+		_D("type %d\nmagn 0x%x\nlen %d\n", fb.data[i].type,
+				fb.data[i].magnitude, fb.data[i].length);
+}
+
+static int vibrate_custom_buffer(int device_handle, const unsigned char *vibe_buffer, int iteration, int feedback, int priority, int *effect_handle)
+{
+	struct ff_info *info;
+	struct ff_info_header *header;
+	struct ff_info_data   *data;
+
+	info = read_from_list(device_handle);
+	if (!info)
+		return -EINVAL;
+
+	if (!check_valid_handle(info))
+		return -EINVAL;
+
+	if (!check_fd(&ff_fd))
+		return -ENODEV;
+
+	if (!info->ffinfobuffer)
+		info->ffinfobuffer = (struct ff_info_buffer *)calloc(sizeof(struct ff_info_buffer), 1);
+	if (!info->ffinfobuffer)
+		return -ENOMEM;
+
+	header = &info->ffinfobuffer->header;
+	data = info->ffinfobuffer->data;
+
+	memcpy(header, vibe_buffer, sizeof(struct ff_info_header));
+	if (header->ff_info_data_count < 0 || header->ff_info_data_count > MAX_DATA)
+		return -EINVAL;
+
+	memcpy(data, vibe_buffer+sizeof(struct ff_info_header), sizeof(struct ff_info_data) * header->ff_info_data_count);
+
+	info->currentindex = 0;
+	if (info->timer)
+		ecore_timer_del(info->timer);
+
+	if (header->iteration > 0)
+		_buffer_play(info);
+
+	return 0;
+}
+
 static int vibrate_buffer(int device_handle, const unsigned char *vibe_buffer, int iteration, int feedback, int priority, int *effect_handle)
 {
-	/* temporary code */
-	return vibrate_monotone(device_handle, 300, feedback, priority, effect_handle);
+	int magic = 0;
+
+	if (!device_handle)
+		return -EINVAL;
+
+	if (vibe_buffer)
+		magic = *(int *)vibe_buffer;
+
+	if (magic == FF_INFO_MAGIC) {
+		print_buffer(vibe_buffer);
+		return vibrate_custom_buffer(device_handle, vibe_buffer, iteration, feedback, priority, effect_handle);
+	} else
+		return vibrate_monotone(device_handle, 300, feedback, priority, effect_handle);
 }
 
 static int stop_device(int device_handle)
@@ -411,9 +589,15 @@ static int stop_device(int device_handle)
 	struct ff_info *info;
 	int r;
 
-	info = get_element_from_list(device_handle);
+	info = read_from_list(device_handle);
 	if (!info)
 		return -EINVAL;
+
+	if (!check_valid_handle(info))
+		return -EINVAL;
+
+	if (!check_fd(&ff_fd))
+		return -ENODEV;
 
 	/* stop effect */
 	r = ff_stop(ff_fd, &info->effect);
