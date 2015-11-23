@@ -26,11 +26,13 @@
 %define haptic_module on
 %define led_module on
 %define telephony_module on
+%define tzip_module on
 %endif
 %if "%{?profile}" == "wearable"
 %define battery_module on
 %define haptic_module on
 %define telephony_module on
+%define tzip_module on
 %endif
 %if "%{?profile}" == "tv"
 %define block_module on
