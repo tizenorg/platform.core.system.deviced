@@ -31,6 +31,7 @@
 #include "core/log.h"
 #include "core/common.h"
 #include "core/devices.h"
+#include "core/device-notifier.h"
 #include "core/edbus-handler.h"
 #include "display/core.h"
 #include "power/power-handler.h"
@@ -43,6 +44,49 @@
 
 static TapiHandle *tapi_handle;
 static Ecore_Timer *poweroff_timer_id;
+static int reboot_opt;
+
+int get_flight_mode(bool *mode)
+{
+
+	return vconf_get_bool(VCONFKEY_TELEPHONY_FLIGHT_MODE, (void *)mode);
+}
+
+int set_flight_mode(bool mode)
+{
+	return vconf_set_bool(VCONFKEY_TELEPHONY_FLIGHT_MODE, mode);
+}
+
+int get_mobile_hotspot_mode(int *mode)
+{
+	return vconf_get_int(VCONFKEY_MOBILE_HOTSPOT_MODE, mode);
+}
+
+static void flight_mode_changed(keynode_t *key_nodes, void *data)
+{
+	bool mode;
+
+	if (key_nodes == NULL) {
+		_E("wrong parameter, key_nodes is null");
+		return;
+	}
+	mode = vconf_keynode_get_bool(key_nodes);
+
+	device_notify(DEVICE_NOTIFIER_FLIGHT_MODE, &mode);
+}
+
+static void mobile_hotspot_mode_changed(keynode_t *key_nodes, void *data)
+{
+	int mode;
+
+	if (key_nodes == NULL) {
+		_E("wrong parameter, key_nodes is null");
+		return;
+	}
+	mode = vconf_keynode_get_int(key_nodes);
+
+	device_notify(DEVICE_NOTIFIER_MOBILE_HOTSPOT_MODE, &mode);
+}
 
 static Eina_Bool telephony_powerdown_ap_internal(void *data)
 {
@@ -56,7 +100,7 @@ static void telephony_powerdown_ap(TapiHandle *handle, const char *noti_id, void
 
 static void telephony_restart_ap(TapiHandle *handle, const char *noti_id, void *data, void *user_data)
 {
-	restart_ap(data);
+	restart_ap(reboot_opt);
 }
 
 static Eina_Bool telephony_restart_ap_by_force(void *data)
@@ -65,13 +109,18 @@ static Eina_Bool telephony_restart_ap_by_force(void *data)
 		ecore_timer_del(poweroff_timer_id);
 		poweroff_timer_id = NULL;
 	}
-	restart_ap(data);
+	restart_ap(reboot_opt);
 	return EINA_TRUE;
 }
 
 static void powerdown_res_cb(TapiHandle *handle, int result, void *data, void *user_data)
 {
 	_D("poweroff command request : %d", result);
+}
+
+static void restart_res_cb(TapiHandle *handle, int result, void *data, void *user_data)
+{
+	_D("restart command request : %d", result);
 }
 
 static Eina_Bool telephony_powerdown_ap_by_force(void *data)
@@ -130,6 +179,12 @@ static void telephony_exit(void *data)
 		return;
 	}
 
+	vconf_ignore_key_changed(VCONFKEY_TELEPHONY_FLIGHT_MODE,
+	    flight_mode_changed);
+
+	vconf_ignore_key_changed(VCONFKEY_MOBILE_HOTSPOT_MODE,
+	    mobile_hotspot_mode_changed);
+
 	if (!strncmp(data, POWER_POWEROFF, POWER_POWEROFF_LEN)) {
 		_I("Terminate");
 		ret = tel_register_noti_event(tapi_handle, TAPI_NOTI_MODEM_POWER,
@@ -157,23 +212,24 @@ static void telephony_exit(void *data)
 	}
 
 	_I("Option: %s", data);
+	reboot_opt = SYSTEMD_STOP_POWER_RESTART;
 
 	ret = tel_register_noti_event(tapi_handle, TAPI_NOTI_MODEM_POWER,
 			telephony_restart_ap, NULL);
 	if (ret != TAPI_API_SUCCESS) {
 		_E("tel_register_event is not subscribed. error %d", ret);
-		telephony_restart_ap_by_force(NULL);
+		telephony_restart_ap_by_force((void *)reboot_opt);
 		return;
 	}
 	ret = tel_process_power_command(tapi_handle, TAPI_PHONE_POWER_OFF,
-			powerdown_res_cb, NULL);
+			restart_res_cb, NULL);
 	if (ret != TAPI_API_SUCCESS) {
 		_E("tel_process_power_command() error %d", ret);
-		telephony_restart_ap_by_force(NULL);
+		telephony_restart_ap_by_force((void *)reboot_opt);
 		return;
 	}
-	poweroff_timer_id = ecore_timer_add(15,telephony_restart_ap_by_force,
-							NULL);
+	poweroff_timer_id = ecore_timer_add(15, telephony_restart_ap_by_force,
+							(void *)reboot_opt);
 }
 
 static void telephony_flight_mode_on(TapiHandle *handle, int result, void *data, void *user_data)
@@ -186,7 +242,7 @@ static void telephony_flight_mode_on(TapiHandle *handle, int result, void *data,
 		return;
 	}
 	_D("enter flight mode result : %d", result);
-	ret = vconf_get_bool(VCONFKEY_TELEPHONY_FLIGHT_MODE, &bCurFlightMode);
+	ret = get_flight_mode(&bCurFlightMode);
 	if (ret == 0)
 		_D("Flight Mode is %d", bCurFlightMode);
 	else
@@ -203,7 +259,7 @@ static void telephony_flight_mode_off(TapiHandle *handle, int result, void *data
 		return;
 	}
 	_D("leave flight mode result : %d", result);
-	ret = vconf_get_bool(VCONFKEY_TELEPHONY_FLIGHT_MODE, &bCurFlightMode);
+	ret = get_flight_mode(&bCurFlightMode);
 	if (ret == 0)
 		_D("Flight Mode is %d", bCurFlightMode);
 	else
@@ -399,6 +455,12 @@ static void telephony_init(void *data)
 			ARRAY_SIZE(edbus_methods));
 	if (ret < 0)
 		_E("fail to init edbus method(%d)", ret);
+
+	vconf_notify_key_changed(VCONFKEY_TELEPHONY_FLIGHT_MODE,
+	    flight_mode_changed, NULL);
+
+	vconf_notify_key_changed(VCONFKEY_MOBILE_HOTSPOT_MODE,
+	    mobile_hotspot_mode_changed, NULL);
 }
 
 static const struct device_ops tel_device_ops = {
