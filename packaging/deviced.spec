@@ -18,7 +18,7 @@
 %define usbhost_module off
 
 #Just For debugging
-%define sdb_prestart off
+%define sdb_prestart on
 
 %if "%{?profile}" == "mobile"
 %define battery_module on
@@ -36,6 +36,7 @@
 %endif
 %if "%{?profile}" == "tv"
 %define block_module on
+%define sdb_prestart off
 %endif
 
 Name:       deviced
