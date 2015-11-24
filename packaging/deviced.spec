@@ -12,6 +12,7 @@
 %define haptic_module off
 %define led_module off
 %define power_module on
+%define storage_module on
 %define telephony_module off
 %define tzip_module off
 %define usb_module on
@@ -76,6 +77,9 @@ BuildRequires:  pkgconfig(xext)
 %endif
 BuildRequires:  pkgconfig(libinput)
 BuildRequires:  pkgconfig(sensor)
+%endif
+%if %{?storage_module} == on
+BuildRequires:	pkgconfig(storage)
 %endif
 %if %{?telephony_module} == on
 BuildRequires:  pkgconfig(tapi)
@@ -241,6 +245,7 @@ Haptic Device manager library for device control (devel)
 	-DHAPTIC_MODULE=%{haptic_module} \
 	-DLED_MODULE=%{led_module} \
 	-DPOWER_MODULE=%{power_module} \
+	-DSTORAGE_MODULE=%{storage_module} \
 	-DTELEPHONY_MODULE=%{telephony_module} \
 	-DTZIP_MODULE=%{tzip_module} \
 	-DUSB_MODULE=%{usb_module} \
@@ -335,6 +340,9 @@ systemctl daemon-reload
 %{_datadir}/license/fsck_msdosfs
 %{_datadir}/license/newfs_msdos
 %config %{_sysconfdir}/deviced/block.conf
+%endif
+%if %{?storage_module} == on
+%config %{_sysconfdir}/deviced/storage.conf
 %endif
 %if %{?usb_module} == on
 %config %{_sysconfdir}/deviced/usb-setting.conf
