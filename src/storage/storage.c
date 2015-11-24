@@ -35,36 +35,21 @@
 #include "core/edbus-handler.h"
 #include "core/device-notifier.h"
 #include "core/config-parser.h"
+#include "apps/apps.h"
 
-#define MEMNOTIFY_NORMAL	0x0000
-#define MEMNOTIFY_LOW		0xfaac
-#define MEMNOTIFY_CRITICAL	0xdead
-#define MEMNOTIFY_REBOOT	0xb00f
+#define MEMORY_STATUS_TMP_PATH  "/tmp"
+#define MEMNOTI_TMP_CRITICAL_VALUE (20)
 
 #define MEMORY_STATUS_USR_PATH  "/opt/usr"
 #define MEMORY_MEGABYTE_VALUE   1048576
 
-#define MEMNOTI_WARNING_VALUE  (5) // 5% under
-#define MEMNOTI_CRITICAL_VALUE (0.1) // 0.1% under
-#define MEMNOTI_FULL_VALUE     (0.0) // 0.0% under
+#define MEMNOTI_WARNING_VALUE  (5) /* 5% under */
+#define MEMNOTI_CRITICAL_VALUE (0.1) /* 0.1% under */
+#define MEMNOTI_FULL_VALUE     (0.0) /* 0.0% under */
 
 #define SIGNAL_LOWMEM_STATE     "ChangeState"
 #define SIGNAL_LOWMEM_FULL      "Full"
-
-#define POPUP_KEY_MEMNOTI       "_MEM_NOTI_"
-#define POPUP_KEY_APPNAME       "_APP_NAME_"
-
-#define LOWMEM_POPUP_NAME       "lowmem-syspopup"
-
 #define MEMNOTI_TIMER_INTERVAL  5
-#define MEM_TRIM_TIMER_INTERVAL 86400 /* 24 hour */
-#define MEM_FSTRIM_PATH         "/sbin/fstrim"
-
-#define MEM_TRIM_START_TIME     2 // AM 02:00:00
-#define MIN_SEC                 (60)
-#define HOUR_SEC                (MIN_SEC * MIN_SEC)
-
-#define BUF_MAX                 1024
 
 #define STORAGE_CONF_FILE       "/etc/deviced/storage.conf"
 
@@ -72,223 +57,204 @@ enum memnoti_level {
 	MEMNOTI_LEVEL_CRITICAL = 0,
 	MEMNOTI_LEVEL_WARNING,
 	MEMNOTI_LEVEL_NORMAL,
-} ;
+	MEMNOTI_LEVEL_FULL,
+};
+
+enum memnoti_status {
+	MEMNOTI_DISABLE,
+	MEMNOTI_ENABLE,
+};
 
 struct storage_config_info {
+	enum memnoti_level current_noti_level;
 	double warning_level;
 	double critical_level;
 	double full_level;
 };
 
-static Ecore_Fd_Handler *lowmem_efd = NULL;
-static int lowmem_fd;
-static int cur_mem_state = MEMNOTIFY_NORMAL;
+static Ecore_Timer *memnoti_timer;
 
-static Ecore_Timer *memnoti_timer = NULL;
-static Ecore_Timer *mem_trim_timer = NULL;
-
-static struct storage_config_info storage_info = {
-	.warning_level   = MEMNOTI_WARNING_VALUE,
-	.critical_level = MEMNOTI_CRITICAL_VALUE,
-	.full_level      = MEMNOTI_FULL_VALUE,
+static struct storage_config_info storage_internal_info = {
+	.current_noti_level = MEMNOTI_LEVEL_NORMAL,
+	.warning_level      = MEMNOTI_WARNING_VALUE,
+	.critical_level     = MEMNOTI_CRITICAL_VALUE,
+	.full_level         = MEMNOTI_FULL_VALUE,
 };
 
-static void memnoti_send_broadcast(int status)
+static struct storage_config_info storage_tmp_info = {
+	.current_noti_level = MEMNOTI_LEVEL_NORMAL,
+	.warning_level      = MEMNOTI_TMP_CRITICAL_VALUE,
+	.critical_level     = MEMNOTI_TMP_CRITICAL_VALUE,
+	.full_level         = MEMNOTI_FULL_VALUE,
+};
+
+static void memnoti_send_broadcast(char *signal, int status)
 {
-	static int old = 0;
 	char *arr[1];
 	char str_status[32];
 
-	if (old == status)
-		return;
-
-	old = status;
+	_I("signal %s status %d", signal, status);
 	snprintf(str_status, sizeof(str_status), "%d", status);
 	arr[0] = str_status;
 	broadcast_edbus_signal(DEVICED_PATH_LOWMEM, DEVICED_INTERFACE_LOWMEM,
-			SIGNAL_LOWMEM_STATE, "i", arr);
-}
-
-static void memnoti_level_broadcast(enum memnoti_level level)
-{
-	static int status = 0;
-	if (level == MEMNOTI_LEVEL_CRITICAL && status == 0)
-		status = 1;
-	else if (level != MEMNOTI_LEVEL_CRITICAL && status == 1)
-		status = 0;
-	else
-		return;
-	_D("send user mem noti : %d %d", level, status);
-	memnoti_send_broadcast(status);
+			signal, "i", arr);
 }
 
 static int memnoti_popup(enum memnoti_level level)
 {
 	int ret = -1;
+	int val = -1;
 	char *value = NULL;
 
 	if (level != MEMNOTI_LEVEL_WARNING && level != MEMNOTI_LEVEL_CRITICAL) {
-		_E("level check error : %d",level);
+		_E("level check error : %d", level);
 		return 0;
 	}
 
-	if (level == MEMNOTI_LEVEL_WARNING) {
-		value = "Warning";
-	} else if (level == MEMNOTI_LEVEL_CRITICAL) {
-		value = "Critical";
+	if (level == MEMNOTI_LEVEL_WARNING)
+		value = "lowstorage_warning";
+	else if (level == MEMNOTI_LEVEL_CRITICAL)
+		value = "lowstorage_critical";
+
+	ret = vconf_get_int(VCONFKEY_STARTER_SEQUENCE, &val);
+	if (val == 0 || ret != 0)
+		goto out;
+
+	if (value) {
+		ret = launch_system_app(APP_DEFAULT,
+				2, APP_KEY_TYPE, value);
+		if (ret < 0)
+			_E("Failed to launch (%s) popup", value);
 	}
 
-	ret = manage_notification("Low memory", value);
-	if (ret == -1)
-		return -1;
+	return 0;
+out:
+	return -1;
+}
+
+static void storage_status_broadcast(struct storage_config_info *info, double total, double avail)
+{
+	double level = (avail/total)*100;
+	int status = MEMNOTI_DISABLE;
+
+	if (level <= info->full_level) {
+		if (info->current_noti_level == MEMNOTI_LEVEL_FULL)
+			return;
+		info->current_noti_level = MEMNOTI_LEVEL_FULL;
+		status = MEMNOTI_ENABLE;
+		memnoti_send_broadcast(SIGNAL_LOWMEM_FULL, status);
+		return;
+	}
+
+	if (level <= info->critical_level) {
+		if (info->current_noti_level == MEMNOTI_LEVEL_CRITICAL)
+			return;
+		if (info->current_noti_level == MEMNOTI_LEVEL_FULL)
+			memnoti_send_broadcast(SIGNAL_LOWMEM_FULL, status);
+		info->current_noti_level = MEMNOTI_LEVEL_CRITICAL;
+		status = MEMNOTI_ENABLE;
+		memnoti_send_broadcast(SIGNAL_LOWMEM_STATE, status);
+		return;
+	}
+
+	if (info->current_noti_level == MEMNOTI_LEVEL_FULL)
+		memnoti_send_broadcast(SIGNAL_LOWMEM_FULL, status);
+	if (info->current_noti_level == MEMNOTI_LEVEL_CRITICAL)
+		memnoti_send_broadcast(SIGNAL_LOWMEM_STATE, status);
+	if (level <= info->warning_level)
+		info->current_noti_level = MEMNOTI_LEVEL_WARNING;
+	else
+		info->current_noti_level = MEMNOTI_LEVEL_NORMAL;
+}
+
+static int storage_get_memory_size(char *path, struct statvfs *s)
+{
+	int ret;
+
+	if (!path) {
+		_E("input param error");
+		return -EINVAL;
+	}
+
+	ret = statvfs(path, s);
+	if (ret) {
+		_E("fail to get storage size");
+		return -errno;
+	}
+
 	return 0;
 }
 
-static enum memnoti_level check_memnoti_level(double total, double avail)
+static void get_storage_status(char *path, struct statvfs *s)
 {
-	double tmp_size = (avail/total)*100;
-
-	if (tmp_size > storage_info.warning_level)
-		return MEMNOTI_LEVEL_NORMAL;
-	if (tmp_size > storage_info.critical_level)
-		return MEMNOTI_LEVEL_WARNING;
-	return MEMNOTI_LEVEL_CRITICAL;
+	if (strcmp(path, MEMORY_STATUS_USR_PATH) == 0)
+		storage_get_internal_memory_size(s);
+	else
+		storage_get_memory_size(path, s);
 }
 
-static void memnoti_full_broadcast(double total, double avail)
-{
-	static int status = 0;
-	int tmp = 0;
-	double tmp_size = (avail/total)*100;
-	char *arr[1];
-	char str_status[32];
-
-	tmp = status;
-	if (tmp_size <= storage_info.full_level && status == 0)
-		status = 1;
-	else if (tmp_size > storage_info.full_level && status == 1)
-		status = 0;
-	if (status == tmp)
-		return;
-
-	_D("send memory full noti : %d (total: %4.4lf avail: %4.4lf)", status, total, avail);
-	snprintf(str_status, sizeof(str_status), "%d", status);
-	arr[0] = str_status;
-	broadcast_edbus_signal(DEVICED_PATH_LOWMEM, DEVICED_INTERFACE_LOWMEM,
-			SIGNAL_LOWMEM_FULL, "i", arr);
-}
-
-static void memory_status_set_full_mem_size(void)
+static void init_storage_config_info(char *path, struct storage_config_info *info)
 {
 	struct statvfs s;
-	double dTotal = 0.0;
 	double dAvail = 0.0;
+	double dTotal = 0.0;
 
-	storage_get_internal_memory_size(&s);
-	dTotal = (double)s.f_frsize * s.f_blocks;
-	dAvail = (double)s.f_bsize * s.f_bavail;
+	get_storage_status(path, &s);
 
-	storage_info.full_level += (MEMORY_MEGABYTE_VALUE/dTotal)*100;
-	_I("full : %4.4lf avail : %4.4lf warning : %4.4lf critical : %4.4lf",
-		storage_info.full_level, (dAvail*100/dTotal),
-		storage_info.warning_level, storage_info.critical_level);
+	dTotal = (double)(s.f_frsize * s.f_blocks);
+	dAvail = (double)(s.f_bsize * s.f_bavail);
+
+	info->full_level += (MEMORY_MEGABYTE_VALUE/dTotal)*100;
+
+	_I("%s t: %4.0lf a: %4.0lf(%4.2lf) c:%4.4lf f:%4.4lf",
+		path, dTotal, dAvail, (dAvail*100/dTotal), info->critical_level, info->full_level);
 }
 
-static Eina_Bool memory_status_get_available_size(void *data)
+static void check_internal_storage_popup(struct storage_config_info *info)
 {
 	static enum memnoti_level old = MEMNOTI_LEVEL_NORMAL;
-	enum memnoti_level now;
 	int ret;
+
+	if (info->current_noti_level < MEMNOTI_LEVEL_NORMAL && info->current_noti_level < old) {
+		ret = memnoti_popup(info->current_noti_level);
+		if (ret != 0)
+			info->current_noti_level = MEMNOTI_LEVEL_NORMAL;
+	}
+	old = info->current_noti_level;
+}
+
+static Eina_Bool check_storage_status(void *data)
+{
 	struct statvfs s;
 	double dAvail = 0.0;
 	double dTotal = 0.0;
 
+	/* check internal */
 	storage_get_internal_memory_size(&s);
 	dTotal = (double)s.f_frsize * s.f_blocks;
 	dAvail = (double)s.f_bsize * s.f_bavail;
+	storage_status_broadcast(&storage_internal_info, dTotal, dAvail);
+	check_internal_storage_popup(&storage_internal_info);
+	/* check tmp */
+	storage_get_memory_size(MEMORY_STATUS_TMP_PATH, &s);
+	dTotal = (double)s.f_frsize * s.f_blocks;
+	dAvail = (double)s.f_bsize * s.f_bavail;
+	storage_status_broadcast(&storage_tmp_info, dTotal, dAvail);
 
-	memnoti_full_broadcast(dTotal, dAvail);
-
-	now = check_memnoti_level(dTotal, dAvail);
-
-	memnoti_level_broadcast(now);
-
-	if (now < MEMNOTI_LEVEL_NORMAL && now < old) {
-		ret = memnoti_popup(now);
-		if (ret != 0)
-			now = MEMNOTI_LEVEL_NORMAL;
-	}
-	old = now;
 	if (memnoti_timer)
 		ecore_timer_interval_set(memnoti_timer, MEMNOTI_TIMER_INTERVAL);
-out:
+
 	return EINA_TRUE;
 }
 
-static int __memnoti_fd_init(void)
+static int init_storage_config_info_all(void)
 {
-	memory_status_set_full_mem_size();
-	memory_status_get_available_size(NULL);
+	init_storage_config_info(MEMORY_STATUS_USR_PATH, &storage_internal_info);
+	init_storage_config_info(MEMORY_STATUS_TMP_PATH, &storage_tmp_info);
 	memnoti_timer = ecore_timer_add(MEMNOTI_TIMER_INTERVAL,
-				memory_status_get_available_size, NULL);
+				check_storage_status, NULL);
 	if (memnoti_timer == NULL)
-	    _E("fail mem available noti timer add");
-	return 0;
-}
-
-static Eina_Bool memory_trim_cb(void *data)
-{
-	ecore_timer_interval_set(memnoti_timer, MEM_TRIM_TIMER_INTERVAL);
-	if (launch_if_noexist(MEM_FSTRIM_PATH, MEMORY_STATUS_USR_PATH) == -1) {
-		_E("fail to launch fstrim");
-	} else {
-		_D("fs memory trim is operated");
-	}
-	return EINA_TRUE;
-}
-
-static int __mem_trim_delta(struct tm *cur_tm)
-{
-	int delta = 0;
-	int sign_val;
-
-	if (cur_tm->tm_hour < MEM_TRIM_START_TIME)
-		sign_val = 1;
-	else
-		sign_val = -1;
-	delta += ((sign_val) * (MEM_TRIM_START_TIME - cur_tm->tm_hour) * HOUR_SEC);
-	delta -= ((sign_val) * (cur_tm->tm_min * MIN_SEC + cur_tm->tm_sec));
-	return delta;
-}
-
-static int __run_mem_trim(void)
-{
-	time_t now;
-	struct tm *cur_tm;
-	int mem_trim_time;
-
-	now = time(NULL);
-	cur_tm = (struct tm *)malloc(sizeof(struct tm));
-	if (cur_tm == NULL) {
-		_E("Fail to memory allocation");
-		return -1;
-	}
-
-	if (localtime_r(&now, cur_tm) == NULL) {
-		_E("Fail to get localtime");
-		free(cur_tm);
-		return -1;
-	}
-
-	mem_trim_time = MEM_TRIM_TIMER_INTERVAL + __mem_trim_delta(cur_tm);
-	_D("start mem trim timer", mem_trim_time);
-	mem_trim_timer = ecore_timer_add(mem_trim_time, memory_trim_cb, NULL);
-	if (mem_trim_timer == NULL) {
-		_E("Fail to add mem trim timer");
-		free(cur_tm);
-		return -1;
-	}
-	free(cur_tm);
+		_E("fail mem available noti timer add");
 	return 0;
 }
 
@@ -296,7 +262,6 @@ static DBusMessage *edbus_getstatus(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
-	int ret;
 	struct statvfs s;
 	double dAvail = 0.0;
 	double dTotal = 0.0;
@@ -312,54 +277,74 @@ static DBusMessage *edbus_getstatus(E_DBus_Object *obj, DBusMessage *msg)
 	return reply;
 }
 
-static DBusMessage *edbus_memtrim(E_DBus_Object *obj, DBusMessage *msg)
+static DBusMessage *edbus_get_storage_status(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
+	DBusError err;
+	char *path;
+	struct statvfs s;
 	int ret;
+	pid_t pid;
+	double dAvail = 0.0;
+	double dTotal = 0.0;
 
-	ret = launch_if_noexist(MEM_FSTRIM_PATH, MEMORY_STATUS_USR_PATH);
-	if (ret == -1) {
-		_E("fail to launch fstrim");
-	} else {
-		_D("fs memory trim is operated");
+	dbus_error_init(&err);
+	if (!dbus_message_get_args(msg, &err, DBUS_TYPE_STRING, &path, DBUS_TYPE_INVALID)) {
+		_E("Bad message: [%s:%s]", err.name, err.message);
+		dbus_error_free(&err);
+		ret = -EBADMSG;
+		goto out;
 	}
 
+	if (!strcmp(path, MEMORY_STATUS_USR_PATH))
+		storage_get_internal_memory_size(&s);
+	else
+		storage_get_memory_size(path, &s);
+
+	dTotal = (double)s.f_frsize * s.f_blocks;
+	dAvail = (double)s.f_bsize * s.f_bavail;
+
+	pid = get_edbus_sender_pid(msg);
+
+	_D("[request %d] path %s total %4.0lf avail %4.0lf", pid, path, dTotal, dAvail);
+
+out:
 	reply = dbus_message_new_method_return(msg);
 	dbus_message_iter_init_append(reply, &iter);
-	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT64, &dTotal);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT64, &dAvail);
 	return reply;
 }
 
 static const struct edbus_method edbus_methods[] = {
-	{ "getstorage",       NULL,   "i", edbus_getstatus },
-	{ "MemTrim",       NULL,   "i", edbus_memtrim },
+	{ "getstorage", NULL, "i", edbus_getstatus },
+	{ "GetStatus",   "s", "i", edbus_get_storage_status},
 	/* Add methods here */
 };
 
 static int booting_done(void *data)
 {
-	static int done = 0;
+	static int done;
 
-	if (data != NULL) {
-		done = *(int*)data;
-		if (done)
-			_I("booting done");
-		if (__memnoti_fd_init() == -1)
-			_E("fail remain mem noti control fd init");
-	}
+	if (data == NULL)
+		return done;
+	done = *(int *)data;
+	if (done == 0)
+		return done;
+
+	_I("booting done");
+
+	if (init_storage_config_info_all() == -1)
+		_E("fail remain mem noti control fd init");
 	return done;
 }
 
-static int lowmem_poweroff(void *data)
+static int storage_poweroff(void *data)
 {
 	if (memnoti_timer) {
 		ecore_timer_del(memnoti_timer);
 		memnoti_timer = NULL;
-	}
-	if (mem_trim_timer) {
-		ecore_timer_del(mem_trim_timer);
-		mem_trim_timer = NULL;
 	}
 	return 0;
 }
@@ -375,6 +360,8 @@ static int load_config(struct parse_result *result, void *user_data)
 
 	if (!MATCH(result->section, "LOWSTORAGE"))
 		return -EINVAL;
+
+	_D("%s,%s,%s", result->section, result->name, result->value);
 
 	name = result->name;
 	value = result->value;
@@ -398,32 +385,28 @@ static void storage_config_load(struct storage_config_info *info)
 		_E("Failed to load %s, %d Use default value!", STORAGE_CONF_FILE, ret);
 }
 
-static void lowmem_init(void *data)
+static void storage_init(void *data)
 {
 	int ret;
 
-	storage_config_load(&storage_info);
+	storage_config_load(&storage_internal_info);
 	register_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
-	register_notifier(DEVICE_NOTIFIER_POWEROFF, lowmem_poweroff);
+	register_notifier(DEVICE_NOTIFIER_POWEROFF, storage_poweroff);
 	ret = register_edbus_method(DEVICED_PATH_STORAGE, edbus_methods, ARRAY_SIZE(edbus_methods));
 	if (ret < 0)
 		_E("fail to init edbus method(%d)", ret);
-
-	if (__run_mem_trim() < 0) {
-		_E("fail mem trim timer start");
-	}
 }
 
-static void lowmem_exit(void *data)
+static void storage_exit(void *data)
 {
 	unregister_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
-	unregister_notifier(DEVICE_NOTIFIER_POWEROFF, lowmem_poweroff);
+	unregister_notifier(DEVICE_NOTIFIER_POWEROFF, storage_poweroff);
 }
 
-static const struct device_ops lowmem_device_ops = {
-	.name     = "lowmem",
-	.init     = lowmem_init,
-	.exit	  = lowmem_exit,
+static const struct device_ops storage_device_ops = {
+	.name     = "storage",
+	.init     = storage_init,
+	.exit	  = storage_exit,
 };
 
-DEVICE_OPS_REGISTER(&lowmem_device_ops)
+DEVICE_OPS_REGISTER(&storage_device_ops)
