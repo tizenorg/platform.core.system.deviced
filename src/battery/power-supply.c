@@ -29,7 +29,6 @@
 #include "core/config-parser.h"
 #include "display/poll.h"
 #include "display/setting.h"
-#include "proc/proc-handler.h"
 #include "power-supply.h"
 #include "battery.h"
 
