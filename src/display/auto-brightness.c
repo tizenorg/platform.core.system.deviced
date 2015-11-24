@@ -33,7 +33,6 @@
 #include "core.h"
 #include "display-ops.h"
 #include "device-node.h"
-#include "proc/proc-handler.h"
 #include "core/device-notifier.h"
 #include "core/config-parser.h"
 
@@ -140,9 +139,6 @@ static void alc_set_brightness(int setting, int value, int lux)
 
 	if (value < min_brightness)
 		value = min_brightness;
-
-	if (cur_siop_level() != 0)
-		value = get_siop_brightness(value);
 
 	if (tmp_value != value) {
 		if (!setting && min_brightness == PM_MIN_BRIGHTNESS &&
