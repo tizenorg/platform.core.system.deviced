@@ -39,7 +39,6 @@
 #include "core/device-idler.h"
 #include "core/common.h"
 #include "core/devices.h"
-#include "proc/proc-handler.h"
 #include "display/poll.h"
 #include "display/setting.h"
 #include "core/edbus-handler.h"
