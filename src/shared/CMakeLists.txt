@@ -2,6 +2,7 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 
 SET(SHARED_SRCS
 	dbus.c
+	deviced-systemd.c
 )
 
 INCLUDE(FindPkgConfig)
