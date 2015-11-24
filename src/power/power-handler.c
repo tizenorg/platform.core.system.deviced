@@ -46,7 +46,6 @@
 #include "display/core.h"
 #include "power-handler.h"
 
-#define SIGNAL_NAME_POWEROFF_POPUP	"poweroffpopup"
 #define SIGNAL_BOOTING_DONE		"BootingDone"
 
 #define POWEROFF_DURATION		2
@@ -168,27 +167,6 @@ static int power_reboot(void)
 		return 0;
 	}
 	return ret;
-}
-
-static void poweroff_popup_edbus_signal_handler(void *data, DBusMessage *msg)
-{
-	DBusError err;
-	char *str;
-	int val = 0;
-
-	if (dbus_message_is_signal(msg, DEVICED_INTERFACE_NAME, SIGNAL_NAME_POWEROFF_POPUP) == 0) {
-		_E("there is no power off popup signal");
-		return;
-	}
-
-	dbus_error_init(&err);
-
-	if (dbus_message_get_args(msg, &err, DBUS_TYPE_STRING, &str, DBUS_TYPE_INVALID) == 0) {
-		_E("there is no message");
-		return;
-	}
-
-	power_execute(str);
 }
 
 static int booting_done(void *data)
@@ -473,8 +451,7 @@ void restart_ap(void *data)
 
 static const struct edbus_method edbus_methods[] = {
 	{ POWER_REBOOT, "si", "i", dbus_power_handler },
-	{ PWROFF_POPUP, "si", "i", dbus_power_handler },
-	/* be linked to device_power_reboot() public API. */
+	/* Public API device_power_reboot() calls this dbus method. */
 	{ "Reboot",      "s", "i", request_reboot },
 	/* Add methods here */
 };
@@ -485,13 +462,11 @@ static void power_init(void *data)
 	int ret;
 
 	/* init dbus interface */
-	ret = register_edbus_method(DEVICED_PATH_POWER, edbus_methods, ARRAY_SIZE(edbus_methods));
+	ret = register_edbus_method(DEVICED_PATH_POWER,
+			edbus_methods, ARRAY_SIZE(edbus_methods));
 	if (ret < 0)
 		_E("fail to init edbus method(%d)", ret);
 
-	register_edbus_signal_handler(DEVICED_OBJECT_PATH, DEVICED_INTERFACE_NAME,
-			SIGNAL_NAME_POWEROFF_POPUP,
-		    poweroff_popup_edbus_signal_handler);
 	register_edbus_signal_handler(DEVICED_PATH_CORE,
 		    DEVICED_INTERFACE_CORE,
 		    SIGNAL_BOOTING_DONE,
