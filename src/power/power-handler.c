@@ -25,6 +25,7 @@
 #include <vconf.h>
 #include <assert.h>
 #include <limits.h>
+#include <time.h>
 #include <vconf.h>
 #include <fcntl.h>
 #include <sys/reboot.h>
@@ -32,6 +33,9 @@
 #include <mntent.h>
 #include <sys/mount.h>
 #include <device-node.h>
+#include <bundle.h>
+#include <eventsystem.h>
+
 #include "dd-deviced.h"
 #include "core/log.h"
 #include "core/launch.h"
@@ -44,8 +48,9 @@
 #include "core/edbus-handler.h"
 #include "display/core.h"
 #include "power-handler.h"
+#include "apps/apps.h"
+#include "shared/deviced-systemd.h"
 
-#define SIGNAL_NAME_POWEROFF_POPUP	"poweroffpopup"
 #define SIGNAL_BOOTING_DONE		"BootingDone"
 
 #define POWEROFF_DURATION		2
@@ -87,28 +92,76 @@ static int telephony_exit(void *data)
 	return ret;
 }
 
+static void system_shutdown_send_system_event(void)
+{
+	bundle *b;
+	const char *str = EVT_VAL_SYSTEM_SHUTDOWN_TRUE;
+
+	b = bundle_create();
+	bundle_add_str(b, EVT_KEY_SYSTEM_SHUTDOWN, str);
+	eventsystem_send_system_event(SYS_EVENT_SYSTEM_SHUTDOWN, b);
+	bundle_free(b);
+}
+
+static void boot_complete_send_system_event(void)
+{
+	bundle *b;
+	const char *str = EVT_VAL_BOOT_COMPLETED_TRUE;
+
+	b = bundle_create();
+	bundle_add_str(b, EVT_KEY_BOOT_COMPLETED, str);
+	eventsystem_send_system_event(SYS_EVENT_BOOT_COMPLETED, b);
+	bundle_free(b);
+}
+
+static void poweroff_stop_systemd_service(void)
+{
+	_D("systemd service stop");
+	umount2("/sys/fs/cgroup", MNT_FORCE |MNT_DETACH);
+}
+
+static int stop_systemd_journald(void)
+{
+	int ret;
+
+	ret = deviced_systemd_stop_unit("systemd-journald.socket");
+	if (ret < 0) {
+		_E("failed to stop 'systemd-journald.socket'");
+		return ret;
+	}
+
+	ret |= deviced_systemd_stop_unit("systemd-journald.service");
+	if (ret < 0) {
+		_E("failed to stop 'systemd-journald.service'");
+		return ret;
+	}
+
+	return 0;
+}
+
 static void poweroff_start_animation(void)
 {
 	char params[128];
 	snprintf(params, sizeof(params), "/usr/bin/boot-animation --stop --clear");
 	launch_app_cmd_with_nice(params, -20);
+	gettimeofday(&tv_start_poweroff, NULL);
 	launch_evenif_exist("/usr/bin/sound_server", "--poweroff");
 	device_notify(DEVICE_NOTIFIER_POWEROFF_HAPTIC, NULL);
 }
 
-int previous_poweroff(void)
+static int poweroff(void)
 {
 	int ret;
 	static const struct device_ops *display_device_ops = NULL;
 
+	poweroff_start_animation();
 	telephony_start();
 
 	FIND_DEVICE_INT(display_device_ops, "display");
 
+	pm_change_internal(getpid(), LCD_NORMAL);
 	display_device_ops->exit(NULL);
 	sync();
-
-	gettimeofday(&tv_start_poweroff, NULL);
 
 	ret = telephony_exit(POWER_POWEROFF);
 
@@ -119,37 +172,17 @@ int previous_poweroff(void)
 	return ret;
 }
 
-static int poweroff(void)
-{
-	int retry_count = 0;
-	poweroff_start_animation();
-	while (retry_count < MAX_RETRY) {
-		if (previous_poweroff() < 0) {
-			_E("failed to request poweroff to deviced");
-			retry_count++;
-			continue;
-		}
-		return 0;
-	}
-	return -1;
-}
-
 static int pwroff_popup(void)
 {
-	int ret;
-
-	ret = manage_notification("Poweroff", "Poweroff");
-	if (ret == -1)
-		return -1;
-
-	return 0;
+	return launch_system_app(APP_POWEROFF,
+			2, APP_KEY_TYPE, APP_POWEROFF);
 }
 
 static int power_reboot(void)
 {
 	int ret;
-
 	const struct device_ops *display_device_ops = NULL;
+
 	poweroff_start_animation();
 	telephony_start();
 
@@ -159,35 +192,12 @@ static int power_reboot(void)
 	display_device_ops->exit(NULL);
 	sync();
 
-	gettimeofday(&tv_start_poweroff, NULL);
-
 	ret = telephony_exit(POWER_REBOOT);
 	if (ret < 0) {
 		restart_ap(NULL);
 		return 0;
 	}
 	return ret;
-}
-
-static void poweroff_popup_edbus_signal_handler(void *data, DBusMessage *msg)
-{
-	DBusError err;
-	char *str;
-	int val = 0;
-
-	if (dbus_message_is_signal(msg, DEVICED_INTERFACE_NAME, SIGNAL_NAME_POWEROFF_POPUP) == 0) {
-		_E("there is no power off popup signal");
-		return;
-	}
-
-	dbus_error_init(&err);
-
-	if (dbus_message_get_args(msg, &err, DBUS_TYPE_STRING, &str, DBUS_TYPE_INVALID) == 0) {
-		_E("there is no message");
-		return;
-	}
-
-	power_execute(str);
 }
 
 static int booting_done(void *data)
@@ -211,6 +221,11 @@ static void booting_done_edbus_signal_handler(void *data, DBusMessage *msg)
 		_E("there is no bootingdone signal");
 		return;
 	}
+
+	_I("real booting done, unlock LCD_OFF");
+	pm_unlock_internal(INTERNAL_LOCK_BOOTING, LCD_OFF, PM_SLEEP_MARGIN);
+	boot_complete_send_system_event();
+
 	done = booting_done(NULL);
 	if (done)
 		return;
@@ -239,18 +254,9 @@ static void poweroff_send_broadcast(int status)
 			SIGNAL_POWEROFF_STATE, "i", arr);
 }
 
-static void poweroff_stop_systemd_service(void)
-{
-	char buf[256];
-	_D("systemd service stop");
-	umount2("/sys/fs/cgroup", MNT_FORCE |MNT_DETACH);
-}
-
 static void poweroff_idler_cb(void *data)
 {
-	enum poweroff_type val = (int)data;
-	int ret;
-	int recovery;
+	enum poweroff_type val = (long)data;
 
 	telephony_start();
 
@@ -260,6 +266,7 @@ static void poweroff_idler_cb(void *data)
 	if (val == POWER_OFF_DIRECT || val == POWER_OFF_RESTART) {
 		poweroff_send_broadcast(val);
 		device_notify(DEVICE_NOTIFIER_POWEROFF, &val);
+		system_shutdown_send_system_event();
 	}
 
 	/* TODO for notify. will be removed asap. */
@@ -275,6 +282,8 @@ static void poweroff_idler_cb(void *data)
 	case POWER_OFF_RESTART:
 		power_reboot();
 		break;
+	default:
+		return;
 	}
 
 	if (update_pm_setting)
@@ -284,25 +293,26 @@ static void poweroff_idler_cb(void *data)
 static int power_execute(void *data)
 {
 	int ret;
-	int val;
+	long val;
+	char *str = (char *)data;
 
 	if (!data) {
 		_E("Invalid parameter : data(NULL)");
 		return -EINVAL;
 	}
 
-	if (strncmp(POWER_POWEROFF, (char *)data, POWER_POWEROFF_LEN) == 0)
+	if (strncmp(POWER_POWEROFF, str, POWER_POWEROFF_LEN) == 0)
 		val = POWER_OFF_DIRECT;
-	else if (strncmp(PWROFF_POPUP, (char *)data, PWROFF_POPUP_LEN) == 0)
+	else if (strncmp(PWROFF_POPUP, str, PWROFF_POPUP_LEN) == 0)
 		val = POWER_OFF_POPUP;
-	else if (strncmp(POWER_REBOOT, (char *)data, POWER_REBOOT_LEN) == 0)
+	else if (strncmp(POWER_REBOOT, str, POWER_REBOOT_LEN) == 0)
 		val = POWER_OFF_RESTART;
 	else {
-		_E("Invalid parameter : data(%s)", (char *)data);
+		_E("Invalid parameter : data(%s)", str);
 		return -EINVAL;
 	}
 
-	ret = add_idle_request(poweroff_idler_cb, (int*)val);
+	ret = add_idle_request(poweroff_idler_cb, (void *)val);
 	if (ret < 0) {
 		_E("fail to add poweroff idle request : %d", ret);
 		return ret;
@@ -314,35 +324,40 @@ static int power_execute(void *data)
 /* umount usr data partition */
 static void unmount_rw_partition()
 {
-	int retry = 0;
+	int retry = 0, r;
+	struct timespec time = {0,};
 	sync();
-#ifdef MICRO_DD
+
 	if (!mount_check(UMOUNT_RW_PATH))
 		return;
-#endif
 	while (1) {
 		switch (retry++) {
 		case 0:
 			/* Second, kill app with SIGTERM */
 			_I("Kill app with SIGTERM");
 			terminate_process(UMOUNT_RW_PATH, false);
-			sleep(3);
+			time.tv_nsec = 700 * NANO_SECOND_MULTIPLIER;
+			nanosleep(&time, NULL);
 			break;
 		case 1:
 			/* Last time, kill app with SIGKILL */
 			_I("Kill app with SIGKILL");
 			terminate_process(UMOUNT_RW_PATH, true);
+			time.tv_nsec = 300 * NANO_SECOND_MULTIPLIER;
+			nanosleep(&time, NULL);
 			sleep(1);
 			break;
 		default:
-			if (umount2(UMOUNT_RW_PATH, 0) != 0) {
-				_I("Failed to unmount %s", UMOUNT_RW_PATH);
-				return;
-			}
-			_I("%s unmounted successfully", UMOUNT_RW_PATH);
+			r = umount2(UMOUNT_RW_PATH, 0);
+			if (r != 0)
+				_I("Failed to unmount %s(%d)", UMOUNT_RW_PATH, r);
+			else
+				_I("%s unmounted successfully", UMOUNT_RW_PATH);
 			return;
 		}
-		if (umount2(UMOUNT_RW_PATH, 0) == 0) {
+
+		r = umount2(UMOUNT_RW_PATH, 0);
+		if (r == 0) {
 			_I("%s unmounted successfully", UMOUNT_RW_PATH);
 			return;
 		}
@@ -361,6 +376,9 @@ static void powerdown(void)
 		_E("during power off");
 		return;
 	}
+
+	stop_systemd_journald();
+
 	/* if this fails, that's OK */
 	telephony_stop();
 	power_off = 1;
@@ -472,25 +490,21 @@ void restart_ap(void *data)
 
 static const struct edbus_method edbus_methods[] = {
 	{ POWER_REBOOT, "si", "i", dbus_power_handler },
-	{ PWROFF_POPUP, "si", "i", dbus_power_handler },
-	/* be linked to device_power_reboot() public API. */
+	/* Public API device_power_reboot() calls this dbus method. */
 	{ "Reboot",      "s", "i", request_reboot },
 	/* Add methods here */
 };
 
 static void power_init(void *data)
 {
-	int bTelReady = 0;
 	int ret;
 
 	/* init dbus interface */
-	ret = register_edbus_method(DEVICED_PATH_POWER, edbus_methods, ARRAY_SIZE(edbus_methods));
+	ret = register_edbus_method(DEVICED_PATH_POWER,
+			edbus_methods, ARRAY_SIZE(edbus_methods));
 	if (ret < 0)
 		_E("fail to init edbus method(%d)", ret);
 
-	register_edbus_signal_handler(DEVICED_OBJECT_PATH, DEVICED_INTERFACE_NAME,
-			SIGNAL_NAME_POWEROFF_POPUP,
-		    poweroff_popup_edbus_signal_handler);
 	register_edbus_signal_handler(DEVICED_PATH_CORE,
 		    DEVICED_INTERFACE_CORE,
 		    SIGNAL_BOOTING_DONE,
