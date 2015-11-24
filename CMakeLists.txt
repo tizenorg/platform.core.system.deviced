@@ -150,6 +150,7 @@ SET(PKG_MODULES
 	capi-base-common
 	dbus-1
 	gio-2.0
+	eventsystem
 	libtzplatform-config
 	notification
 	hwcommon

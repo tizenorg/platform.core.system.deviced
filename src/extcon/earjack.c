@@ -19,12 +19,15 @@
 
 #include <stdio.h>
 #include <vconf.h>
+#include <bundle.h>
+#include <eventsystem.h>
 
 #include "core/log.h"
 #include "display/poll.h"
 #include "extcon/extcon.h"
 
 #define SIGNAL_EARJACK_STATE	"ChangedEarjack"
+#define GET_EARJACK_STATE		"Earjack"
 
 static void earjack_send_broadcast(int status)
 {
@@ -44,11 +47,28 @@ static void earjack_send_broadcast(int status)
 			SIGNAL_EARJACK_STATE, "i", arr);
 }
 
+static void earjack_send_system_event(int status)
+{
+	bundle *b;
+	const char *str;
+
+	if (status)
+		str = EVT_VAL_EARJACK_CONNECTED;
+	else
+		str = EVT_VAL_EARJACK_DISCONNECTED;
+
+	b = bundle_create();
+	bundle_add_str(b, EVT_KEY_EARJACK_STATUS, str);
+	eventsystem_send_system_event(SYS_EVENT_EARJACK_STATUS, b);
+	bundle_free(b);
+}
+
 static int earjack_update(int status)
 {
 	_I("jack - earjack changed %d", status);
 	vconf_set_int(VCONFKEY_SYSMAN_EARJACK, status);
 	earjack_send_broadcast(status);
+	earjack_send_system_event(status);
 	if (status != 0)
 		pm_change_internal(getpid(), LCD_NORMAL);
 
