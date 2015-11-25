@@ -38,6 +38,8 @@
 #endif
 
 #define HAPTIC_CONF_PATH			"/etc/deviced/haptic.conf"
+#define VIBRATION_CONF_PATH				"/usr/share/feedback/vibration.conf"
+#define EFFECT_CONF_PATH				"/usr/share/feedback/effect.conf"
 
 /* hardkey vibration variable */
 #define HARDKEY_VIB_ITERATION		1
@@ -51,6 +53,8 @@
 #define POWER_ON_VIB_DURATION			300
 #define POWER_OFF_VIB_DURATION			300
 #define POWER_VIB_FEEDBACK			100
+#define DEFAULT_DURATION			100
+#define HAPTIC_ITERATION_ONCE			1
 
 #define MAX_EFFECT_BUFFER			(64*1024)
 
@@ -61,6 +65,7 @@
 
 #define CHECK_VALID_OPS(ops, r)		((ops) ? true : !(r = -ENODEV))
 #define RETRY_CNT	3
+#define WHITESPACE	" \t"
 
 struct haptic_info {
 	char *sender;
@@ -83,12 +88,40 @@ struct haptic_config {
 	int sound_capture;
 };
 
+struct vibration_config {
+	char *pattern;
+	char *value;
+};
+
+struct effect_config {
+	char *effect_name;
+	char *value;
+	int iteration;
+	int duration;
+};
+
 static struct haptic_config haptic_conf;
+static dd_list *vib_conf_list;
+static dd_list *effect_conf_list;
 
 static int haptic_start(void);
 static int haptic_stop(void);
 static int haptic_internal_init(void);
 static int remove_haptic_info(struct haptic_info *info);
+
+static inline char *trim_str(char *s)
+{
+	char *t;
+	/* left trim */
+	s += strspn(s, WHITESPACE);
+
+	/* right trim */
+	for (t = strchr(s, 0); t > s; t--)
+		if (!strchr(WHITESPACE, t[-1]))
+			break;
+	*t = 0;
+	return s;
+}
 
 void add_haptic(const struct haptic_ops *ops)
 {
@@ -419,6 +452,89 @@ exit:
 	return reply;
 }
 
+static DBusMessage *edbus_vibrate_effect(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	unsigned int handle;
+	char *pattern;
+	char *effect_name;
+	char *data;
+	int level, priority, e_handle, ret = 0;
+	dd_list *v_elem, *e_elem;
+	struct vibration_config *v_conf;
+	struct effect_config *e_conf;
+
+	if (!CHECK_VALID_OPS(h_ops, ret))
+		goto exit;
+
+	if (haptic_disabled)
+		goto exit;
+
+	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_UINT32, &handle,
+				DBUS_TYPE_STRING, &pattern,
+				DBUS_TYPE_STRING, &effect_name,
+				DBUS_TYPE_INT32, &level,
+				DBUS_TYPE_INT32, &priority, DBUS_TYPE_INVALID)) {
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	_D("pattern: %s", pattern);
+
+	/* convert as per conf value */
+	level = convert_magnitude_by_conf(level);
+	if (level < 0) {
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	DD_LIST_FOREACH(vib_conf_list, v_elem, v_conf) {
+		if (!v_conf->pattern)
+			continue;
+		if (strncmp(v_conf->pattern, pattern, strlen(v_conf->pattern)+1))
+			continue;
+
+		if (!effect_name)
+			data = v_conf->value;
+		else {
+			if (!strncmp(effect_name, "NULL", strlen(effect_name)+1))
+				data = v_conf->value;
+			else
+				data = effect_name;
+		}
+		if (!data)
+			continue;
+		_D("data : %s", data);
+		break;
+	}
+	DD_LIST_FOREACH(effect_conf_list, e_elem, e_conf) {
+		if (strncmp(data, e_conf->effect_name, strlen(data)+1))
+			continue;
+		if (!e_conf->value)
+			continue;
+		if (strncmp(e_conf->value, "mono", strlen(e_conf->value)+1)) {
+			_D("It is not monotone");
+			ret = h_ops->vibrate_buffer(handle, e_conf->value,
+					e_conf->iteration, level, priority, &e_handle);
+			if (ret >= 0)
+				ret = e_handle;
+			break;
+		}
+		_D("It is monotone");
+		ret = h_ops->vibrate_monotone(handle, e_conf->duration, level, priority, &e_handle);
+		if (ret >= 0)
+			ret = e_handle;
+		break;
+	}
+
+exit:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+	return reply;
+}
+
 static DBusMessage *edbus_stop_device(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
@@ -582,6 +698,83 @@ static DBusMessage *edbus_show_handle_list(E_DBus_Object *obj, DBusMessage *msg)
 	}
 
 	return dbus_message_new_method_return(msg);
+}
+
+static DBusMessage *edbus_pattern_is_supported(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	char *data;
+	int ret = 0;
+	dd_list *elem;
+	struct vibration_config *conf;
+
+	if (!CHECK_VALID_OPS(h_ops, ret))
+		goto exit;
+
+	if (haptic_disabled)
+		goto exit;
+
+	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &data,
+				DBUS_TYPE_INVALID)) {
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	_D("pattern: %s", data);
+	DD_LIST_FOREACH(vib_conf_list, elem, conf) {
+		if (!conf->pattern)
+			continue;
+		if (!strncmp(conf->pattern, data, strlen(conf->pattern)+1)) {
+			ret = true;
+			break;
+		}
+	}
+	_I("pattern_is_supported : %d", ret);
+
+exit:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+	return reply;
+}
+
+static DBusMessage *edbus_pattern_get_effect_name(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int ret;
+	char *data;
+	char *effect = "NULL";
+	dd_list *elem;
+	struct vibration_config *conf;
+
+	if (!CHECK_VALID_OPS(h_ops, ret))
+		goto exit;
+
+	if (haptic_disabled)
+		goto exit;
+
+	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &data,
+				DBUS_TYPE_INVALID))
+		goto exit;
+
+	_D("pattern: %s", data);
+	DD_LIST_FOREACH(vib_conf_list, elem, conf) {
+		if (!conf->pattern)
+			continue;
+		if (!strncmp(conf->pattern, data, strlen(conf->pattern)+1)) {
+			effect = conf->value;
+			break;
+		}
+	}
+	_D("get_effect_name : %s", effect);
+
+exit:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &effect);
+	return reply;
 }
 
 static int haptic_internal_init(void)
@@ -749,6 +942,100 @@ out:
 	return 0;
 }
 
+static int vibration_load_config(struct parse_result *result, void *user_data)
+{
+	struct vibration_config *conf;
+
+	if (!result)
+		return 0;
+
+	if (!MATCH(result->section, "Vibration"))
+		return 0;
+
+
+	if (!result->name || !result->value)
+		return 0;
+
+	conf = (struct vibration_config *)malloc(sizeof(struct vibration_config));
+	if (!conf) {
+		_E("fail to alloc");
+		return -ENOMEM;
+	}
+
+	conf->pattern = strdup(result->name);
+	if (!conf->pattern)
+		_E("fail to copy %s pattern data", result->name);
+
+	conf->value = strdup(result->value);
+	if (!conf->value)
+		_E("fail to copy %s pattern value", result->value);
+
+	if (conf->pattern && conf->value)
+		_D("pattern : %s, value : %s", conf->pattern, conf->value);
+	DD_LIST_APPEND(vib_conf_list, conf);
+
+	return 0;
+}
+
+static int effect_load_config(struct parse_result *result, void *user_data)
+{
+	struct effect_config *conf;
+	char *value;
+	char *itr_dur_str;
+	char *split;
+	int ret;
+
+	if (!result)
+		return 0;
+
+	if (!MATCH(result->section, "Effect"))
+		return 0;
+
+	if (!result->name || !result->value)
+		return 0;
+
+	conf = (struct effect_config *)malloc(sizeof(struct effect_config));
+	if (!conf) {
+		_E("fail to alloc");
+		return -ENOMEM;
+	}
+
+	conf->effect_name = strdup(result->name);
+	if (!conf->effect_name)
+		_E("fail to copy %s effect name data", conf->effect_name);
+
+	split = strchr(result->value, ',');
+	if (!split || *split != ',') {
+		conf->value = strdup(result->value);
+		itr_dur_str = NULL;
+	} else {
+		*split = '\0';
+		conf->value = strdup(trim_str(result->value));
+		itr_dur_str = trim_str(split+1);
+	}
+	if (!conf->value)
+		_E("fail to copy %s effect value", conf->value);
+
+	if (!itr_dur_str) {
+		conf->iteration = HAPTIC_ITERATION_ONCE;
+		conf->duration = DEFAULT_DURATION;
+	} else {
+		if (!strncmp(conf->value, "mono", strlen(conf->value)+1)) {
+			conf->duration = atoi(itr_dur_str);
+			conf->iteration = HAPTIC_ITERATION_ONCE;
+		} else {
+			conf->iteration = atoi(itr_dur_str);
+			conf->duration = DEFAULT_DURATION;
+		}
+	}
+
+	DD_LIST_APPEND(effect_conf_list, conf);
+	_I("effect : %s, effect value : %s, iteration : %d, duration : %d",
+			conf->effect_name, conf->value, conf->iteration, conf->duration);
+
+	return 0;
+}
+
 static const struct edbus_method edbus_methods[] = {
 	{ "GetCount",          NULL,   "i", edbus_get_count },
 	{ "OpenDevice",         "i",   "i", edbus_open_device },
@@ -756,11 +1043,14 @@ static const struct edbus_method edbus_methods[] = {
 	{ "StopDevice",         "u",   "i", edbus_stop_device },
 	{ "VibrateMonotone", "uiii",   "i", edbus_vibrate_monotone },
 	{ "VibrateBuffer", "uayiii",   "i", edbus_vibrate_buffer },
+	{ "VibrateEffect",  "ussii",   "i", edbus_vibrate_effect },
 	{ "GetState",           "i",   "i", edbus_get_state },
 	{ "GetDuration",      "uay",   "i", edbus_get_duration },
 	{ "CreateEffect",    "iayi", "ayi", edbus_create_effect },
 	{ "SaveBinary",       "ays",   "i", edbus_save_binary },
 	{ "ShowHandleList",    NULL,  NULL, edbus_show_handle_list },
+	{ "IsSupported",        "s",   "i", edbus_pattern_is_supported },
+	{ "GetEffect",          "s",   "s", edbus_pattern_get_effect_name },
 	/* Add methods here */
 };
 
@@ -785,6 +1075,14 @@ static void haptic_init(void *data)
 		safe_free(haptic_conf.level_arr);
 	}
 
+	r = config_parse(VIBRATION_CONF_PATH, vibration_load_config, NULL);
+	if (r < 0)
+		_E("failed to load configuration file(%s) : %d", VIBRATION_CONF_PATH, r);
+
+	r = config_parse(EFFECT_CONF_PATH, effect_load_config, NULL);
+	if (r < 0)
+		_E("failed to load configuration file(%s) : %d", EFFECT_CONF_PATH, r);
+
 	/* init dbus interface */
 	r = register_edbus_interface_and_method(DEVICED_PATH_HAPTIC,
 			DEVICED_INTERFACE_HAPTIC,
@@ -804,6 +1102,8 @@ static void haptic_init(void *data)
 static void haptic_exit(void *data)
 {
 	struct haptic_ops *ops;
+	struct vibration_conf *v_conf;
+	struct effect_conf *e_conf;
 	dd_list *elem;
 	int r;
 
@@ -833,6 +1133,15 @@ static void haptic_exit(void *data)
 			break;
 		}
 	}
+
+	/* release vibration configure data */
+	DD_LIST_FOREACH(vib_conf_list, elem, v_conf)
+		free(v_conf);
+
+	/* release effect configure data */
+	DD_LIST_FOREACH(effect_conf_list, elem, e_conf)
+		free(e_conf);
+
 }
 
 static int haptic_start(void)
