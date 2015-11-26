@@ -25,6 +25,15 @@ enum device_change_type {
 	DEVICE_CHANGE_NORMAL	= 1,
 };
 
+enum charge_status_type {
+	CHARGE_STATUS_UNKNOWN,
+	CHARGE_STATUS_DISCONNECTED,
+	CHARGE_STATUS_CONNECTED,
+	CHARGE_STATUS_CHARGING,
+	CHARGE_STATUS_DISCHARGING,
+	CHARGE_STATUS_NOT_CHARGING,
+	CHARGE_STATUS_FULL,
+};
 enum charge_full_type {
 	CHARGING_NOT_FULL	= 0,
 	CHARGING_FULL		= 1,
@@ -68,6 +77,7 @@ enum battery_noti_status {
 
 struct battery_status {
 	int capacity;
+	int charge_status;
 	int charge_full;
 	int charge_now;
 	int health;

@@ -22,6 +22,8 @@
 #include <limits.h>
 #include <vconf.h>
 #include <fcntl.h>
+#include <bundle.h>
+#include <eventsystem.h>
 
 #include "battery.h"
 #include "config.h"
@@ -37,6 +39,7 @@
 #include "display/poll.h"
 #include "core/edbus-handler.h"
 #include "power/power-handler.h"
+#include "apps/apps.h"
 #include "power-supply.h"
 
 #define CHARGE_POWERSAVE_FREQ_ACT	"charge_powersave_freq_act"
@@ -79,8 +82,6 @@ static struct battery_config_info battery_info = {
 	.critical = BATTERY_CRITICAL,
 	.poweroff = BATTERY_POWEROFF,
 	.realoff  = BATTERY_REALOFF,
-	.warning_method = "warning",
-	.critical_method = "critical",
 };
 
 static dd_list *lpe;
@@ -251,25 +252,25 @@ static int lowbat_popup(char *option)
 		launched_poweroff = 0;
 
 	if (!strcmp(option, CRITICAL_LOW_BAT_ACT)) {
-		value = battery_info.critical_method;
+		value = "lowbattery_critical";
 		lowbat_popup_option = LOWBAT_OPT_CHECK;
 	} else if (!strcmp(option, WARNING_LOW_BAT_ACT)) {
-		value = battery_info.warning_method;
+		value = "lowbattery_warning";
 		lowbat_popup_option = LOWBAT_OPT_WARNING;
 	} else if (!strcmp(option, POWER_OFF_BAT_ACT)) {
 		value = "poweroff";
 		lowbat_popup_option = LOWBAT_OPT_POWEROFF;
 	} else if (!strcmp(option, CHARGE_ERROR_ACT)) {
-		value = "Charger error";
+		value = "chargeerr";
 		lowbat_popup_option = LOWBAT_OPT_CHARGEERR;
 	} else if (!strcmp(option, CHARGE_ERROR_LOW_ACT)) {
-		value = "Charger low temperature error";
+		value = "chargeerrlow";
 		lowbat_popup_option = LOWBAT_OPT_CHARGEERR;
 	} else if (!strcmp(option, CHARGE_ERROR_HIGH_ACT)) {
-		value = "Charger high temperature error";
+		value = "chargeerrhigh";
 		lowbat_popup_option = LOWBAT_OPT_CHARGEERR;
 	} else if (!strcmp(option, CHARGE_ERROR_OVP_ACT)) {
-		value = "Charger ovp error";
+		value = "chargeerrovp";
 		lowbat_popup_option = LOWBAT_OPT_CHARGEERR;
 	} else if (!strcmp(option, CHARGE_CHECK_ACT)) {
 		launched_poweroff = 0;
@@ -290,6 +291,11 @@ direct_launch:
 		if (lowbat_popup_option == LOWBAT_OPT_POWEROFF)
 			launched_poweroff = 1;
 
+		ret = launch_system_app(APP_DEFAULT,
+				2, APP_KEY_TYPE, "remove_battery_popups");
+		if (ret < 0)
+			_E("Failed to close all of battery popups");
+
 		r_disturb = vconf_get_int("memory/shealth/sleep/do_not_disturb", &s_disturb);
 		r_block = vconf_get_bool("db/setting/blockmode_wearable", &s_block);
 		if ((r_disturb != 0 && r_block != 0) ||
@@ -299,9 +305,8 @@ direct_launch:
 		else
 			_I("block LCD");
 
-		ret = manage_notification("Low battery", value);
-		if (ret == -1)
-			return -1;
+		return launch_system_app(APP_DEFAULT,
+				2, APP_KEY_TYPE, value);
 	} else {
 		_D("boot-animation running yet");
 	}
@@ -387,6 +392,36 @@ static void lowbat_scenario_init(void)
 	lowbat_add_scenario(battery_info.realoff, battery_info.realoff, battery_power_off_act);
 }
 
+static void battery_level_send_system_event(int bat_percent)
+{
+	bundle *b;
+	const char *str;
+	static const char *prev;
+
+	if (bat_percent > BATTERY_LEVEL_CHECK_FULL)
+		str = EVT_VAL_BATTERY_LEVEL_FULL;
+	else if (bat_percent > BATTERY_LEVEL_CHECK_HIGH)
+		str = EVT_VAL_BATTERY_LEVEL_HIGH;
+	else if (bat_percent > BATTERY_LEVEL_CHECK_LOW)
+		str = EVT_VAL_BATTERY_LEVEL_LOW;
+	else if (bat_percent > BATTERY_LEVEL_CHECK_CRITICAL)
+		str = EVT_VAL_BATTERY_LEVEL_CRITICAL;
+	else
+		str = EVT_VAL_BATTERY_LEVEL_EMPTY;
+
+	if (prev == str)
+		return;
+
+	prev = str;
+
+	_D("system_event(%s)", str);
+
+	b = bundle_create();
+	bundle_add_str(b, EVT_KEY_BATTERY_LEVEL_STATUS, str);
+	eventsystem_send_system_event(SYS_EVENT_BATTERY_LEVEL_STATUS, b);
+	bundle_free(b);
+}
+
 static void change_lowbat_level(int bat_percent)
 {
 	int prev, now;
@@ -430,6 +465,7 @@ static int lowbat_process(int bat_percent, void *ad)
 	if (new_bat_capacity < 0)
 		return -EINVAL;
 	change_lowbat_level(new_bat_capacity);
+	battery_level_send_system_event(new_bat_capacity);
 
 	if (new_bat_capacity != cur_bat_capacity) {
 		_D("[BAT_MON] cur = %d new = %d", cur_bat_capacity, new_bat_capacity);
@@ -532,6 +568,7 @@ static int check_lowbat_percent(int *pct)
 	if (bat_percent > 100)
 		bat_percent = 100;
 	change_lowbat_level(bat_percent);
+	battery_level_send_system_event(bat_percent);
 	*pct = bat_percent;
 	return 0;
 }

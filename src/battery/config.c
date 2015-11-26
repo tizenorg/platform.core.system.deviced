@@ -59,12 +59,6 @@ static int load_config(struct parse_result *result, void *user_data)
 		info->poweroff = atoi(value);
 	else if (MATCH(name, "RealOff"))
 		info->realoff = atoi(value);
-	else if (MATCH(name, "WarningMethod"))
-		snprintf(info->warning_method,
-				sizeof(info->warning_method), "%s", value);
-	else if (MATCH(name, "CriticalMethod"))
-		snprintf(info->critical_method,
-				sizeof(info->critical_method), "%s", value);
 
 	return 0;
 }

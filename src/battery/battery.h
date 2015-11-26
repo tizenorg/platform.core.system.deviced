@@ -37,8 +37,6 @@ struct battery_config_info {
 	int critical;
 	int poweroff;
 	int realoff;
-	char warning_method[METHOD_NAME_MAX];
-	char critical_method[METHOD_NAME_MAX];
 };
 
 int battery_charge_err_low_act(void *data);

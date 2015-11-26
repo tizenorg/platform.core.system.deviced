@@ -34,8 +34,6 @@
 #define POWER_PATH              "/sys/class/power_supply/battery"
 #define POWER_SUPPLY_UEVENT     POWER_PATH"/uevent"
 #define CAPACITY                "POWER_SUPPLY_CAPACITY"
-#define CHARGE_FULL             "POWER_SUPPLY_CHARGE_FULL"
-#define CHARGE_NOW              "POWER_SUPPLY_CHARGE_NOW"
 #define CHARGE_HEALTH           "POWER_SUPPLY_HEALTH"
 #define CHARGE_PRESENT          "POWER_SUPPLY_PRESENT"
 #define CHARGE_NAME             "POWER_SUPPLY_NAME"

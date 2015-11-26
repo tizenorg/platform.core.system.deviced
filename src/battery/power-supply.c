@@ -22,6 +22,9 @@
 #include <vconf.h>
 #include <Ecore.h>
 #include <device-node.h>
+#include <bundle.h>
+#include <eventsystem.h>
+
 #include "core/devices.h"
 #include "core/device-notifier.h"
 #include "core/udev.h"
@@ -29,6 +32,7 @@
 #include "core/config-parser.h"
 #include "display/poll.h"
 #include "display/setting.h"
+#include "apps/apps.h"
 #include "power-supply.h"
 #include "battery.h"
 
@@ -52,15 +56,8 @@
 #define METHOD_FULL_NOTI_OFF  "BatteryFullNotiOff"
 #define METHOD_CHARGE_NOTI_ON "BatteryChargeNotiOn"
 
-#define CHARGE_SIOP_DISABLE_SIGNAL "SiopDisable"
-
 #define RETRY_MAX 5
 #define BATTERY_CHECK_TIMER_INTERVAL (0.5)
-
-enum siop_disable_status_type {
-	SIOP_ENABLE  = 0,
-	SIOP_DISABLE = 1,
-};
 
 enum power_supply_init_type {
 	POWER_SUPPLY_NOT_READY   = 0,
@@ -73,7 +70,6 @@ static const struct uevent_handler uh = {
 	.uevent_func = uevent_power_handler,
 };
 
-static int siop_disable = SIOP_ENABLE;
 struct battery_status battery;
 static int noti_id;
 static Ecore_Timer *power_timer;
@@ -101,16 +97,15 @@ static void pm_check_and_change(int bInserted)
 
 static int changed_battery_cf(enum present_type status)
 {
-	int ret;
+	char *value;
 
-	if (status != PRESENT_ABNORMAL)
-		return 0;
+	if (status == PRESENT_ABNORMAL)
+		value = "battdisconnect";
+	else
+		value = "remove_battery_popups";
 
-	ret = manage_notification("Battery disconnect", "Battery disconnect");
-	if (ret < 0)
-		return -1;
-
-	return 0;
+	return launch_system_app(APP_DEFAULT,
+			2, APP_KEY_TYPE, value);
 }
 
 static void abnormal_popup_timer_init(void)
@@ -142,7 +137,6 @@ static Eina_Bool health_timer_cb(void *data)
 		return EINA_FALSE;
 
 	_I("popup - Battery health status is not good");
-	siop_disable = SIOP_DISABLE;
 	device_notify(DEVICE_NOTIFIER_BATTERY_HEALTH, (void *)HEALTH_BAD);
 	pm_change_internal(getpid(), LCD_NORMAL);
 	pm_lock_internal(INTERNAL_LOCK_POPUP, LCD_DIM, STAY_CUR_STATE, 0);
@@ -351,6 +345,38 @@ static void check_power_supply(int state)
 		update_pm_setting(SETTING_CHARGING, state);
 }
 
+static void charger_state_send_system_event(int state)
+{
+	bundle *b;
+	const char *str;
+
+	switch (state) {
+	case CHARGE_STATUS_CHARGING:
+		str = EVT_VAL_BATTERY_CHARGER_CHARGING;
+		break;
+	case CHARGE_STATUS_FULL:
+	case CHARGE_STATUS_DISCHARGING:
+		str = EVT_VAL_BATTERY_CHARGER_DISCHARGING;
+		break;
+	case CHARGE_STATUS_CONNECTED:
+		str = EVT_VAL_BATTERY_CHARGER_CONNECTED;
+		break;
+	case CHARGE_STATUS_DISCONNECTED:
+		str = EVT_VAL_BATTERY_CHARGER_DISCONNECTED;
+		break;
+	default:
+		_E("invalid parameter(%d)", state);
+		return;
+	}
+
+	_D("system_event(%s)", str);
+
+	b = bundle_create();
+	bundle_add_str(b, EVT_KEY_BATTERY_CHARGER_STATUS, str);
+	eventsystem_send_system_event(SYS_EVENT_BATTERY_CHARGER_STATUS, b);
+	bundle_free(b);
+}
+
 static void update_present(enum battery_noti_status status)
 {
 	static int old = DEVICE_NOTI_OFF;
@@ -385,7 +411,6 @@ static void update_health(enum battery_noti_status status)
 	pm_change_internal(getpid(), LCD_NORMAL);
 	if (status == DEVICE_NOTI_ON) {
 		_I("popup - Battery health status is not good");
-		siop_disable = SIOP_DISABLE;
 		device_notify(DEVICE_NOTIFIER_BATTERY_HEALTH, (void *)HEALTH_BAD);
 		pm_lock_internal(INTERNAL_LOCK_POPUP, LCD_DIM, STAY_CUR_STATE, 0);
 		if (battery.temp == TEMP_LOW)
@@ -393,7 +418,6 @@ static void update_health(enum battery_noti_status status)
 		else if (battery.temp == TEMP_HIGH)
 			battery_charge_err_high_act(NULL);
 	} else {
-		siop_disable = SIOP_ENABLE;
 		device_notify(DEVICE_NOTIFIER_BATTERY_HEALTH, (void *)HEALTH_GOOD);
 		pm_unlock_internal(INTERNAL_LOCK_POPUP, LCD_DIM, PM_SLEEP_MARGIN);
 		health_status_broadcast();
@@ -457,6 +481,13 @@ static void check_battery_status(void)
 static void check_online(void)
 {
 	static int old_online;
+	static int old_charge_status;
+	int charge_status;
+
+	if (battery.charge_status == CHARGE_STATUS_FULL)
+		charge_status = CHARGE_STATUS_DISCHARGING;
+	else
+		charge_status = battery.charge_status;
 
 	if (battery.online > POWER_SUPPLY_TYPE_BATTERY &&
 	    old_online == VCONFKEY_SYSMAN_CHARGER_DISCONNECTED) {
@@ -464,33 +495,60 @@ static void check_online(void)
 		vconf_set_int(VCONFKEY_SYSMAN_CHARGER_STATUS, old_online);
 		power_supply_broadcast(CHARGER_STATUS_SIGNAL, old_online);
 		check_power_supply(old_online);
+		charger_state_send_system_event(CHARGE_STATUS_CONNECTED);
+		if (charge_status != old_charge_status)
+			charger_state_send_system_event(charge_status);
+
 	} else if (battery.online <= POWER_SUPPLY_TYPE_BATTERY &&
 	    old_online == VCONFKEY_SYSMAN_CHARGER_CONNECTED) {
 		old_online = VCONFKEY_SYSMAN_CHARGER_DISCONNECTED;
 		vconf_set_int(VCONFKEY_SYSMAN_CHARGER_STATUS, old_online);
 		power_supply_broadcast(CHARGER_STATUS_SIGNAL, old_online);
 		check_power_supply(old_online);
+		if (charge_status != old_charge_status)
+			charger_state_send_system_event(charge_status);
+		charger_state_send_system_event(CHARGE_STATUS_DISCONNECTED);
+
+	} else {
+		if (charge_status != old_charge_status)
+			charger_state_send_system_event(charge_status);
 	}
+
+	old_charge_status = charge_status;
 }
 
 static void check_charge_status(const char *env_value)
 {
 	if (env_value == NULL)
 		return;
+
+	_D("Charge Status(%s)", env_value);
+
 	if (strncmp(env_value, CHARGEFULL_NAME,
-				sizeof(CHARGEFULL_NAME)) == 0) {
+				sizeof(CHARGEFULL_NAME)) == 0)
+		battery.charge_status = CHARGE_STATUS_FULL;
+	else if (strncmp(env_value, CHARGENOW_NAME,
+				sizeof(CHARGENOW_NAME)) == 0)
+		battery.charge_status = CHARGE_STATUS_CHARGING;
+	else if (strncmp(env_value, DISCHARGE_NAME,
+				sizeof(DISCHARGE_NAME)) == 0)
+		battery.charge_status = CHARGE_STATUS_DISCHARGING;
+	else if (strncmp(env_value, NOTCHARGE_NAME,
+				sizeof(NOTCHARGE_NAME)) == 0)
+		battery.charge_status = CHARGE_STATUS_NOT_CHARGING;
+	else
+		battery.charge_status = CHARGE_STATUS_UNKNOWN;
+
+	if (battery.charge_status == CHARGE_STATUS_FULL) {
 		battery.charge_full = CHARGING_FULL;
 		battery.charge_now = CHARGER_DISCHARGING;
-	} else if (strncmp(env_value, CHARGENOW_NAME,
-				sizeof(CHARGENOW_NAME)) == 0) {
+	} else if (battery.charge_status == CHARGE_STATUS_CHARGING) {
 		battery.charge_full = CHARGING_NOT_FULL;
 		battery.charge_now = CHARGER_CHARGING;
-	} else if (strncmp(env_value, DISCHARGE_NAME,
-				sizeof(DISCHARGE_NAME)) == 0) {
+	} else if (battery.charge_status == CHARGE_STATUS_DISCHARGING) {
 		battery.charge_full = CHARGING_NOT_FULL;
 		battery.charge_now = CHARGER_DISCHARGING;
-	} else if (strncmp(env_value, NOTCHARGE_NAME,
-				sizeof(NOTCHARGE_NAME)) == 0) {
+	} else if (battery.charge_status == CHARGE_STATUS_NOT_CHARGING) {
 		battery.charge_full = CHARGING_NOT_FULL;
 		battery.charge_now = CHARGER_ABNORMAL;
 	} else {
@@ -568,6 +626,7 @@ static void process_power_supply(void *data)
 
 	old.capacity = battery.capacity;
 	old.online = battery.online;
+	old.charge_status = battery.charge_status;
 	old.charge_now = battery.charge_now;
 	old.charge_full = battery.charge_full;
 
@@ -666,10 +725,7 @@ static void power_supply_status_init(void)
 	    capacity == battery.capacity)
 		return;
 
-	if (charge_now != battery.charge_now ||
-	    charge_full != battery.charge_full ||
-	    capacity != battery.capacity)
-		_I("charging %d full %d capacity %d", battery.charge_now, battery.charge_full, battery.capacity);
+	_I("charging %d full %d capacity %d", battery.charge_now, battery.charge_full, battery.capacity);
 
 	if (charge_now != battery.charge_now) {
 		vconf_set_int(VCONFKEY_SYSMAN_BATTERY_CHARGE_NOW, battery.charge_now);
@@ -812,20 +868,6 @@ static DBusMessage *dbus_get_health(E_DBus_Object *obj, DBusMessage *msg)
 	return reply;
 }
 
-static DBusMessage *dbus_get_siop_disable_status(E_DBus_Object *obj, DBusMessage *msg)
-{
-	DBusMessageIter iter;
-	DBusMessage *reply;
-	int ret;
-
-	ret = siop_disable;
-
-	reply = dbus_message_new_method_return(msg);
-	dbus_message_iter_init_append(reply, &iter);
-	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
-	return reply;
-}
-
 static DBusMessage *dbus_power_supply_handler(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusError err;
@@ -901,7 +943,6 @@ static const struct edbus_method edbus_methods[] = {
 	{ CHARGE_CAPACITY_LAW_SIGNAL, NULL, "i", dbus_get_percent_raw },
 	{ CHARGE_FULL_SIGNAL,         NULL, "i", dbus_is_full },
 	{ CHARGE_HEALTH_SIGNAL,       NULL, "i", dbus_get_health },
-	{ CHARGE_SIOP_DISABLE_SIGNAL, NULL, "i", dbus_get_siop_disable_status },
 	{ POWER_SUBSYSTEM,       "sisssss", "i", dbus_power_supply_handler },
 };
 
