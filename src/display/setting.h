@@ -49,7 +49,7 @@ enum {
 
 extern int (*update_pm_setting) (int key_idx, int val);
 
-extern int get_setting_brightness();
+int get_setting_brightness(int *level);
 
 /*
  * @brief setting initialization function

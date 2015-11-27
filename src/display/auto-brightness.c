@@ -26,15 +26,18 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <vconf.h>
-#include <sensor_internal.h>
+#include <sensor.h>
 #include <Ecore.h>
 
 #include "util.h"
 #include "core.h"
 #include "display-ops.h"
 #include "device-node.h"
+#include "setting.h"
 #include "core/device-notifier.h"
 #include "core/config-parser.h"
+
+#define METHOD_CHECK_SUPPORTED	"CheckSupported"
 
 #define DISP_FORCE_SHIFT	12
 #define DISP_FORCE_CMD(prop, force)	(((force) << DISP_FORCE_SHIFT) | prop)
@@ -77,9 +80,9 @@ struct lbm_config lbm_conf = {
 static int (*_default_action) (int);
 static Ecore_Timer *alc_timeout_id = 0;
 static Ecore_Timer *update_timeout;
-static int light_handle = -1;
-static int accel_handle = -1;
-static int fault_count = 0;
+static sensor_listener_h light_listener;
+static sensor_listener_h accel_listener;
+static int fault_count;
 static int automatic_brt = DEFAULT_AUTOMATIC_BRT;
 static int min_brightness = PM_MIN_BRIGHTNESS;
 static char *min_brightness_name = 0;
@@ -88,15 +91,15 @@ static int lbm_state = -1;
 
 static bool update_working_position(void)
 {
-	sensor_data_t data;
+	sensor_event_s data;
 	int ret;
 	float x, y, z, pitch, realg;
 
 	if (!display_conf.accel_sensor_on)
 		return false;
 
-	ret = sf_get_data(accel_handle, ACCELEROMETER_BASE_DATA_SET, &data);
-	if (ret < 0) {
+	ret = sensor_listener_read_data(accel_listener, &data);
+	if (ret != SENSOR_ERROR_NONE) {
 		_E("Fail to get accelerometer data! %d", ret);
 		return true;
 	}
@@ -113,17 +116,6 @@ static bool update_working_position(void)
 	if (pitch >= WORKING_ANGLE_MIN && pitch <= WORKING_ANGLE_MAX)
 		return true;
 	return false;
-}
-
-static int get_siop_brightness(int value)
-{
-	int brt;
-
-	brt = DEFAULT_DISPLAY_MAX_BRIGHTNESS;
-	if (value > brt)
-		return brt;
-
-	return value;
 }
 
 static void alc_set_brightness(int setting, int value, int lux)
@@ -221,9 +213,6 @@ static bool check_brightness_changed(int value)
 	int i;
 	static int values[MAX_SAMPLING_COUNT], count = 0;
 
-	if (!get_hallic_open())
-		return false;
-
 	if (count >= MAX_SAMPLING_COUNT || count < 0)
 		count = 0;
 
@@ -238,13 +227,12 @@ static bool check_brightness_changed(int value)
 static bool alc_update_brt(bool setting)
 {
 	int value = 0;
-	int cal_value = 0;
 	int ret = -1;
 	int cmd;
-	sensor_data_t light_data;
+	sensor_event_s light_data;
 
-	ret = sf_get_data(light_handle, LIGHT_LUX_DATA_SET, &light_data);
-	if (ret < 0 || (int)light_data.values[0] < 0) {
+	ret = sensor_listener_read_data(light_listener, &light_data);
+	if (ret != SENSOR_ERROR_NONE || (int)light_data.values[0] < 0) {
 		fault_count++;
 	} else {
 		int force = (setting ? 1 : 0);
@@ -287,9 +275,9 @@ static bool alc_update_brt(bool setting)
 	return EINA_TRUE;
 }
 
-static bool alc_handler(void* data)
+static bool alc_handler(void *data)
 {
-	if (pm_cur_state != S_NORMAL || !get_hallic_open()){
+	if (pm_cur_state != S_NORMAL){
 		if (alc_timeout_id > 0)
 			ecore_timer_del(alc_timeout_id);
 		alc_timeout_id = NULL;
@@ -323,76 +311,88 @@ static int alc_action(int timeout)
 	return -1;
 }
 
-static int connect_sfsvc(void)
+static int connect_sensor(void)
 {
-	int sf_state = -1;
+	int ret;
+	sensor_h sensor;
 
 	_I("connect with sensor fw");
 	/* light sensor */
-	light_handle = sf_connect(LIGHT_SENSOR);
-	if (light_handle < 0) {
-		_E("light sensor attach fail");
+	ret = sensor_get_default_sensor(SENSOR_LIGHT, &sensor);
+	if (ret != SENSOR_ERROR_NONE) {
+		_E("Failed to get default light sensor!");
 		goto error;
 	}
-	sf_state = sf_start(light_handle, 0);
-	if (sf_state < 0) {
-		_E("light sensor attach fail");
-		sf_disconnect(light_handle);
-		light_handle = -1;
+	ret = sensor_create_listener(&sensor, &light_listener);
+	if (ret != SENSOR_ERROR_NONE) {
+		_E("Failed to create listener(light)!");
 		goto error;
 	}
-	sf_change_sensor_option(light_handle, 1);
+	sensor_listener_set_option(light_listener, SENSOR_OPTION_ALWAYS_ON);
+	ret = sensor_listener_start(light_listener);
+	if (ret != SENSOR_ERROR_NONE) {
+		_E("Failed to start light sensor!");
+		sensor_destroy_listener(light_listener);
+		light_listener = 0;
+		goto error;
+	}
 
 	if (!display_conf.accel_sensor_on)
 		goto success;
 
 	/* accelerometer sensor */
-	accel_handle = sf_connect(ACCELEROMETER_SENSOR);
-	if (accel_handle < 0) {
-		_E("accelerometer sensor attach fail");
+	ret = sensor_get_default_sensor(SENSOR_ACCELEROMETER, &sensor);
+	if (ret != SENSOR_ERROR_NONE) {
+		_E("Failed to get default accel sensor!");
 		goto error;
 	}
-	sf_state = sf_start(accel_handle, 0);
-	if (sf_state < 0) {
-		_E("accelerometer sensor attach fail");
-		sf_disconnect(accel_handle);
-		accel_handle = -1;
+	ret = sensor_create_listener(&sensor, &accel_listener);
+	if (ret != SENSOR_ERROR_NONE) {
+		_E("Failed to create listener(accel)!");
 		goto error;
 	}
-	sf_change_sensor_option(accel_handle, 1);
+	sensor_listener_set_option(accel_listener, SENSOR_OPTION_ALWAYS_ON);
+	ret = sensor_listener_start(accel_listener);
+	if (ret != SENSOR_ERROR_NONE) {
+		_E("Failed to start accel sensor!");
+		sensor_destroy_listener(accel_listener);
+		accel_listener = 0;
+		goto error;
+	}
 
 success:
 	fault_count = 0;
 	return 0;
 
 error:
-	if (light_handle >= 0) {
-		sf_stop(light_handle);
-		sf_disconnect(light_handle);
-		light_handle = -1;
+	if (light_listener > 0) {
+		sensor_listener_stop(light_listener);
+		sensor_destroy_listener(light_listener);
+		light_listener = 0;
 	}
-	if (display_conf.accel_sensor_on && accel_handle >= 0) {
-		sf_stop(accel_handle);
-		sf_disconnect(accel_handle);
-		accel_handle = -1;
+	if (display_conf.accel_sensor_on && accel_listener > 0) {
+		sensor_listener_stop(accel_listener);
+		sensor_destroy_listener(accel_listener);
+		accel_listener = 0;
 	}
 	return -EIO;
 }
 
-static int disconnect_sfsvc(void)
+static int disconnect_sensor(void)
 {
 	_I("disconnect with sensor fw");
 	/* light sensor*/
-	if(light_handle >= 0) {
-		sf_stop(light_handle);
-		sf_disconnect(light_handle);
-		light_handle = -1;
+	if (light_listener > 0) {
+		sensor_listener_stop(light_listener);
+		sensor_destroy_listener(light_listener);
+		light_listener = 0;
 	}
+
 	/* accelerometer sensor*/
-	if (display_conf.accel_sensor_on && accel_handle >= 0) {
-		sf_stop(accel_handle);
-		sf_disconnect(accel_handle);
-		accel_handle = -1;
+	if (display_conf.accel_sensor_on && accel_listener > 0) {
+		sensor_listener_stop(accel_listener);
+		sensor_destroy_listener(accel_listener);
+		accel_listener = 0;
 	}
 
 	if (_default_action != NULL) {
@@ -407,11 +407,10 @@ static int disconnect_sfsvc(void)
 	return 0;
 }
 
-static inline void set_brtch_state(void)
+void set_brightness_changed_state(void)
 {
 	if (pm_status_flag & PWRSV_FLAG) {
 		pm_status_flag |= BRTCH_FLAG;
-		vconf_set_bool(VCONFKEY_PM_BRIGHTNESS_CHANGED_IN_LPM, true);
 		_D("brightness changed in low battery,"
 		    "escape dim state (light)");
 	}
@@ -422,14 +421,13 @@ static int set_autobrightness_state(int status)
 	int ret = -1;
 	int brt = -1;
 	int default_brt = -1;
-	int max_brt = -1;
 
 	if (status == SETTING_BRIGHTNESS_AUTOMATIC_ON) {
-		if(connect_sfsvc() < 0)
+		if (connect_sensor() < 0)
 			return -1;
 
 		/* escape dim state if it's in low battery.*/
-		set_brtch_state();
+		set_brightness_changed_state();
 
 		/* change alc action func */
 		if (_default_action == NULL)
@@ -443,19 +441,19 @@ static int set_autobrightness_state(int status)
 			    (Ecore_Task_Cb)alc_handler, NULL);
 	} else if (status == SETTING_BRIGHTNESS_AUTOMATIC_PAUSE) {
 		_I("auto brightness paused!");
-		disconnect_sfsvc();
+		disconnect_sensor();
 		lbm_state = 0;
 	} else {
-		disconnect_sfsvc();
+		disconnect_sensor();
 		lbm_state = 0;
 		/* escape dim state if it's in low battery.*/
-		set_brtch_state();
+		set_brightness_changed_state();
 
 		ret = get_setting_brightness(&default_brt);
 		if (ret != 0 || (default_brt < PM_MIN_BRIGHTNESS || default_brt > PM_MAX_BRIGHTNESS)) {
 			_I("fail to read vconf value for brightness");
 			brt = PM_DEFAULT_BRIGHTNESS;
-			if(default_brt < PM_MIN_BRIGHTNESS || default_brt > PM_MAX_BRIGHTNESS)
+			if (default_brt < PM_MIN_BRIGHTNESS || default_brt > PM_MAX_BRIGHTNESS)
 				vconf_set_int(VCONFKEY_SETAPPL_LCD_BRIGHTNESS, brt);
 			default_brt = brt;
 		}
@@ -490,35 +488,6 @@ static void set_alc_function(keynode_t *key_nodes, void *data)
 	}
 }
 
-static bool check_sfsvc(void* data)
-{
-	/* this function will return opposite value for re-callback in fail */
-	int vconf_auto;
-	int sf_state = 0;
-
-	_I("register sfsvc");
-
-	vconf_get_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT, &vconf_auto);
-	if (vconf_auto == SETTING_BRIGHTNESS_AUTOMATIC_ON) {
-		if(connect_sfsvc() < 0)
-			return EINA_TRUE;
-
-		/* change alc action func */
-		if (_default_action == NULL)
-			_default_action = states[S_NORMAL].action;
-		states[S_NORMAL].action = alc_action;
-		alc_timeout_id =
-		    ecore_timer_add(display_conf.lightsensor_interval,
-			    (Ecore_Task_Cb)alc_handler, NULL);
-		if (alc_timeout_id > 0)
-			return EINA_FALSE;
-		disconnect_sfsvc();
-		return EINA_TRUE;
-	}
-	_I("change vconf value before registering sfsvc");
-	return EINA_FALSE;
-}
-
 static void set_alc_automatic_brt(keynode_t *key_nodes, void *data)
 {
 	if (key_nodes == NULL) {
@@ -531,16 +500,13 @@ static void set_alc_automatic_brt(keynode_t *key_nodes, void *data)
 	alc_update_brt(true);
 }
 
-static Eina_Bool update_handler(void* data)
+static Eina_Bool update_handler(void *data)
 {
 	int ret, on;
 
 	update_timeout = NULL;
 
 	if (pm_cur_state != S_NORMAL)
-		return EINA_FALSE;
-
-	if (!get_hallic_open())
 		return EINA_FALSE;
 
 	ret = vconf_get_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT, &on);
@@ -569,7 +535,6 @@ static void update_auto_brightness(bool update)
 static int prepare_lsensor(void *data)
 {
 	int status, ret;
-	int sf_state = 0;
 	int brt = -1;
 
 	ret = vconf_get_int(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT, &status);
@@ -656,12 +621,28 @@ static int lcd_changed_cb(void *data)
 
 	if (!data)
 		return 0;
-
-	lcd_state = *(int*)data;
+	lcd_state = *(int *)data;
 	if (lcd_state == S_LCDOFF && alc_timeout_id > 0) {
 		ecore_timer_del(alc_timeout_id);
 		alc_timeout_id = NULL;
 	}
+
+	return 0;
+}
+
+static int booting_done_cb(void *data)
+{
+	int state;
+
+	if (!data)
+		return 0;
+
+	state = *(int *)data;
+	if (state != true)
+		return 0;
+
+	/* get light data from sensor fw */
+	prepare_lsensor(NULL);
 
 	return 0;
 }
@@ -695,6 +676,17 @@ static int lbm_load_config(struct parse_result *result, void *user_data)
 	return 0;
 }
 
+static void exit_lsensor(void)
+{
+	vconf_ignore_key_changed(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT,
+	    set_alc_function);
+
+	vconf_ignore_key_changed(VCONFKEY_SETAPPL_LCD_AUTOMATIC_BRIGHTNESS,
+	    set_alc_automatic_brt);
+
+	set_autobrightness_state(SETTING_BRIGHTNESS_AUTOMATIC_OFF);
+}
+
 static void auto_brightness_init(void *data)
 {
 	int ret;
@@ -710,21 +702,15 @@ static void auto_brightness_init(void *data)
 		    BOARD_CONF_FILE, ret);
 
 	register_notifier(DEVICE_NOTIFIER_LCD, lcd_changed_cb);
-
-	prepare_lsensor(NULL);
+	register_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done_cb);
 }
 
 static void auto_brightness_exit(void *data)
 {
-	vconf_ignore_key_changed(VCONFKEY_SETAPPL_BRIGHTNESS_AUTOMATIC_INT,
-	    set_alc_function);
-
-	vconf_ignore_key_changed(VCONFKEY_SETAPPL_LCD_AUTOMATIC_BRIGHTNESS,
-	    set_alc_automatic_brt);
+	exit_lsensor();
 
 	unregister_notifier(DEVICE_NOTIFIER_LCD, lcd_changed_cb);
-
-	set_autobrightness_state(SETTING_BRIGHTNESS_AUTOMATIC_OFF);
+	unregister_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done_cb);
 }
 
 static const struct display_ops display_autobrightness_ops = {

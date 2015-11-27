@@ -77,7 +77,7 @@ BuildRequires:  pkgconfig(x11)
 BuildRequires:  pkgconfig(xext)
 %endif
 BuildRequires:  pkgconfig(libinput)
-BuildRequires:  pkgconfig(sensor)
+BuildRequires:	pkgconfig(capi-system-sensor)
 %endif
 %if %{?storage_module} == on
 BuildRequires:	pkgconfig(storage)
