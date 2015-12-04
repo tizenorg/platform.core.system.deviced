@@ -14,6 +14,7 @@
 %define power_module on
 %define storage_module on
 %define telephony_module off
+%define touchscreen_module off
 %define tzip_module off
 %define usb_module on
 %define usbhost_module off
@@ -27,12 +28,14 @@
 %define haptic_module on
 %define led_module on
 %define telephony_module on
+%define touchscreen_module on
 %define tzip_module on
 %endif
 %if "%{?profile}" == "wearable"
 %define battery_module on
 %define haptic_module on
 %define telephony_module on
+%define touchscreen_module on
 %define tzip_module on
 %endif
 %if "%{?profile}" == "tv"
@@ -248,6 +251,7 @@ Haptic Device manager library for device control (devel)
 	-DPOWER_MODULE=%{power_module} \
 	-DSTORAGE_MODULE=%{storage_module} \
 	-DTELEPHONY_MODULE=%{telephony_module} \
+	-DTOUCHSCREEN_MODULE=%{touchscreen_module} \
 	-DTZIP_MODULE=%{tzip_module} \
 	-DUSB_MODULE=%{usb_module} \
 	-DUSBHOST_MODULE=%{usbhost_module} \
