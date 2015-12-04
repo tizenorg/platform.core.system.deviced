@@ -27,7 +27,6 @@
 #include "util.h"
 #include "core.h"
 #include "poll.h"
-#include "brightness.h"
 #include "device-node.h"
 #include "display-actor.h"
 #include "core/common.h"
@@ -407,23 +406,6 @@ static int process_power_key(struct input_event *pinput)
 	return ignore;
 }
 
-static int process_brightness_key(struct input_event *pinput, int action)
-{
-	if (pinput->value == KEY_RELEASED) {
-		stop_key_combination();
-		return true;
-	}
-
-	if (get_lock_screen_state() == VCONFKEY_IDLE_LOCK)
-		return false;
-
-	/* check weak function symbol */
-	if (!control_brightness_key)
-		return true;
-
-	return control_brightness_key(action);
-}
-
 static int process_screenlock_key(struct input_event *pinput)
 {
 	if (pinput->value != KEY_RELEASED) {
@@ -503,12 +485,6 @@ static int check_key(struct input_event *pinput, int fd)
 		break;
 	case KEY_POWER:
 		ignore = process_power_key(pinput);
-		break;
-	case KEY_BRIGHTNESSDOWN:
-		ignore = process_brightness_key(pinput, BRIGHTNESS_DOWN);
-		break;
-	case KEY_BRIGHTNESSUP:
-		ignore = process_brightness_key(pinput, BRIGHTNESS_UP);
 		break;
 	case KEY_SCREENLOCK:
 		ignore = process_screenlock_key(pinput);
