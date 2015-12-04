@@ -1652,12 +1652,12 @@ static int block_init_from_udev_enumerate(void)
 		if (!dev)
 			continue;
 
-		if (fnmatch(MMC_PATH, syspath, 0) &&
-		    fnmatch(SCSI_PATH, syspath, 0))
-			continue;
-
 		devnode = udev_device_get_devnode(dev);
 		if (!devnode)
+			continue;
+
+		if (fnmatch(MMC_PATH, devnode, 0) &&
+		    fnmatch(SCSI_PATH, devnode, 0))
 			continue;
 
 		_D("%s device add", devnode);
