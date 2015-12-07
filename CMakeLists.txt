@@ -128,7 +128,9 @@ ENDIF()
 IF(${USB_MODULE} STREQUAL on)
 	ADD_SOURCE(src/usb USB_SRCS)
 	ADD_SOURCE(src/usb/legacy-gadget USB_LEGACY_GADGET_SRCS)
-	SET(SRCS ${SRCS} ${USB_SRCS} ${USB_LEGACY_GADGET_SRCS})
+	ADD_SOURCE(src/usb/configfs USB_CFS_GADGET_SRCS)
+	SET(SRCS ${SRCS} ${USB_SRCS} ${USB_LEGACY_GADGET_SRCS} ${USB_CFS_GADGET_SRCS})
+	SET(USB_PKGS_MODULES libusbg)
 ENDIF()
 
 # usb host
@@ -155,6 +157,7 @@ SET(PKG_MODULES
 	libtzplatform-config
 	notification
 	hwcommon
+	${USB_PKGS_MODULES}
 )
 
 IF(DISPLAY_MODULE STREQUAL on)
@@ -222,6 +225,10 @@ ENDIF()
 IF(${USB_MODULE} STREQUAL on)
 	INSTALL_CONF(src/usb/legacy-gadget legacy-gadget-setting)
 	INSTALL_CONF(src/usb/legacy-gadget legacy-gadget-operation)
+
+	INSTALL_CONF(src/usb/configfs cfs-gadget-setting)
+	INSTALL_CONF(src/usb/configfs cfs-gadget-operations)
+	INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/usb/configfs/cfs-gadget.gs DESTINATION /etc/deviced)
 
 	# USB (Manual setting)
 	INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/scripts/direct_set_debug.sh DESTINATION bin)
