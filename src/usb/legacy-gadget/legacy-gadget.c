@@ -19,6 +19,9 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "core/log.h"
 #include "core/common.h"
@@ -203,12 +206,26 @@ static int update_configuration(char *name)
 			load_setting_config, name);
 }
 
+static inline int parse_base_config(char *name)
+{
+	int ret = 0;
+	bool base_config_initialized = false;
+
+	if (!base_config_initialized) {
+		ret = config_parse(LEGACY_GADGET_SETTING,
+				   load_base_config, name);
+
+		base_config_initialized = !(ret < 0);
+	}
+
+	return ret;
+}
+
 static int legacy_gadget_init(char *name)
 {
 	int ret;
 
-	ret = config_parse(USB_SETTING,
-			   load_base_config, name);
+	ret = parse_base_config(name);
 	if (ret < 0) {
 		_E("Failed to get base information(%d)", ret);
 		return ret;
@@ -253,9 +270,24 @@ static const struct usb_config_plugin_ops legacy_gadget_plugin = {
 
 static bool legacy_gadget_is_valid(void)
 {
+	struct stat st;
+	bool is_valid = false;
+	int ret;
+
+	ret = parse_base_config(NULL);
+	if (ret < 0) {
+		_E("Failed to get base information(%d)", ret);
+		return is_valid;
+	}
+
+	/* Check if slp-gadget is realy provided by kernel */
+	ret = stat(config_rootpath, &st);
+	if (!ret && S_ISDIR(st.st_mode))
+		is_valid = true;
+
 	/* TODO
 	 * add checking default config valid condition */
-	return true;
+	return is_valid;
 }
 
 static const struct usb_config_plugin_ops *legacy_gadget_load(void)
