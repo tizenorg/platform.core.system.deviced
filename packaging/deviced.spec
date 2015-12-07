@@ -58,6 +58,9 @@ Source3:    sysman.manifest
 Source4:    libslp-pm.manifest
 Source5:    haptic.manifest
 Source6:    devman.manifest
+%if %{?usb_module} == on
+Source7:    deviced.conf
+%endif
 
 BuildRequires:  cmake
 BuildRequires:  libattr-devel
@@ -88,6 +91,10 @@ BuildRequires:	pkgconfig(storage)
 %endif
 %if %{?telephony_module} == on
 BuildRequires:  pkgconfig(tapi)
+%endif
+%if %{?usb_module} == on
+BuildRequires:  pkgconfig(libusbg)
+Requires:       gt
 %endif
 %if %{?tzip_module} == on
 BuildRequires:	pkgconfig(fuse)
@@ -289,6 +296,12 @@ rm -rf %{buildroot}
 %install_service basic.target.wants sdb-prestart.service
 %endif
 
+# Directory for FFS mount points
+%if %{?usb_module} == on
+mkdir -p %{buildroot}%{_libdir}/tmpfiles.d/
+install -m 644 %{SOURCE7} %{buildroot}%{_libdir}/tmpfiles.d/deviced.conf
+%endif
+
 %post
 #memory type vconf key init
 users_gid=$(getent group %{TZ_SYS_USER_GROUP} | cut -f3 -d':')
@@ -364,6 +377,10 @@ systemctl daemon-reload
 %if %{?usb_module} == on
 %config %{_sysconfdir}/deviced/legacy-gadget-setting.conf
 %config %{_sysconfdir}/deviced/legacy-gadget-operation.conf
+%config %{_sysconfdir}/deviced/cfs-gadget.gs
+%config %{_sysconfdir}/deviced/cfs-gadget-setting.conf
+%config %{_sysconfdir}/deviced/cfs-gadget-operations.conf
+%{_libdir}/tmpfiles.d/deviced.conf
 %endif
 
 %{_unitdir}/sdb-prestart.service
