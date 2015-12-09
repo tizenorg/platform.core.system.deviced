@@ -30,6 +30,7 @@
 %define telephony_module on
 %define touchscreen_module on
 %define tzip_module on
+%define usbhost_module on
 %endif
 %if "%{?profile}" == "wearable"
 %define battery_module on
@@ -41,6 +42,7 @@
 %if "%{?profile}" == "tv"
 %define block_module on
 %define sdb_prestart off
+%define usbhost_module on
 %endif
 
 Name:       deviced
