@@ -17,14 +17,18 @@ unload_usb_gadget() {
 }
 
 sdb_set() {
-	load_usb_gadget "6860" "sdb" ""
+	load_usb_gadget "6860" "mtp" "mtp,acm,sdb"
+	/usr/bin/systemctl start mtp-responder.service
 	/usr/bin/systemctl start sdbd.service
+	/usr/bin/vconftool set -t int memory/sysman/usb_status 1 -f
 	echo "SDB enabled"
 }
 
 sdb_unset() {
 	unload_usb_gadget
+	/usr/bin/vconftool set -t int memory/sysman/usb_status 0 -f
 	/usr/bin/systemctl stop sdbd.service
+	/usr/bin/systemctl stop mtp-responder.service
 	echo "SDB disabled"
 }
 
