@@ -18,6 +18,7 @@
 
 
 #include <stdio.h>
+#include <hw/external_connection.h>
 
 #include "core/log.h"
 #include "core/list.h"
@@ -35,6 +36,8 @@
 #define BUF_MAX 256
 
 static dd_list *extcon_list;
+
+static struct external_connection_device *extcon_dev;
 
 void add_extcon(struct extcon_ops *dev)
 {
@@ -272,8 +275,47 @@ static const struct edbus_method edbus_methods[] = {
 	{ "disable",   "s", NULL, dbus_disable_device }, /* for devicectl */
 };
 
+/* used by HAL */
+static void extcon_changed(struct connection_info *info, void *data)
+{
+	if (!info)
+		return;
+
+	if (!info->name || !info->state)
+		return;
+
+	/* call to update */
+	extcon_update(info->name, info->state);
+
+	return 0;
+}
+
 static int extcon_probe(void *data)
 {
+	struct hw_info *info;
+	int ret;
+
+	if (extcon_dev)
+		return 0;
+
+	ret = hw_get_info(EXTERNAL_CONNECTION_HARDWARE_DEVICE_ID,
+			(const struct hw_info **)&info);
+	if (ret == 0) {
+		if (!info->open) {
+			_E("Failed to open extcon device; open(NULL)");
+			return -ENODEV;
+		}
+
+		ret = info->open(info, NULL, (struct hw_common **)&extcon_dev);
+		if (ret < 0) {
+			_E("Failed to get extcon device structure (%d)", ret);
+			return ret;
+		}
+
+		_I("extcon device structure load success");
+		return 0;
+	}
+
 	/**
 	 * find extcon class.
 	 * if there is no extcon class,
@@ -303,15 +345,24 @@ static void extcon_init(void *data)
 			dev->init(data);
 	}
 
-	/* register extcon uevent */
-	ret = register_kernel_uevent_control(&uh);
-	if (ret < 0)
-		_E("fail to register extcon uevent : %d", ret);
+	if (extcon_dev) { /* HAL is used */
+		if (extcon_dev->register_changed_event)
+			extcon_dev->register_changed_event(extcon_changed, NULL);
 
-	/* load the initialize value by accessing the node directly */
-	ret = get_extcon_init_state();
-	if (ret < 0)
-		_E("fail to init extcon nodes : %d", ret);
+		if (extcon_dev->get_current_state)
+			extcon_dev->get_current_state(extcon_changed, NULL);
+
+	} else {
+		/* register extcon uevent */
+		ret = register_kernel_uevent_control(&uh);
+		if (ret < 0)
+			_E("fail to register extcon uevent : %d", ret);
+
+		/* load the initialize value by accessing the node directly */
+		ret = get_extcon_init_state();
+		if (ret < 0)
+			_E("fail to init extcon nodes : %d", ret);
+	}
 
 	/* register extcon object first */
 	ret = register_edbus_interface_and_method(DEVICED_PATH_EXTCON,
@@ -325,12 +376,24 @@ static void extcon_exit(void *data)
 {
 	dd_list *l;
 	struct extcon_ops *dev;
+	struct hw_info *info;
 	int ret;
 
-	/* unreigster extcon uevent */
-	ret = unregister_kernel_uevent_control(&uh);
-	if (ret < 0)
-		_E("fail to unregister extcon uevent : %d", ret);
+	if (extcon_dev) {
+		if (extcon_dev->unregister_changed_event)
+			extcon_dev->unregister_changed_event(extcon_changed);
+
+		info = extcon_dev->common.info;
+		if (info)
+			info->close((struct hw_common *)extcon_dev);
+		extcon_dev = NULL;
+
+	} else {
+		/* unreigster extcon uevent */
+		ret = unregister_kernel_uevent_control(&uh);
+		if (ret < 0)
+			_E("fail to unregister extcon uevent : %d", ret);
+	}
 
 	/* deinitialize extcon devices */
 	DD_LIST_FOREACH(extcon_list, l, dev) {
