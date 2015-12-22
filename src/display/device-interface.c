@@ -469,8 +469,8 @@ int display_service_load(void)
 	r = hw_get_info(DISPLAY_HARDWARE_DEVICE_ID,
 			(const struct hw_info **)&info);
 	if (r < 0) {
-		_E("fail to load display shared library : %d", r);
-		return -ENOENT;
+		_I("display shared library is not supported: %d", r);
+		return 0;
 	}
 
 	if (!info->open) {
