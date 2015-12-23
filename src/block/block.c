@@ -644,7 +644,7 @@ static Eina_Bool pipe_cb(void *data, Ecore_Fd_Handler *fdh)
 	}
 
 	fd = ecore_main_fd_handler_fd_get(fdh);
-	if (!fd) {
+	if (fd <= 0) {
 		_E("fail to get fd");
 		goto out;
 	}
@@ -1335,6 +1335,7 @@ static void trigger_operation(struct block_device *bdev)
 		case BLOCK_DEV_FORMAT:
 			ret = block_format_device(bdev, op->data);
 			_D("Format (%s) result:(%d)", devnode, ret);
+			break;
 		case BLOCK_DEV_UNMOUNT:
 			ret = block_unmount_device(bdev, op->data);
 			_D("Unmount (%s) result:(%d)", devnode, ret);
