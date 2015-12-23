@@ -348,6 +348,11 @@ systemctl daemon-reload
 %{_datadir}/license/newfs_msdos
 %config %{_sysconfdir}/deviced/block.conf
 %endif
+%if "%{?profile}" == "tv"
+%if %{?display_module} == on
+%config %{_sysconfdir}/deviced/display.conf
+%endif
+%endif
 %if %{?storage_module} == on
 %config %{_sysconfdir}/deviced/storage.conf
 %endif

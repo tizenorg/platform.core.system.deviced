@@ -2232,7 +2232,7 @@ static void display_init(void *data)
 		check_seed_status();
 
 		if (display_conf.lcd_always_on) {
-			_D("LCD always on!");
+			_I("LCD always on!");
 			trans_table[S_NORMAL][EVENT_TIMEOUT] = S_NORMAL;
 		}
 
