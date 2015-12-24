@@ -195,7 +195,7 @@ void change_brightness(int start, int end, int step)
 	if (abs(diff) < step)
 		val = (diff > 0 ? 1 : -1);
 	else
-		val = (int)ceil(diff / step);
+		val = (int)ceil((double)diff / step);
 
 	while (start != end) {
 		if (val == 0) break;
