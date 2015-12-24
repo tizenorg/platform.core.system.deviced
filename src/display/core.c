@@ -961,7 +961,7 @@ static int proc_condition(PMMsg *data)
 			 * to intptr_t and void *(64bit) type.
 			 */
 			cond_timeout_id =
-			    ecore_timer_add(MSEC_TO_SEC(data->timeout),
+			    ecore_timer_add(MSEC_TO_SEC((double)data->timeout),
 				    (Ecore_Task_Cb)del_dim_cond, (void*)((intptr_t)pid));
 		}
 		holdkey_block = GET_HOLDKEY_BLOCK_STATE(val);
@@ -992,7 +992,7 @@ static int proc_condition(PMMsg *data)
 			 * to intptr_t and void *(64bit) type.
 			 */
 			cond_timeout_id =
-			    ecore_timer_add(MSEC_TO_SEC(data->timeout),
+			    ecore_timer_add(MSEC_TO_SEC((double)data->timeout),
 				    (Ecore_Task_Cb)del_off_cond, (void*)((intptr_t)pid));
 		}
 		holdkey_block = GET_HOLDKEY_BLOCK_STATE(val);
@@ -1031,7 +1031,7 @@ static int proc_condition(PMMsg *data)
 			 * to intptr_t and void *(64bit) type.
 			 */
 			cond_timeout_id =
-			    ecore_timer_add(MSEC_TO_SEC(data->timeout),
+			    ecore_timer_add(MSEC_TO_SEC((double)data->timeout),
 				    (Ecore_Task_Cb)del_sleep_cond, (void*)((intptr_t)pid));
 		}
 		if (GET_STANDBY_MODE_STATE(val))
