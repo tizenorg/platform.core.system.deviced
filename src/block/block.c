@@ -64,6 +64,7 @@
 
 #define BLOCK_OBJECT_ADDED      "ObjectAdded"
 #define BLOCK_OBJECT_REMOVED    "ObjectRemoved"
+#define BLOCK_DEVICE_BLOCKED    "DeviceBlocked"
 #define BLOCK_DEVICE_CHANGED    "DeviceChanged"
 #define BLOCK_DEVICE_CHANGED_2  "DeviceChanged2"
 
@@ -206,6 +207,35 @@ static void broadcast_block_info(enum block_dev_operation op,
 		else if (op == BLOCK_DEV_REMOVE)
 			ops->removed(data);
 	}
+}
+
+static void signal_device_blocked(struct block_device *bdev)
+{
+	struct block_data *data;
+	char *arr[2];
+	char *str_null = "";
+	const char *object_path;
+	int flags;
+
+	if (!bdev || !bdev->data)
+		return;
+
+	data = bdev->data;
+
+	/* Broadcast outside with Block iface */
+	arr[0] = (data->fs_uuid_enc ? data->fs_uuid_enc : str_null);
+	arr[1] = (data->mount_point ? data->mount_point : str_null);
+
+	object_path = e_dbus_object_path_get(bdev->object);
+	if (!object_path) {
+		_E("there is no object_path");
+		return;
+	}
+
+	broadcast_edbus_signal(object_path,
+			DEVICED_INTERFACE_BLOCK,
+			BLOCK_DEVICE_BLOCKED,
+			"ss", arr);
 }
 
 static void signal_device_changed(struct block_device *bdev,
@@ -933,15 +963,19 @@ static int mount_block_device(struct block_device *bdev)
 	return 0;
 }
 
-static int block_unmount(struct block_data *data,
+static int block_unmount(struct block_device *bdev,
 		enum unmount_operation option)
 {
+	struct block_data *data;
 	int r, retry = 0;
 	struct timespec time = {0,};
 
-	if (!data || !data->mount_point)
+	if (!bdev || !bdev->data || !bdev->data->mount_point)
 		return -EINVAL;
 
+	data = bdev->data;
+
+	signal_device_blocked(bdev);
 	/* it must called before unmounting mmc */
 	r = mmc_check_and_unmount(data->mount_point);
 	if (!r)
@@ -1027,7 +1061,7 @@ static int unmount_block_device(struct block_device *bdev,
 	_I("Unmount Start : (%s -> %s)",
 			data->devnode, data->mount_point);
 
-	r = block_unmount(data, option);
+	r = block_unmount(bdev, option);
 	if (r < 0) {
 		_E("fail to unmount %s device : %d", data->devnode, r);
 		goto out;
@@ -1103,7 +1137,7 @@ static int format_block_device(struct block_device *bdev,
 			data->devnode, data->mount_point);
 
 	if (data->state == BLOCK_MOUNT) {
-		r = block_unmount(data, option);
+		r = block_unmount(bdev, option);
 		if (r < 0) {
 			_E("fail to unmount %s device : %d", data->devnode, r);
 			goto out;
@@ -2225,6 +2259,12 @@ static int init_block_object_iface(void)
 			_E("fail to register %s method to iface",
 					device_methods[i].member);
 	}
+
+	r = e_dbus_interface_signal_add(iface,
+			BLOCK_DEVICE_BLOCKED, "ss");
+	if (r < 0)
+		_E("fail to register %s signal to iface",
+				BLOCK_DEVICE_BLOCKED);
 
 	r = e_dbus_interface_signal_add(iface,
 			BLOCK_DEVICE_CHANGED, "issssssisib");
