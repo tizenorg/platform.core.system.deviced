@@ -84,7 +84,14 @@ static inline void process_event(struct libinput_event *ev)
 	case LIBINPUT_EVENT_POINTER_MOTION:
 	case LIBINPUT_EVENT_POINTER_BUTTON:
 	case LIBINPUT_EVENT_POINTER_AXIS:
+		li = libinput_event_get_context(ev);
 		input.type = EV_REL;
+
+		fd = libinput_get_fd(li);
+		_D("time %d.%d type %d code %d value %d fd %d",
+				input.time.tv_sec, input.time.tv_usec, input.type,
+				input.code, input.value, fd);
+
 		if (CHECK_OPS(keyfilter_ops, check) &&
 		    keyfilter_ops->check(&input, fd) != 0)
 			return;
