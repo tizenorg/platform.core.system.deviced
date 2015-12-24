@@ -63,6 +63,7 @@ int get_exec_pid(const char *execpath)
 	struct dirent *dentry;
 	int pid = -1, fd;
 	int ret;
+	int len;
 	char buf[PATH_MAX];
 	char buf2[PATH_MAX];
 
@@ -72,6 +73,7 @@ int get_exec_pid(const char *execpath)
 		return -1;
 	}
 
+	len = strlen(execpath) + 1;
 	while (1) {
 		ret = readdir_r(dp, &entry, &dentry);
 		if (ret != 0 || dentry == NULL)
@@ -94,7 +96,7 @@ int get_exec_pid(const char *execpath)
 
 		buf2[ret] = '\0';
 
-		if (!strcmp(buf2, execpath)) {
+		if (!strncmp(buf2, execpath, len)) {
 			closedir(dp);
 			return pid;
 		}
@@ -162,6 +164,7 @@ static int remove_dir_internal(int fd)
 	struct dirent entry;
 	struct dirent *de;
 	int subfd, ret = 0;
+	int len;
 
 	dir = fdopendir(fd);
 	if (!dir)
@@ -171,7 +174,8 @@ static int remove_dir_internal(int fd)
 		if (ret != 0 || de == NULL)
 			break;
 		if (de->d_type == DT_DIR) {
-			if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
+			len = strlen(de->d_name) + 1;
+			if (!strncmp(de->d_name, ".", len) || !strncmp(de->d_name, "..", len))
 				continue;
 			subfd = openat(fd, de->d_name, O_RDONLY | O_DIRECTORY);
 			if (subfd < 0) {
@@ -350,15 +354,18 @@ int mount_check(const char *path)
 	struct mntent *mnt;
 	const char *table = "/etc/mtab";
 	FILE *fp;
+	int len;
 
 	fp = setmntent(table, "r");
 	if (!fp)
 		return ret;
+
+	len = strlen(path) + 1;
 	while (1) {
 		mnt = getmntent(fp);
 		if (mnt == NULL)
 			break;
-		if (!strcmp(mnt->mnt_dir, path)) {
+		if (!strncmp(mnt->mnt_dir, path, len)) {
 			ret = true;
 			break;
 		}
