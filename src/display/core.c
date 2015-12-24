@@ -205,7 +205,7 @@ static void set_process_active(bool flag, pid_t pid)
 	if (pid >= INTERNAL_LOCK_BASE)
 		return;
 
-	sprintf(str, "%d", (int)pid);
+	snprintf(str, sizeof(str),"%d", (int)pid);
 
 	arr[0] = (flag ? ACTIVE_ACT : INACTIVE_ACT);
 	arr[1] = str;
