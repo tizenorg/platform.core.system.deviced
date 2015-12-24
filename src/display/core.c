@@ -1725,10 +1725,8 @@ static int default_check(int next)
 
 	vconf_get_int(VCONFKEY_IDLE_LOCK_STATE, &lock_state);
 	if (lock_state==VCONFKEY_IDLE_LOCK && next != S_SLEEP) {
-		while(0) {
-			vconf_get_int(VCONFKEY_CALL_STATE, &app_state);
-			if (app_state != VCONFKEY_CALL_OFF)
-				break;
+		vconf_get_int(VCONFKEY_CALL_STATE, &app_state);
+		if (app_state == VCONFKEY_CALL_OFF) {
 			_I("default_check:LOCK STATE, it's transitable");
 			return 1;
 		}
