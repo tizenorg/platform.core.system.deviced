@@ -845,11 +845,11 @@ static int standby_action(int timeout)
 		keyfilter_ops->backlight_enable(false);
 
 	ops = find_device("touchkey");
-	if (!check_default(ops))
+	if (!check_default(ops) && CHECK_OPS(ops, stop))
 		ops->stop(NORMAL_MODE);
 
 	ops = find_device("touchscreen");
-	if (!check_default(ops))
+	if (!check_default(ops) && CHECK_OPS(ops, stop))
 		ops->stop(NORMAL_MODE);
 
 	set_standby_state(true);
