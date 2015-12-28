@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <vconf.h>
 #include <errno.h>
+#include <unistd.h>
 
 #include "log.h"
 #include "dbus.h"
