@@ -99,6 +99,11 @@ API int deviced_get_cmdline_name(pid_t pid, char *cmdline, size_t cmdline_size)
 
 	ret = read(fd, buf, PATH_MAX);
 	close(fd);
+	if (ret < 0) {
+		ret = -errno;
+		_E("read() failed (%d)", ret);
+		return ret;
+	}
 	buf[PATH_MAX] = '\0';
 
 	filename = strrchr(buf, '/');
