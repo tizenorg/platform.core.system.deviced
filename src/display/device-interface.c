@@ -33,6 +33,7 @@
 
 #include "core/log.h"
 #include "core/devices.h"
+#include "core/common.h"
 #include "util.h"
 #include "device-interface.h"
 #include "vconf.h"

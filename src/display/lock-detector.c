@@ -193,25 +193,30 @@ void print_lock_info_list(int fd)
 	struct lock_info *info;
 	dd_list *l;
 	char buf[255];
+	int ret;
 
 	if (!lock_info_list)
 		return;
 
 	snprintf(buf, sizeof(buf),
-	    "current time : %u ms\n", get_time());
-	write(fd, buf, strlen(buf));
+	    "current time : %ld ms\n", get_time());
+	ret = write(fd, buf, strlen(buf));
+	if (ret < 0)
+		_E("write() failed (%d)", errno);
 
 	snprintf(buf, sizeof(buf),
 	    "[%10s %6s] %6s %10s %10s %10s %s\n", "hash", "state",
 	    "count", "locktime", "unlocktime", "time", "process name");
-	write(fd, buf, strlen(buf));
+	ret = write(fd, buf, strlen(buf));
+	if (ret < 0)
+		_E("write() failed (%d)", errno);
 
 	DD_LIST_FOREACH(lock_info_list, l, info) {
 		long time = 0;
 		if (info->locktime != 0 && info->unlocktime == 0)
 			time = get_time() - info->locktime;
 		snprintf(buf, sizeof(buf),
-		    "[%10u %6d] %6d %10u %10u %10u %s\n",
+		    "[%10lu %6d] %6d %10ld %10ld %10ld %s\n",
 		    info->hash,
 		    info->state,
 		    info->count,
@@ -219,7 +224,9 @@ void print_lock_info_list(int fd)
 		    info->unlocktime,
 		    info->time + time,
 		    info->name);
-		write(fd, buf, strlen(buf));
+		ret = write(fd, buf, strlen(buf));
+		if (ret < 0)
+			_E("write() failed (%d)", errno);
 	}
 }
 

@@ -50,6 +50,7 @@
 #include "core/common.h"
 #include "core/edbus-handler.h"
 #include "core/config-parser.h"
+#include "core/launch.h"
 #include "extcon/extcon.h"
 #include "power/power-handler.h"
 #include "dd-display.h"
@@ -623,7 +624,7 @@ static int get_lcd_timeout_from_settings(void)
 
 static void update_display_time(void)
 {
-	int ret, run_timeout, val;
+	int run_timeout, val;
 
 	/* first priority : s cover */
 	if (!hallic_open) {
@@ -886,8 +887,7 @@ static void set_standby_mode(pid_t pid, int enable)
 			return;
 		DD_LIST_FOREACH_SAFE(standby_mode_list, l, l_next, data)
 			if (pid == (pid_t)((intptr_t)data)) {
-				standby_mode_list = DD_LIST_REMOVE_LIST(
-						    standby_mode_list, l);
+				DD_LIST_REMOVE_LIST(standby_mode_list, l);
 				_I("%d release standby mode", pid);
 			}
 		if (standby_mode_list != NULL)
@@ -1168,7 +1168,6 @@ int check_holdkey_block(enum state_t state)
 int delete_condition(enum state_t state)
 {
 	PmLockNode *t = cond_head[state];
-	int ret = 0;
 	PmLockNode *tmp = NULL;
 	pid_t pid;
 	char pname[PATH_MAX];
@@ -1222,7 +1221,7 @@ typedef struct _pm_history {
 } pm_history;
 
 static int max_history_count = MAX_LOG_COUNT;
-static pm_history pm_history_log[MAX_LOG_COUNT] = {0,};
+static pm_history pm_history_log[MAX_LOG_COUNT] = {{0, }, };
 static int history_count = 0;
 
 static const char history_string[PM_LOG_MAX][15] =
@@ -1253,6 +1252,7 @@ void pm_history_save(enum pm_log_type log_type, int code)
 void pm_history_print(int fd, int count)
 {
 	int start_index, index, i;
+	int ret;
 	char buf[255];
 	char time_buf[30];
 
@@ -1277,7 +1277,9 @@ void pm_history_print(int fd, int count)
 			history_string[pm_history_log[index].log_type],
 			pm_history_log[index].keycode,
 			time_buf);
-		write(fd, buf, strlen(buf));
+		ret = write(fd, buf, strlen(buf));
+		if (ret < 0)
+			_E("write() failed (%d)", errno);
 	}
 }
 #endif
@@ -1286,7 +1288,8 @@ void print_info(int fd)
 {
 	int s_index = 0;
 	char buf[255];
-	int i = 1, ret;
+	int i = 1;
+	int ret;
 	dd_list *l = NULL;
 	void *data;
 	char pname[PATH_MAX];
@@ -1297,24 +1300,34 @@ void print_info(int fd)
 	snprintf(buf, sizeof(buf),
 		"\n==========================================="
 		"===========================\n");
-	write(fd, buf, strlen(buf));
+	ret = write(fd, buf, strlen(buf));
+	if (ret < 0)
+		_E("write() failed (%d)", errno);
 	snprintf(buf, sizeof(buf),"Timeout Info: Run[%dms] Dim[%dms] Off[%dms]\n",
 		 states[S_NORMAL].timeout,
 		 states[S_LCDDIM].timeout, states[S_LCDOFF].timeout);
-	write(fd, buf, strlen(buf));
+	ret = write(fd, buf, strlen(buf));
+	if (ret < 0)
+		_E("write() failed (%d)", errno);
 
 	snprintf(buf, sizeof(buf), "Tran. Locked : %s %s %s\n",
 		 (trans_condition & MASK_DIM) ? state_string[S_NORMAL] : "-",
 		 (trans_condition & MASK_OFF) ? state_string[S_LCDDIM] : "-",
 		 (trans_condition & MASK_SLP) ? state_string[S_LCDOFF] : "-");
-	write(fd, buf, strlen(buf));
+	ret = write(fd, buf, strlen(buf));
+	if (ret < 0)
+		_E("write() failed (%d)", errno);
 
 	snprintf(buf, sizeof(buf), "Current State: %s\n",
 		state_string[pm_cur_state]);
-	write(fd, buf, strlen(buf));
+	ret = write(fd, buf, strlen(buf));
+	if (ret < 0)
+		_E("write() failed (%d)", errno);
 
 	snprintf(buf, sizeof(buf), "Current Lock Conditions: \n");
-	write(fd, buf, strlen(buf));
+	ret = write(fd, buf, strlen(buf));
+	if (ret < 0)
+		_E("write() failed (%d)", errno);
 
 	for (s_index = S_NORMAL; s_index < S_END; s_index++) {
 		PmLockNode *t;
@@ -1327,21 +1340,27 @@ void print_info(int fd)
 			snprintf(buf, sizeof(buf),
 				 " %d: [%s] locked by pid %d %s %s",
 				 i++, state_string[s_index - 1], t->pid, pname, time_buf);
-			write(fd, buf, strlen(buf));
+			ret = write(fd, buf, strlen(buf));
+			if (ret < 0)
+				_E("write() failed (%d)", errno);
 			t = t->next;
 		}
 	}
 
 	if (standby_mode) {
 		snprintf(buf, sizeof(buf), "\n\nstandby mode is on\n");
-		write(fd, buf, strlen(buf));
+		ret = write(fd, buf, strlen(buf));
+		if (ret < 0)
+			_E("write() failed (%d)", errno);
 
 		DD_LIST_FOREACH(standby_mode_list, l, data) {
 			get_pname((pid_t)((intptr_t)data), pname);
 			snprintf(buf, sizeof(buf),
 			    "  standby mode acquired by pid %d"
-			    " - process %s\n", data, pname);
-                        write(fd, buf, strlen(buf));
+			    " - process %s\n", (pid_t)data, pname);
+			ret = write(fd, buf, strlen(buf));
+			if (ret < 0)
+				_E("write() failed (%d)", errno);
 		}
 	}
 	print_lock_info_list(fd);
@@ -1353,7 +1372,7 @@ void print_info(int fd)
 
 void save_display_log(void)
 {
-	int fd;
+	int fd, ret;
 	char buf[255];
 	time_t now_time;
 	char time_buf[30];
@@ -1368,14 +1387,20 @@ void save_display_log(void)
 		snprintf(buf, sizeof(buf),
 			"\npm_state_log now-time : %d(s) %s\n\n",
 			(int)now_time, time_buf);
-		write(fd, buf, strlen(buf));
+		ret = write(fd, buf, strlen(buf));
+		if (ret < 0)
+			_E("write() failed (%d)", errno);
 
 		snprintf(buf, sizeof(buf), "pm_status_flag: %x\n", pm_status_flag);
-		write(fd, buf, strlen(buf));
+		ret = write(fd, buf, strlen(buf));
+		if (ret < 0)
+			_E("write() failed (%d)", errno);
 
 		snprintf(buf, sizeof(buf), "screen lock status : %d\n",
 			get_lock_screen_state());
-		write(fd, buf, strlen(buf));
+		ret = write(fd, buf, strlen(buf));
+		if (ret < 0)
+			_E("write() failed (%d)", errno);
 
 		print_info(fd);
 		close(fd);
@@ -1394,11 +1419,6 @@ void save_display_log(void)
 static void sig_hup(int signo)
 {
 	save_display_log();
-}
-
-static void sig_usr(int signo)
-{
-	pm_status_flag |= VCALL_FLAG;
 }
 
 int check_lcdoff_direct(void)
@@ -1564,13 +1584,7 @@ lcd_on:
 /* default enter action function */
 static int default_action(int timeout)
 {
-	int ret;
 	int wakeup_count = -1;
-	char buf[NAME_MAX];
-	char *pkgname = NULL;
-	int i = 0;
-	int lock_state = -1;
-	int app_state = -1;
 	time_t now;
 	double diff;
 	static time_t last_update_time = 0;
@@ -1802,8 +1816,6 @@ static int poll_callback(int condition, PMMsg *data)
 static int update_setting(int key_idx, int val)
 {
 	char buf[PATH_MAX];
-	int ret = -1;
-	int run_timeout = -1;
 
 	switch (key_idx) {
 	case SETTING_TO_NORMAL:
@@ -1919,10 +1931,8 @@ static void check_seed_status(void)
 	int ret = -1;
 	int tmp = 0;
 	int bat_state = VCONFKEY_SYSMAN_BAT_NORMAL;
-	int max_brt = 0;
 	int brt = 0;
 	int lock_state = -1;
-	int smart_stay_on = 0;
 
 	/* Charging check */
 	if ((get_charging_status(&tmp) == 0) && (tmp > 0)) {
@@ -2005,7 +2015,7 @@ static const char *errMSG[INIT_END] = {
 	[INIT_DBUS] = "d-bus init error",
 };
 
-int set_lcd_timeout(int on, int dim, int holdkey_block, char *name)
+int set_lcd_timeout(int on, int dim, int holdkey_block, const char *name)
 {
 	if (on == 0 && dim == 0) {
 		_I("LCD timeout changed : default setting");
@@ -2074,22 +2084,6 @@ void reset_lcd_timeout(const char *sender, void *data)
 	if (pm_cur_state == S_NORMAL) {
 		states[pm_cur_state].trans(EVENT_INPUT);
 	}
-}
-
-static int hall_ic_open(void *data)
-{
-	int open;
-
-	if (!data)
-		return -EINVAL;
-
-	open = *(int*)data;
-	update_pm_setting(SETTING_HALLIC_OPEN, open);
-
-	if (display_info.update_auto_brightness)
-		display_info.update_auto_brightness(false);
-
-	return 0;
 }
 
 static int booting_done(void *data)

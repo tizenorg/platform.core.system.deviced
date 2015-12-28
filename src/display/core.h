@@ -159,6 +159,33 @@ int check_processes(enum state_t prohibit_state);
 extern struct state state[S_END];
 void reset_lcd_timeout(const char *sender, void *data);
 int check_lcdoff_lock_state(void);
+
+/* setting.c */
+int get_lock_screen_bg_state(void);
+int set_custom_lcdon_timeout(int timeout);
+void set_lock_screen_state(int state);
+void set_lock_screen_bg_state(bool state);
+
+/* core.c */
+int delete_condition(enum state_t state);
+void update_lcdoff_source(int source);
+int low_battery_state(int val);
+int set_lcd_timeout(int on, int dim, int holdkey_block, const char *name);
+void save_display_log(void);
+int custom_lcdon(int timeout);
+void set_stay_touchscreen_off(int val);
+void set_lcd_paneloff_mode(int val);
+void lcd_on_direct(enum device_flags flags);
+void lcd_off_procedure(void);
+int check_holdkey_block(enum state_t state);
+int get_standby_state(void);
+
+/* poll.c */
+int check_dimstay(int next_state, int flag);
+
+/* display-dbus.c */
+int init_pm_dbus(void);
+
 /**
  * @}
  */
