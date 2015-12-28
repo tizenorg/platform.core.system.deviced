@@ -18,6 +18,7 @@
 
 
 #include <stdio.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dlfcn.h>
@@ -267,7 +268,6 @@ API int deviced_conf_is_vip(int pid)
 
 API int deviced_conf_set_permanent_bypid(int pid)
 {
-	int fd;
 	if (already_permanent(pid))
 		goto MEMPOL_SET;
 

@@ -220,7 +220,7 @@ API int haptic_close(haptic_device_h device_handle)
 	int ret;
 
 	/* check if handle is valid */
-	if (device_handle == NULL) {
+	if (!device_handle) {
 		_E("Invalid parameter : device_handle");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
@@ -261,7 +261,7 @@ API int haptic_vibrate_monotone_with_detail(haptic_device_h device_handle,
 	int ret;
 
 	/* check if handle is valid */
-	if (device_handle == NULL) {
+	if (!device_handle) {
 		_E("Invalid parameter : device_handle");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
@@ -310,7 +310,7 @@ API int haptic_vibrate_monotone_with_detail(haptic_device_h device_handle,
 
 API int haptic_vibrate_file(haptic_device_h device_handle, const char *file_path, haptic_effect_h *effect_handle)
 {
-	char *vibe_buffer;
+	unsigned char *vibe_buffer;
 	int size, ret;
 
 	vibe_buffer = convert_file_to_buffer(file_path, &size);
@@ -320,7 +320,7 @@ API int haptic_vibrate_file(haptic_device_h device_handle, const char *file_path
 	}
 
 	ret = haptic_vibrate_buffers_with_detail(device_handle,
-											vibe_buffer,
+											(const unsigned char *)vibe_buffer,
 											size,
 											HAPTIC_ITERATION_ONCE,
 											HAPTIC_FEEDBACK_AUTO,
@@ -337,7 +337,7 @@ API int haptic_vibrate_file_with_detail(haptic_device_h device_handle,
 					haptic_priority_e priority,
 					haptic_effect_h *effect_handle)
 {
-	char *vibe_buffer;
+	unsigned char *vibe_buffer;
 	int size, ret;
 
 	vibe_buffer = convert_file_to_buffer(file_path, &size);
@@ -347,7 +347,7 @@ API int haptic_vibrate_file_with_detail(haptic_device_h device_handle,
 	}
 
 	ret = haptic_vibrate_buffers_with_detail(device_handle,
-											vibe_buffer,
+											(const unsigned char *)vibe_buffer,
 											size,
 											iteration,
 											feedback,
@@ -415,7 +415,7 @@ API int haptic_vibrate_buffers_with_detail(haptic_device_h device_handle,
 	int ret;
 
 	/* check if handle is valid */
-	if (device_handle == NULL) {
+	if (!device_handle) {
 		_E("Invalid parameter : device_handle");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
@@ -482,7 +482,7 @@ API int haptic_stop_all_effects(haptic_device_h device_handle)
 	int ret;
 
 	/* check if handle is valid */
-	if (device_handle == NULL) {
+	if (!device_handle) {
 		_E("Invalid parameter : device_handle");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
@@ -507,7 +507,7 @@ API int haptic_get_effect_state(haptic_device_h device_handle, haptic_effect_h e
 	int ret;
 
 	/* check if handle is valid */
-	if (device_handle == NULL) {
+	if (!device_handle) {
 		_E("Invalid parameter : device_handle");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
@@ -624,7 +624,7 @@ API int haptic_save_effect(const unsigned char *vibe_buffer,
 			const char *file_path)
 {
 	struct stat buf;
-	int size, ret;
+	int ret;
 
 	/* check if passed arguments are valid */
 	if (vibe_buffer == NULL) {
@@ -660,7 +660,7 @@ API int haptic_save_effect(const unsigned char *vibe_buffer,
 
 API int haptic_get_file_duration(haptic_device_h device_handle, const char *file_path, int *file_duration)
 {
-	char *vibe_buffer;
+	unsigned char *vibe_buffer;
 	int size, ret;
 
 	vibe_buffer = convert_file_to_buffer(file_path, &size);
@@ -670,7 +670,7 @@ API int haptic_get_file_duration(haptic_device_h device_handle, const char *file
 	}
 
 	ret = haptic_get_buffers_duration(device_handle,
-									 vibe_buffer,
+									 (const unsigned char *)vibe_buffer,
 									 size,
 									 file_duration);
 	free(vibe_buffer);
@@ -693,7 +693,7 @@ API int haptic_get_buffers_duration(haptic_device_h device_handle, const unsigne
 	int ret;
 
 	/* check if handle is valid */
-	if (device_handle == NULL) {
+	if (!device_handle) {
 		_E("Invalid parameter : device_handle");
 		return HAPTIC_ERROR_INVALID_PARAMETER;
 	}
@@ -729,7 +729,6 @@ API int haptic_get_buffers_duration(haptic_device_h device_handle, const unsigne
 API int haptic_save_led(const unsigned char *vibe_buffer, int max_bufsize, const char *file_path)
 {
 	struct stat buf;
-	char str_bufsize[32];
 	char *arr[3];
 	struct dbus_byte bytes;
 	int ret;

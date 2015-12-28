@@ -80,6 +80,8 @@ static inline int send_str(int fd, char *str)
 			len = SYSTEM_NOTI_MAXSTR;
 		write(fd, &len, sizeof(int));
 		ret = write(fd, str, len);
+		if (ret < 0)
+			_E("Failed to write (%d)", errno);
 	}
 	return ret;
 }
@@ -140,38 +142,6 @@ static int noti_send(struct sysnoti *msg)
 
 	close(client_sockfd);
 	return result;
-}
-
-static int dbus_flightmode_handler(char* type, char *buf)
-{
-	DBusError err;
-	DBusMessage *msg;
-	char *pa[3];
-	int ret, val;
-
-	pa[0] = type;
-	pa[1] = "1";
-	pa[2] = buf;
-
-	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
-			DEVICED_PATH_POWER, DEVICED_INTERFACE_POWER,
-			pa[0], "sis", pa);
-	if (!msg)
-		return -EBADMSG;
-
-	dbus_error_init(&err);
-
-	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &val, DBUS_TYPE_INVALID);
-	if (!ret) {
-		_E("no message : [%s:%s]", err.name, err.message);
-		val = -EBADMSG;
-	}
-
-	dbus_message_unref(msg);
-	dbus_error_free(&err);
-
-	_D("%s-%s : %d", DEVICED_INTERFACE_POWER, pa[0], val);
-	return val;
 }
 
 API int deviced_call_predef_action(const char *type, int num, ...)
@@ -371,7 +341,6 @@ static DBusMessage *alarm_set_time_sync_with_reply(time_t timet)
 	DBusMessageIter iter;
 	DBusMessage *reply;
 	DBusError err;
-	int r;
 
 	conn = dbus_bus_get(DBUS_BUS_SYSTEM, NULL);
 	if (!conn) {
