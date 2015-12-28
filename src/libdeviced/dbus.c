@@ -23,6 +23,7 @@
 #include <stdint.h>
 #include <errno.h>
 #include <dbus/dbus.h>
+#include <dbus/dbus-glib-lowlevel.h>
 
 #include "common.h"
 #include "log.h"
