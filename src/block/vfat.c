@@ -64,7 +64,7 @@ static int vfat_check(const char *devpath)
 		switch (r) {
 		case 0:
 			_I("filesystem check completed OK");
-			return 0;
+			break;
 		case 2:
 			_I("file system check failed (not a FAT filesystem)");
 			errno = ENODATA;
@@ -75,7 +75,7 @@ static int vfat_check(const char *devpath)
 				continue;
 			}
 			_I("failing check after rechecks, but file system modified");
-			return 0;
+			break;
 		default:
 			_I("filesystem check failed (unknown exit code %d)", r);
 			errno = EIO;
