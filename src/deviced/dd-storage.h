@@ -65,7 +65,7 @@ enum storage_path_type {
  *  ...
  * @endcode
  */
-int storage_get_path(int type, unsigned char *path, int size);
+int storage_get_path(int type, char *path, int size);
 
 /**
  * @} // end of CAPI_SYSTEM_DEVICED_STORAGE_MODULE

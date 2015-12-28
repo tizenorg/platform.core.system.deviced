@@ -33,23 +33,9 @@
 #define EXT_PARENT_PATH			"/opt/storage"
 #define EXT_OPTION1_PATH		"/mnt/mmc"
 
-static bool check_ext_mount(void)
-{
-	struct stat parent, ext;
-
-	if (stat(EXT_PATH, &ext) != 0 || stat(EXT_PARENT_PATH, &parent) != 0)
-		return false;
-
-	if (ext.st_dev == parent.st_dev)
-		return false;
-
-	return true;
-}
-
-API int storage_get_path(int type, unsigned char *path, int size)
+API int storage_get_path(int type, char *path, int size)
 {
 	char *ext_path = EXT_PATH;
-	int option;
 
 	if (type < 0 || type > STORAGE_MAX || !path)
 		return -EINVAL;
