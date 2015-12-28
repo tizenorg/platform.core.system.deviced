@@ -215,7 +215,6 @@ static void signal_device_blocked(struct block_device *bdev)
 	char *arr[2];
 	char *str_null = "";
 	const char *object_path;
-	int flags;
 
 	if (!bdev || !bdev->data)
 		return;
