@@ -286,8 +286,6 @@ static void extcon_changed(struct connection_info *info, void *data)
 
 	/* call to update */
 	extcon_update(info->name, info->state);
-
-	return 0;
 }
 
 static int extcon_probe(void *data)
