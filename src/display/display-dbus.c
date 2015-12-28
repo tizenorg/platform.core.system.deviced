@@ -35,6 +35,7 @@
 #include "core/devices.h"
 #include "dd-display.h"
 #include "display-actor.h"
+#include "display-ops.h"
 
 #define TELEPHONY_PATH			"/org/tizen/telephony/SAMSUNG_QMI"
 #define TELEPHONY_INTERFACE_SIM		"org.tizen.telephony.Sim"
@@ -1095,10 +1096,9 @@ int init_pm_dbus(void)
 	}
 /*
  * Auto-brightness feature has been implemented in wearable-device.
- * But UX is not determined, then Block sim-check-logic temporary.
- * This logic'll be re-enabled when UX concept related to sim is confirmed.
+ * But UX is not determined yet. Thus this logic can be modified
+ * when UX concept related to sim is changed
  */
-/*
 	ret = register_edbus_signal_handler(TELEPHONY_PATH,
 		    TELEPHONY_INTERFACE_SIM, SIGNAL_SIM_STATUS,
 		    sim_signal_handler);
@@ -1106,7 +1106,6 @@ int init_pm_dbus(void)
 		_E("Failed to register signal handler! %d", ret);
 		return ret;
 	}
-*/
 
 	ret = register_edbus_signal_handler(POPUP_PATH_LOWBAT,
 		    POPUP_INTERFACE_LOWBAT, SIGNAL_EXTREME,

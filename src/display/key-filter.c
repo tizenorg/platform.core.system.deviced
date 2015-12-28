@@ -80,7 +80,7 @@ static int menu_pressed = false;
 static bool touch_pressed = false;
 static int skip_lcd_off = false;
 static bool powerkey_pressed = false;
-static struct device_ops *touchled;
+static const struct device_ops *touchled;
 
 static inline int current_state_in_on(void)
 {
@@ -105,8 +105,6 @@ static int power_execute(void *data)
 
 static void longkey_pressed()
 {
-	int val = 0;
-	int ret;
 	char *opt;
 	unsigned int caps;
 
@@ -162,7 +160,7 @@ static void stop_key_combination(void)
 {
 	key_combination = KEY_COMBINATION_STOP;
 	if (combination_timeout_id > 0) {
-		g_source_remove(combination_timeout_id);
+		ecore_timer_del(combination_timeout_id);
 		combination_timeout_id = NULL;
 	}
 }

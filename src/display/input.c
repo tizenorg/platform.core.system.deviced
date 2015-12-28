@@ -18,6 +18,8 @@
 
 
 #include <stdio.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include <linux/input.h>
 #include <libinput.h>
 #include <Ecore.h>
