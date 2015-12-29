@@ -18,6 +18,7 @@
 
 
 #include <stdio.h>
+#include <unistd.h>
 #include <dd-deviced.h>
 
 #include "sysman-priv.h"
