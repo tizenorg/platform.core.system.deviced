@@ -53,8 +53,12 @@ static inline int send_str(int fd, char *str)
 		len = strlen(str);
 		if (len > SYSMAN_MAXSTR)
 			len = SYSMAN_MAXSTR;
-		write(fd, &len, sizeof(int));
+		ret = write(fd, &len, sizeof(int));
+		if (ret < 0)
+			ERR("write() failed (%d)", errno);
 		ret = write(fd, str, len);
+		if (ret < 0)
+			ERR("write() failed (%d)", errno);
 	}
 	return ret;
 }

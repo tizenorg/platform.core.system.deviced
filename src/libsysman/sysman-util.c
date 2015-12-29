@@ -94,7 +94,7 @@ API int sysman_get_cmdline_name(pid_t pid, char *cmdline, size_t cmdline_size)
 	close(fd);
 	if (ret < 0) {
 		ret = -errno;
-		_E("read() failed (%d)", ret);
+		ERR("read() failed (%d)", ret);
 		return ret;
 	}
 	buf[PATH_MAX] = '\0';
