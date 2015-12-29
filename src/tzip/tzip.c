@@ -208,7 +208,12 @@ static int tzip_open(const char *path, struct fuse_file_info *fi)
 	handle->path = zippath;
 	handle->file = file;
 
+#ifdef ARCH_32BIT
+	int hd = (int)handle;
+	fi->fh = (uint64_t)hd;
+#else
 	fi->fh = (uint64_t)handle;
+#endif
 	return 0;
 
 out_unlock:
@@ -236,7 +241,13 @@ static int tzip_read(const char *path, char *buf, size_t size, off_t offset,
 		_E("Invalid Zip Handle ");
 		return -EINVAL;
 	}
+
+#ifdef ARCH_32BIT
+	int hd = (int)fi->fh;
+	handle = (struct tzip_handle *)hd;
+#else
 	handle = (struct tzip_handle *)(fi->fh);
+#endif
 
 	_D("Read - Path : %s  size : %zd offset : %jd ", path, size, offset);
 	ret = read_zipfile(handle, buf, size, offset);
@@ -256,7 +267,13 @@ static int tzip_release(const char *path, struct fuse_file_info *fi)
 		_E("Invalid Zip Handle ");
 		return -EINVAL;
 	}
+
+#ifdef ARCH_32BIT
+	int hd = (int)fi->fh;
+	handle = (struct tzip_handle *)hd;
+#else
 	handle = (struct tzip_handle *)(fi->fh);
+#endif
 
 	unzCloseCurrentFile(handle->zipfile);
 	unzClose(handle->zipfile);
