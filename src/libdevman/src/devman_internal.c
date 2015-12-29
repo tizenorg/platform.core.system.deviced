@@ -90,7 +90,9 @@ API int display_register_postjob(void)
 		unlink(fifo_path);
 		return -1;
 	}
-	read(fifo_pollfd.fd, buf, sizeof(buf));
+	ret = read(fifo_pollfd.fd, buf, sizeof(buf));
+	if (ret < 0)
+		DEVERR("read() failed (%d)", ret);
 
 	fifo_fd = fifo_pollfd.fd;
 
@@ -100,7 +102,7 @@ API int display_register_postjob(void)
 API int display_cancel_postjob(void)
 {
 	char buf[PATH_MAX];
-	int ret;
+	int ret, disp;
 
 	snprintf(buf, PATH_MAX, "%s.%d", DISPLAY_WD_FIFO, getpid());
 	if (access(buf, F_OK) != 0) {
@@ -115,8 +117,10 @@ API int display_cancel_postjob(void)
 		DEVLOG("fifo file path is %s", buf);
 		return -1;
 	}
-	ret = DISPLAY_WD_CANCEL;
-	write(fifo_fd, &ret, sizeof(int));
+	disp = DISPLAY_WD_CANCEL;
+	ret = write(fifo_fd, &disp, sizeof(int));
+	if (ret < 0)
+		DEVERR("write() failed (%d)", ret);
 	close(fifo_fd);
 	unlink(buf);
 	fifo_fd = -1;

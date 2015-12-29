@@ -47,7 +47,7 @@ static void sig_quit(int signo)
 
 int main(void)
 {
-	int fd = -1;
+	int r = -1;
 	int ret = -1;
 	int val = -1;
 	int auto_brightness_state = -1;
@@ -87,7 +87,9 @@ int main(void)
 			return -1;
 		}
 		if (fifo_pollfd.revents & POLLIN) {
-			read(fifo_pollfd.fd, &ret, sizeof(int));
+			r = read(fifo_pollfd.fd, &ret, sizeof(int));
+			if (r < 0)
+				DEVERR("read() failed(%d)", r);
 			if (ret == DISPLAY_WD_CANCEL) {
 				DEVERR("[DISPLAY_WD] Canceled. - %s, %d", fifo_path, ret);
 				close(fifo_pollfd.fd);
