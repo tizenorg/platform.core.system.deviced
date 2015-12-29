@@ -303,7 +303,6 @@ static int usbhost_init_from_udev_enumerate(void)
 	struct udev_device *dev;
 	const char *syspath;
 	const char *devpath;
-	int ret;
 
 	udev = udev_new();
 	if (!udev) {
