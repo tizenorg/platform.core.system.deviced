@@ -218,7 +218,7 @@
 #define CRASHD_INTERFACE_CRASH              CRASHD_INTERFACE_NAME".Crash"
 
 struct dbus_byte {
-	const char *data;
+	const unsigned char *data;
 	int size;
 };
 
