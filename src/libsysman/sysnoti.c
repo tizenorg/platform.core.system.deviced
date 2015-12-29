@@ -44,18 +44,35 @@ static inline int send_int(int fd, int val)
 
 static inline int send_str(int fd, char *str)
 {
-	int len;
+	int len = 0;
 	int ret;
+
 	if (str == NULL) {
-		len = 0;
 		ret = write(fd, &len, sizeof(int));
-	} else {
-		len = strlen(str);
-		if (len > SYSMAN_MAXSTR)
-			len = SYSMAN_MAXSTR;
-		write(fd, &len, sizeof(int));
-		ret = write(fd, str, len);
+		if (ret < 0) {
+			ret = -errno;
+			ERR("write() failed (%d)", ret);
+		}
+		return ret;
 	}
+
+	len = strlen(str);
+	if (len > SYSMAN_MAXSTR)
+		len = SYSMAN_MAXSTR;
+
+	ret = write(fd, &len, sizeof(int));
+	if (ret < 0) {
+		ret = -errno;
+		ERR("write() failed (%d)", ret);
+		return ret;
+	}
+
+	ret = write(fd, str, len);
+	if (ret < 0) {
+		ret = -errno;
+		ERR("write() failed (%d)", ret);
+	}
+
 	return ret;
 }
 
