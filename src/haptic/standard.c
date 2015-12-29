@@ -92,17 +92,6 @@ struct ff_info *read_from_list(int handle)
 	return NULL;
 }
 
-/* for debug */
-static void print_list(void)
-{
-	struct ff_info *temp;
-	dd_list *elem;
-	int i = 0;
-
-	DD_LIST_FOREACH(ff_list, elem, temp)
-		_D("[%d] %x", i++, temp);
-}
-
 static bool check_valid_handle(struct ff_info *info)
 {
 	struct ff_info *temp;
