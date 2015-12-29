@@ -10,6 +10,12 @@ ELSEIF("${ARCH}" STREQUAL "arm")
 	OPTION(USE_ARM "Use Arm" ON)
 ENDIF()
 
+IF("${ARCH_BIT}" STREQUAL "32")
+	OPTION(USE_32BIT "Use 32bit architecture" ON)
+ELSEIF("${ARCH_BIT}" STREQUAL "64")
+	OPTION(USE_64BIT "Use 64bit architecture" ON)
+ENDIF()
+
 ########################################################
 # Deviced Macros
 ########################################################
@@ -198,6 +204,11 @@ IF(USE_ARM)
 	ADD_DEFINITIONS("-DTARGET")
 ELSEIF(USE_EMULATOR)
 	ADD_DEFINITIONS("-DEMULATOR")
+ENDIF()
+IF(USE_32BIT)
+	ADD_DEFINITIONS("-DARCH_32BIT")
+ELSEIF(USE_64BIT)
+	ADD_DEFINITIONS("-DARCH_64BIT")
 ENDIF()
 ADD_DEFINITIONS("-DDEBUG")
 

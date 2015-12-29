@@ -225,9 +225,19 @@ Haptic Device manager library for device control (devel)
 %prep
 %setup -q
 %if %{with emulator}
-%define ARCH emulator
+	%define ARCH emulator
 %else
-%define ARCH arm
+	%ifarch %{arm} aarch64
+		%define ARCH arm
+	%else
+		%define ARCH x86
+	%endif
+%endif
+
+%ifarch %{arm} %ix86
+	%define ARCH_BIT 32
+%else
+	%define ARCH_BIT 64
 %endif
 
 %define DPMS none
@@ -242,6 +252,7 @@ Haptic Device manager library for device control (devel)
 	-DTZ_SYS_ETC=%TZ_SYS_ETC \
 	-DCMAKE_INSTALL_PREFIX=%{_prefix} \
 	-DARCH=%{ARCH} \
+	-DARCH_BIT=%{ARCH_BIT} \
 	-DDPMS=%{DPMS} \
 	-DPROFILE=%{profile} \
 	-DBATTERY_MODULE=%{battery_module} \
