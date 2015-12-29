@@ -160,7 +160,7 @@ static void get_pname(pid_t pid, char *pname)
 static int save_dbus_name(char **args)
 {
 	DBusMessage *msg;
-	unsigned char **list;
+	char **list;
 	int ret, size, i;
 	pid_t pid;
 	char *arr[1];
