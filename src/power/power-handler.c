@@ -43,6 +43,7 @@
 #include "core/device-idler.h"
 #include "core/common.h"
 #include "core/devices.h"
+#include "core/launch.h"
 #include "display/poll.h"
 #include "display/setting.h"
 #include "core/edbus-handler.h"

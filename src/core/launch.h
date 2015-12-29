@@ -27,5 +27,6 @@ int launch_evenif_exist(const char *execpath, const char *arg, ...);
 int launch_after_kill_if_exist(const char *execpath, const char *arg, ...);
 
 int launch_app_cmd(const char *cmdline);
+int launch_app_cmd_with_nice(const char *cmdline, int _nice);
 
 #endif /* __LAUNCH_H__ */
