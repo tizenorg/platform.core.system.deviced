@@ -116,12 +116,7 @@ static int mmc_check_smack(const char *mount_point)
 
 static int check_smack_popup(void)
 {
-	int ret = -1;
-
-	ret = manage_notification("MMC", "Check smack");
-	if (ret == -1)
-		return -1;
-
+	/* TODO: show smack popup */
 	return 0;
 }
 

@@ -74,7 +74,6 @@ BuildRequires:  pkgconfig(libudev)
 BuildRequires:  pkgconfig(gio-2.0)
 BuildRequires:	pkgconfig(eventsystem)
 BuildRequires:  pkgconfig(libtzplatform-config)
-BuildRequires:  pkgconfig(notification)
 BuildRequires:  pkgconfig(hwcommon)
 %if %{?display_module} == on
 %if %{with x}

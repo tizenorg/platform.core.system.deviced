@@ -163,7 +163,6 @@ SET(PKG_MODULES
 	gio-2.0
 	eventsystem
 	libtzplatform-config
-	notification
 	hwcommon
 )
 
