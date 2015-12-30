@@ -50,7 +50,7 @@ Summary:    Deviced
 Version:    1.0.0
 Release:    1
 Group:      System/Management
-License:    Apache-2.0
+License:    Apache-2.0 and BSD 2-clause and BSD-1.0
 Source0:    %{name}-%{version}.tar.gz
 Source1:    deviced.manifest
 Source2:    libdeviced.manifest
