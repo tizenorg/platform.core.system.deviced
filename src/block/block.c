@@ -1325,6 +1325,54 @@ static void block_send_dbus_reply(DBusMessage *msg, int result)
 		_E("Failed to send reply");
 }
 
+static bool check_removed(struct block_device *bdev, dd_list **queue, struct operation_queue **op)
+{
+	struct operation_queue *temp;
+	dd_list *l;
+	char name[16];
+	bool removed = false;
+
+	if (!bdev)
+		return removed;
+
+	if (!queue)
+		return removed;
+
+	if (!op)
+		return removed;
+
+	pthread_mutex_lock(&bdev->mutex);
+	DD_LIST_FOREACH(*queue, l, temp) {
+		if (temp->op == BLOCK_DEV_REMOVE) {
+			removed = true;
+			_D("Operation queue has remove operation");
+			break;
+		}
+	}
+	pthread_mutex_unlock(&bdev->mutex);
+
+	if (!removed)
+		return removed;
+
+	pthread_mutex_lock(&bdev->mutex);
+
+	DD_LIST_FOREACH(*queue, l, temp) {
+		if (temp->op == BLOCK_DEV_REMOVE) {
+			*op = temp;
+			break;
+		}
+		temp->done = true;
+		block_send_dbus_reply((*op)->msg, 0);
+
+		if (pipe_trigger(BLOCK_DEV_DEQUEUE, bdev, 0) < 0)
+			_E("fail to trigger pipe");
+	}
+
+	pthread_mutex_unlock(&bdev->mutex);
+
+	return removed;
+}
+
 static void trigger_operation(struct block_device *bdev)
 {
 	struct operation_queue *op;
@@ -1334,6 +1382,7 @@ static void trigger_operation(struct block_device *bdev)
 	char devnode[PATH_MAX];
 	char name[16];
 	enum block_dev_operation operation;
+	bool removed = false;
 
 	assert(bdev);
 
@@ -1355,6 +1404,15 @@ static void trigger_operation(struct block_device *bdev)
 
 		_D("Trigger operation (%s, %s)",
 			get_operation_char(operation, name, sizeof(name)), devnode);
+
+		if (operation == BLOCK_DEV_INSERT) {
+			removed = check_removed(bdev, &queue, &op);
+			if (removed) {
+				operation = op->op;
+				_D("Trigger operation again (%s, %s)",
+					get_operation_char(operation, name, sizeof(name)), devnode);
+			}
+		}
 
 		switch (operation) {
 		case BLOCK_DEV_INSERT:
@@ -1390,7 +1448,7 @@ static void trigger_operation(struct block_device *bdev)
 
 		block_send_dbus_reply(op->msg, ret);
 
-		queue = g_list_next(queue);
+		queue = DD_LIST_NEXT(queue);
 
 		continue_th = true;
 		if (!queue || DD_LIST_LENGTH(queue) == 0 ||

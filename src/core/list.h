@@ -54,5 +54,7 @@ typedef GList dd_list;
 	for (elem = g_list_last(head), elem_next = g_list_previous(elem), node = NULL; \
 			elem && ((node = elem->data) != NULL); \
 			elem = elem_next, elem_next = g_list_previous(elem), node = NULL)
+#define DD_LIST_NEXT(a)		\
+	g_list_next(a)
 
 #endif
