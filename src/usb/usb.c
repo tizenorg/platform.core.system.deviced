@@ -137,10 +137,38 @@ static int usb_config_disable(void)
 	return config_plugin->disable(NULL);
 }
 
+static void usb_change_state(int val)
+{
+	static int old_status = -1;
+	static int old_mode = -1;
+	int mode, legacy_mode;
+
+	switch (val) {
+	case VCONFKEY_SYSMAN_USB_DISCONNECTED:
+	case VCONFKEY_SYSMAN_USB_CONNECTED:
+		mode = SET_USB_NONE;
+		legacy_mode = SETTING_USB_NONE_MODE;
+		break;
+	case VCONFKEY_SYSMAN_USB_AVAILABLE:
+		mode = SET_USB_DEFAULT;
+		legacy_mode = SETTING_USB_DEFAULT_MODE;
+		break;
+	default:
+		return;
+	}
+
+	if (old_status != val)
+		vconf_set_int(VCONFKEY_SYSMAN_USB_STATUS, val);
+
+	if (old_mode != mode) {
+		vconf_set_int(VCONFKEY_USB_CUR_MODE, mode);
+		vconf_set_int(VCONFKEY_SETAPPL_USB_MODE_INT, legacy_mode);
+	}
+}
+
 static int usb_state_changed(int status)
 {
 	static int old = -1;	/* to update at the first time */
-	int vconf_state;
 	int ret;
 
 	_I("USB state is changed from (%d) to (%d)", old, status);
@@ -151,19 +179,22 @@ static int usb_state_changed(int status)
 	switch (status) {
 	case USB_CONNECTED:
 		_I("USB cable is connected");
+		usb_change_state(VCONFKEY_SYSMAN_USB_CONNECTED);
 		ret = usb_config_enable();
 		if (ret != 0) {
-			vconf_state = VCONFKEY_SYSMAN_USB_CONNECTED;
+			_E("Failed to enable usb config (%d)", ret);
 			break;
 		}
-		vconf_state = VCONFKEY_SYSMAN_USB_AVAILABLE;
+		usb_change_state(VCONFKEY_SYSMAN_USB_AVAILABLE);
 		pm_lock_internal(INTERNAL_LOCK_USB,
 				LCD_OFF, STAY_CUR_STATE, 0);
 		break;
 	case USB_DISCONNECTED:
 		_I("USB cable is disconnected");
+		usb_change_state(VCONFKEY_SYSMAN_USB_DISCONNECTED);
 		ret = usb_config_disable();
-		vconf_state = VCONFKEY_SYSMAN_USB_DISCONNECTED;
+		if (ret != 0)
+			_E("Failed to disable usb config (%d)", ret);
 		pm_unlock_internal(INTERNAL_LOCK_USB,
 				LCD_OFF, STAY_CUR_STATE);
 		break;
@@ -176,7 +207,6 @@ static int usb_state_changed(int status)
 	else
 		old = status;
 
-	vconf_set_int(VCONFKEY_SYSMAN_USB_STATUS, vconf_state);
 	return ret;
 }
 
