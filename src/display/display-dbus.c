@@ -36,6 +36,7 @@
 #include "dd-display.h"
 #include "display-actor.h"
 #include "display-ops.h"
+#include "display-flags.h"
 
 #define TELEPHONY_PATH			"/org/tizen/telephony/SAMSUNG_QMI"
 #define TELEPHONY_INTERFACE_SIM		"org.tizen.telephony.Sim"
@@ -1041,7 +1042,7 @@ static void extreme_signal_handler(void *data, DBusMessage *msg)
 		return;
 	}
 
-	pm_status_flag &= ~BRTCH_FLAG;
+	PM_STATUS_UNSET(BRTCH_FLAG);
 	backlight_ops.update();
 	_D("extreme mode : enter dim state!");
 	if (vconf_set_int(VCONFKEY_PM_KEY_IGNORE, TRUE) != 0)

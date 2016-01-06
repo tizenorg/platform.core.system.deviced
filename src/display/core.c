@@ -43,6 +43,7 @@
 #include "device-node.h"
 #include "lock-detector.h"
 #include "display-ops.h"
+#include "display-flags.h"
 #include "core/devices.h"
 #include "core/device-notifier.h"
 #include "core/udev.h"
@@ -75,9 +76,6 @@
 #define EVENT_STR		"event"
 #define UNKNOWN_STR		"unknown"
 
-unsigned int pm_status_flag;
-
-static void (*power_saving_func) (int onoff);
 static enum device_ops_status status = DEVICE_OPS_STATUS_UNINIT;
 
 int pm_cur_state;
@@ -646,17 +644,10 @@ static void update_display_time(void)
 	/* third priority : lock state */
 	if ((get_lock_screen_state() == VCONFKEY_IDLE_LOCK) &&
 	    !get_lock_screen_bg_state()) {
-		if (pm_status_flag & SMAST_FLAG) {
-			/* smart stay is on, timeout is always 5 seconds. */
-			states[S_NORMAL].timeout = LOCK_SCREEN_CONTROL_TIMEOUT;
-			_I("LOCK : timeout is set, smart stay timeout(%d ms)",
-			    LOCK_SCREEN_CONTROL_TIMEOUT);
-		} else {
-			/* timeout is different according to key or event. */
-			states[S_NORMAL].timeout = lock_screen_timeout;
-			_I("LOCK : timeout is set by normal(%d ms)",
-			    lock_screen_timeout);
-		}
+		/* timeout is different according to key or event. */
+		states[S_NORMAL].timeout = lock_screen_timeout;
+		_I("LOCK : timeout is set by normal(%d ms)",
+		    lock_screen_timeout);
 		return;
 	}
 
@@ -1489,13 +1480,6 @@ static int default_trans(int evt)
 		}
 	}
 
-	/* smart stay */
-	if (display_info.face_detection &&
-	    (pm_status_flag & SMAST_FLAG) && hallic_open) {
-		if (display_info.face_detection(evt, pm_cur_state, next_state))
-			return 0;
-	}
-
 	/* state transition */
 	pm_old_state = pm_cur_state;
 	pm_cur_state = next_state;
@@ -1769,17 +1753,6 @@ static int default_check(int next)
 	return 1;		/* transitable */
 }
 
-static void default_saving_mode(int onoff)
-{
-	if (onoff) {
-		pm_status_flag |= PWRSV_FLAG;
-	} else {
-		pm_status_flag &= ~PWRSV_FLAG;
-	}
-	if (pm_cur_state == S_NORMAL)
-		backlight_ops.update();
-}
-
 static int poll_callback(int condition, PMMsg *data)
 {
 	static time_t last_t;
@@ -1832,45 +1805,28 @@ static int update_setting(int key_idx, int val)
 			    (SHIFT_CHANGE_STATE + S_LCDOFF), getpid());
 		break;
 	case SETTING_LOW_BATT:
-		if (low_battery_state(val)) {
-			if (!(pm_status_flag & CHRGR_FLAG))
-				power_saving_func(true);
-			pm_status_flag |= LOWBT_FLAG;
-		} else {
-			if (pm_status_flag & PWRSV_FLAG)
-				power_saving_func(false);
-			pm_status_flag &= ~LOWBT_FLAG;
-			pm_status_flag &= ~BRTCH_FLAG;
-			vconf_set_bool(VCONFKEY_PM_BRIGHTNESS_CHANGED_IN_LPM,
-			    false);
+		if (low_battery_state(val))
+			PM_STATUS_SET(LOWBT_FLAG);
+		else {
+			PM_STATUS_UNSET(LOWBT_FLAG);
+			PM_STATUS_UNSET(BRTCH_FLAG);
+			vconf_set_bool(VCONFKEY_PM_BRIGHTNESS_CHANGED_IN_LPM, false);
 		}
 		break;
 	case SETTING_CHARGING:
 		if (val) {
-			if (pm_status_flag & LOWBT_FLAG) {
-				power_saving_func(false);
-				pm_status_flag &= ~LOWBT_FLAG;
-			}
-			pm_status_flag |= CHRGR_FLAG;
+			PM_STATUS_UNSET(LOWBT_FLAG);
+			PM_STATUS_SET(CHRGR_FLAG);
 		} else {
 			int bat_state = VCONFKEY_SYSMAN_BAT_NORMAL;
 			vconf_get_int(VCONFKEY_SYSMAN_BATTERY_STATUS_LOW,
 				&bat_state);
-			if (low_battery_state(bat_state)) {
-				power_saving_func(true);
-				pm_status_flag |= LOWBT_FLAG;
-			}
-			pm_status_flag &= ~CHRGR_FLAG;
+			if (low_battery_state(bat_state))
+				PM_STATUS_SET(LOWBT_FLAG);
+			PM_STATUS_UNSET(CHRGR_FLAG);
 		}
 		break;
 	case SETTING_BRT_LEVEL:
-		if (pm_status_flag & PWRSV_FLAG) {
-			pm_status_flag |= BRTCH_FLAG;
-			vconf_set_bool(VCONFKEY_PM_BRIGHTNESS_CHANGED_IN_LPM,
-			    true);
-			_I("brightness changed in low battery,"
-				"escape dim state");
-		}
 		backlight_ops.set_default_brt(val);
 		snprintf(buf, sizeof(buf), "%d", val);
 		_D("Brightness set in bl : %d",val);
@@ -1905,11 +1861,11 @@ static int update_setting(int key_idx, int val)
 		switch (val) {
 		case POWER_OFF_NONE:
 		case POWER_OFF_POPUP:
-			pm_status_flag &= ~PWROFF_FLAG;
+			PM_STATUS_UNSET(PWROFF_FLAG);
 			break;
 		case POWER_OFF_DIRECT:
 		case POWER_OFF_RESTART:
-			pm_status_flag |= PWROFF_FLAG;
+			PM_STATUS_SET(PWROFF_FLAG);
 			break;
 		}
 		break;
@@ -1935,9 +1891,8 @@ static void check_seed_status(void)
 	int lock_state = -1;
 
 	/* Charging check */
-	if ((get_charging_status(&tmp) == 0) && (tmp > 0)) {
-		pm_status_flag |= CHRGR_FLAG;
-	}
+	if ((get_charging_status(&tmp) == 0) && (tmp > 0))
+		PM_STATUS_SET(CHRGR_FLAG);
 
 	ret = get_setting_brightness(&tmp);
 	if (ret != 0 || (tmp < PM_MIN_BRIGHTNESS || tmp > PM_MAX_BRIGHTNESS)) {
@@ -1951,12 +1906,9 @@ static void check_seed_status(void)
 	backlight_ops.set_default_brt(tmp);
 
 	vconf_get_int(VCONFKEY_SYSMAN_BATTERY_STATUS_LOW, &bat_state);
-	if (low_battery_state(bat_state)) {
-		if (!(pm_status_flag & CHRGR_FLAG)) {
-			power_saving_func(true);
-			pm_status_flag |= LOWBT_FLAG;
-		}
-	}
+	if (low_battery_state(bat_state) && !IS_PM_STATUS_SET(CHRGR_FLAG))
+		PM_STATUS_SET(LOWBT_FLAG);
+
 	lcd_on_procedure(LCD_NORMAL, LCD_ON_BY_EVENT);
 
 	/* lock screen check */
@@ -2180,8 +2132,6 @@ static void display_init(void *data)
 	_I("Start power manager");
 
 	signal(SIGHUP, sig_hup);
-
-	power_saving_func = default_saving_mode;
 
 	/* load configutation */
 	ret = config_parse(DISPLAY_CONF_FILE, display_load_config, &display_conf);

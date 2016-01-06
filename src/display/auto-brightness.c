@@ -262,7 +262,7 @@ static bool alc_update_brt(bool setting)
 		}
 	}
 
-	if ((fault_count > MAX_FAULT) && !(pm_status_flag & PWROFF_FLAG)) {
+	if ((fault_count > MAX_FAULT)) {
 		if (alc_timeout_id > 0)
 			ecore_timer_del(alc_timeout_id);
 		alc_timeout_id = NULL;
@@ -296,7 +296,7 @@ static bool alc_handler(void *data)
 static int alc_action(int timeout)
 {
 	/* sampling timer add */
-	if (alc_timeout_id == 0 && !(pm_status_flag & PWRSV_FLAG)) {
+	if (alc_timeout_id == 0) {
 		display_info.update_auto_brightness(true);
 
 		alc_timeout_id =
@@ -407,15 +407,6 @@ static int disconnect_sensor(void)
 	return 0;
 }
 
-void set_brightness_changed_state(void)
-{
-	if (pm_status_flag & PWRSV_FLAG) {
-		pm_status_flag |= BRTCH_FLAG;
-		_D("brightness changed in low battery,"
-		    "escape dim state (light)");
-	}
-}
-
 static int set_autobrightness_state(int status)
 {
 	int ret = -1;
@@ -425,9 +416,6 @@ static int set_autobrightness_state(int status)
 	if (status == SETTING_BRIGHTNESS_AUTOMATIC_ON) {
 		if (connect_sensor() < 0)
 			return -1;
-
-		/* escape dim state if it's in low battery.*/
-		set_brightness_changed_state();
 
 		/* change alc action func */
 		if (_default_action == NULL)
@@ -446,8 +434,6 @@ static int set_autobrightness_state(int status)
 	} else {
 		disconnect_sensor();
 		lbm_state = 0;
-		/* escape dim state if it's in low battery.*/
-		set_brightness_changed_state();
 
 		ret = get_setting_brightness(&default_brt);
 		if (ret != 0 || (default_brt < PM_MIN_BRIGHTNESS || default_brt > PM_MAX_BRIGHTNESS)) {

@@ -34,15 +34,6 @@
 #define MASK_OFF 0x2		/* 010 */
 #define MASK_SLP 0x4		/* 100 */
 
-#define VCALL_FLAG		0x00000001
-#define LOWBT_FLAG		0x00000100
-#define CHRGR_FLAG		0x00000200
-#define PWRSV_FLAG		0x00000400
-#define SMAST_FLAG		0x00001000
-#define BRTCH_FLAG		0x00002000
-#define PWROFF_FLAG		0x00004000
-#define DIMSTAY_FLAG		0x00008000
-
 #define DEFAULT_NORMAL_TIMEOUT	30
 
 #define MASK32			0xffffffff
@@ -69,8 +60,6 @@ enum pm_log_type {
 
 void pm_history_save(enum pm_log_type, int);
 #endif
-
-extern unsigned int pm_status_flag;
 
 /*
  * State enumeration

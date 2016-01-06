@@ -27,6 +27,7 @@
 #include "util.h"
 #include "core.h"
 #include "poll.h"
+#include "display-flags.h"
 
 #define SHIFT_UNLOCK                    4
 #define SHIFT_UNLOCK_PARAMETER          12
@@ -47,7 +48,7 @@ int check_dimstay(int next_state, int flag)
 	if (!(flag & GOTO_STATE_NOW))
 		return false;
 
-	if (!(pm_status_flag & DIMSTAY_FLAG))
+	if (!IS_PM_STATUS_SET(DIMSTAY_FLAG))
 		return false;
 
 	return true;

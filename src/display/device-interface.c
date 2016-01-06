@@ -176,10 +176,6 @@ void change_brightness(int start, int end, int step)
 		return;
 	}
 
-	if ((pm_status_flag & PWRSV_FLAG) &&
-	    !(pm_status_flag & BRTCH_FLAG))
-		return;
-
 	ret = display_dev->get_brightness(&prev);
 	if (ret < 0) {
 		_E("fail to get brightness : %d", ret);
@@ -320,12 +316,8 @@ static int custom_backlight_update(void)
 	    custom_brightness > PM_MAX_BRIGHTNESS)
 		return -EINVAL;
 
-	if ((pm_status_flag & PWRSV_FLAG) && !(pm_status_flag & BRTCH_FLAG)) {
-		ret = backlight_dim();
-	} else {
-		_I("custom brightness restored! %d", custom_brightness);
-		ret = bl_brt(custom_brightness, 0);
-	}
+	_I("custom brightness restored! %d", custom_brightness);
+	ret = bl_brt(custom_brightness, 0);
 
 	return ret;
 }
@@ -342,18 +334,12 @@ static int set_force_brightness(int level)
 
 static int backlight_update(void)
 {
-	int ret = 0;
-
 	if (get_custom_status()) {
 		_I("custom brightness mode! brt no updated");
 		return 0;
 	}
-	if ((pm_status_flag & PWRSV_FLAG) && !(pm_status_flag & BRTCH_FLAG)) {
-		ret = backlight_dim();
-	} else {
-		ret = bl_brt(default_brightness, 0);
-	}
-	return ret;
+
+	return bl_brt(default_brightness, 0);
 }
 
 static int backlight_standby(int force)
