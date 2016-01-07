@@ -36,21 +36,11 @@
 #include "dd-display.h"
 #include "display-actor.h"
 #include "display-ops.h"
-#include "display-flags.h"
 
 #define TELEPHONY_PATH			"/org/tizen/telephony/SAMSUNG_QMI"
 #define TELEPHONY_INTERFACE_SIM		"org.tizen.telephony.Sim"
 #define SIGNAL_SIM_STATUS		"Status"
 #define SIM_CARD_NOT_PRESENT		(0x01)
-
-#define SIGNAL_HOMESCREEN		"HomeScreen"
-#define SIGNAL_EXTREME			"Extreme"
-#define SIGNAL_NOTEXTREME		"NotExtreme"
-
-#define BLIND_MASK(val)			((val) & 0xFFFF)
-#define BLIND_RED(val)			BLIND_MASK((val) >> 32)
-#define BLIND_GREEN(val)		BLIND_MASK((val) >> 16)
-#define BLIND_BLUE(val)			BLIND_MASK((val))
 
 #define DISPLAY_DIM_BRIGHTNESS  0
 #define DUMP_MODE_WATING_TIME   600000
@@ -1031,40 +1021,6 @@ static void sim_signal_handler(void *data, DBusMessage *msg)
 	}
 }
 
-static void extreme_signal_handler(void *data, DBusMessage *msg)
-{
-	int ret;
-
-	ret = dbus_message_is_signal(msg, POPUP_INTERFACE_LOWBAT,
-	    SIGNAL_EXTREME);
-	if (!ret) {
-		_E("there is no extreme signal");
-		return;
-	}
-
-	PM_STATUS_UNSET(BRTCH_FLAG);
-	backlight_ops.update();
-	_D("extreme mode : enter dim state!");
-	if (vconf_set_int(VCONFKEY_PM_KEY_IGNORE, TRUE) != 0)
-		_E("failed to set vconf status");
-}
-
-static void not_extreme_signal_handler(void *data, DBusMessage *msg)
-{
-	int ret;
-
-	ret = dbus_message_is_signal(msg, POPUP_INTERFACE_LOWBAT,
-	    SIGNAL_NOTEXTREME);
-	if (!ret) {
-		_E("there is no extreme signal");
-		return;
-	}
-
-	_D("release extreme mode");
-	if (vconf_set_int(VCONFKEY_PM_KEY_IGNORE, FALSE) != 0)
-		_E("failed to set vconf status");
-}
-
 /*
  * Default capability
  * api      := LCDON | LCDOFF | BRIGHTNESS
@@ -1103,21 +1059,6 @@ int init_pm_dbus(void)
 	ret = register_edbus_signal_handler(TELEPHONY_PATH,
 		    TELEPHONY_INTERFACE_SIM, SIGNAL_SIM_STATUS,
 		    sim_signal_handler);
-	if (ret < 0 && ret != -EEXIST) {
-		_E("Failed to register signal handler! %d", ret);
-		return ret;
-	}
-
-	ret = register_edbus_signal_handler(POPUP_PATH_LOWBAT,
-		    POPUP_INTERFACE_LOWBAT, SIGNAL_EXTREME,
-		    extreme_signal_handler);
-	if (ret < 0 && ret != -EEXIST) {
-		_E("Failed to register signal handler! %d", ret);
-		return ret;
-	}
-	ret = register_edbus_signal_handler(POPUP_PATH_LOWBAT,
-		    POPUP_INTERFACE_LOWBAT, SIGNAL_NOTEXTREME,
-		    not_extreme_signal_handler);
 	if (ret < 0 && ret != -EEXIST) {
 		_E("Failed to register signal handler! %d", ret);
 		return ret;
