@@ -1329,7 +1329,6 @@ static bool check_removed(struct block_device *bdev, dd_list **queue, struct ope
 {
 	struct operation_queue *temp;
 	dd_list *l;
-	char name[16];
 	bool removed = false;
 
 	if (!bdev)
