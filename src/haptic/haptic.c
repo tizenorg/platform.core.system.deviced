@@ -133,7 +133,8 @@ static int haptic_module_load(void)
 
 static int convert_magnitude_by_conf(int level)
 {
-	int i, step;
+	int i;
+	double step;
 
 	assert(level >= 0 && level <= 100);
 
