@@ -36,6 +36,7 @@
 
 #define MAX_MAGNITUDE			0xFFFF
 #define PERIODIC_MAX_MAGNITUDE	0x7FFF	/* 0.5 * MAX_MAGNITUDE */
+#define RUMBLE_MAX_MAGNITUDE	0xFFFF
 
 #define DEV_INPUT   "/dev/input"
 #define EVENT		"event"
@@ -215,8 +216,8 @@ static int ff_init_effect(struct ff_effect *effect)
 	effect->replay.length = 0;
 	effect->replay.delay = 10;
 	effect->id = -1;
-	effect->u.rumble.strong_magnitude = 0x100;
-	effect->u.rumble.weak_magnitude = 0x50;
+	effect->u.rumble.strong_magnitude = 0x8000;
+	effect->u.rumble.weak_magnitude = 0xc000;
 
 	return 0;
 }
@@ -229,12 +230,12 @@ static int ff_set_effect(struct ff_effect *effect, int length, int level)
 		return -EINVAL;
 
 	magnitude = (double)level/HAPTIC_MODULE_FEEDBACK_MAX;
-	magnitude *= PERIODIC_MAX_MAGNITUDE;
+	magnitude *= RUMBLE_MAX_MAGNITUDE;
 
 	_I("info : magnitude(%d) length(%d)", (int)magnitude, length);
 
 	/* set member variables in effect struct */
-	effect->u.periodic.magnitude = (int)magnitude;
+	effect->u.rumble.strong_magnitude = (int)magnitude;
 	effect->replay.length = length;		/* length millisecond */
 
 	return 0;
