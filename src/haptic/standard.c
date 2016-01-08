@@ -215,8 +215,8 @@ static int ff_init_effect(struct ff_effect *effect)
 	effect->replay.length = 0;
 	effect->replay.delay = 10;
 	effect->id = -1;
-	effect->u.rumble.strong_magnitude = 0x100;
-	effect->u.rumble.weak_magnitude = 0x50;
+	effect->u.rumble.strong_magnitude = 0x8000;
+	effect->u.rumble.weak_magnitude = 0xc000;
 
 	return 0;
 }
