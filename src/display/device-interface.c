@@ -193,10 +193,6 @@ static int backlight_on(enum device_flags flags)
 		}
 	}
 
-	if (flags & LCD_PHASED_TRANSIT_MODE)
-		change_brightness(LCD_PHASED_MIN_BRIGHTNESS,
-		    default_brightness, LCD_PHASED_CHANGE_STEP);
-
 	return ret;
 }
 
@@ -206,10 +202,6 @@ static int backlight_off(enum device_flags flags)
 	int i;
 
 	_D("LCD off %x", flags);
-
-	if (flags & LCD_PHASED_TRANSIT_MODE)
-		change_brightness(default_brightness,
-		    LCD_PHASED_MIN_BRIGHTNESS, LCD_PHASED_CHANGE_STEP);
 
 	for (i = 0; i < PM_LCD_RETRY_CNT; i++) {
 		usleep(30000);

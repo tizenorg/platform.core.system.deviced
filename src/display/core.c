@@ -285,13 +285,11 @@ void lcd_on_procedure(int state, enum device_flags flag)
 		lcdon_broadcast = true;
 	}
 
-	if (!(flags & LCD_PHASED_TRANSIT_MODE)) {
-		/* Update brightness level */
-		if (state == LCD_DIM)
-			backlight_ops.dim();
-		else if (state == LCD_NORMAL)
-			backlight_ops.update();
-	}
+	/* Update brightness level */
+	if (state == LCD_DIM)
+		backlight_ops.dim();
+	else if (state == LCD_NORMAL)
+		backlight_ops.update();
 
 	DD_LIST_FOREACH(lcdon_ops, l, ops)
 		ops->start(flags);

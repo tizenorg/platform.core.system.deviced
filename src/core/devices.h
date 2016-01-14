@@ -33,7 +33,6 @@ enum device_flags {
 	CORE_LOGIC_MODE               = 0x00010000,
 	TOUCH_SCREEN_OFF_MODE         = 0x00020000,
 	LCD_PANEL_OFF_MODE            = 0x00040000,
-	LCD_PHASED_TRANSIT_MODE       = 0x00080000,
 	LCD_ON_BY_GESTURE             = 0x00100000,
 	LCD_ON_BY_POWER_KEY           = 0x00200000,
 	LCD_ON_BY_EVENT               = 0x00400000,
