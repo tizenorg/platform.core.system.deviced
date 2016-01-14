@@ -691,10 +691,6 @@ void lcd_on_direct(enum device_flags flags)
 {
 	int ret, call_state;
 
-	if (power_ops.get_power_lock_support()
-	    && pm_cur_state == S_SLEEP)
-		power_ops.power_lock();
-
 #ifdef MICRO_DD
 	_D("lcd is on directly");
 	gettimeofday(&lcdon_tv, NULL);
@@ -1599,8 +1595,6 @@ static int default_action(int timeout)
 	}
 
 	if (pm_cur_state != pm_old_state && pm_cur_state != S_SLEEP) {
-		if (power_ops.get_power_lock_support())
-			power_ops.power_lock();
 		set_setting_pmstate(pm_cur_state);
 		device_notify(DEVICE_NOTIFIER_LCD, &pm_cur_state);
 	}
@@ -1660,20 +1654,18 @@ static int default_action(int timeout)
 		if (backlight_ops.get_lcd_power() != DPMS_OFF)
 			lcd_off_procedure();
 
-		if (!power_ops.get_power_lock_support()) {
-			/* sleep state : set system mode to SUSPEND */
-			if (power_ops.get_wakeup_count(&wakeup_count) < 0)
-				_E("wakeup count read error");
+		/* sleep state : set system mode to SUSPEND */
+		if (power_ops.get_wakeup_count(&wakeup_count) < 0)
+			_E("wakeup count read error");
 
-			if (wakeup_count < 0) {
-				_I("Wakup Event! Can not enter suspend mode.");
-				goto go_lcd_off;
-			}
+		if (wakeup_count < 0) {
+			_I("Wakup Event! Can not enter suspend mode.");
+			goto go_lcd_off;
+		}
 
-			if (power_ops.set_wakeup_count(wakeup_count) < 0) {
-				_E("wakeup count write error");
-				goto go_lcd_off;
-			}
+		if (power_ops.set_wakeup_count(wakeup_count) < 0) {
+			_E("wakeup count write error");
+			goto go_lcd_off;
 		}
 		goto go_suspend;
 	}
@@ -1684,28 +1676,21 @@ go_suspend:
 #ifdef ENABLE_PM_LOG
 	pm_history_save(PM_LOG_SLEEP, pm_cur_state);
 #endif
-	if (power_ops.get_power_lock_support()) {
-		if (power_ops.power_unlock() < 0)
-			_E("power unlock state error!");
-	} else {
-		power_ops.suspend();
-		_I("system wakeup!!");
-		system_wakeup_flag = true;
-		/* Resume !! */
-		if (power_ops.check_wakeup_src() == EVENT_DEVICE)
-			/* system waked up by devices */
-			states[pm_cur_state].trans(EVENT_DEVICE);
-		else
-			/* system waked up by user input */
-			states[pm_cur_state].trans(EVENT_INPUT);
-	}
+	power_ops.suspend();
+	_I("system wakeup!!");
+	system_wakeup_flag = true;
+	/* Resume !! */
+	if (power_ops.check_wakeup_src() == EVENT_DEVICE)
+		/* system waked up by devices */
+		states[pm_cur_state].trans(EVENT_DEVICE);
+	else
+		/* system waked up by user input */
+		states[pm_cur_state].trans(EVENT_INPUT);
 	return 0;
 
 go_lcd_off:
-	if (!power_ops.get_power_lock_support()) {
-		/* Resume !! */
-		states[pm_cur_state].trans(EVENT_DEVICE);
-	}
+	/* Resume !! */
+	states[pm_cur_state].trans(EVENT_DEVICE);
 	return 0;
 }
 

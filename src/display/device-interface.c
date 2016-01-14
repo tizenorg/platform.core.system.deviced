@@ -48,15 +48,8 @@
 #define LCD_PHASED_CHANGE_STEP		5
 #define LCD_PHASED_DELAY		35000 /* microsecond */
 
-#define POWER_LOCK_PATH         "/sys/power/wake_lock"
-#define POWER_UNLOCK_PATH       "/sys/power/wake_unlock"
 #define POWER_WAKEUP_PATH       "/sys/power/wakeup_count"
 #define POWER_STATE_PATH        "/sys/power/state"
-
-enum {
-	POWER_UNLOCK = 0,
-	POWER_LOCK,
-};
 
 struct _backlight_ops backlight_ops;
 struct _power_ops power_ops;
@@ -117,39 +110,6 @@ static int system_suspend(void)
 	ret = sys_set_str(POWER_STATE_PATH, "mem");
 	_I("system resume (result : %d)", ret);
 	return 0;
-}
-
-static int system_power_lock(void)
-{
-	_I("system power lock");
-	return sys_set_str(POWER_LOCK_PATH, "mainlock");
-}
-
-static int system_power_unlock(void)
-{
-	_I("system power unlock");
-	return sys_set_str(POWER_UNLOCK_PATH, "mainlock");
-}
-
-static int system_get_power_lock_support(void)
-{
-	static int power_lock_support = -1;
-	int ret;
-
-	if (power_lock_support >= 0)
-		goto out;
-
-	ret = sys_check_node(POWER_LOCK_PATH);
-	if (ret < 0)
-		power_lock_support = false;
-	else
-		power_lock_support = true;
-
-	_I("system power lock : %s",
-			(power_lock_support ? "support" : "not support"));
-
-out:
-	return power_lock_support;
 }
 
 static int get_lcd_power(void)
@@ -451,9 +411,6 @@ static void _init_ops(void)
 	backlight_ops.get_brightness = get_brightness;
 
 	power_ops.suspend = system_suspend;
-	power_ops.power_lock = system_power_lock;
-	power_ops.power_unlock = system_power_unlock;
-	power_ops.get_power_lock_support = system_get_power_lock_support;
 	power_ops.check_wakeup_src = check_wakeup_src;
 	power_ops.get_wakeup_count = get_wakeup_count;
 	power_ops.set_wakeup_count = set_wakeup_count;
