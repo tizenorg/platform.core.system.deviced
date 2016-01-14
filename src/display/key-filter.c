@@ -284,52 +284,79 @@ static inline void switch_off_lcd(void)
 	lcd_off_procedure();
 }
 
-static void process_combination_key(struct input_event *pinput)
+static void process_combination_key_pressed(void)
 {
-	key_combination_e comb = get_key_combination();
-
-	if (pinput->value == KEY_PRESSED) {
-		if (comb == KEY_COMBINATION_STOP)
-			start_key_combination();
-		else if (comb == KEY_COMBINATION_START) {
-			stop_key_combination();
-			remove_longkey_timeout();
-			_I("capture mode");
-			set_key_combination(KEY_COMBINATION_SCREENCAPTURE);
-			skip_lcd_off = true;
-		}
-		menu_pressed = true;
-	} else if (pinput->value == KEY_RELEASED) {
-		if (comb != KEY_COMBINATION_SCREENCAPTURE)
-			stop_key_combination();
-		menu_pressed = false;
+	switch (get_key_combination()) {
+	case KEY_COMBINATION_STOP:
+		start_key_combination();
+		break;
+	case KEY_COMBINATION_START:
+		remove_combination_timeout();
+		remove_longkey_timeout();
+		set_key_combination(KEY_COMBINATION_SCREENCAPTURE);
+		skip_lcd_off = true;
+		break;
+	default:
+		break;
 	}
+
+	menu_pressed = true;
 }
 
+static void process_combination_key_released(void)
+{
+	switch (get_key_combination()) {
+	case KEY_COMBINATION_STOP:
+	case KEY_COMBINATION_START:
+		stop_key_combination();
+		break;
+	case KEY_COMBINATION_SCREENCAPTURE:
+	default:
+		break;
+	}
+
+	menu_pressed = false;
+}
+
+static void process_combination_key(struct input_event *pinput)
+{
+	switch (pinput->value) {
+	case KEY_PRESSED:
+		process_combination_key_pressed();
+		break;
+	case KEY_RELEASED:
+		process_combination_key_released();
+		break;
+	default:
+		break;
+	}
+}
 
 static int process_menu_key(struct input_event *pinput)
 {
 	int caps;
+	bool caps_lcdon;
 
 	caps = display_get_caps(DISPLAY_ACTOR_MENU_KEY);
+	if (display_has_caps(caps, DISPLAY_CAPA_LCDON))
+		caps_lcdon = true;
+	else
+		caps_lcdon = false;
 
-	if (!display_has_caps(caps, DISPLAY_CAPA_LCDON)) {
-		if (current_state_in_on()) {
-			process_combination_key(pinput);
-			return false;
-		}
-		_D("No lcd-on capability!");
+	if (!caps_lcdon && !current_state_in_on()) {
+		_I("No lcd-on capability!");
 		return true;
-	} else if (pinput->value == KEY_PRESSED) {
-		switch_on_lcd();
 	}
+
+	if (caps_lcdon && pinput->value == KEY_PRESSED)
+		switch_on_lcd();
 
 	process_combination_key(pinput);
 
 	return false;
 }
 
-static int decide_lcdoff(void)
+static bool decide_lcdoff(void)
 {
 	/* It's not needed if it's already LCD off state */
 	if (!current_state_in_on() &&
@@ -363,103 +390,136 @@ static int decide_lcdoff(void)
 	return true;
 }
 
-static int lcdoff_powerkey(void)
+static bool lcdoff_powerkey(void)
 {
-	int ignore = true;
+	bool ignore;
 
-	if (decide_lcdoff() == true) {
-		check_processes(S_LCDOFF);
-		check_processes(S_LCDDIM);
+	ignore = decide_lcdoff();
+	if (!ignore)
+		goto out;
 
-		if (!check_holdkey_block(S_LCDOFF) &&
-		    !check_holdkey_block(S_LCDDIM)) {
-			if (display_info.update_auto_brightness)
-				display_info.update_auto_brightness(false);
-			switch_off_lcd();
-			delete_condition(S_LCDOFF);
-			delete_condition(S_LCDDIM);
-			update_lcdoff_source(VCONFKEY_PM_LCDOFF_BY_POWERKEY);
-			recv_data.pid = getpid();
-			recv_data.cond = 0x400;
-			(*pm_callback)(PM_CONTROL_EVENT, &recv_data);
-		}
-	} else {
+	check_processes(S_LCDOFF);
+	check_processes(S_LCDDIM);
+
+	if (check_holdkey_block(S_LCDOFF) ||
+		check_holdkey_block(S_LCDDIM))
+		goto out;
+
+	if (display_info.update_auto_brightness)
+		display_info.update_auto_brightness(false);
+
+	switch_off_lcd();
+	delete_condition(S_LCDOFF);
+	delete_condition(S_LCDDIM);
+	update_lcdoff_source(VCONFKEY_PM_LCDOFF_BY_POWERKEY);
+	recv_data.pid = getpid();
+	recv_data.cond = 0x400;
+	(*pm_callback)(PM_CONTROL_EVENT, &recv_data);
+
+out:
+	cancel_lcdoff = 0;
+	return ignore;
+}
+
+static bool process_power_key_released(struct input_event *pinput)
+{
+	bool ignore = false;
+	unsigned int caps;
+
+	_I("power key releaseed");
+	powerkey_pressed = false;
+
+	caps = display_get_caps(DISPLAY_ACTOR_POWER_KEY);
+	if (!display_conf.powerkey_doublepress) {
+		if (display_has_caps(caps, DISPLAY_CAPA_LCDOFF))
+			ignore = lcdoff_powerkey();
+		else
+			_D("No lcdoff capability!");
+	} else if (skip_lcd_off)
 		ignore = false;
+
+	if (!display_has_caps(caps, DISPLAY_CAPA_LCDON))
+		ignore = true;
+
+	stop_key_combination();
+	remove_longkey_timeout();
+
+	return ignore;
+}
+
+static bool process_power_key_pressed(struct input_event *pinput)
+{
+	bool ignore = true;
+	unsigned int caps;
+
+	_I("Power key pressed");
+	powerkey_pressed = true;
+	caps = display_get_caps(DISPLAY_ACTOR_POWER_KEY);
+	if (display_has_caps(caps, DISPLAY_CAPA_LCDON))
+		skip_lcd_off = switch_on_lcd();
+	else {
+		_D("No lcdon capability!");
+		skip_lcd_off = false;
 	}
+
+	pressed_time.tv_sec = (pinput->time).tv_sec;
+	pressed_time.tv_usec = (pinput->time).tv_usec;
+
+	switch (get_key_combination()) {
+	case KEY_COMBINATION_STOP:
+		add_longkey_timeout();
+		start_key_combination();
+		break;
+
+	case KEY_COMBINATION_START:
+		remove_combination_timeout();
+		set_key_combination(KEY_COMBINATION_SCREENCAPTURE);
+		skip_lcd_off = true;
+		ignore = false;
+		break;
+
+	default:
+		break;
+	}
+
+	if (skip_lcd_off)
+		ignore = false;
 	cancel_lcdoff = 0;
 
 	return ignore;
 }
 
-static int process_power_key(struct input_event *pinput)
+static bool process_power_key_being_pressed(struct input_event *pinput)
 {
-	int ignore = true;
-	static int value = KEY_RELEASED;
-	unsigned int caps;
-	key_combination_e comb;
+	unsigned long diff = timediff_usec(pressed_time, pinput->time);
 
-	caps = display_get_caps(DISPLAY_ACTOR_POWER_KEY);
+	if (diff > (display_conf.longpress_interval * USEC_PER_SEC))
+		longkey_pressed();
+
+	return true;
+}
+
+static bool process_power_key(struct input_event *pinput)
+{
+	bool ignore = true;
 
 	switch (pinput->value) {
 	case KEY_RELEASED:
-		powerkey_pressed = false;
-		check_key_pair(pinput->code, pinput->value, &value);
-
-		if (!display_conf.powerkey_doublepress) {
-			if (display_has_caps(caps, DISPLAY_CAPA_LCDOFF))
-				ignore = lcdoff_powerkey();
-			else
-				_D("No lcdoff capability!");
-		} else if (skip_lcd_off) {
-			ignore = false;
-		}
-
-		if (!display_has_caps(caps, DISPLAY_CAPA_LCDON))
-			ignore = true;
-
-		stop_key_combination();
-		remove_longkey_timeout();
-
+		ignore = process_power_key_released(pinput);
 		break;
+
 	case KEY_PRESSED:
-		powerkey_pressed = true;
-		if (display_has_caps(caps, DISPLAY_CAPA_LCDON)) {
-			skip_lcd_off = switch_on_lcd();
-		} else {
-			_D("No lcdon capability!");
-			skip_lcd_off = false;
-		}
-		check_key_pair(pinput->code, pinput->value, &value);
-		_I("power key pressed");
-		pressed_time.tv_sec = (pinput->time).tv_sec;
-		pressed_time.tv_usec = (pinput->time).tv_usec;
-		comb = get_key_combination();
-		if (comb == KEY_COMBINATION_STOP) {
-			/* add long key timer */
-			add_longkey_timeout();
-			start_key_combination();
-		} else if (comb == KEY_COMBINATION_START) {
-			stop_key_combination();
-			_I("capture mode");
-			set_key_combination(KEY_COMBINATION_SCREENCAPTURE);
-			skip_lcd_off = true;
-			ignore = false;
-		}
-		if (skip_lcd_off)
-			ignore = false;
-		cancel_lcdoff = 0;
-
+		ignore = process_power_key_pressed(pinput);
 		break;
+
 	case KEY_BEING_PRESSED:
-		if (timediff_usec(pressed_time, pinput->time) >
-		    (display_conf.longpress_interval * USEC_PER_SEC))
-			longkey_pressed();
+		ignore = process_power_key_being_pressed(pinput);
 		break;
 	}
 	return ignore;
 }
 
-static int process_screenlock_key(struct input_event *pinput)
+static bool process_screenlock_key(struct input_event *pinput)
 {
 	if (pinput->value != KEY_RELEASED) {
 		stop_key_combination();
@@ -472,16 +532,20 @@ static int process_screenlock_key(struct input_event *pinput)
 	check_processes(S_LCDOFF);
 	check_processes(S_LCDDIM);
 
-	if (!check_holdkey_block(S_LCDOFF) && !check_holdkey_block(S_LCDDIM)) {
-		delete_condition(S_LCDOFF);
-		delete_condition(S_LCDDIM);
-		update_lcdoff_source(VCONFKEY_PM_LCDOFF_BY_POWERKEY);
+	if (check_holdkey_block(S_LCDOFF))
+		return true;
 
-		/* LCD off forcly */
-		recv_data.pid = -1;
-		recv_data.cond = 0x400;
-		(*pm_callback)(PM_CONTROL_EVENT, &recv_data);
-	}
+	if (check_holdkey_block(S_LCDDIM))
+		return true;
+
+	delete_condition(S_LCDOFF);
+	delete_condition(S_LCDDIM);
+	update_lcdoff_source(VCONFKEY_PM_LCDOFF_BY_POWERKEY);
+
+	/* LCD off forcly */
+	recv_data.pid = -1;
+	recv_data.cond = 0x400;
+	(*pm_callback)(PM_CONTROL_EVENT, &recv_data);
 
 	return true;
 }
@@ -495,42 +559,60 @@ static void sound_vibrate_hardkey(void)
 			SIGNAL_CHANGE_HARDKEY, NULL, NULL);
 }
 
-static void process_hardkey_backlight(struct input_event *pinput)
+static void process_hardkey_backlight_pressed(struct input_event *pinput)
 {
 	int opt;
 
-	_E("pinput->value : %d", pinput->value);
-	if (pinput->value == KEY_PRESSED) {
-		if (touch_pressed) {
-			_I("Touch is pressed, then hard key is not working!");
-			return;
-		}
-		/* Sound & Vibrate only in unlock state */
-		if (get_lock_screen_state() == VCONFKEY_IDLE_UNLOCK
-		    || get_lock_screen_bg_state())
-			sound_vibrate_hardkey();
+	if (touch_pressed) {
+		_I("Touch is pressed, then hard key is not working!");
+		return;
+	}
 
-		if (touchled && touchled->execute) {
-			opt = TOUCHLED_PRESS;
-			touchled->execute(&opt);
-		}
-	} else if (pinput->value == KEY_RELEASED) {
-		/* if lockscreen is idle lock */
-		if (get_lock_screen_state() == VCONFKEY_IDLE_LOCK) {
-			_D("Lock state, key backlight is off when phone is unlocked!");
-			return;
-		}
+	/* Sound & Vibrate only in unlock state */
+	if (get_lock_screen_state() == VCONFKEY_IDLE_UNLOCK ||
+		get_lock_screen_bg_state())
+		sound_vibrate_hardkey();
 
-		if (touchled && touchled->execute) {
-			opt = TOUCHLED_RELEASE;
-			touchled->execute(&opt);
-		}
+	if (touchled && touchled->execute) {
+		opt = TOUCHLED_PRESS;
+		touchled->execute(&opt);
 	}
 }
 
-static int check_key(struct input_event *pinput, int fd)
+static void process_hardkey_backlight_released(struct input_event *pinput)
 {
-	int ignore = true;
+	int opt;
+
+	/* if lockscreen is idle lock */
+	if (get_lock_screen_state() == VCONFKEY_IDLE_LOCK) {
+		_I("Lock state, key backlight is off when phone is unlocked!");
+		return;
+	}
+
+	if (touchled && touchled->execute) {
+		opt = TOUCHLED_RELEASE;
+		touchled->execute(&opt);
+	}
+}
+
+static void process_hardkey_backlight(struct input_event *pinput)
+{
+	_E("pinput->value : %d", pinput->value);
+	switch (pinput->value) {
+	case KEY_PRESSED:
+		process_hardkey_backlight_pressed(pinput);
+		break;
+	case KEY_RELEASED:
+		process_hardkey_backlight_released(pinput);
+		break;
+	default:
+		break;
+	}
+}
+
+static bool check_key(struct input_event *pinput, int fd)
+{
+	bool ignore = true;
 
 	switch (pinput->code) {
 	case KEY_MENU:
@@ -588,65 +670,103 @@ static int check_key(struct input_event *pinput, int fd)
 	return ignore;
 }
 
+static bool check_key_filter_key(struct input_event *pinput, int fd)
+{
+	int ignore;
+	static int old_fd, code, value;
+
+	if (pinput->code == BTN_TOUCH &&
+		pinput->value == KEY_RELEASED)
+		touch_pressed = false;
+
+	/*
+	 * Normally, touch press/release events don't occur
+	 * in lcd off state. But touch release events can occur
+	 * in the state abnormally. Then touch events are ignored
+	 * when lcd is off state.
+	 */
+	if (pinput->code == BTN_TOUCH && !current_state_in_on())
+		return true;
+
+	if (get_standby_state() && pinput->code != KEY_POWER) {
+		_I("standby mode,key ignored except powerkey");
+		return true;
+	}
+
+	if (pinput->code == code && pinput->value == value)
+		_E("Same key(%d, %d) is polled [%d,%d]",
+				code, value, old_fd, fd);
+
+	old_fd = fd;
+	code = pinput->code;
+	value = pinput->value;
+
+	ignore = check_key(pinput, fd);
+	restore_custom_brightness();
+
+	return ignore;
+}
+
+static bool check_key_filter_rel(struct input_event *pinput, int fd)
+{
+	if (get_standby_state())
+		return true;
+	return false;
+}
+
+static bool check_key_filter_abs(struct input_event *pinput, int fd)
+{
+	bool ignore = true;
+
+	if (get_standby_state())
+		return true;
+
+	if (current_state_in_on())
+		ignore = false;
+
+	restore_custom_brightness();
+
+	touch_pressed = (pinput->value == TOUCH_RELEASE ? false : true);
+
+	return ignore;
+}
+
+static bool check_key_filter_sw(struct input_event *pinput, int fd)
+{
+	if (!get_glove_state || !switch_glove_key)
+		return true;
+
+	if (pinput->code == SW_GLOVE &&
+		get_glove_state() == GLOVE_MODE)
+		switch_glove_key(pinput->value);
+
+	return true;
+}
+
 static int check_key_filter(void *data, int fd)
 {
 	struct input_event *pinput = data;
-	int ignore = true;
-	static int old_fd, code, value;
+	bool ignore = true;
 
 	assert(pinput);
 
 	switch (pinput->type) {
 	case EV_KEY:
-		if (pinput->code == BTN_TOUCH &&
-			pinput->value == KEY_RELEASED)
-			touch_pressed = false;
-		/*
-		 * Normally, touch press/release events don't occur
-		 * in lcd off state. But touch release events can occur
-		 * in the state abnormally. Then touch events are ignored
-		 * when lcd is off state.
-		 */
-		if (pinput->code == BTN_TOUCH && !current_state_in_on())
-			break;
-		if (get_standby_state() && pinput->code != KEY_POWER) {
-			_D("standby mode,key ignored except powerkey");
-			break;
-		}
-		if (pinput->code == code && pinput->value == value) {
-			_E("Same key(%d, %d) is polled [%d,%d]",
-				code, value, old_fd, fd);
-		}
-		old_fd = fd;
-		code = pinput->code;
-		value = pinput->value;
-
-		ignore = check_key(pinput, fd);
-		restore_custom_brightness();
-
+		ignore = check_key_filter_key(pinput, fd);
 		break;
+
 	case EV_REL:
-		if (get_standby_state())
-			break;
-		ignore = false;
+		ignore = check_key_filter_rel(pinput, fd);
 		break;
-	case EV_ABS:
-		if (get_standby_state())
-			break;
-		if (current_state_in_on())
-			ignore = false;
-		restore_custom_brightness();
 
-		touch_pressed =
-			(pinput->value == TOUCH_RELEASE ? false : true);
+	case EV_ABS:
+		ignore = check_key_filter_abs(pinput, fd);
 		break;
+
 	case EV_SW:
-		if (!get_glove_state || !switch_glove_key)
-			break;
-		if (pinput->code == SW_GLOVE &&
-			get_glove_state() == GLOVE_MODE) {
-			switch_glove_key(pinput->value);
-		}
+		ignore = check_key_filter_sw(pinput, fd);
+		break;
+	default:
 		break;
 	}
 
@@ -699,7 +819,7 @@ static void key_backlight_enable(bool enable)
 static const struct display_keyfilter_ops normal_keyfilter_ops = {
 	.init			= keyfilter_init,
 	.check			= check_key_filter,
-	.set_powerkey_ignore 	= NULL,
+	.set_powerkey_ignore	= NULL,
 	.powerkey_lcdoff	= NULL,
 	.backlight_enable	= key_backlight_enable,
 };
