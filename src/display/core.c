@@ -128,8 +128,6 @@ static int trans_table[S_END][EVENT_END] = {
 };
 
 #define SHIFT_UNLOCK		4
-#define MASK_RESET_TIMEOUT	0x8	/* 1000 */
-#define MASK_MARGIN_TIMEOUT	(0x1 << 8)
 #define SHIFT_CHANGE_STATE	7
 #define CHANGE_STATE_BIT	0xF00	/* 1111 0000 0000 */
 #define SHIFT_LOCK_FLAG	16
@@ -143,7 +141,6 @@ static int trans_table[S_END][EVENT_END] = {
 #define S_COVER_TIMEOUT			8000
 #define GET_HOLDKEY_BLOCK_STATE(x) ((x >> SHIFT_LOCK_FLAG) & HOLD_KEY_BLOCK_BIT)
 #define GET_STANDBY_MODE_STATE(x) ((x >> SHIFT_LOCK_FLAG) & STANDBY_MODE_BIT)
-#define MASK32				0xffffffff
 #define BOOTING_DONE_WATING_TIME	60000	/* 1 minute */
 #define LOCK_TIME_WARNING		60	/* 60 seconds */
 
