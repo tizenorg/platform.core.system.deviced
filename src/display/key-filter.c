@@ -138,6 +138,23 @@ static Eina_Bool longkey_pressed_cb(void *data)
 	return EINA_FALSE;
 }
 
+static void add_longkey_timeout(void)
+{
+	longkey_timeout_id = ecore_timer_add(
+			display_conf.longpress_interval,
+			(Ecore_Task_Cb)longkey_pressed_cb, NULL);
+	if (!longkey_timeout_id)
+		_E("Failed to add longkey timeout");
+}
+
+static void remove_longkey_timeout(void)
+{
+	if (longkey_timeout_id) {
+		ecore_timer_del(longkey_timeout_id);
+		longkey_timeout_id = NULL;
+	}
+}
+
 static Eina_Bool combination_failed_cb(void *data)
 {
 	key_combination = KEY_COMBINATION_STOP;
@@ -226,10 +243,7 @@ static void process_combination_key(struct input_event *pinput)
 				ecore_timer_del(combination_timeout_id);
 				combination_timeout_id = NULL;
 			}
-			if (longkey_timeout_id > 0) {
-				ecore_timer_del(longkey_timeout_id);
-				longkey_timeout_id = NULL;
-			}
+			remove_longkey_timeout();
 			_I("capture mode");
 			key_combination = KEY_COMBINATION_SCREENCAPTURE;
 			skip_lcd_off = true;
@@ -353,10 +367,7 @@ static int process_power_key(struct input_event *pinput)
 			ignore = true;
 
 		stop_key_combination();
-		if (longkey_timeout_id > 0) {
-			ecore_timer_del(longkey_timeout_id);
-			longkey_timeout_id = NULL;
-		}
+		remove_longkey_timeout();
 
 		break;
 	case KEY_PRESSED:
@@ -373,9 +384,7 @@ static int process_power_key(struct input_event *pinput)
 		pressed_time.tv_usec = (pinput->time).tv_usec;
 		if (key_combination == KEY_COMBINATION_STOP) {
 			/* add long key timer */
-			longkey_timeout_id = ecore_timer_add(
-				    display_conf.longpress_interval,
-				    (Ecore_Task_Cb)longkey_pressed_cb, NULL);
+			add_longkey_timeout();
 			key_combination = KEY_COMBINATION_START;
 			combination_timeout_id = ecore_timer_add(
 				    COMBINATION_INTERVAL,
