@@ -56,10 +56,6 @@
 #define KEY_PRESSED		1
 #define KEY_BEING_PRESSED	2
 
-#define KEY_COMBINATION_STOP		0
-#define KEY_COMBINATION_START		1
-#define KEY_COMBINATION_SCREENCAPTURE	2
-
 #define SIGNAL_CHANGE_HARDKEY		"ChangeHardkey"
 #define SIGNAL_LCDON_BY_POWERKEY	"LCDOnByPowerkey"
 #define SIGNAL_LCDOFF_BY_POWERKEY	"LCDOffByPowerkey"
@@ -68,6 +64,12 @@
 
 #define GLOVE_MODE	1
 
+typedef enum {
+	KEY_COMBINATION_STOP,
+	KEY_COMBINATION_START,
+	KEY_COMBINATION_SCREENCAPTURE,
+} key_combination_e;
+
 int __WEAK__ get_glove_state(void);
 void __WEAK__ switch_glove_key(int val);
 
@@ -75,7 +77,7 @@ static struct timeval pressed_time;
 static Ecore_Timer *longkey_timeout_id = NULL;
 static Ecore_Timer *combination_timeout_id = NULL;
 static int cancel_lcdoff;
-static int key_combination = KEY_COMBINATION_STOP;
+static key_combination_e key_combination = KEY_COMBINATION_STOP;
 static int menu_pressed = false;
 static bool touch_pressed = false;
 static int skip_lcd_off = false;
@@ -158,13 +160,71 @@ static void add_longkey_timeout(void)
 }
 /* long key pressed timer */
 
+/* key combination timer */
+static key_combination_e get_key_combination(void)
+{
+	return key_combination;
+}
+
+static void set_key_combination(key_combination_e state)
+{
+	char *str;
+
+	switch (state) {
+	case KEY_COMBINATION_STOP:
+		str = "STOP";
+		break;
+	case KEY_COMBINATION_START:
+		str = "START";
+		break;
+	case KEY_COMBINATION_SCREENCAPTURE:
+		str = "SCREENCAPTURE";
+		break;
+	default:
+		return;
+	}
+	_I("Key Combination (%s) Mode", str);
+	key_combination = state;
+}
+
+static void remove_combination_timeout(void)
+{
+	if (combination_timeout_id) {
+		ecore_timer_del(combination_timeout_id);
+		combination_timeout_id = NULL;
+	}
+}
+
 static Eina_Bool combination_failed_cb(void *data)
 {
-	key_combination = KEY_COMBINATION_STOP;
-	combination_timeout_id = NULL;
+	set_key_combination(KEY_COMBINATION_STOP);
+	remove_combination_timeout();
 
 	return EINA_FALSE;
 }
+
+static void add_combination_timeout(void)
+{
+	remove_combination_timeout();
+	combination_timeout_id = ecore_timer_add(
+			COMBINATION_INTERVAL,
+			(Ecore_Task_Cb)combination_failed_cb, NULL);
+	if (!combination_timeout_id)
+		_E("Failed to add combination timeout");
+}
+
+static void start_key_combination(void)
+{
+	set_key_combination(KEY_COMBINATION_START);
+	add_combination_timeout();
+}
+
+static void stop_key_combination(void)
+{
+	set_key_combination(KEY_COMBINATION_STOP);
+	remove_combination_timeout();
+}
+/* key combination timer */
 
 static unsigned long timediff_usec(struct timeval t1, struct timeval t2)
 {
@@ -174,15 +234,6 @@ static unsigned long timediff_usec(struct timeval t1, struct timeval t2)
 	udiff += (t2.tv_usec - t1.tv_usec);
 
 	return udiff;
-}
-
-static void stop_key_combination(void)
-{
-	key_combination = KEY_COMBINATION_STOP;
-	if (combination_timeout_id > 0) {
-		ecore_timer_del(combination_timeout_id);
-		combination_timeout_id = NULL;
-	}
 }
 
 static inline void check_key_pair(int code, int new, int *old)
@@ -235,25 +286,21 @@ static inline void switch_off_lcd(void)
 
 static void process_combination_key(struct input_event *pinput)
 {
+	key_combination_e comb = get_key_combination();
+
 	if (pinput->value == KEY_PRESSED) {
-		if (key_combination == KEY_COMBINATION_STOP) {
-			key_combination = KEY_COMBINATION_START;
-			combination_timeout_id = ecore_timer_add(
-			    COMBINATION_INTERVAL,
-			    (Ecore_Task_Cb)combination_failed_cb, NULL);
-		} else if (key_combination == KEY_COMBINATION_START) {
-			if (combination_timeout_id > 0) {
-				ecore_timer_del(combination_timeout_id);
-				combination_timeout_id = NULL;
-			}
+		if (comb == KEY_COMBINATION_STOP)
+			start_key_combination();
+		else if (comb == KEY_COMBINATION_START) {
+			stop_key_combination();
 			remove_longkey_timeout();
 			_I("capture mode");
-			key_combination = KEY_COMBINATION_SCREENCAPTURE;
+			set_key_combination(KEY_COMBINATION_SCREENCAPTURE);
 			skip_lcd_off = true;
 		}
 		menu_pressed = true;
 	} else if (pinput->value == KEY_RELEASED) {
-		if (key_combination != KEY_COMBINATION_SCREENCAPTURE)
+		if (comb != KEY_COMBINATION_SCREENCAPTURE)
 			stop_key_combination();
 		menu_pressed = false;
 	}
@@ -310,7 +357,7 @@ static int decide_lcdoff(void)
 		return false;
 
 	/* LCD-off is blocked when powerkey and volmedown key are pressed */
-	if (key_combination == KEY_COMBINATION_SCREENCAPTURE)
+	if (get_key_combination() == KEY_COMBINATION_SCREENCAPTURE)
 		return false;
 
 	return true;
@@ -349,6 +396,7 @@ static int process_power_key(struct input_event *pinput)
 	int ignore = true;
 	static int value = KEY_RELEASED;
 	unsigned int caps;
+	key_combination_e comb;
 
 	caps = display_get_caps(DISPLAY_ACTOR_POWER_KEY);
 
@@ -385,20 +433,15 @@ static int process_power_key(struct input_event *pinput)
 		_I("power key pressed");
 		pressed_time.tv_sec = (pinput->time).tv_sec;
 		pressed_time.tv_usec = (pinput->time).tv_usec;
-		if (key_combination == KEY_COMBINATION_STOP) {
+		comb = get_key_combination();
+		if (comb == KEY_COMBINATION_STOP) {
 			/* add long key timer */
 			add_longkey_timeout();
-			key_combination = KEY_COMBINATION_START;
-			combination_timeout_id = ecore_timer_add(
-				    COMBINATION_INTERVAL,
-				    (Ecore_Task_Cb)combination_failed_cb, NULL);
-		} else if (key_combination == KEY_COMBINATION_START) {
-			if (combination_timeout_id > 0) {
-				ecore_timer_del(combination_timeout_id);
-				combination_timeout_id = NULL;
-			}
+			start_key_combination();
+		} else if (comb == KEY_COMBINATION_START) {
+			stop_key_combination();
 			_I("capture mode");
-			key_combination = KEY_COMBINATION_SCREENCAPTURE;
+			set_key_combination(KEY_COMBINATION_SCREENCAPTURE);
 			skip_lcd_off = true;
 			ignore = false;
 		}
