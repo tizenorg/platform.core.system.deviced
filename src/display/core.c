@@ -666,7 +666,7 @@ static void update_display_time(void)
 	/* for sdk
 	 * if the run_timeout is zero, it regards AlwaysOn state
 	 */
-	if (run_timeout == 0) {
+	if (run_timeout == 0 || display_conf.lcd_always_on) {
 		trans_table[S_NORMAL][EVENT_TIMEOUT] = S_NORMAL;
 		run_timeout = ALWAYS_ON_TIMEOUT;
 		_I("LCD Always On");
