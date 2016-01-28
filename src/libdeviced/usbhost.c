@@ -27,6 +27,7 @@
 
 #define ARRAY_SIZE(array) (sizeof(array) / sizeof(array[0]))
 
+#define METHOD_OPEN_DEVICE                "OpenDevice"
 #define METHOD_REQUEST_STORAGE_INFO_ALL   "StorageInfoAll"
 #define METHOD_REQUEST_STORAGE_MOUNT      "StorageMount"
 #define METHOD_REQUEST_STORAGE_UNMOUNT    "StorageUnmount"
@@ -251,4 +252,30 @@ API int format_usb_storage(char *path)
 	param[0] = path;
 	return dbus_method_sync(DEVICED_BUS_NAME, DEVICED_PATH_USBHOST,
 			DEVICED_INTERFACE_USBHOST, METHOD_REQUEST_STORAGE_FORMAT, "s", param);
+}
+
+API int open_usb_device(char *path, int *fd)
+{
+	DBusMessage *reply;
+	int ret, rfd;
+	dbus_bool_t result;
+
+	if (!fd || !path)
+		return -EINVAL;
+
+	reply = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
+			DEVICED_PATH_USBHOST,
+			DEVICED_INTERFACE_USBHOST,
+			METHOD_OPEN_DEVICE,
+			"s", &path);
+
+	if (!reply)
+		_E("Unable to send USB device request");
+
+	result = dbus_message_get_args(reply, NULL, DBUS_TYPE_INT32, &ret, DBUS_TYPE_UNIX_FD, &rfd);
+	if (!result)
+		_E("Failed to get arguments");
+
+	*fd = rfd;
+	return ret;
 }
