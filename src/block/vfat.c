@@ -105,7 +105,7 @@ static int vfat_mount(bool smack, const char *devpath, const char *mount_point)
 	char options[NAME_MAX];
 	int r, retry = RETRY_COUNT;
 	struct timespec time = {0,};
-	unsigned long mountflags = 0;
+	unsigned long mountflags = MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_DIRSYNC;
 
 	if (smack)
 		snprintf(options, sizeof(options), "%s,%s", FS_VFAT_MOUNT_OPT, SMACKFS_MOUNT_OPT);

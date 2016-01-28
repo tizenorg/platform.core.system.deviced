@@ -124,7 +124,7 @@ static int ext4_mount(bool smack, const char *devpath, const char *mount_point)
 {
 	int r, retry = RETRY_COUNT;
 	struct timespec time = {0,};
-	unsigned long mountflags = 0;
+	unsigned long mountflags = MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_DIRSYNC;
 
 	do {
 		r = mount(devpath, mount_point, "ext4", mountflags, NULL);
