@@ -41,6 +41,8 @@
 #define SIGNAL_USB_HOST_CHANGED "ChangedDevice"
 #define METHOD_GET_CONNECTION_CREDENTIALS "GetConnectionCredentials"
 
+#define POLICY_FILEPATH "/var/usbhost-policy"
+
 /**
  * Below usb host class is defined by www.usb.org.
  * Please refer to below site.
@@ -492,6 +494,155 @@ static const char *policy_value_str(enum policy_value value) {
 	}
 }
 
+static int get_policy_value_from_str(const char *str) {
+	if (strncmp("ALLOW", str, 5) == 0)
+		return POLICY_ALLOW;
+	if (strncmp("DENY", str, 4) == 0)
+		return POLICY_DENY;
+	return -1;
+}
+
+static inline int marshal_policy_entry(char *buf, int len, struct policy_entry *entry) {
+	return snprintf(buf, len, "%d %s %04x %02x %02x %02x %04x %04x %04x %s\n",
+			entry->creds.uid,
+			entry->creds.sec_label,
+			entry->device.bcdUSB,
+			entry->device.bDeviceClass,
+			entry->device.bDeviceSubClass,
+			entry->device.bDeviceProtocol,
+			entry->device.idVendor,
+			entry->device.idProduct,
+			entry->device.bcdDevice,
+			policy_value_str(entry->value));
+}
+
+static DBusMessage *print_policy(E_DBus_Object *obj, DBusMessage *msg) {
+	char line[256];
+	dd_list *elem;
+	struct policy_entry *entry;
+	int ret;
+
+	_I("USB access policy:");
+	DD_LIST_FOREACH(access_list, elem, entry) {
+		ret = marshal_policy_entry(line, 256, entry);
+		if (ret < 0)
+			break;
+		_I("\t%s", line);
+	}
+
+	return dbus_message_new_method_return(msg);
+}
+
+static int store_policy()
+{
+	int fd;
+	dd_list *elem;
+	struct policy_entry *entry;
+	char line[256];
+	int ret;
+
+	fd = open(POLICY_FILEPATH, O_WRONLY | O_CREAT, 0664);
+	if (fd < 0) {
+		_E("Could not open policy file for writing: %m");
+		ret = -1;
+		goto out;
+	}
+
+	DD_LIST_FOREACH(access_list, elem, entry) {
+		ret = marshal_policy_entry(line, 256, entry);
+		if (ret < 0) {
+			_E("Serialization failed: %m");
+			goto out;
+		}
+
+		ret = write(fd, line, ret);
+		if (ret < 0) {
+			_E("Error writing policy entry: %m");
+			goto out;
+		}
+	}
+
+	_I("Policy stored in %s", POLICY_FILEPATH);
+
+	ret = 0;
+
+out:
+	close(fd);
+	return ret;
+}
+
+static int read_policy()
+{
+	FILE *fp;
+	struct policy_entry *entry;
+	char *line = NULL, value_str[256];
+	char *p;
+	int ret = -1;
+	int count = 0;
+	size_t len;
+
+	fp = fopen(POLICY_FILEPATH, "r");
+	if (!fp) {
+		_E("Could not open policy file for reading: %m");
+		return -EACCES;
+	}
+
+	while ((ret = getline(&line, &len, fp)) != -1) {
+		entry = malloc(sizeof(*entry));
+		if (!entry) {
+			_E("No memory: %m");
+			goto out;
+		}
+
+		entry->creds.sec_label = calloc(256, 1);
+		if (!entry->creds.sec_label) {
+			_E("No memory: %m");
+			goto out;
+		}
+
+		ret = sscanf(line, "%d %s %04x %02x %02x %02x %04x %04x %04x %s\n",
+				&entry->creds.uid,
+				entry->creds.sec_label,
+				&entry->device.bcdUSB,
+				&entry->device.bDeviceClass,
+				&entry->device.bDeviceSubClass,
+				&entry->device.bDeviceProtocol,
+				&entry->device.idVendor,
+				&entry->device.idProduct,
+				&entry->device.bcdDevice,
+				value_str);
+		if (ret == EOF) {
+			_E("Error reading line: %m");
+			free(entry);
+			free(entry->creds.sec_label);
+			goto out;
+		}
+
+		entry->value = get_policy_value_from_str(value_str);
+		if (entry->value < 0) {
+			_E("Invalid policy value: %s", value_str);
+			ret = -EINVAL;
+			goto out;
+		}
+
+		_I("%04x:%04x : %s", entry->device.idVendor, entry->device.idProduct,
+				value_str);
+
+		DD_LIST_APPEND(access_list, entry);
+		count++;
+	}
+
+	_I("Found %d policy entries", count);
+	ret = 0;
+
+out:
+	fclose(fp);
+	if (line)
+		free(line);
+
+	return ret;
+}
+
 static int get_device_desc(const char *filepath, struct usb_device_descriptor *desc)
 {
 	char *path = NULL;
@@ -606,6 +757,8 @@ static int get_policy_value(const char *path, struct user_credentials *cred)
 
 	_I("Added policy entry: %s", policy_value_str(entry->value));
 	DD_LIST_APPEND(access_list, entry);
+
+	store_policy();
 
 	return entry->value;
 }
@@ -802,6 +955,7 @@ out:
 
 static const struct edbus_method edbus_methods[] = {
 	{ "PrintDeviceList",   NULL,           NULL, print_device_list }, /* for debugging */
+	{ "PrintPolicy",       NULL,           NULL, print_policy }, /* for debugging */
 	{ "GetDeviceList",      "i", "a(siiiiisss)", get_device_list },
 	{ "GetDeviceListCount", "i",            "i", get_device_list_count },
 	{ "OpenDevice",         "s",           "ih", open_device },
@@ -840,6 +994,8 @@ static void usbhost_init(void *data)
 
 	/* register notifier */
 	register_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
+
+	read_policy();
 }
 
 static void usbhost_exit(void *data)
@@ -854,6 +1010,7 @@ static void usbhost_exit(void *data)
 	/* remove all usbhost list */
 	remove_all_usbhost_list();
 
+	store_policy();
 	remove_all_access_list();
 }
 
