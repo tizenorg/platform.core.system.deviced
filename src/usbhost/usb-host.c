@@ -15,10 +15,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+#define _GNU_SOURCE
 
 #include <stdio.h>
 #include <limits.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include "core/log.h"
 #include "core/devices.h"
@@ -37,6 +39,7 @@
 #define USB_SERIAL              "serial"
 
 #define SIGNAL_USB_HOST_CHANGED "ChangedDevice"
+#define METHOD_GET_CONNECTION_CREDENTIALS "GetConnectionCredentials"
 
 /**
  * Below usb host class is defined by www.usb.org.
@@ -47,6 +50,7 @@
  */
 #include <linux/usb/ch9.h>
 #define USB_CLASS_ALL   0xffffffff
+#define USB_DEVICE_MAJOR 189
 
 /**
  * HID Standard protocol information.
@@ -453,11 +457,195 @@ enum policy_value {
 	POLICY_DENY,
 };
 
-static int get_policy_value(const char *path)
+struct user_credentials {
+	uint32_t uid;
+	char *sec_label;
+};
+
+static int get_device_desc(const char *filepath, struct usb_device_descriptor *desc)
 {
-	/* TODO */
+	char *path = NULL;
+	struct stat st;
+	int ret;
+	int fd = -1;
+
+	ret = stat(filepath, &st);
+	if (ret < 0) {
+		ret = -errno;
+		_E("Could not stat %s: %m", filepath);
+		goto out;
+	}
+
+	if (!S_ISCHR(st.st_mode) ||
+	    major(st.st_rdev) != USB_DEVICE_MAJOR) {
+		ret = -EINVAL;
+		_E("Not an USB device");
+		goto out;
+	}
+
+	ret = asprintf(&path, "/sys/dev/char/%d:%d/descriptors", major(st.st_rdev), minor(st.st_rdev));
+	if (ret < 0) {
+		ret = -ENOMEM;
+		_E("asprintf failed");
+		goto out;
+	}
+
+	_I("Opening descriptor at %s", path);
+	fd = open(path, O_RDONLY);
+	if (fd < 0) {
+		ret = -errno;
+		fd = -1;
+		_E("Failed to open %s: %m", path);
+		goto out;
+	}
+
+	ret = read(fd, desc, sizeof(*desc));
+	if (ret < 0) {
+		ret = -errno;
+		_E("Failed to read %s: %m", path);
+		goto out;
+	}
+
+	ret = 0;
+
+out:
+	if (fd > 0)
+		close(fd);
+	free(path);
+
+	return ret;
+}
+
+static int get_policy_value(const char *path, struct user_credentials *cred)
+{
+	struct usb_device_descriptor desc;
+	int ret;
+
+	_I("Requested access from user %d to %s", cred->uid, path);
+	ret = get_device_desc(path, &desc);
+	if (ret < 0) {
+		_E("Could not get device descriptor");
+		return ret;
+	}
+
+	/* TODO check policy for this device */
 
 	return POLICY_ALLOW;
+}
+
+static int creds_read_uid(DBusMessageIter *iter, uint32_t *dest)
+{
+	int type;
+	DBusMessageIter sub;
+
+	dbus_message_iter_next(iter);
+
+	dbus_message_iter_recurse(iter, &sub);
+	type = dbus_message_iter_get_arg_type(&sub);
+	if (type != DBUS_TYPE_UINT32) {
+		_E("expected uint32");
+		return -EINVAL;
+	}
+
+	dbus_message_iter_get_basic(&sub, dest);
+
+	return 0;
+}
+
+static int creds_read_label(DBusMessageIter *iter, char **dest)
+{
+	int type;
+	DBusMessageIter sub, byte;
+	int n;
+
+	dbus_message_iter_next(iter);
+
+	dbus_message_iter_recurse(iter, &sub);
+	type = dbus_message_iter_get_arg_type(&sub);
+	if (type != DBUS_TYPE_ARRAY) {
+		_E("expected array of bytes");
+		return -EINVAL;
+	}
+
+	dbus_message_iter_recurse(&sub, &byte);
+	dbus_message_iter_get_fixed_array(&byte, dest, &n);
+
+	return n;
+}
+
+static int get_caller_credentials(DBusMessage *msg, struct user_credentials *cred)
+{
+	char *cid;
+	char *key;
+	char *arr[1];
+	DBusMessage *reply;
+	DBusMessageIter iter, dict, entry;
+	dbus_bool_t ret;
+	int type;
+	int reti;
+
+	cid = dbus_message_get_sender(msg);
+	if (!cid) {
+		_E("Unable to identify client");
+		return -1;
+	}
+
+	arr[0] = cid;
+	reply = dbus_method_sync_with_reply(DBUS_BUS_NAME,
+			DBUS_OBJECT_PATH,
+			DBUS_INTERFACE_NAME,
+			METHOD_GET_CONNECTION_CREDENTIALS,
+			"s", arr);
+
+	if (!reply) {
+		_E("Cannot get connection credentials for %s", cid);
+		return -1;
+	}
+
+	ret = dbus_message_iter_init(reply, &iter);
+	if (!ret) {
+		_E("could not init msg iterator");
+		return -1;
+	}
+
+	type = dbus_message_iter_get_arg_type(&iter);
+	if (type != DBUS_TYPE_ARRAY) {
+		_E("Expected array (%s)", cid);
+		return -EINVAL;
+	}
+
+	dbus_message_iter_recurse(&iter, &dict);
+
+	while ((type = dbus_message_iter_get_arg_type(&dict)) != DBUS_TYPE_INVALID) {
+		if (type != DBUS_TYPE_DICT_ENTRY) {
+			_E("Expected dict entry (%s)", cid);
+			return -EINVAL;
+		}
+
+		dbus_message_iter_recurse(&dict, &entry);
+		type = dbus_message_iter_get_arg_type(&entry);
+		if (type != DBUS_TYPE_STRING) {
+			_E("Expected string (%s)", cid);
+			return -EINVAL;
+		}
+
+		dbus_message_iter_get_basic(&entry, &key);
+		if (strcmp(key, "UnixUserID") == 0) {
+			reti = creds_read_uid(&entry, &cred->uid);
+			if (reti < 0)
+				return reti;
+		} else if (strcmp(key, "LinuxSecurityLabel") == 0) {
+			reti = creds_read_label(&entry, &cred->sec_label);
+			if (reti < 0)
+				return reti;
+		}
+
+		dbus_message_iter_next(&dict);
+	}
+
+	dbus_message_unref(reply);
+
+	return 0;
 }
 
 static DBusMessage *open_device(E_DBus_Object *obj, DBusMessage *msg)
@@ -466,13 +654,18 @@ static DBusMessage *open_device(E_DBus_Object *obj, DBusMessage *msg)
 	DBusMessage *reply;
 	int ret = 0, fd;
 	const char *path;
-	struct device d;
+	struct user_credentials cred;
+
+	ret = get_caller_credentials(msg, &cred);
+	if (ret < 0) {
+		_E("Unable to get credentials for caller : %s", strerror(-ret));
+		return NULL;
+	}
 
 	dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &path);
-
 	reply = dbus_message_new_method_return(msg);
 
-	ret = get_policy_value(path);
+	ret = get_policy_value(path, &cred);
 	switch (ret) {
 	case POLICY_ALLOW:
 		fd = open(path, O_RDWR);
