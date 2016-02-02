@@ -465,6 +465,33 @@ struct user_credentials {
 	char *sec_label;
 };
 
+struct policy_entry {
+	struct user_credentials creds;
+	struct {
+		uint16_t bcdUSB;
+		uint8_t bDeviceClass;
+		uint8_t bDeviceSubClass;
+		uint8_t bDeviceProtocol;
+		uint16_t idVendor;
+		uint16_t idProduct;
+		uint16_t bcdDevice;
+	} device;
+	enum policy_value value;
+};
+
+dd_list *access_list;
+
+static const char *policy_value_str(enum policy_value value) {
+	switch (value) {
+	case POLICY_ALLOW:
+		return "ALLOW";
+	case POLICY_DENY:
+		return "DENY";
+	default:
+		return "UNKNOWN";
+	}
+}
+
 static int get_device_desc(const char *filepath, struct usb_device_descriptor *desc)
 {
 	char *path = NULL;
@@ -522,6 +549,10 @@ static int get_policy_value(const char *path, struct user_credentials *cred)
 {
 	struct usb_device_descriptor desc;
 	int ret;
+	dd_list *elem;
+	struct policy_entry *entry;
+
+	memset(&desc, 0, sizeof(desc));
 
 	_I("Requested access from user %d to %s", cred->uid, path);
 	ret = get_device_desc(path, &desc);
@@ -530,9 +561,63 @@ static int get_policy_value(const char *path, struct user_credentials *cred)
 		return ret;
 	}
 
-	/* TODO check policy for this device */
+	DD_LIST_FOREACH(access_list, elem, entry) {
+		if (entry->creds.uid != cred->uid
+		 || strncmp(entry->creds.sec_label, cred->sec_label, strlen(cred->sec_label)) != 0
+		 || entry->device.bcdUSB != le16toh(desc.bcdUSB)
+		 || entry->device.bDeviceClass != desc.bDeviceClass
+		 || entry->device.bDeviceSubClass != desc.bDeviceSubClass
+		 || entry->device.bDeviceProtocol != desc.bDeviceProtocol
+		 || entry->device.idVendor != le16toh(desc.idVendor)
+		 || entry->device.idProduct != le16toh(desc.idProduct)
+		 || entry->device.bcdDevice != le16toh(desc.bcdDevice))
+			continue;
 
-	return POLICY_ALLOW;
+		_I("Found matching policy entry: %s", policy_value_str(entry->value));
+
+		return entry->value;
+	}
+
+	/* TODO ask user for policy */
+
+	/* Allow always */
+	entry = calloc(sizeof(*entry), 1);
+	if (!entry) {
+		_E("No memory");
+		return -ENOMEM;
+	}
+
+	entry->creds.uid = cred->uid;
+	entry->creds.sec_label = calloc(strlen(cred->sec_label)+1, 1);
+	if (!entry->creds.sec_label) {
+		_E("No memory");
+		return -ENOMEM;
+	}
+
+	strncpy(entry->creds.sec_label, cred->sec_label, calloc(strlen(cred->sec_label));
+	entry->device.bcdUSB = le16toh(desc.bcdUSB);
+	entry->device.bDeviceClass = desc.bDeviceClass;
+	entry->device.bDeviceSubClass = desc.bDeviceSubClass;
+	entry->device.bDeviceProtocol = desc.bDeviceProtocol;
+	entry->device.idVendor = le16toh(desc.idVendor);
+	entry->device.idProduct = le16toh(desc.idProduct);
+	entry->device.bcdDevice = le16toh(desc.bcdDevice);
+	entry->value = POLICY_ALLOW;
+
+	_I("Added policy entry: %d %s %04x %02x %02x %02x %04x %04x %04x %s",
+		entry->creds.uid,
+		entry->creds.sec_label,
+		entry->device.bcdUSB,
+		entry->device.bDeviceClass,
+		entry->device.bDeviceSubClass,
+		entry->device.bDeviceProtocol,
+		entry->device.idVendor,
+		entry->device.idProduct,
+		entry->device.bcdDevice,
+		policy_value_str(entry->value));
+	DD_LIST_APPEND(access_list, entry);
+
+	return entry->value;
 }
 
 static int creds_read_uid(DBusMessageIter *iter, uint32_t *dest)
@@ -656,6 +741,18 @@ out:
 	return reti;
 }
 
+static void remove_all_access_list(void)
+{
+	struct policy_entry *entry;
+	dd_list *n, *next;
+
+	DD_LIST_FOREACH_SAFE(access_list, n, next, entry) {
+		DD_LIST_REMOVE(access_list, entry);
+		free(entry->creds.sec_label);
+		free(entry);
+	}
+}
+
 static DBusMessage *open_device(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
@@ -766,6 +863,8 @@ static void usbhost_exit(void *data)
 
 	/* remove all usbhost list */
 	remove_all_usbhost_list();
+
+	remove_all_access_list();
 }
 
 static const struct device_ops usbhost_device_ops = {
