@@ -643,17 +643,10 @@ static void update_display_time(void)
 	/* third priority : lock state */
 	if ((get_lock_screen_state() == VCONFKEY_IDLE_LOCK) &&
 	    !get_lock_screen_bg_state()) {
-		if (pm_status_flag & SMAST_FLAG) {
-			/* smart stay is on, timeout is always 5 seconds. */
-			states[S_NORMAL].timeout = LOCK_SCREEN_CONTROL_TIMEOUT;
-			_I("LOCK : timeout is set, smart stay timeout(%d ms)",
-			    LOCK_SCREEN_CONTROL_TIMEOUT);
-		} else {
-			/* timeout is different according to key or event. */
-			states[S_NORMAL].timeout = lock_screen_timeout;
-			_I("LOCK : timeout is set by normal(%d ms)",
-			    lock_screen_timeout);
-		}
+		/* timeout is different according to key or event. */
+		states[S_NORMAL].timeout = lock_screen_timeout;
+		_I("LOCK : timeout is set by normal(%d ms)",
+		    lock_screen_timeout);
 		return;
 	}
 
@@ -1484,13 +1477,6 @@ static int default_trans(int evt)
 			/* this is valid condition - the application that sent the condition is running now. */
 			return -1;
 		}
-	}
-
-	/* smart stay */
-	if (display_info.face_detection &&
-	    (pm_status_flag & SMAST_FLAG) && hallic_open) {
-		if (display_info.face_detection(evt, pm_cur_state, next_state))
-			return 0;
 	}
 
 	/* state transition */
