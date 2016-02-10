@@ -36,6 +36,24 @@ extern "C" {
  * @{
  */
 
+#include <limits.h>
+struct usbhost_device {
+	char devpath[PATH_MAX]; /* unique info. */
+	int baseclass;
+	int subclass;
+	int protocol;
+	int vendorid;
+	int productid;
+	char *manufacturer;
+	char *product;
+	char *serial;
+};
+
+enum usbhost_state {
+	USB_HOST_REMOVED,
+	USB_HOST_ADDED,
+};
+
 /**
  * @par Description:
  *      This API is used to initialize usbhost signal \n
@@ -100,6 +118,37 @@ int register_usb_storage_change_handler(
 
 /**
  * @par Description:
+ *      This API is used to register usbhost signal \n
+ * @param[in] device_changed callback function which is called when the device is connected/disconnected
+ * @param[in] data parameter of the callback function
+ * @return 0 on success, negative if failed
+ * @par Example
+ * @code
+ *  ...
+ *  if (init_usbhost_signal() < 0)
+ *      printf("Failed to initialize usbhost signal\n");
+ *
+ *  if (register_usb_device_change_handler(device_cb, data) < 0) {
+ *      printf("Failed to register device handler\n");
+ *      deinit_usbhost_signal();
+ *      return;
+ *  }
+ *
+ *  // Do something
+ *
+ *  if (unregister_usb_device_changed_handler() < 0)
+ *      printf("Failed to unregister device changed signal\n");
+ *
+ *  deinit_usbhost_signal();
+ *  ...
+ * @endcode
+ */
+int register_usb_device_change_handler(
+		void (*device_changed)(struct usbhost_device *device, int state, void *data),
+		void *data);
+
+/**
+ * @par Description:
  *      This API is used to unregister usbhost signal \n
  * @return 0 on success, negative if failed
  * @par Example
@@ -124,6 +173,34 @@ int register_usb_storage_change_handler(
  * @endcode
  */
 int unregister_usb_storage_change_handler(void);
+
+/**
+ * @par Description:
+ *      This API is used to unregister usb connect/disconnect signal handler\n
+ * @return 0 on success, negative if failed
+ * @par Example
+ * @code
+ *  ...
+ *  if (init_usbhost_signal() < 0)
+ *      printf("Failed to initialize usbhost signal\n");
+ *
+ *  if (register_usb_device_change_handler(device_cb, data) < 0) {
+ *      printf("Failed to register device signal\n");
+ *      deinit_usbhost_signal();
+ *      return;
+ *  }
+ *
+ *  // Do something
+ *
+ *  if (unregister_usb_device_change_handler() < 0)
+ *      printf("Failed to unregister storage signal\n");
+ *
+ *  deinit_usbhost_signal();
+ *  ...
+ * @endcode
+ */
+int unregister_usb_device_change_handler(
+		void (*device_changed)(struct usbhost_device *device, int state, void *data));
 
 /**
  * @par Description:

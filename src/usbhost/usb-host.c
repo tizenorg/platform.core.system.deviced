@@ -929,7 +929,7 @@ static DBusMessage *open_device(E_DBus_Object *obj, DBusMessage *msg)
 	DBusError err;
 	dbus_bool_t dbus_ret;
 	int ret = 0, fd = -1;
-	const char *path;
+	char *path;
 	struct user_credentials cred;
 
 	dbus_error_init(&err);
