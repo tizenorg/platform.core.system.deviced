@@ -29,6 +29,7 @@
 #include "core/device-notifier.h"
 #include "core/udev.h"
 #include "core/list.h"
+#include "core/device-idler.h"
 
 #define USB_INTERFACE_CLASS     "bInterfaceClass"
 #define USB_INTERFACE_SUBCLASS  "bInterfaceSubClass"
@@ -45,7 +46,7 @@
 #define ROOTPATH tzplatform_getenv(TZ_SYS_VAR)
 #define POLICY_FILENAME "usbhost-policy"
 
-const char *POLICY_FILEPATH;
+char *POLICY_FILEPATH;
 
 /**
  * Below usb host class is defined by www.usb.org.
@@ -582,7 +583,6 @@ static int read_policy(void)
 	FILE *fp;
 	struct policy_entry *entry;
 	char *line = NULL, value_str[256];
-	char *p;
 	int ret = -1;
 	int count = 0;
 	size_t len;
@@ -608,7 +608,7 @@ static int read_policy(void)
 			goto out;
 		}
 
-		ret = sscanf(line, "%d %s %04x %02x %02x %02x %04x %04x %04x %s\n",
+		ret = sscanf(line, "%d %s %04hx %02hhx %02hhx %02hhx %04hx %04hx %04hx %s\n",
 				&entry->creds.uid,
 				entry->creds.sec_label,
 				&entry->device.bcdUSB,
@@ -831,7 +831,7 @@ static int creds_read_label(DBusMessageIter *iter, char **dest)
 
 static int get_caller_credentials(DBusMessage *msg, struct user_credentials *cred)
 {
-	char *cid;
+	const char *cid;
 	char *key;
 	char *arr[1];
 	DBusMessage *reply;
@@ -846,7 +846,7 @@ static int get_caller_credentials(DBusMessage *msg, struct user_credentials *cre
 		return -1;
 	}
 
-	arr[0] = cid;
+	arr[0] = (char *)cid;
 	reply = dbus_method_sync_with_reply(DBUS_BUS_NAME,
 			DBUS_OBJECT_PATH,
 			DBUS_INTERFACE_NAME,
@@ -929,7 +929,7 @@ static DBusMessage *open_device(E_DBus_Object *obj, DBusMessage *msg)
 	DBusError err;
 	dbus_bool_t dbus_ret;
 	int ret = 0, fd = -1;
-	const char *path;
+	char *path;
 	struct user_credentials cred;
 
 	dbus_error_init(&err);
