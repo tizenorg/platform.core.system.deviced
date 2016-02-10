@@ -24,6 +24,7 @@
 #include "log.h"
 #include "common.h"
 #include "dbus.h"
+#include "dd-usbhost.h"
 
 #define ARRAY_SIZE(array) (sizeof(array) / sizeof(array[0]))
 
@@ -33,24 +34,31 @@
 #define METHOD_REQUEST_STORAGE_UNMOUNT    "StorageUnmount"
 #define METHOD_REQUEST_STORAGE_FORMAT     "StorageFormat"
 #define SIGNAL_NAME_USB_STORAGE_CHANGED   "usb_storage_changed"
+#define SIGNAL_NAME_USB_DEVICE_CHANGED    "ChangedDevice"
 #define RETRY_MAX 5
+
+union action {
+	void (*storage)(char *type, char *path, int mount, void *param);
+	void (*device)(struct usbhost_device *device, int state);
+};
 
 struct signal_handler {
 	char *name;
 	E_DBus_Signal_Handler *handler;
-	void (*action)(char *type, char *path, int mount, void *param);
+	union action action;
 	void *data;
 };
 
 static struct signal_handler handlers[] = {
 	{ SIGNAL_NAME_USB_STORAGE_CHANGED    , NULL, NULL, NULL },
+	{ SIGNAL_NAME_USB_DEVICE_CHANGED     , NULL, NULL, NULL },
 };
 
 static E_DBus_Connection *conn = NULL;
 
 static int register_edbus_signal_handler(const char *path, const char *interface,
 		const char *name, E_DBus_Signal_Cb cb,
-		void (*action)(char *type, char *path, int mount, void *param),
+		union action action,
 		void *data)
 {
 	int i, ret;
@@ -67,7 +75,7 @@ static int register_edbus_signal_handler(const char *path, const char *interface
 		break;
 	}
 	if (i >= ARRAY_SIZE(handlers)) {
-		_E("Failed to find \"storage_changed\" signal");
+		_E("Failed to find \"%s\" signal", name);
 		ret = -1;
 		goto out;
 	}
@@ -127,8 +135,55 @@ static void storage_signal_handler(void *data, DBusMessage *msg)
 		return;
 	}
 
-	if (handlers[i].action)
-		handlers[i].action(type, path, mount, handlers[i].data);
+	if (handlers[i].action.storage)
+		handlers[i].action.storage(type, path, mount, handlers[i].data);
+}
+
+static void device_signal_handler(void *data, DBusMessage *msg)
+{
+	int i;
+	char *path;
+	struct usbhost_device device;
+	int state;
+	DBusError err;
+
+	if (dbus_message_is_signal(msg, DEVICED_INTERFACE_USBHOST, SIGNAL_NAME_USB_DEVICE_CHANGED) == 0) {
+		_E("The signal is not ChangedDevice");
+		return;
+	}
+
+	dbus_error_init(&err);
+	if (dbus_message_get_args(msg, &err,
+				DBUS_TYPE_INT32, &state,
+				DBUS_TYPE_STRING, &path,
+				DBUS_TYPE_INT32, &device.baseclass,
+				DBUS_TYPE_INT32, &device.subclass,
+				DBUS_TYPE_INT32, &device.protocol,
+				DBUS_TYPE_INT32, &device.vendorid,
+				DBUS_TYPE_INT32, &device.productid,
+				DBUS_TYPE_STRING, &device.manufacturer,
+				DBUS_TYPE_STRING, &device.product,
+				DBUS_TYPE_STRING, &device.serial,
+				DBUS_TYPE_INVALID) == 0) {
+		_E("Failed to get device info");
+		return;
+	}
+
+	for (i = 0 ; i < ARRAY_SIZE(handlers) ; i++) {
+		if (strcmp(handlers[i].name, SIGNAL_NAME_USB_DEVICE_CHANGED))
+			continue;
+		break;
+	}
+
+	if (i >= ARRAY_SIZE(handlers)) {
+		_E("Failed to find ChangedDevice signal");
+		return;
+	}
+
+	strncpy(device.devpath, path, PATH_MAX);
+
+	if (handlers[i].action.device)
+		handlers[i].action.device(&device, state);
 }
 
 API int init_usbhost_signal(void)
@@ -168,7 +223,7 @@ API void deinit_usbhost_signal(void)
 			e_dbus_signal_handler_del(conn, handlers[i].handler);
 			handlers[i].handler = NULL;
 		}
-		handlers[i].action = NULL;
+		handlers[i].action.storage = NULL;
 		handlers[i].data = NULL;
 	}
 
@@ -185,17 +240,36 @@ API int request_usb_storage_info(void)
 }
 
 API int register_usb_storage_change_handler(
-		void (*storage_changed)(char *type, char *path, int mount, void *),
+		void (*storage_changed)(char *type, char *path, int mount, void *param),
 		void *data)
 {
+	union action action;
 	if (!storage_changed)
 		return -EINVAL;
 
+	action.storage = storage_changed;
 	return register_edbus_signal_handler(DEVICED_PATH_USBHOST,
 			DEVICED_INTERFACE_USBHOST,
 			SIGNAL_NAME_USB_STORAGE_CHANGED,
 			storage_signal_handler,
-			storage_changed,
+			action,
+			data);
+}
+
+API int register_usb_device_change_handler(
+		void (*device_changed)(struct usbhost_device *device, int state),
+		void *data)
+{
+	union action action;
+	if (!device_changed)
+		return -EINVAL;
+
+	action.device = device_changed;
+	return register_edbus_signal_handler(DEVICED_PATH_USBHOST,
+			DEVICED_INTERFACE_USBHOST,
+			SIGNAL_NAME_USB_DEVICE_CHANGED,
+			device_signal_handler,
+			action,
 			data);
 }
 
@@ -211,10 +285,30 @@ API int unregister_usb_storage_change_handler(void)
 
 		e_dbus_signal_handler_del(conn, handlers[i].handler);
 		handlers[i].handler = NULL;
-		handlers[i].action = NULL;
+		handlers[i].action.storage = NULL;
 		handlers[i].data = NULL;
 		return 0;
 	}
+	return -1;
+}
+
+API int unregister_usb_device_change_handler(void)
+{
+	int i;
+
+	for (i = 0 ; i < ARRAY_SIZE(handlers) ; i++) {
+		if (strcmp(handlers[i].name, SIGNAL_NAME_USB_DEVICE_CHANGED))
+			continue;
+		if (handlers[i].handler == NULL)
+			continue;
+
+		e_dbus_signal_handler_del(conn, handlers[i].handler);
+		handlers[i].handler = NULL;
+		handlers[i].action.storage = NULL;
+		handlers[i].data = NULL;
+		return 0;
+	}
+
 	return -1;
 }
 
