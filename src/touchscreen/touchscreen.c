@@ -65,7 +65,6 @@ static void touchscreen_exit(void *data)
 	assert(info);
 
 	info->close((struct hw_common *)touchscreen_dev);
-	touchscreen_dev = NULL;
 }
 
 static int touchscreen_set_state(enum touchscreen_state state)
