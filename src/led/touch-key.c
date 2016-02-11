@@ -239,10 +239,14 @@ static int touchled_service_free(void)
 		return -ENOENT;
 
 	info = touchled_dev->common.info;
-	if (!info)
+	if (!info) {
+		free(touchled_dev);
+		touchled_dev = NULL;
 		return -EPERM;
+	}
 
 	info->close((struct hw_common *)touchled_dev);
+	touchled_dev = NULL;
 
 	return 0;
 }

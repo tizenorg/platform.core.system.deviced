@@ -70,7 +70,7 @@ int append_variant(DBusMessageIter *iter, const char *sig, char *param[])
 			dbus_message_iter_append_basic(iter, DBUS_TYPE_STRING, &param[i]);
 			break;
 		case 'a':
-			++i, ++ch;
+			++ch;
 			switch (*ch) {
 			case 'y':
 				dbus_message_iter_open_container(iter, DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE_AS_STRING, &arr);
