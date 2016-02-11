@@ -1,0 +1,1 @@
+SUBSYSTEM=="usb", MODE="0644", SECLABEL{smack}="*"

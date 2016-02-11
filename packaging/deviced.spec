@@ -371,6 +371,10 @@ systemctl daemon-reload
 %{_unitdir}/basic.target.wants/sdb-prestart.service
 %endif
 
+%if %{?usbhost_module} == on
+%{_libdir}/udev/rules.d/40-usb.rules
+%endif
+
 %files tools
 %manifest %{name}.manifest
 %{_bindir}/devicectl
