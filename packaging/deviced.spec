@@ -18,6 +18,7 @@
 %define tzip_module off
 %define usb_module on
 %define usbhost_module off
+%define ir_module off
 
 #Just For debugging
 %define sdb_prestart on
@@ -31,6 +32,7 @@
 %define touchscreen_module on
 %define tzip_module on
 %define usbhost_module on
+%define ir_module on
 %endif
 %if "%{?profile}" == "wearable"
 %define battery_module on
@@ -267,6 +269,7 @@ Haptic Device manager library for device control (devel)
 	-DTZIP_MODULE=%{tzip_module} \
 	-DUSB_MODULE=%{usb_module} \
 	-DUSBHOST_MODULE=%{usbhost_module} \
+	-DIR_MODULE=%{ir_module} \
 	#eol
 
 %build
