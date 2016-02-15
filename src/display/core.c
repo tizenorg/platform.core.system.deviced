@@ -190,6 +190,7 @@ typedef struct _pm_lock_node {
 	time_t time;
 	bool holdkey_block;
 	struct _pm_lock_node *next;
+	bool background;
 } PmLockNode;
 
 static PmLockNode *cond_head[S_END];
@@ -217,10 +218,19 @@ static void set_process_active(bool flag, pid_t pid)
 
 bool check_lock_state(int state)
 {
-	if (cond_head[state] != NULL)
-		return true;
+	PmLockNode *t;
+	bool ret = false;
 
-	return false;
+	t = cond_head[state];
+	while (t != NULL) {
+		if (t->background == false) {
+			ret = true;
+			break;
+		}
+		t = t->next;
+	}
+
+	return ret;
 }
 
 int get_standby_state(void)
@@ -360,14 +370,64 @@ static int refresh_app_cond()
 {
 	trans_condition = 0;
 
-	if (cond_head[S_LCDDIM] != NULL)
+	if (check_lock_state(S_LCDDIM))
 		trans_condition = trans_condition | MASK_DIM;
-	if (cond_head[S_LCDOFF] != NULL)
+	if (check_lock_state(S_LCDOFF))
 		trans_condition = trans_condition | MASK_OFF;
-	if (cond_head[S_SLEEP] != NULL)
+	if (check_lock_state(S_SLEEP))
 		trans_condition = trans_condition | MASK_SLP;
 
 	return 0;
+}
+
+static void condition_background_remove(enum state_t s_index)
+{
+	PmLockNode *t;
+	PmLockNode *prev;
+
+	t = cond_head[s_index];
+	prev = NULL;
+
+	while (t != NULL) {
+		if (t->background == false) {
+			prev = t;
+			t = t->next;
+			continue;
+		}
+
+		/* delete node */
+		if (prev != NULL)
+			prev->next = t->next;
+		else
+			cond_head[s_index] = cond_head[s_index]->next;
+
+		/* delete timer */
+		if (t->timeout_id)
+			ecore_timer_del(t->timeout_id);
+
+		free(t);
+		if (prev != NULL)
+			t = prev->next;
+		else
+			t = cond_head[s_index];
+	}
+
+	refresh_app_cond();
+}
+
+static void makeup_trans_condition(void)
+{
+	enum state_t iter;
+	for (iter = S_START; iter < S_END; iter++) {
+		switch (iter) {
+		case S_LCDDIM:
+		case S_LCDOFF:
+		case S_SLEEP:
+			condition_background_remove(iter);
+		default:
+			break;
+		}
+	}
 }
 
 static PmLockNode *find_node(enum state_t s_index, pid_t pid)
@@ -400,6 +460,7 @@ static PmLockNode *add_node(enum state_t s_index, pid_t pid, Ecore_Timer *timeou
 	n->time = now;
 	n->holdkey_block = holdkey_block;
 	n->next = cond_head[s_index];
+	n->background = false;
 	cond_head[s_index] = n;
 
 	refresh_app_cond();
@@ -1716,9 +1777,13 @@ go_lcd_off:
  */
 static int default_check(int next)
 {
-	int trans_cond = trans_condition & MASK_BIT;
+	int trans_cond;
 	int lock_state = -1;
 	int app_state = -1;
+
+	makeup_trans_condition();
+
+	trans_cond = trans_condition & MASK_BIT;
 
 	vconf_get_int(VCONFKEY_IDLE_LOCK_STATE, &lock_state);
 	if (lock_state==VCONFKEY_IDLE_LOCK && next != S_SLEEP) {
@@ -2084,6 +2149,38 @@ static int booting_done(void *data)
 	return 0;
 }
 
+static int process_background(void *data)
+{
+	pid_t pid;
+	PmLockNode *node;
+
+	pid = *(pid_t *)data;
+
+	node = find_node(S_LCDDIM, pid);
+	if (node) {
+		node->background = true;
+		_I("%d pid is background, then PM will be unlocked LCD_NORMAL", pid);
+	}
+
+	return 0;
+}
+
+static int process_foreground(void *data)
+{
+	pid_t pid;
+	PmLockNode *node;
+
+	pid = *(pid_t *)data;
+
+	node = find_node(S_LCDDIM, pid);
+	if (node) {
+		node->background = false;
+		_I("%d pid is foreground, then PM will be maintained locked LCD_NORMAL", pid);
+	}
+
+	return 0;
+}
+
 static int display_load_config(struct parse_result *result, void *user_data)
 {
 	struct display_config *c = user_data;
@@ -2173,6 +2270,8 @@ static void display_init(void *data)
 		    DISPLAY_CONF_FILE, ret);
 
 	register_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
+	register_notifier(DEVICE_NOTIFIER_PROCESS_BACKGROUND, process_background);
+	register_notifier(DEVICE_NOTIFIER_PROCESS_FOREGROUND, process_foreground);
 
 	for (i = INIT_SETTING; i < INIT_END; i++) {
 		switch (i) {
@@ -2262,8 +2361,9 @@ static void display_exit(void *data)
 			exit_sysfs();
 			break;
 		case INIT_POLL:
-			unregister_notifier(DEVICE_NOTIFIER_BOOTING_DONE,
-			    booting_done);
+			unregister_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
+			unregister_notifier(DEVICE_NOTIFIER_PROCESS_BACKGROUND, process_background);
+			unregister_notifier(DEVICE_NOTIFIER_PROCESS_FOREGROUND, process_foreground);
 
 			exit_input();
 			break;
