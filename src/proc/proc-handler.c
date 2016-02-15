@@ -175,6 +175,8 @@ static void proc_signal_handler(void *data, DBusMessage *msg)
 
 	if (type == PROC_STATUS_BACKGROUND)
 		device_notify(DEVICE_NOTIFIER_PROCESS_BACKGROUND, &pid);
+	if (type == PROC_STATUS_FOREGROUND)
+		device_notify(DEVICE_NOTIFIER_PROCESS_FOREGROUND, &pid);
 }
 
 static const struct edbus_method edbus_methods[] = {
