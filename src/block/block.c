@@ -325,7 +325,7 @@ static char *generate_mount_path(struct block_data *data)
 	else
 		return NULL;
 
-	str = tzplatform_mkpath(TZ_SYS_STORAGE, node);
+	str = tzplatform_mkpath(TZ_SYS_MEDIA, node);
 	if (!str)
 		return NULL;
 	return strdup(str);
