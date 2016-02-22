@@ -75,11 +75,13 @@ extern unsigned int pm_status_flag;
  * State enumeration
  */
 enum state_t {
-	S_START = 0,
+	S_START,
 	S_NORMAL,		/*< normal state */
 	S_LCDDIM,		/*< LCD dimming */
 	S_LCDOFF,		/*< LCD off */
+	S_STANDBY,		/*< Standby */
 	S_SLEEP,		/*< system suspend */
+	S_POWEROFF,		/*< Power off */
 	S_END
 };
 
@@ -96,10 +98,11 @@ int pm_old_state;
  * @brief State structure
  */
 struct state {
-	enum state_t state;					/**< state number */
-	int (*trans) (int evt);		/**< transition function pointer */
-	int (*action) (int timeout);	/**< enter action */
-	int (*check) (int next);	/**< transition check function */
+	enum state_t state;           /**< state number */
+	char *name;                   /**< state name (string) */
+	int (*trans) (int evt);       /**< transition function pointer */
+	int (*action) (int timeout);  /**< enter action */
+	int (*check) (int next);      /**< transition check function */
 	int timeout;
 } states[S_END];
 
@@ -166,6 +169,11 @@ void set_lock_screen_state(int state);
 void set_lock_screen_bg_state(bool state);
 
 /* core.c */
+void change_state_action(enum state_t state, int (*func)(int timeout));
+void change_state_trans(enum state_t state, int (*func)(int evt));
+void change_state_check(enum state_t state, int (*func)(int next));
+void change_trans_table(enum state_t state, enum state_t next);
+
 int delete_condition(enum state_t state);
 void update_lcdoff_source(int source);
 int low_battery_state(int val);

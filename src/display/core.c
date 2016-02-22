@@ -108,15 +108,25 @@ static int default_action(int timeout);
 static int default_check(int next);
 
 struct state states[S_END] = {
-	{S_START, default_trans, default_action, default_check,},
-	{S_NORMAL, default_trans, default_action, default_check,},
-	{S_LCDDIM, default_trans, default_action, default_check,},
-	{S_LCDOFF, default_trans, default_action, default_check,},
-	{S_SLEEP, default_trans, default_action, default_check,}
+	{ S_START,    "S_START",    NULL,          NULL,           NULL,         },
+	{ S_NORMAL,   "S_NORMAL",   default_trans, default_action, default_check },
+	{ S_LCDDIM,   "S_LCDDIM",   default_trans, default_action, default_check },
+	{ S_LCDOFF,   "S_LCDOFF",   default_trans, default_action, default_check },
+	{ S_STANDBY,  "S_STANDBY",  NULL,          NULL,           NULL          },
+	{ S_SLEEP,    "S_SLEEP",    default_trans, default_action, default_check },
+	{ S_POWEROFF, "S_POWEROFF", NULL,          NULL,           NULL          },
 };
 
-static const char state_string[5][10] =
-	{ "S_START", "S_NORMAL", "S_LCDDIM", "S_LCDOFF", "S_SLEEP" };
+static int trans_table[S_END][EVENT_END] = {
+	/* Timeout,   Input */
+	{ S_START,    S_START    }, /* S_START */
+	{ S_LCDDIM,   S_NORMAL   }, /* S_NORMAL */
+	{ S_LCDOFF,   S_NORMAL   }, /* S_LCDDIM */
+	{ S_SLEEP,    S_NORMAL   }, /* S_LCDOFF */
+	{ S_STANDBY,  S_STANDBY  }, /* S_STANDBY */
+	{ S_LCDOFF,   S_NORMAL   }, /* S_SLEEP */
+	{ S_POWEROFF, S_POWEROFF }, /* S_POWEROFF */
+};
 
 enum signal_type {
 	SIGNAL_INVALID = 0,
@@ -132,15 +142,6 @@ static const char *lcdon_sig_lookup[SIGNAL_MAX] = {
 static const char *lcdoff_sig_lookup[SIGNAL_MAX] = {
         [SIGNAL_PRE]  = "LCDOff",
         [SIGNAL_POST] = "LCDOffCompleted",
-};
-
-static int trans_table[S_END][EVENT_END] = {
-	/* Timeout , Input */
-	{S_START, S_START},	/* S_START */
-	{S_LCDDIM, S_NORMAL},	/* S_NORMAL */
-	{S_LCDOFF, S_NORMAL},	/* S_LCDDIM */
-	{S_SLEEP, S_NORMAL},	/* S_LCDOFF */
-	{S_LCDOFF, S_NORMAL},	/* S_SLEEP */
 };
 
 #define SHIFT_UNLOCK		4
@@ -241,6 +242,29 @@ bool check_lock_state(int state)
 	}
 
 	return false;
+}
+
+void change_state_action(enum state_t state, int (*func)(int timeout))
+{
+	if (func)
+		states[state].action = func;
+}
+
+void change_state_trans(enum state_t state, int (*func)(int evt))
+{
+	if (func)
+		states[state].trans = func;
+}
+
+void change_state_check(enum state_t state, int (*func)(int next))
+{
+	if (func)
+		states[state].check = func;
+}
+
+void change_trans_table(enum state_t state, enum state_t next)
+{
+	trans_table[state][EVENT_TIMEOUT] = next;
 }
 
 int get_standby_state(void)
@@ -622,7 +646,7 @@ static Eina_Bool del_sleep_cond(void *data)
 /* timeout handler  */
 Eina_Bool timeout_handler(void *data)
 {
-	_I("Time out state %s\n", state_string[pm_cur_state]);
+	_I("Time out state %s\n", states[pm_cur_state].name);
 
 	if (timeout_src_id) {
 		ecore_timer_del(timeout_src_id);
@@ -671,7 +695,7 @@ static int get_lcd_timeout_from_settings(void)
 		if (val > 0)
 			states[i].timeout = val;
 
-		_I("%s state : %d ms timeout", state_string[i],
+		_I("%s state : %d ms timeout", states[i].name,
 			states[i].timeout);
 	}
 
@@ -822,7 +846,7 @@ static int proc_change_state(unsigned int cond, pid_t pid)
 
 	get_pname(pid, pname);
 
-	_I("Change State to %s (%d)", state_string[next_state], pid);
+	_I("Change State to %s (%d)", states[next_state].name, pid);
 
 	if (next_state == S_NORMAL) {
 		if (check_lcd_on() == true)
@@ -1194,7 +1218,7 @@ int check_holdkey_block(enum state_t state)
 	PmLockNode *t = cond_head[state];
 	int ret = 0;
 
-	_I("check holdkey block : state of %s", state_string[state]);
+	_I("check holdkey block : state of %s", states[state].name);
 
 	if (custom_holdkey_block == true) {
 		_I("custom hold key blocked by pid(%d)",
@@ -1221,7 +1245,7 @@ int delete_condition(enum state_t state)
 	pid_t pid;
 	char pname[PATH_MAX];
 
-	_I("delete condition : state of %s", state_string[state]);
+	_I("delete condition : state of %s", states[state].name);
 
 	while (t != NULL) {
 		if (t->timeout_id > 0) {
@@ -1360,15 +1384,15 @@ void print_info(int fd)
 		_E("write() failed (%d)", errno);
 
 	snprintf(buf, sizeof(buf), "Tran. Locked : %s %s %s\n",
-		 (trans_condition & MASK_DIM) ? state_string[S_NORMAL] : "-",
-		 (trans_condition & MASK_OFF) ? state_string[S_LCDDIM] : "-",
-		 (trans_condition & MASK_SLP) ? state_string[S_LCDOFF] : "-");
+		 (trans_condition & MASK_DIM) ? states[S_NORMAL].name : "-",
+		 (trans_condition & MASK_OFF) ? states[S_LCDDIM].name : "-",
+		 (trans_condition & MASK_SLP) ? states[S_LCDOFF].name : "-");
 	ret = write(fd, buf, strlen(buf));
 	if (ret < 0)
 		_E("write() failed (%d)", errno);
 
 	snprintf(buf, sizeof(buf), "Current State: %s\n",
-		state_string[pm_cur_state]);
+		states[pm_cur_state].name);
 	ret = write(fd, buf, strlen(buf));
 	if (ret < 0)
 		_E("write() failed (%d)", errno);
@@ -1388,7 +1412,7 @@ void print_info(int fd)
 			ctime_r(&t->time, time_buf);
 			snprintf(buf, sizeof(buf),
 				 " %d: [%s] locked by pid %d %s %s",
-				 i++, state_string[s_index - 1], t->pid, pname, time_buf);
+				 i++, states[s_index - 1].name, t->pid, pname, time_buf);
 			ret = write(fd, buf, strlen(buf));
 			if (ret < 0)
 				_E("write() failed (%d)", errno);
@@ -1526,12 +1550,12 @@ static int default_trans(int evt)
 	while (st->check && !st->check(next_state)) {
 		/* There is a condition. */
 		if (standby_mode) {
-			_D("standby mode, goto next_state %s",
-			    state_string[next_state]);
+			_I("standby mode, goto next_state %s",
+			    states[next_state].name);
 			break;
 		}
-		_I("%s -> %s : check fail", state_string[pm_cur_state],
-		       state_string[next_state]);
+		_I("%s -> %s : check fail", states[pm_cur_state].name,
+		       states[next_state].name);
 		if (!check_processes(next_state)) {
 			/* this is valid condition - the application that sent the condition is running now. */
 			return -1;
@@ -1653,7 +1677,7 @@ static int default_action(int timeout)
 			last_timeout = timeout;
 		} else {
 			_I("timout set: %s state %d ms",
-			    state_string[pm_cur_state], timeout);
+			    states[pm_cur_state].name, timeout);
 		}
 	}
 
@@ -1668,7 +1692,7 @@ static int default_action(int timeout)
 		time(&now);
 		diff = difftime(now, last_update_time);
 		_I("S_NORMAL is changed to %s [%d ms, %.0f s]",
-		    state_string[pm_cur_state], last_timeout, diff);
+		    states[pm_cur_state].name, last_timeout, diff);
 	}
 
 	switch (pm_cur_state) {
