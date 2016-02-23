@@ -68,7 +68,6 @@ enum {
 #define STAY_CUR_STATE	0x1
 #define GOTO_STATE_NOW	0x2
 #define HOLD_KEY_BLOCK  0x4
-#define STANDBY_MODE    0x8
 
 #define PM_SLEEP_MARGIN	0x0	/**< keep guard time for unlock */
 #define PM_RESET_TIMER	0x1	/**< reset timer for unlock */

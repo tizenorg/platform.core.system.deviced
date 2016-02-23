@@ -554,10 +554,6 @@ static int check_key_filter(void *data, int fd)
 		 */
 		if (pinput->code == BTN_TOUCH && !current_state_in_on())
 			break;
-		if (get_standby_state() && pinput->code != KEY_POWER) {
-			_D("standby mode,key ignored except powerkey");
-			break;
-		}
 		if (pinput->code == code && pinput->value == value) {
 			_E("Same key(%d, %d) is polled [%d,%d]",
 				code, value, old_fd, fd);
@@ -571,13 +567,9 @@ static int check_key_filter(void *data, int fd)
 
 		break;
 	case EV_REL:
-		if (get_standby_state())
-			break;
 		ignore = false;
 		break;
 	case EV_ABS:
-		if (get_standby_state())
-			break;
 		if (current_state_in_on())
 			ignore = false;
 		restore_custom_brightness();

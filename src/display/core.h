@@ -185,7 +185,6 @@ void set_lcd_paneloff_mode(int val);
 void lcd_on_direct(enum device_flags flags);
 void lcd_off_procedure(void);
 int check_holdkey_block(enum state_t state);
-int get_standby_state(void);
 
 /* poll.c */
 int check_dimstay(int next_state, int flag);

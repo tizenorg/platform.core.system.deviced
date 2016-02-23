@@ -34,9 +34,7 @@
 #define SHIFT_CHANGE_TIMEOUT            20
 #define LOCK_FLAG_SHIFT                 16
 #define __HOLDKEY_BLOCK_BIT              0x1
-#define __STANDBY_MODE_BIT               0x2
 #define HOLDKEY_BLOCK_BIT               (__HOLDKEY_BLOCK_BIT << LOCK_FLAG_SHIFT)
-#define STANDBY_MODE_BIT                (__STANDBY_MODE_BIT << LOCK_FLAG_SHIFT)
 
 
 int check_dimstay(int next_state, int flag)
@@ -72,9 +70,6 @@ int pm_lock_internal(pid_t pid, int s_bits, int flag, int timeout)
 
 	if (flag & HOLD_KEY_BLOCK)
 		s_bits = s_bits | HOLDKEY_BLOCK_BIT;
-
-	if (flag & STANDBY_MODE)
-		s_bits = s_bits | STANDBY_MODE_BIT;
 
 	recv_data.pid = pid;
 	recv_data.cond = s_bits;
