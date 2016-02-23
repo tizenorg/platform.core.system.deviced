@@ -304,15 +304,15 @@ static int lcdoff_powerkey(void)
 	int ignore = true;
 
 	if (decide_lcdoff() == true) {
-		check_processes(S_LCDOFF);
+		check_processes(S_NORMAL);
 		check_processes(S_LCDDIM);
 
-		if (!check_holdkey_block(S_LCDOFF) &&
+		if (!check_holdkey_block(S_NORMAL) &&
 		    !check_holdkey_block(S_LCDDIM)) {
 			if (display_info.update_auto_brightness)
 				display_info.update_auto_brightness(false);
 			switch_off_lcd();
-			delete_condition(S_LCDOFF);
+			delete_condition(S_NORMAL);
 			delete_condition(S_LCDDIM);
 			update_lcdoff_source(VCONFKEY_PM_LCDOFF_BY_POWERKEY);
 			recv_data.pid = getpid();
@@ -414,11 +414,11 @@ static int process_screenlock_key(struct input_event *pinput)
 	if (!current_state_in_on())
 		return false;
 
-	check_processes(S_LCDOFF);
+	check_processes(S_NORMAL);
 	check_processes(S_LCDDIM);
 
-	if (!check_holdkey_block(S_LCDOFF) && !check_holdkey_block(S_LCDDIM)) {
-		delete_condition(S_LCDOFF);
+	if (!check_holdkey_block(S_NORMAL) && !check_holdkey_block(S_LCDDIM)) {
+		delete_condition(S_NORMAL);
 		delete_condition(S_LCDDIM);
 		update_lcdoff_source(VCONFKEY_PM_LCDOFF_BY_POWERKEY);
 

@@ -101,7 +101,7 @@ static bool lcdon_broadcast = false;
 /* default transition, action fuctions */
 static int default_trans(int evt);
 static int default_action(int timeout);
-static int default_check(int next);
+static int default_check(int curr, int next);
 
 struct state states[S_END] = {
 	{ S_START,    "S_START",    NULL,          NULL,           NULL,         },
@@ -403,12 +403,12 @@ static int refresh_app_cond()
 {
 	trans_condition = 0;
 
+	if (check_lock_state(S_NORMAL))
+		trans_condition = trans_condition | MASK_NORMAL;
 	if (check_lock_state(S_LCDDIM))
 		trans_condition = trans_condition | MASK_DIM;
 	if (check_lock_state(S_LCDOFF))
 		trans_condition = trans_condition | MASK_OFF;
-	if (check_lock_state(S_SLEEP))
-		trans_condition = trans_condition | MASK_SLP;
 
 	return 0;
 }
@@ -547,77 +547,46 @@ void get_pname(pid_t pid, char *pname)
 	close(cmdline);
 }
 
-static Eina_Bool del_dim_cond(void *data)
+static void del_state_cond(void *data, enum state_t state)
 {
 	PmLockNode *tmp = NULL;
 	char pname[PATH_MAX];
 	pid_t pid;
 
 	if (!data)
-		return EINA_FALSE;
+		return;
 
 	/* A passed data is a pid_t type data, not a 64bit data. */
 	pid = (pid_t)((intptr_t)data);
 	_I("delete prohibit dim condition by timeout (%d)", pid);
 
-	tmp = find_node(S_LCDDIM, pid);
-	del_node(S_LCDDIM, tmp);
+	tmp = find_node(state, pid);
+	del_node(state, tmp);
 	get_pname(pid, pname);
-	set_unlock_time(pname, S_NORMAL);
+	set_unlock_time(pname, state);
 
 	if (!timeout_src_id)
 		states[pm_cur_state].trans(EVENT_TIMEOUT);
 
+	if (state == S_LCDOFF)
+		set_process_active(EINA_FALSE, pid);
+}
+
+static Eina_Bool del_normal_cond(void *data)
+{
+	del_state_cond(data, S_NORMAL);
+	return EINA_FALSE;
+}
+
+static Eina_Bool del_dim_cond(void *data)
+{
+	del_state_cond(data, S_LCDDIM);
 	return EINA_FALSE;
 }
 
 static Eina_Bool del_off_cond(void *data)
 {
-	PmLockNode *tmp = NULL;
-	char pname[PATH_MAX];
-	pid_t pid;
-
-	if (!data)
-		return EINA_FALSE;
-
-	/* A passed data is a pid_t type data, not a 64bit data. */
-	pid = (pid_t)((intptr_t)data);
-	_I("delete prohibit off condition by timeout (%d)", pid);
-
-	tmp = find_node(S_LCDOFF, pid);
-	del_node(S_LCDOFF, tmp);
-	get_pname(pid, pname);
-	set_unlock_time(pname, S_LCDDIM);
-
-	if (!timeout_src_id)
-		states[pm_cur_state].trans(EVENT_TIMEOUT);
-
-	return EINA_FALSE;
-}
-
-static Eina_Bool del_sleep_cond(void *data)
-{
-	PmLockNode *tmp = NULL;
-	char pname[PATH_MAX];
-	pid_t pid;
-
-	if (!data)
-		return EINA_FALSE;
-
-	/* A passed data is a pid_t type data, not a 64bit data. */
-	pid = (pid_t)((intptr_t)data);
-	_I("delete prohibit sleep condition by timeout (%d)", pid);
-
-	tmp = find_node(S_SLEEP, pid);
-	del_node(S_SLEEP, tmp);
-	get_pname(pid, pname);
-	set_unlock_time(pname, S_LCDOFF);
-
-	if (!timeout_src_id)
-		states[pm_cur_state].trans(EVENT_TIMEOUT);
-
-	set_process_active(EINA_FALSE, pid);
-
+	del_state_cond(data, S_LCDOFF);
 	return EINA_FALSE;
 }
 
@@ -637,6 +606,7 @@ Eina_Bool timeout_handler(void *data)
 
 void reset_timeout(int timeout)
 {
+	_I("Reset Timeout (%d)ms", timeout);
 	if (timeout_src_id != 0) {
 		ecore_timer_del(timeout_src_id);
 		timeout_src_id = NULL;
@@ -865,7 +835,6 @@ static int proc_change_state(unsigned int cond, pid_t pid)
 		if (st->action) {
 			st->action(TIMEOUT_NONE);
 		}
-		delete_condition(S_SLEEP);
 		pm_old_state = pm_cur_state;
 		pm_cur_state = S_SLEEP;
 		st = &states[pm_cur_state];
@@ -930,6 +899,37 @@ static int proc_condition(PMMsg *data)
 		}
 	}
 
+	if (val & MASK_NORMAL) {
+		if (data->timeout > 0) {
+			/*
+			 * To pass a pid_t data through the timer infrastructure
+			 * without memory allocation, a pid_t data becomes typecast
+			 * to intptr_t and void *(64bit) type.
+			 */
+			cond_timeout_id =
+			    ecore_timer_add(MSEC_TO_SEC((double)data->timeout),
+				    (Ecore_Task_Cb)del_normal_cond, (void*)((intptr_t)pid));
+		}
+		holdkey_block = GET_HOLDKEY_BLOCK_STATE(val);
+		tmp = find_node(S_NORMAL, pid);
+		if (tmp == NULL) {
+			add_node(S_NORMAL, pid, cond_timeout_id, holdkey_block);
+		} else {
+			if (data->timeout > 0) {
+				time(&now);
+				tmp->time = now;
+			}
+			if (tmp->timeout_id) {
+				ecore_timer_del(tmp->timeout_id);
+				tmp->timeout_id = cond_timeout_id;
+			}
+			tmp->holdkey_block = holdkey_block;
+		}
+		/* for debug */
+		_SD("[%s] locked by pid %d - process %s holdkeyblock %d\n",
+		    "S_NORMAL", pid, pname, holdkey_block);
+		set_lock_time(pname, S_NORMAL);
+	}
 	if (val & MASK_DIM) {
 		if (data->timeout > 0) {
 			/*
@@ -958,41 +958,10 @@ static int proc_condition(PMMsg *data)
 		}
 		/* for debug */
 		_SD("[%s] locked by pid %d - process %s holdkeyblock %d\n",
-		    "S_NORMAL", pid, pname, holdkey_block);
-		set_lock_time(pname, S_NORMAL);
-	}
-	if (val & MASK_OFF) {
-		if (data->timeout > 0) {
-			/*
-			 * To pass a pid_t data through the timer infrastructure
-			 * without memory allocation, a pid_t data becomes typecast
-			 * to intptr_t and void *(64bit) type.
-			 */
-			cond_timeout_id =
-			    ecore_timer_add(MSEC_TO_SEC((double)data->timeout),
-				    (Ecore_Task_Cb)del_off_cond, (void*)((intptr_t)pid));
-		}
-		holdkey_block = GET_HOLDKEY_BLOCK_STATE(val);
-		tmp = find_node(S_LCDOFF, pid);
-		if (tmp == NULL) {
-			add_node(S_LCDOFF, pid, cond_timeout_id, holdkey_block);
-		} else {
-			if (data->timeout > 0) {
-				time(&now);
-				tmp->time = now;
-			}
-			if (tmp->timeout_id) {
-				ecore_timer_del(tmp->timeout_id);
-				tmp->timeout_id = cond_timeout_id;
-			}
-			tmp->holdkey_block = holdkey_block;
-		}
-		/* for debug */
-		_SD("[%s] locked by pid %d - process %s holdkeyblock %d\n",
 		    "S_LCDDIM", pid, pname, holdkey_block);
 		set_lock_time(pname, S_LCDDIM);
 	}
-	if (val & MASK_SLP) {
+	if (val & MASK_OFF) {
 		/*
 		 * pm-state must be changed to LCDOFF,
 		 * to guarantee of LCDOFF-lock
@@ -1009,11 +978,11 @@ static int proc_condition(PMMsg *data)
 			 */
 			cond_timeout_id =
 			    ecore_timer_add(MSEC_TO_SEC((double)data->timeout),
-				    (Ecore_Task_Cb)del_sleep_cond, (void*)((intptr_t)pid));
+				    (Ecore_Task_Cb)del_off_cond, (void*)((intptr_t)pid));
 		}
-		tmp = find_node(S_SLEEP, pid);
+		tmp = find_node(S_LCDOFF, pid);
 		if (tmp == NULL) {
-			add_node(S_SLEEP, pid, cond_timeout_id, 0);
+			add_node(S_LCDOFF, pid, cond_timeout_id, 0);
 		} else {
 			if (data->timeout > 0) {
 				time(&now);
@@ -1035,23 +1004,23 @@ static int proc_condition(PMMsg *data)
 
 	/* UNLOCK(GRANT) condition processing */
 	val = val >> SHIFT_UNLOCK;
-	if (val & MASK_DIM) {
-		tmp = find_node(S_LCDDIM, pid);
-		del_node(S_LCDDIM, tmp);
+	if (val & MASK_NORMAL) {
+		tmp = find_node(S_NORMAL, pid);
+		del_node(S_NORMAL, tmp);
 		_SD("[%s] unlocked by pid %d - process %s\n", "S_NORMAL",
 			pid, pname);
 		set_unlock_time(pname, S_NORMAL);
 	}
-	if (val & MASK_OFF) {
-		tmp = find_node(S_LCDOFF, pid);
-		del_node(S_LCDOFF, tmp);
+	if (val & MASK_DIM) {
+		tmp = find_node(S_LCDDIM, pid);
+		del_node(S_LCDDIM, tmp);
 		_SD("[%s] unlocked by pid %d - process %s\n", "S_LCDDIM",
 			pid, pname);
 		set_unlock_time(pname, S_LCDDIM);
 	}
-	if (val & MASK_SLP) {
-		tmp = find_node(S_SLEEP, pid);
-		del_node(S_SLEEP, tmp);
+	if (val & MASK_OFF) {
+		tmp = find_node(S_LCDOFF, pid);
+		del_node(S_LCDOFF, tmp);
 		set_process_active(EINA_FALSE, pid);
 
 		_SD("[%s] unlocked by pid %d - process %s\n", "S_LCDOFF",
@@ -1153,7 +1122,7 @@ int delete_condition(enum state_t state)
 		tmp = t;
 		t = t->next;
 		pid = tmp->pid;
-		if (state == S_SLEEP)
+		if (state == S_LCDOFF)
 			set_process_active(EINA_FALSE, pid);
 		_I("delete node of pid(%d)", pid);
 		del_node(state, tmp);
@@ -1277,9 +1246,9 @@ void print_info(int fd)
 		_E("write() failed (%d)", errno);
 
 	snprintf(buf, sizeof(buf), "Tran. Locked : %s %s %s\n",
-		 (trans_condition & MASK_DIM) ? states[S_NORMAL].name : "-",
-		 (trans_condition & MASK_OFF) ? states[S_LCDDIM].name : "-",
-		 (trans_condition & MASK_SLP) ? states[S_LCDOFF].name : "-");
+		 (trans_condition & MASK_NORMAL) ? states[S_NORMAL].name : "-",
+		 (trans_condition & MASK_DIM) ? states[S_LCDDIM].name : "-",
+		 (trans_condition & MASK_OFF) ? states[S_LCDOFF].name : "-");
 	ret = write(fd, buf, strlen(buf));
 	if (ret < 0)
 		_E("write() failed (%d)", errno);
@@ -1305,7 +1274,7 @@ void print_info(int fd)
 			ctime_r(&t->time, time_buf);
 			snprintf(buf, sizeof(buf),
 				 " %d: [%s] locked by pid %d %s %s",
-				 i++, states[s_index - 1].name, t->pid, pname, time_buf);
+				 i++, states[s_index].name, t->pid, pname, time_buf);
 			ret = write(fd, buf, strlen(buf));
 			if (ret < 0)
 				_E("write() failed (%d)", errno);
@@ -1400,7 +1369,7 @@ int check_lcdoff_direct(void)
 
 int check_lcdoff_lock_state(void)
 {
-	if (cond_head[S_SLEEP] != NULL)
+	if (cond_head[S_LCDOFF] != NULL)
 		return true;
 
 	return false;
@@ -1420,12 +1389,13 @@ static int default_trans(int evt)
 	next_state = (enum state_t)trans_table[pm_cur_state][evt];
 
 	/* check conditions */
-	while (st->check && !st->check(next_state)) {
+	while (st->check && !st->check(pm_cur_state, next_state)) {
 		/* There is a condition. */
-		_I("%s -> %s : check fail", states[pm_cur_state].name,
+		_I("(%s) locked. Trans to (%s) failed", states[pm_cur_state].name,
 		       states[next_state].name);
-		if (!check_processes(next_state)) {
-			/* this is valid condition - the application that sent the condition is running now. */
+		if (!check_processes(pm_cur_state)) {
+			/* This is valid condition
+			 * The application that sent the condition is running now. */
 			return -1;
 		}
 	}
@@ -1663,7 +1633,7 @@ go_lcd_off:
  *   return
  *    0 : can't transit, others : transitable
  */
-static int default_check(int next)
+static int default_check(int curr, int next)
 {
 	int trans_cond;
 	int lock_state = -1;
@@ -1674,7 +1644,7 @@ static int default_check(int next)
 	trans_cond = trans_condition & MASK_BIT;
 
 	vconf_get_int(VCONFKEY_IDLE_LOCK_STATE, &lock_state);
-	if (lock_state==VCONFKEY_IDLE_LOCK && next != S_SLEEP) {
+	if (lock_state==VCONFKEY_IDLE_LOCK && curr != S_LCDOFF) {
 		vconf_get_int(VCONFKEY_CALL_STATE, &app_state);
 		if (app_state == VCONFKEY_CALL_OFF) {
 			_I("default_check:LOCK STATE, it's transitable");
@@ -1682,23 +1652,26 @@ static int default_check(int next)
 		}
 	}
 
-	switch (next) {
+	if (next == S_NORMAL) /* S_NORMAL is exceptional */
+		return 1;
+
+	switch (curr) {
+	case S_NORMAL:
+		trans_cond = trans_cond & MASK_NORMAL;
+		break;
 	case S_LCDDIM:
 		trans_cond = trans_cond & MASK_DIM;
 		break;
 	case S_LCDOFF:
 		trans_cond = trans_cond & MASK_OFF;
 		break;
-	case S_SLEEP:
-		trans_cond = trans_cond & MASK_SLP;
-		break;
-	default:		/* S_NORMAL is exceptional */
+	default:
 		trans_cond = 0;
 		break;
 	}
 
 	if (trans_cond != 0) {
-		print_node(next);
+		print_node(curr);
 		return 0;
 	}
 
@@ -2044,7 +2017,7 @@ static int process_background(void *data)
 
 	pid = *(pid_t *)data;
 
-	node = find_node(S_LCDDIM, pid);
+	node = find_node(S_NORMAL, pid);
 	if (node) {
 		node->background = true;
 		_I("%d pid is background, then PM will be unlocked LCD_NORMAL", pid);
@@ -2060,7 +2033,7 @@ static int process_foreground(void *data)
 
 	pid = *(pid_t *)data;
 
-	node = find_node(S_LCDDIM, pid);
+	node = find_node(S_NORMAL, pid);
 	if (node) {
 		node->background = false;
 		_I("%d pid is foreground, then PM will be maintained locked LCD_NORMAL", pid);
