@@ -10,6 +10,7 @@
 %define display_module on
 %define extcon_module on
 %define haptic_module off
+%define ir_module off
 %define led_module off
 %define power_module on
 %define storage_module on
@@ -26,6 +27,7 @@
 %define battery_module on
 %define block_module on
 %define haptic_module on
+%define ir_module on
 %define led_module on
 %define telephony_module on
 %define touchscreen_module on
@@ -259,6 +261,7 @@ Haptic Device manager library for device control (devel)
 	-DDISPLAY_MODULE=%{display_module} \
 	-DEXTCON_MODULE=%{extcon_module} \
 	-DHAPTIC_MODULE=%{haptic_module} \
+	-DIR_MODULE=%{ir_module} \
 	-DLED_MODULE=%{led_module} \
 	-DPOWER_MODULE=%{power_module} \
 	-DSTORAGE_MODULE=%{storage_module} \

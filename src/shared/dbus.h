@@ -121,8 +121,11 @@
 #define DEVICED_PATH_BATTERY                DEVICED_OBJECT_PATH"/Battery"
 #define DEVICED_INTERFACE_BATTERY           DEVICED_INTERFACE_NAME".Battery"
 /* Time service */
-#define DEVICED_PATH_TIME                DEVICED_OBJECT_PATH"/Time"
-#define DEVICED_INTERFACE_TIME           DEVICED_INTERFACE_NAME".Time"
+#define DEVICED_PATH_TIME                   DEVICED_OBJECT_PATH"/Time"
+#define DEVICED_INTERFACE_TIME              DEVICED_INTERFACE_NAME".Time"
+/* IR service */
+#define DEVICED_PATH_IR                     DEVICED_OBJECT_PATH"/Ir"
+#define DEVICED_INTERFACE_IR                DEVICED_INTERFACE_NAME".ir"
 
 /* Apps service */
 #define DEVICED_PATH_APPS               DEVICED_OBJECT_PATH"/Apps"

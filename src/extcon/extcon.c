@@ -382,7 +382,9 @@ static void extcon_exit(void *data)
 			extcon_dev->unregister_changed_event(extcon_changed);
 
 		info = extcon_dev->common.info;
-		if (info)
+		if (!info)
+			free(extcon_dev);
+		else
 			info->close((struct hw_common *)extcon_dev);
 		extcon_dev = NULL;
 
