@@ -103,6 +103,7 @@ struct state {
 	int (*trans) (int evt);       /**< transition function pointer */
 	int (*action) (int timeout);  /**< enter action */
 	int (*check) (int curr, int next); /**< transition check function */
+	Ecore_Task_Cb timeout_cb;
 	int timeout;
 } states[S_END];
 
