@@ -29,10 +29,10 @@
 #include "setting.h"
 
 #define WITHOUT_STARTNOTI	0x1
-#define MASK_BIT 0x7		/* 111 */
-#define MASK_DIM 0x1		/* 001 */
-#define MASK_OFF 0x2		/* 010 */
-#define MASK_SLP 0x4		/* 100 */
+#define MASK_BIT    0x7		/* 111 */
+#define MASK_NORMAL 0x1		/* 001 */
+#define MASK_DIM    0x2		/* 010 */
+#define MASK_OFF    0x4		/* 100 */
 
 #define VCALL_FLAG		0x00000001
 #define LOWBT_FLAG		0x00000100
@@ -102,7 +102,7 @@ struct state {
 	char *name;                   /**< state name (string) */
 	int (*trans) (int evt);       /**< transition function pointer */
 	int (*action) (int timeout);  /**< enter action */
-	int (*check) (int next);      /**< transition check function */
+	int (*check) (int curr, int next); /**< transition check function */
 	int timeout;
 } states[S_END];
 
@@ -171,7 +171,7 @@ void set_lock_screen_bg_state(bool state);
 /* core.c */
 void change_state_action(enum state_t state, int (*func)(int timeout));
 void change_state_trans(enum state_t state, int (*func)(int evt));
-void change_state_check(enum state_t state, int (*func)(int next));
+void change_state_check(enum state_t state, int (*func)(int curr, int next));
 void change_trans_table(enum state_t state, enum state_t next);
 
 int delete_condition(enum state_t state);
