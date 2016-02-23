@@ -51,28 +51,46 @@ int check_dimstay(int next_state, int flag)
 	return true;
 }
 
+static enum state_t get_state(int s_bits)
+{
+	switch (s_bits) {
+	case LCD_NORMAL:
+		return S_NORMAL;
+	case LCD_DIM:
+		return S_LCDDIM;
+	case LCD_OFF:
+		return S_LCDOFF;
+	case STANDBY:
+		return S_STANDBY;
+	case SUSPEND:
+		return S_SLEEP;
+	default:
+		return -EINVAL;
+	}
+}
+
 int pm_lock_internal(pid_t pid, int s_bits, int flag, int timeout)
 {
+	int cond;
+
 	if (!pm_callback)
 		return -1;
 
-	switch (s_bits) {
-	case LCD_NORMAL:
-	case LCD_DIM:
-	case LCD_OFF:
-		break;
-	default:
-		return -1;
-	}
+	cond = get_state(s_bits);
+	if (cond < 0)
+		return cond;
+
+	cond = SET_COND_REQUEST(cond, PM_REQUEST_LOCK);
+
 	if (flag & GOTO_STATE_NOW)
 		/* if the flag is true, go to the locking state directly */
-		s_bits = s_bits | (s_bits << SHIFT_CHANGE_STATE);
+		cond = SET_COND_REQUEST(cond, PM_REQUEST_CHANGE);
 
 	if (flag & HOLD_KEY_BLOCK)
-		s_bits = s_bits | HOLDKEY_BLOCK_BIT;
+		cond = SET_COND_FLAG(cond, PM_FLAG_BLOCK_HOLDKEY);
 
 	recv_data.pid = pid;
-	recv_data.cond = s_bits;
+	recv_data.cond = cond;
 	recv_data.timeout = timeout;
 
 	(*pm_callback)(PM_CONTROL_EVENT, &recv_data);
@@ -82,23 +100,26 @@ int pm_lock_internal(pid_t pid, int s_bits, int flag, int timeout)
 
 int pm_unlock_internal(pid_t pid, int s_bits, int flag)
 {
+	int cond;
+
 	if (!pm_callback)
 		return -1;
 
-	switch (s_bits) {
-	case LCD_NORMAL:
-	case LCD_DIM:
-	case LCD_OFF:
-		break;
-	default:
-		return -1;
-	}
+	cond = get_state(s_bits);
+	if (cond < 0)
+		return cond;
 
-	s_bits = (s_bits << SHIFT_UNLOCK);
-	s_bits = (s_bits | (flag << SHIFT_UNLOCK_PARAMETER));
+	cond = SET_COND_REQUEST(cond, PM_REQUEST_UNLOCK);
+
+	if (flag & PM_KEEP_TIMER)
+		cond = SET_COND_FLAG(cond, PM_FLAG_KEEP_TIMER);
+
+	if (flag & PM_RESET_TIMER)
+		cond = SET_COND_FLAG(cond, PM_FLAG_RESET_TIMER);
 
 	recv_data.pid = pid;
-	recv_data.cond = s_bits;
+	recv_data.cond = cond;
+	recv_data.timeout = 0;
 
 	(*pm_callback)(PM_CONTROL_EVENT, &recv_data);
 
@@ -107,21 +128,20 @@ int pm_unlock_internal(pid_t pid, int s_bits, int flag)
 
 int pm_change_internal(pid_t pid, int s_bits)
 {
+	int cond;
+
 	if (!pm_callback)
 		return -1;
 
-	switch (s_bits) {
-	case LCD_NORMAL:
-	case LCD_DIM:
-	case LCD_OFF:
-	case SUSPEND:
-		break;
-	default:
-		return -1;
-	}
+	cond = get_state(s_bits);
+	if (cond < 0)
+		return cond;
+
+	cond = SET_COND_REQUEST(cond, PM_REQUEST_CHANGE);
 
 	recv_data.pid = pid;
-	recv_data.cond = s_bits << SHIFT_CHANGE_STATE;
+	recv_data.cond = cond;
+	recv_data.timeout = 0;
 
 	(*pm_callback)(PM_CONTROL_EVENT, &recv_data);
 

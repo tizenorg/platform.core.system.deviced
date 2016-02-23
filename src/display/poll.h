@@ -59,11 +59,13 @@ enum {
 
 #define SIGNAL_NAME_LCD_CONTROL		"lcdcontol"
 
-#define LCD_NORMAL	0x1		/**< NORMAL state */
-#define LCD_DIM		0x2		/**< LCD dimming state */
-#define LCD_OFF		0x4		/**< LCD off state */
-#define SUSPEND		0x8		/**< Suspend state */
-#define POWER_OFF	0x16	/**< Sleep state */
+#define LCD_NORMAL  0x01	/**< NORMAL state */
+#define LCD_DIM     0x02	/**< LCD dimming state */
+#define LCD_OFF     0x04	/**< LCD off state */
+#define SUSPEND     0x08	/**< Suspend state */
+#define POWER_OFF   0x10	/**< Sleep state */
+#define STANDBY     0x20	/**< Standby state */
+
 
 #define STAY_CUR_STATE	0x1
 #define GOTO_STATE_NOW	0x2
@@ -72,6 +74,39 @@ enum {
 #define PM_SLEEP_MARGIN	0x0	/**< keep guard time for unlock */
 #define PM_RESET_TIMER	0x1	/**< reset timer for unlock */
 #define PM_KEEP_TIMER		0x2	/**< keep timer for unlock */
+
+/**
+ * display lock condition (unsigned integer)
+ *
+ *     xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx
+ *       none    flags   request   state
+ *
+ */
+
+enum cond_request_e {
+	PM_REQUEST_LOCK     = 1 << 0,
+	PM_REQUEST_UNLOCK   = 1 << 1,
+	PM_REQUEST_CHANGE   = 1 << 2,
+};
+
+enum cond_flags_e {
+	PM_FLAG_BLOCK_HOLDKEY  = 1 << 0,
+	PM_FLAG_RESET_TIMER    = 1 << 1,
+	PM_FLAG_KEEP_TIMER     = 1 << 2,
+};
+
+#define SHIFT_STATE            0
+#define SHIFT_REQUEST          8
+#define SHIFT_FLAGS            16
+#define COND_MASK              0xff /* 11111111 */
+#define SET_COND_REQUEST(cond, req)      ((cond) | ((req) << SHIFT_REQUEST))
+#define SET_COND_FLAG(cond, flags)       ((cond) | ((flags) << SHIFT_FLAGS))
+#define IS_COND_REQUEST_LOCK(cond)       (((cond) >> SHIFT_REQUEST) & COND_MASK & PM_REQUEST_LOCK)
+#define IS_COND_REQUEST_UNLOCK(cond)     (((cond) >> SHIFT_REQUEST) & COND_MASK & PM_REQUEST_UNLOCK)
+#define IS_COND_REQUEST_CHANGE(cond)     (((cond) >> SHIFT_REQUEST) & COND_MASK & PM_REQUEST_CHANGE)
+#define GET_COND_STATE(cond)             ((cond) & COND_MASK)
+#define GET_COND_FLAG(cond)              (((cond) >> SHIFT_FLAGS) & COND_MASK)
+
 
 #define PM_LOCK_STR	"lock"
 #define PM_UNLOCK_STR	"unlock"

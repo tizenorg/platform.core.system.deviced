@@ -43,11 +43,12 @@ extern "C" {
 /**
  * LCD state
  */
-#define LCD_NORMAL	0x1	/**< NORMAL state */
-#define LCD_DIM		0x2	/**< LCD dimming state */
-#define LCD_OFF		0x4	/**< LCD off state */
-#define SUSPEND		0x8	/**< Sleep state */
-#define POWER_OFF	0x16	/**< Sleep state */
+#define LCD_NORMAL  0x01 /**< NORMAL state */
+#define LCD_DIM     0x02 /**< LCD dimming state */
+#define LCD_OFF     0x04 /**< LCD off state */
+#define SUSPEND     0x08 /**< Sleep state */
+#define POWER_OFF   0x10 /**< Sleep state */
+#define STANDBY     0x20 /**< Standby state */
 #define SETALL (LCD_DIM | LCD_OFF | LCD_NORMAL)	/*< select all state - not supported yet */
 
 /**
