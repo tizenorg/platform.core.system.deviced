@@ -86,6 +86,49 @@ struct usbhost_device {
 
 static dd_list *usbhost_list;
 
+enum policy_value {
+	POLICY_ALLOW_ALWAYS,
+	POLICY_ALLOW_NOW,
+	POLICY_DENY_ALWAYS,
+	POLICY_DENY_NOW,
+};
+
+#define UID_KEY "UnixUserID"
+#define SEC_LABEL_KEY "LinuxSecurityLabel"
+#define ENTRY_LINE_SIZE 256
+
+struct user_credentials {
+	uint32_t uid;
+	char *sec_label;
+};
+
+struct policy_entry {
+	struct user_credentials creds;
+	union {
+		struct {
+			uint16_t bcdUSB;
+			uint8_t bDeviceClass;
+			uint8_t bDeviceSubClass;
+			uint8_t bDeviceProtocol;
+			uint16_t idVendor;
+			uint16_t idProduct;
+			uint16_t bcdDevice;
+		} device;
+
+		/* for temporary policy */
+		char devpath[PATH_MAX];
+	};
+
+	enum policy_value value;
+};
+
+static inline int is_policy_temporary(struct policy_entry *entry) {
+	return entry->value == POLICY_ALLOW_NOW ||
+		entry->value == POLICY_DENY_NOW;
+}
+
+dd_list *access_list;
+
 static void print_usbhost(struct usbhost_device *usbhost)
 {
 	if (!usbhost)
@@ -212,6 +255,7 @@ static int add_usbhost_list(struct udev_device *dev, const char *devpath)
 static int remove_usbhost_list(const char *devpath)
 {
 	struct usbhost_device *usbhost;
+	struct policy_entry *entry;
 	dd_list *n, *next;
 
 	/* find the matched item */
@@ -231,6 +275,14 @@ static int remove_usbhost_list(const char *devpath)
 	/* for debugging */
 	_I("USB HOST Removed");
 	_I("devpath : %s", usbhost->devpath);
+	DD_LIST_FOREACH_SAFE(access_list, n, next, entry) {
+		if (is_policy_temporary(entry) &&
+				strcmp(usbhost->devpath, entry->devpath) == 0) {
+			DD_LIST_REMOVE(access_list, entry);
+			free(entry->creds.sec_label);
+			free(entry);
+		}
+	}
 
 	DD_LIST_REMOVE(usbhost_list, usbhost);
 	free(usbhost->manufacturer);
@@ -454,42 +506,16 @@ static struct uevent_handler uh = {
 	.uevent_func = uevent_usbhost_handler,
 };
 
-enum policy_value {
-	POLICY_ALLOW,
-	POLICY_DENY,
-};
-
-#define UID_KEY "UnixUserID"
-#define SEC_LABEL_KEY "LinuxSecurityLabel"
-#define ENTRY_LINE_SIZE 256
-
-struct user_credentials {
-	uint32_t uid;
-	char *sec_label;
-};
-
-struct policy_entry {
-	struct user_credentials creds;
-	struct {
-		uint16_t bcdUSB;
-		uint8_t bDeviceClass;
-		uint8_t bDeviceSubClass;
-		uint8_t bDeviceProtocol;
-		uint16_t idVendor;
-		uint16_t idProduct;
-		uint16_t bcdDevice;
-	} device;
-	enum policy_value value;
-};
-
-dd_list *access_list;
-
 static const char *policy_value_str(enum policy_value value) {
 	switch (value) {
-	case POLICY_ALLOW:
+	case POLICY_ALLOW_ALWAYS:
 		return "ALLOW";
-	case POLICY_DENY:
+	case POLICY_ALLOW_NOW:
+		return "ALLOW_NOW";
+	case POLICY_DENY_ALWAYS:
 		return "DENY";
+	case POLICY_DENY_NOW:
+		return "DENY_NOW";
 	default:
 		return "UNKNOWN";
 	}
@@ -497,9 +523,13 @@ static const char *policy_value_str(enum policy_value value) {
 
 static int get_policy_value_from_str(const char *str) {
 	if (strncmp("ALLOW", str, 5) == 0)
-		return POLICY_ALLOW;
+		return POLICY_ALLOW_ALWAYS;
+	if (strncmp("ALLOW_NOW", str, 5) == 0)
+		return POLICY_ALLOW_NOW;
 	if (strncmp("DENY", str, 4) == 0)
-		return POLICY_DENY;
+		return POLICY_DENY_ALWAYS;
+	if (strncmp("DENY_NOW", str, 4) == 0)
+		return POLICY_DENY_NOW;
 	return -1;
 }
 
@@ -550,6 +580,9 @@ static int store_policy(void)
 	}
 
 	DD_LIST_FOREACH(access_list, elem, entry) {
+		if (is_policy_temporary(entry))
+			continue;
+
 		ret = marshal_policy_entry(line, ENTRY_LINE_SIZE, entry);
 		if (ret < 0) {
 			_E("Serialization failed: %m");
@@ -578,7 +611,6 @@ static int read_policy(void)
 	FILE *fp;
 	struct policy_entry *entry;
 	char *line = NULL, value_str[256];
-	char *p;
 	int ret = -1;
 	int count = 0;
 	size_t len;
@@ -646,9 +678,10 @@ out:
 	return ret;
 }
 
-static int get_device_desc(const char *filepath, struct usb_device_descriptor *desc)
+static int get_device_desc(const char *filepath, struct usb_device_descriptor *desc, const char *devpath)
 {
 	char *path = NULL;
+	char *rdevpath;
 	struct stat st;
 	int ret;
 	int fd = -1;
@@ -666,6 +699,21 @@ static int get_device_desc(const char *filepath, struct usb_device_descriptor *d
 		_E("Not an USB device");
 		goto out;
 	}
+
+	ret = asprintf(&path, "/sys/dev/char/%d:%d/descriptors", major(st.st_rdev), minor(st.st_rdev));
+	if (ret < 0) {
+		ret = -ENOMEM;
+		_E("asprintf failed");
+		goto out;
+	}
+
+	rdevpath = realpath(path, devpath);
+	if (!rdevpath) {
+		return -ENOMEM;
+		_E("realpath failed");
+	}
+
+	free(path);
 
 	ret = asprintf(&path, "/sys/dev/char/%d:%d/descriptors", major(st.st_rdev), minor(st.st_rdev));
 	if (ret < 0) {
@@ -704,32 +752,44 @@ static void store_idler_cb(void *data)
 	store_policy();
 }
 
+int get_policy_from_user(struct user_credentials *cred, struct usb_device_descriptor *desc)
+{
+	/* TODO */
+
+	return POLICY_ALLOW_NOW;
+}
+
 static int get_policy_value(const char *path, struct user_credentials *cred)
 {
 	struct usb_device_descriptor desc;
 	int ret;
 	dd_list *elem;
 	struct policy_entry *entry;
+	char devpath[PATH_MAX];
+	int value;
 
 	memset(&desc, 0, sizeof(desc));
 
 	_I("Requested access from user %d to %s", cred->uid, path);
-	ret = get_device_desc(path, &desc);
+	ret = get_device_desc(path, &desc, devpath);
 	if (ret < 0) {
 		_E("Could not get device descriptor");
 		return ret;
 	}
 
 	DD_LIST_FOREACH(access_list, elem, entry) {
-		if (entry->creds.uid != cred->uid
-		 || strncmp(entry->creds.sec_label, cred->sec_label, strlen(cred->sec_label)) != 0
-		 || entry->device.bcdUSB != le16toh(desc.bcdUSB)
-		 || entry->device.bDeviceClass != desc.bDeviceClass
-		 || entry->device.bDeviceSubClass != desc.bDeviceSubClass
-		 || entry->device.bDeviceProtocol != desc.bDeviceProtocol
-		 || entry->device.idVendor != le16toh(desc.idVendor)
-		 || entry->device.idProduct != le16toh(desc.idProduct)
-		 || entry->device.bcdDevice != le16toh(desc.bcdDevice))
+		if(entry->creds.uid != cred->uid
+			|| strncmp(entry->creds.sec_label, cred->sec_label, strlen(cred->sec_label)) != 0)
+			continue;
+
+		if (is_policy_temporary(entry) ? strncmp(entry->devpath, devpath, PATH_MAX) :
+			entry->device.bcdUSB != le16toh(desc.bcdUSB)
+			|| entry->device.bDeviceClass != desc.bDeviceClass
+			|| entry->device.bDeviceSubClass != desc.bDeviceSubClass
+			|| entry->device.bDeviceProtocol != desc.bDeviceProtocol
+			|| entry->device.idVendor != le16toh(desc.idVendor)
+			|| entry->device.idProduct != le16toh(desc.idProduct)
+			|| entry->device.bcdDevice != le16toh(desc.bcdDevice))
 			continue;
 
 		_I("Found matching policy entry: %s", policy_value_str(entry->value));
@@ -737,9 +797,8 @@ static int get_policy_value(const char *path, struct user_credentials *cred)
 		return entry->value;
 	}
 
-	/* TODO ask user for policy */
+	value = get_policy_from_user(cred, &desc);
 
-	/* Allow always */
 	entry = calloc(sizeof(*entry), 1);
 	if (!entry) {
 		_E("No memory");
@@ -754,26 +813,42 @@ static int get_policy_value(const char *path, struct user_credentials *cred)
 	}
 
 	strncpy(entry->creds.sec_label, cred->sec_label, strlen(cred->sec_label));
-	entry->device.bcdUSB = le16toh(desc.bcdUSB);
-	entry->device.bDeviceClass = desc.bDeviceClass;
-	entry->device.bDeviceSubClass = desc.bDeviceSubClass;
-	entry->device.bDeviceProtocol = desc.bDeviceProtocol;
-	entry->device.idVendor = le16toh(desc.idVendor);
-	entry->device.idProduct = le16toh(desc.idProduct);
-	entry->device.bcdDevice = le16toh(desc.bcdDevice);
-	entry->value = POLICY_ALLOW;
 
-	_I("Added policy entry: %d %s %04x %02x %02x %02x %04x %04x %04x %s",
-		entry->creds.uid,
-		entry->creds.sec_label,
-		entry->device.bcdUSB,
-		entry->device.bDeviceClass,
-		entry->device.bDeviceSubClass,
-		entry->device.bDeviceProtocol,
-		entry->device.idVendor,
-		entry->device.idProduct,
-		entry->device.bcdDevice,
-		policy_value_str(entry->value));
+	switch (value) {
+		case POLICY_ALLOW_ALWAYS:
+		case POLICY_DENY_ALWAYS:
+			entry->device.bcdUSB = le16toh(desc.bcdUSB);
+			entry->device.bDeviceClass = desc.bDeviceClass;
+			entry->device.bDeviceSubClass = desc.bDeviceSubClass;
+			entry->device.bDeviceProtocol = desc.bDeviceProtocol;
+			entry->device.idVendor = le16toh(desc.idVendor);
+			entry->device.idProduct = le16toh(desc.idProduct);
+			entry->device.bcdDevice = le16toh(desc.bcdDevice);
+
+			_I("Added policy entry: %d %s %04x %02x %02x %02x %04x %04x %04x %s",
+					entry->creds.uid,
+					entry->creds.sec_label,
+					entry->device.bcdUSB,
+					entry->device.bDeviceClass,
+					entry->device.bDeviceSubClass,
+					entry->device.bDeviceProtocol,
+					entry->device.idVendor,
+					entry->device.idProduct,
+					entry->device.bcdDevice,
+					policy_value_str(value));
+			break;
+		case POLICY_ALLOW_NOW:
+		case POLICY_DENY_NOW:
+			strncpy(entry->devpath, devpath, strlen(devpath));
+			_I("Added temporary policy entry: %d %s %s %s",
+					entry->creds.uid,
+					entry->creds.sec_label,
+					entry->devpath,
+					policy_value_str(value));
+			break;
+	}
+
+	entry->value = value;
 	DD_LIST_APPEND(access_list, entry);
 
 	ret = add_idle_request(store_idler_cb, NULL);
@@ -951,7 +1026,8 @@ static DBusMessage *open_device(E_DBus_Object *obj, DBusMessage *msg)
 
 	ret = get_policy_value(path, &cred);
 	switch (ret) {
-	case POLICY_ALLOW:
+	case POLICY_ALLOW_NOW:
+	case POLICY_ALLOW_ALWAYS:
 		fd = open(path, O_RDWR);
 		if (fd < 0) {
 			ret = -errno;
@@ -959,7 +1035,8 @@ static DBusMessage *open_device(E_DBus_Object *obj, DBusMessage *msg)
 		} else
 			ret = 0;
 		break;
-	case POLICY_DENY:
+	case POLICY_DENY_NOW:
+	case POLICY_DENY_ALWAYS:
 		ret = -EACCES;
 		break;
 	default:
