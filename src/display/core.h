@@ -77,10 +77,12 @@ extern unsigned int pm_status_flag;
 enum state_t {
 	S_START,
 	S_NORMAL,		/*< normal state */
+	S_LCDON = S_NORMAL,
 	S_LCDDIM,		/*< LCD dimming */
 	S_LCDOFF,		/*< LCD off */
 	S_STANDBY,		/*< Standby */
 	S_SLEEP,		/*< system suspend */
+	S_SUSPEND = S_SLEEP,
 	S_POWEROFF,		/*< Power off */
 	S_END
 };
@@ -123,6 +125,8 @@ struct display_config {
 	int alpm_on;
 	int accel_sensor_on;
 	int continuous_sampling;
+	bool timeout_enable;
+	bool input_support;
 };
 
 /*
@@ -173,7 +177,11 @@ void set_lock_screen_bg_state(bool state);
 void change_state_action(enum state_t state, int (*func)(int timeout));
 void change_state_trans(enum state_t state, int (*func)(int evt));
 void change_state_check(enum state_t state, int (*func)(int curr, int next));
+void change_state_name(enum state_t state, char *name);
 void change_trans_table(enum state_t state, enum state_t next);
+void change_proc_change_state(int (*func)(unsigned int cond, pid_t pid));
+
+bool check_lock_state(int state);
 
 int delete_condition(enum state_t state);
 void update_lcdoff_source(int source);

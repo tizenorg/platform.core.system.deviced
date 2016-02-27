@@ -159,17 +159,10 @@ static const struct libinput_interface interface = {
 	.close_restricted = close_restricted,
 };
 
-int init_input(int (*callback)(int , PMMsg * ))
+int init_input(void)
 {
 	int ret;
 	int fd;
-
-	if (!callback) {
-		_E("invalid parameter : callback(NULL)");
-		return -EINVAL;
-	}
-
-	pm_callback = callback;
 
 	udev = udev_new();
 	if (!udev) {

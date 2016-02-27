@@ -107,6 +107,9 @@ static Eina_Bool del_normal_cond(void *data);
 static Eina_Bool del_dim_cond(void *data);
 static Eina_Bool del_off_cond(void *data);
 
+static int default_proc_change_state(unsigned int cond, pid_t pid);
+static int (*proc_change_state)(unsigned int cond, pid_t pid) = default_proc_change_state;
+
 struct state states[S_END] = {
 	{ S_START,    "S_START",    NULL,          NULL,           NULL,          NULL            },
 	{ S_NORMAL,   "S_NORMAL",   default_trans, default_action, default_check, del_normal_cond },
@@ -188,6 +191,8 @@ struct display_config display_conf = {
 	.powerkey_doublepress	= 0,
 	.accel_sensor_on	= ACCEL_SENSOR_ON,
 	.continuous_sampling	= CONTINUOUS_SAMPLING,
+	.timeout_enable		= true,
+	.input_support		= true,
 };
 
 struct display_function_info display_info = {
@@ -244,25 +249,38 @@ bool check_lock_state(int state)
 
 void change_state_action(enum state_t state, int (*func)(int timeout))
 {
-	if (func)
-		states[state].action = func;
+	_I("[%s] action is changed", states[state].name);
+	states[state].action = func;
 }
 
 void change_state_trans(enum state_t state, int (*func)(int evt))
 {
-	if (func)
-		states[state].trans = func;
+	_I("[%s] trans is changed", states[state].name);
+	states[state].trans = func;
 }
 
 void change_state_check(enum state_t state, int (*func)(int curr, int next))
 {
-	if (func)
-		states[state].check = func;
+	_I("[%s] check is changed", states[state].name);
+	states[state].check = func;
+}
+
+void change_state_name(enum state_t state, char *name)
+{
+	_I("[%s] name is changed", states[state].name);
+	states[state].name = name;
 }
 
 void change_trans_table(enum state_t state, enum state_t next)
 {
+	_I("[%s] timeout trans table is changed", states[state].name);
 	trans_table[state][EVENT_TIMEOUT] = next;
+}
+
+void change_proc_change_state(int (*func)(unsigned int cond, pid_t pid))
+{
+	_I("proc change state is changed");
+	proc_change_state = func;
 }
 
 static void broadcast_lcd_on(enum signal_type type, enum device_flags flags)
@@ -601,6 +619,9 @@ Eina_Bool timeout_handler(void *data)
 
 void reset_timeout(int timeout)
 {
+	if (!display_conf.timeout_enable)
+		return;
+
 	_I("Reset Timeout (%d)ms", timeout);
 	if (timeout_src_id != 0) {
 		ecore_timer_del(timeout_src_id);
@@ -773,7 +794,7 @@ int custom_lcdon(int timeout)
 	return 0;
 }
 
-static void proc_change_state_action(enum state_t next, int timeout)
+static void default_proc_change_state_action(enum state_t next, int timeout)
 {
 	struct state *st;
 
@@ -790,7 +811,7 @@ static void proc_change_state_action(enum state_t next, int timeout)
 	}
 }
 
-static int proc_change_state(unsigned int cond, pid_t pid)
+static int default_proc_change_state(unsigned int cond, pid_t pid)
 {
 	enum state_t next;
 
@@ -807,25 +828,25 @@ static int proc_change_state(unsigned int cond, pid_t pid)
 		if (check_lcd_on())
 			lcd_on_direct(LCD_ON_BY_EVENT);
 		update_display_locktime(LOCK_SCREEN_CONTROL_TIMEOUT);
-		proc_change_state_action(next, -1);
+		default_proc_change_state_action(next, -1);
 		break;
 	case S_LCDDIM:
-		proc_change_state_action(next, -1);
+		default_proc_change_state_action(next, -1);
 		break;
 	case S_LCDOFF:
 		if (backlight_ops.get_lcd_power() != DPMS_OFF)
 			lcd_off_procedure();
 		if (set_custom_lcdon_timeout(0))
 			update_display_time();
-		proc_change_state_action(next, -1);
+		default_proc_change_state_action(next, -1);
 		break;
 	case S_SLEEP:
 		_I("Dangerous requests.");
 		/* at first LCD_OFF and then goto sleep */
 		/* state transition */
-		proc_change_state_action(S_LCDOFF, TIMEOUT_NONE);
+		default_proc_change_state_action(S_LCDOFF, TIMEOUT_NONE);
 		delete_condition(S_LCDOFF);
-		proc_change_state_action(S_SLEEP, TIMEOUT_NONE);
+		default_proc_change_state_action(S_SLEEP, TIMEOUT_NONE);
 		break;
 
 	default:
@@ -935,6 +956,9 @@ static int proc_condition(PMMsg *data)
 
 	if (IS_COND_REQUEST_UNLOCK(data->cond))
 		proc_condition_unlock(data);
+
+	if (!display_conf.timeout_enable)
+		return 0;
 
 	flags = GET_COND_FLAG(data->cond);
 	if (flags == 0) {
@@ -1998,6 +2022,12 @@ static int display_load_config(struct parse_result *result, void *user_data)
 	} else if (MATCH(result->name, "ContinuousSampling")) {
 		c->continuous_sampling = (MATCH(result->value, "yes") ? 1 : 0);
 		_D("ContinuousSampling is %d", c->continuous_sampling);
+	} else if (MATCH(result->name, "TimeoutEnable")) {
+		c->timeout_enable = (MATCH(result->value, "yes") ? true : false);
+		_D("Timeout is %d", c->timeout_enable ? "enalbed" : "disabled");
+	} else if (MATCH(result->name, "InputSupport")) {
+		c->input_support = (MATCH(result->value, "yes") ? true : false);
+		_D("Input support is %d", c->input_support ? "enalbed" : "disabled");
 	}
 
 	return 0;
@@ -2045,12 +2075,17 @@ static void display_init(void *data)
 			ret = init_setting(update_setting);
 			break;
 		case INIT_INTERFACE:
-			get_lcd_timeout_from_settings();
+			if (display_conf.timeout_enable)
+				get_lcd_timeout_from_settings();
 			ret = init_sysfs(flags);
 			break;
 		case INIT_POLL:
 			_I("input init");
-			ret = init_input(poll_callback);
+			pm_callback = poll_callback;
+			if (display_conf.input_support)
+				ret = init_input();
+			else
+				ret = 0;
 			break;
 		case INIT_DBUS:
 			_I("dbus init");
@@ -2081,12 +2116,15 @@ static void display_init(void *data)
 			pm_cur_state = S_NORMAL;
 			set_setting_pmstate(pm_cur_state);
 
-			timeout = states[S_NORMAL].timeout;
-			/* check minimun lcd on time */
-			if (timeout < SEC_TO_MSEC(DEFAULT_NORMAL_TIMEOUT))
-				timeout = SEC_TO_MSEC(DEFAULT_NORMAL_TIMEOUT);
+			if (display_conf.timeout_enable) {
+				timeout = states[S_NORMAL].timeout;
+				/* check minimun lcd on time */
+				if (timeout < SEC_TO_MSEC(DEFAULT_NORMAL_TIMEOUT))
+					timeout = SEC_TO_MSEC(DEFAULT_NORMAL_TIMEOUT);
 
-			reset_timeout(timeout);
+				reset_timeout(timeout);
+			}
+
 			status = DEVICE_OPS_STATUS_START;
 			/*
 			 * Lock lcd off until booting is done.
@@ -2096,8 +2134,10 @@ static void display_init(void *data)
 			pm_lock_internal(INTERNAL_LOCK_BOOTING, LCD_OFF,
 			    STAY_CUR_STATE, BOOTING_DONE_WATING_TIME);
 		}
-		if (CHECK_OPS(keyfilter_ops, init))
-			keyfilter_ops->init();
+
+		if (display_conf.input_support)
+			if (CHECK_OPS(keyfilter_ops, init))
+				keyfilter_ops->init();
 	}
 }
 
