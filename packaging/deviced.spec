@@ -248,6 +248,17 @@ Haptic Device manager library for device control (devel)
 %if %{with wayland}
 %define DPMS wayland
 %endif
+cp %{SOURCE1} .
+cp %{SOURCE2} .
+cp %{SOURCE3} .
+cp %{SOURCE4} .
+cp %{SOURCE5} .
+cp %{SOURCE6} .
+
+%build
+export CFLAGS="$(echo $CFLAGS | sed 's/-Wl,--as-needed//g')"
+export CXXFLAGS="$(echo $CXXFLAGS | sed 's/-Wl,--as-needed//g')"
+export FFLAGS="$(echo $FFLAGS | sed 's/-Wl,--as-needed//g')"
 
 %cmake . \
 	-DTZ_SYS_ETC=%TZ_SYS_ETC \
@@ -272,13 +283,6 @@ Haptic Device manager library for device control (devel)
 	-DUSBHOST_MODULE=%{usbhost_module} \
 	#eol
 
-%build
-cp %{SOURCE1} .
-cp %{SOURCE2} .
-cp %{SOURCE3} .
-cp %{SOURCE4} .
-cp %{SOURCE5} .
-cp %{SOURCE6} .
 make %{?jobs:-j%jobs}
 
 %install
