@@ -30,7 +30,6 @@
 #define DISPLAY_DIM_BRIGHTNESS  0
 
 #define HOLDKEY_BLOCK_BIT		0x1
-#define STANDBY_MODE_BIT		0x2
 
 #define METHOD_SET_REFRESH_RATE	"SetRefreshRate"
 #define METHOD_LOCK_STATE		"lockstate"
@@ -54,7 +53,6 @@
 #define STR_GOTOSTATENOW "gotostatenow"
 
 #define STR_HOLDKEYBLOCK "holdkeyblock"
-#define STR_STANDBYMODE  "standbymode"
 #define STR_NULL         "NULL"
 
 #define STR_SLEEP_MARGIN "sleepmargin"
@@ -376,8 +374,6 @@ API int display_lock_state(unsigned int s_bits, unsigned int flag,
 
 	if (flag & HOLD_KEY_BLOCK)
 		p = STR_HOLDKEYBLOCK;
-	else if (flag & STANDBY_MODE)
-		p = STR_STANDBYMODE;
 	else
 		p = STR_NULL;
 	pa[2] = p;

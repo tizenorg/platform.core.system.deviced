@@ -134,8 +134,6 @@ static DBusMessage *edbus_lockstate(E_DBus_Object *obj, DBusMessage *msg)
 
 	if (!strcmp(option2_str, HOLDKEYBLOCK_STR))
 		flag |= HOLD_KEY_BLOCK;
-	else if (!strcmp(option2_str, STANDBYMODE_STR))
-		flag |= STANDBY_MODE;
 
 	if (flag & GOTO_STATE_NOW) {
 		caps = display_get_caps(DISPLAY_ACTOR_API);
