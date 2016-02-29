@@ -68,10 +68,51 @@ static int default_brightness;
 
 static struct display_device *display_dev;
 
+#ifdef PROFILE_TV
+#include <sys/ioctl.h>
+#define PANEL_PATH          "/dev/tztv_frc"
+#define FRC_IOCTL_CTRL_PVCC	_IOWR('f', 0xAD, int)
+static int bl_onoff(int on)
+{
+	int fd, ret;
+	int value;
+
+	switch (on) {
+	case DPMS_ON:
+		value = 1;
+		break;
+	case DPMS_OFF:
+	case DPMS_STANDBY:
+		value = 0;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	fd = open(PANEL_PATH, O_RDWR);
+	if (fd == -1) {
+		ret = -errno;
+		_E("Failed to open panel path (%s, ret:%d)", PANEL_PATH, ret);
+		return ret;
+	}
+
+	ret = ioctl(fd, FRC_IOCTL_CTRL_PVCC, &value);
+	close(fd);
+
+	if (ret < 0) {
+		ret = -errno;
+		_E("ioctl() failed (%d)", ret);
+		return ret;
+	}
+
+	return 0;
+}
+#else
 static int bl_onoff(int on)
 {
 	return dpms_set_power(on);
 }
+#endif
 
 static int bl_brt(int brightness, int delay)
 {
@@ -210,6 +251,33 @@ void change_brightness(int start, int end, int step)
 	}
 }
 
+#ifdef PROFILE_TV
+static int backlight_on(enum device_flags flags)
+{
+	int ret;
+
+	_I("LCD on %x", flags);
+
+	ret = bl_onoff(DPMS_ON);
+	if (ret < 0)
+		_E("Failed to turn on backlight (%d)", ret);
+
+	return ret;
+}
+
+static int backlight_off(enum device_flags flags)
+{
+	int ret;
+
+	_I("LCD off %x", flags);
+
+	ret = bl_onoff(DPMS_OFF);
+	if (ret < 0)
+		_E("Failed to turn off backlight (%d)", ret);
+
+	return ret;
+}
+#else
 static int backlight_on(enum device_flags flags)
 {
 	int ret = -1;
@@ -269,6 +337,7 @@ static int backlight_off(enum device_flags flags)
 	}
 	return ret;
 }
+#endif
 
 static int backlight_dim(void)
 {
