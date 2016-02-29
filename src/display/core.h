@@ -123,6 +123,8 @@ struct display_config {
 	int alpm_on;
 	int accel_sensor_on;
 	int continuous_sampling;
+	bool timeout_enable;
+	bool input_support;
 };
 
 /*

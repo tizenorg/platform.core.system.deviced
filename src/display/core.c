@@ -188,6 +188,8 @@ struct display_config display_conf = {
 	.powerkey_doublepress	= 0,
 	.accel_sensor_on	= ACCEL_SENSOR_ON,
 	.continuous_sampling	= CONTINUOUS_SAMPLING,
+	.timeout_enable		= true,
+	.input_support		= true,
 };
 
 struct display_function_info display_info = {
@@ -601,6 +603,9 @@ Eina_Bool timeout_handler(void *data)
 
 void reset_timeout(int timeout)
 {
+	if (!display_conf.timeout_enable)
+		return;
+
 	_I("Reset Timeout (%d)ms", timeout);
 	if (timeout_src_id != 0) {
 		ecore_timer_del(timeout_src_id);
@@ -935,6 +940,9 @@ static int proc_condition(PMMsg *data)
 
 	if (IS_COND_REQUEST_UNLOCK(data->cond))
 		proc_condition_unlock(data);
+
+	if (!display_conf.timeout_enable)
+		return 0;
 
 	flags = GET_COND_FLAG(data->cond);
 	if (flags == 0) {
@@ -1998,6 +2006,12 @@ static int display_load_config(struct parse_result *result, void *user_data)
 	} else if (MATCH(result->name, "ContinuousSampling")) {
 		c->continuous_sampling = (MATCH(result->value, "yes") ? 1 : 0);
 		_D("ContinuousSampling is %d", c->continuous_sampling);
+	} else if (MATCH(result->name, "TimeoutEnable")) {
+		c->timeout_enable = (MATCH(result->value, "yes") ? true : false);
+		_D("Timeout is %s", c->timeout_enable ? "enalbed" : "disabled");
+	} else if (MATCH(result->name, "InputSupport")) {
+		c->input_support = (MATCH(result->value, "yes") ? true : false);
+		_D("Input is %s", c->input_support ? "supported" : "NOT supported");
 	}
 
 	return 0;
@@ -2045,12 +2059,17 @@ static void display_init(void *data)
 			ret = init_setting(update_setting);
 			break;
 		case INIT_INTERFACE:
-			get_lcd_timeout_from_settings();
+			if (display_conf.timeout_enable)
+				get_lcd_timeout_from_settings();
 			ret = init_sysfs(flags);
 			break;
 		case INIT_POLL:
 			_I("input init");
-			ret = init_input(poll_callback);
+			pm_callback = poll_callback;
+			if (display_conf.input_support)
+				ret = init_input();
+			else
+				ret = 0;
 			break;
 		case INIT_DBUS:
 			_I("dbus init");
@@ -2081,12 +2100,15 @@ static void display_init(void *data)
 			pm_cur_state = S_NORMAL;
 			set_setting_pmstate(pm_cur_state);
 
-			timeout = states[S_NORMAL].timeout;
-			/* check minimun lcd on time */
-			if (timeout < SEC_TO_MSEC(DEFAULT_NORMAL_TIMEOUT))
-				timeout = SEC_TO_MSEC(DEFAULT_NORMAL_TIMEOUT);
+			if (display_conf.timeout_enable) {
+				timeout = states[S_NORMAL].timeout;
+				/* check minimun lcd on time */
+				if (timeout < SEC_TO_MSEC(DEFAULT_NORMAL_TIMEOUT))
+					timeout = SEC_TO_MSEC(DEFAULT_NORMAL_TIMEOUT);
 
-			reset_timeout(timeout);
+				reset_timeout(timeout);
+			}
+
 			status = DEVICE_OPS_STATUS_START;
 			/*
 			 * Lock lcd off until booting is done.
@@ -2096,8 +2118,10 @@ static void display_init(void *data)
 			pm_lock_internal(INTERNAL_LOCK_BOOTING, LCD_OFF,
 			    STAY_CUR_STATE, BOOTING_DONE_WATING_TIME);
 		}
-		if (CHECK_OPS(keyfilter_ops, init))
-			keyfilter_ops->init();
+
+		if (display_conf.input_support)
+			if (CHECK_OPS(keyfilter_ops, init))
+				keyfilter_ops->init();
 	}
 }
 
