@@ -952,6 +952,7 @@ static const struct edbus_method edbus_methods[] = {
 	{ "lockstate",     "sssi",   "i", edbus_lockstate },
 	{ "unlockstate",     "ss",   "i", edbus_unlockstate },
 	{ "changestate",      "s",   "i", edbus_changestate },
+	{ "ChangeState",      "s",   "i", edbus_changestate },
 	{ "getbrightness",   NULL,   "i", edbus_getbrightness },	/* deprecated */
 	{ "setbrightness",    "i",   "i", edbus_setbrightness },	/* deprecated */
 	{ "setframerate",    "ii",   "i", edbus_setrefreshrate },	/* deprecated */

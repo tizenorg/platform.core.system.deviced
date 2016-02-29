@@ -115,6 +115,7 @@ enum cond_flags_e {
 #define PM_LCDOFF_STR	"lcdoff"
 #define PM_LCDDIM_STR	"lcddim"
 #define PM_LCDON_STR	"lcdon"
+#define PM_STANDBY_STR	"standby"
 #define PM_SUSPEND_STR	"suspend"
 
 #define STAYCURSTATE_STR "staycurstate"
