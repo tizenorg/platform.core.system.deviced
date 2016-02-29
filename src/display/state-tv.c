@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <time.h>
+#include <Ecore.h>
 #include "core/common.h"
 #include "core/log.h"
 #include "core/device-notifier.h"
@@ -36,6 +37,8 @@
 #define SIGNAL_PRE_WAKEUP          "PreWakeUp"
 #define SIGNAL_POST_WAKEUP         "PostWakeUp"
 #define SIGNAL_EARLY_WAKEUP        "EarlyWakeUp"
+
+static Ecore_Timer *standby_timer;
 
 static int change_state(pid_t pid, int type, enum state_t st)
 {
@@ -265,9 +268,9 @@ static int standby_check(int curr, int next)
 		return -EPERM;
 
 	/* do not change to next state if who lock the standby mode */
-	check_processes(pm_cur_state);
-	if (check_lock_state(pm_cur_state)) {
-		_I("S_STANDBY Lock state");
+	check_processes(S_LCDOFF);
+	if (check_lock_state(S_LCDOFF)) {
+		_I("S_LCDOFF Lock state");
 		return 1;
 	}
 
@@ -297,6 +300,26 @@ static int standby_post(void *data)
 	return 0;
 }
 
+static int poweroff_trans(int evt);
+
+static Eina_Bool standby_go_next_state(void *data)
+{
+	int ret;
+
+	if (standby_timer) {
+		ecore_timer_del(standby_timer);
+		standby_timer = NULL;
+	}
+
+	ret = pm_change_internal(INTERNAL_LOCK_SUSPEND, SUSPEND);
+	if (ret < 0) {
+		_E("Failed to change state to S_SUSPEND. Now Power off !!");
+		poweroff_trans(0);
+	}
+
+	return ECORE_CALLBACK_CANCEL;
+}
+
 static int standby_action(int timeout)
 {
 	if (pm_cur_state != pm_old_state &&
@@ -304,6 +327,11 @@ static int standby_action(int timeout)
 		set_setting_pmstate(pm_cur_state);
 
 	backlight_ops.off(0);
+
+	standby_timer = ecore_timer_add(0,
+			standby_go_next_state, NULL);
+	if (!standby_timer)
+		_E("Failed to add timer to go to next state of S_STANDBY");
 
 	return 0;
 }
@@ -354,7 +382,7 @@ static int suspend_post(void *data)
 	/* TODO: count InstandOn */
 
 	cond = S_LCDON;
-	ret = tv_proc_change_state(cond, getpid());
+	ret = tv_proc_change_state(cond, INTERNAL_LOCK_SUSPEND);
 	if (ret < 0)
 		_E("Fail to change state to next_state(%s)", states[cond].name);
 
@@ -453,6 +481,19 @@ static int poweroff_trans(int evt)
 	return 0;
 }
 
+static int display_lock_changed(void *data)
+{
+	bool state = (bool)data;
+
+	if (pm_cur_state != S_STANDBY)
+		return 0;
+
+	if (!state)
+		standby_go_next_state(NULL);
+
+	return 0;
+}
+
 static void set_tv_operations(enum state_t st,
 		char *name,
 		int (*check) (int curr, int next),
@@ -493,4 +534,11 @@ static void __CONSTRUCTOR__ state_tv_init(void)
 				tv_states[i].action);
 
 	change_proc_change_state(tv_proc_change_state);
+
+	register_notifier(DEVICE_NOTIFIER_DISPLAY_LOCK, display_lock_changed);
+}
+
+static void __DESTRUCTOR__ state_tv_deinit(void)
+{
+	unregister_notifier(DEVICE_NOTIFIER_DISPLAY_LOCK, display_lock_changed);
 }
