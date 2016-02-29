@@ -107,6 +107,9 @@ static Eina_Bool del_normal_cond(void *data);
 static Eina_Bool del_dim_cond(void *data);
 static Eina_Bool del_off_cond(void *data);
 
+static int default_proc_change_state(unsigned int cond, pid_t pid);
+static int (*proc_change_state)(unsigned int cond, pid_t pid) = default_proc_change_state;
+
 struct state states[S_END] = {
 	{ S_START,    "S_START",    NULL,          NULL,           NULL,          NULL            },
 	{ S_NORMAL,   "S_NORMAL",   default_trans, default_action, default_check, del_normal_cond },
@@ -246,25 +249,38 @@ bool check_lock_state(int state)
 
 void change_state_action(enum state_t state, int (*func)(int timeout))
 {
-	if (func)
-		states[state].action = func;
+	_I("[%s] action is changed", states[state].name);
+	states[state].action = func;
 }
 
 void change_state_trans(enum state_t state, int (*func)(int evt))
 {
-	if (func)
-		states[state].trans = func;
+	_I("[%s] trans is changed", states[state].name);
+	states[state].trans = func;
 }
 
 void change_state_check(enum state_t state, int (*func)(int curr, int next))
 {
-	if (func)
-		states[state].check = func;
+	_I("[%s] check is changed", states[state].name);
+	states[state].check = func;
+}
+
+void change_state_name(enum state_t state, char *name)
+{
+	_I("[%s] name is changed", states[state].name);
+	states[state].name = name;
 }
 
 void change_trans_table(enum state_t state, enum state_t next)
 {
+	_I("[%s] timeout trans table is changed", states[state].name);
 	trans_table[state][EVENT_TIMEOUT] = next;
+}
+
+void change_proc_change_state(int (*func)(unsigned int cond, pid_t pid))
+{
+	_I("proc change state is changed");
+	proc_change_state = func;
 }
 
 static void broadcast_lcd_on(enum signal_type type, enum device_flags flags)
@@ -778,7 +794,7 @@ int custom_lcdon(int timeout)
 	return 0;
 }
 
-static void proc_change_state_action(enum state_t next, int timeout)
+static void default_proc_change_state_action(enum state_t next, int timeout)
 {
 	struct state *st;
 
@@ -795,7 +811,7 @@ static void proc_change_state_action(enum state_t next, int timeout)
 	}
 }
 
-static int proc_change_state(unsigned int cond, pid_t pid)
+static int default_proc_change_state(unsigned int cond, pid_t pid)
 {
 	enum state_t next;
 
@@ -812,25 +828,25 @@ static int proc_change_state(unsigned int cond, pid_t pid)
 		if (check_lcd_on())
 			lcd_on_direct(LCD_ON_BY_EVENT);
 		update_display_locktime(LOCK_SCREEN_CONTROL_TIMEOUT);
-		proc_change_state_action(next, -1);
+		default_proc_change_state_action(next, -1);
 		break;
 	case S_LCDDIM:
-		proc_change_state_action(next, -1);
+		default_proc_change_state_action(next, -1);
 		break;
 	case S_LCDOFF:
 		if (backlight_ops.get_lcd_power() != DPMS_OFF)
 			lcd_off_procedure();
 		if (set_custom_lcdon_timeout(0))
 			update_display_time();
-		proc_change_state_action(next, -1);
+		default_proc_change_state_action(next, -1);
 		break;
 	case S_SLEEP:
 		_I("Dangerous requests.");
 		/* at first LCD_OFF and then goto sleep */
 		/* state transition */
-		proc_change_state_action(S_LCDOFF, TIMEOUT_NONE);
+		default_proc_change_state_action(S_LCDOFF, TIMEOUT_NONE);
 		delete_condition(S_LCDOFF);
-		proc_change_state_action(S_SLEEP, TIMEOUT_NONE);
+		default_proc_change_state_action(S_SLEEP, TIMEOUT_NONE);
 		break;
 
 	default:
