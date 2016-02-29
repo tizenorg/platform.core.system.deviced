@@ -103,14 +103,18 @@ static int default_trans(int evt);
 static int default_action(int timeout);
 static int default_check(int curr, int next);
 
+static Eina_Bool del_normal_cond(void *data);
+static Eina_Bool del_dim_cond(void *data);
+static Eina_Bool del_off_cond(void *data);
+
 struct state states[S_END] = {
-	{ S_START,    "S_START",    NULL,          NULL,           NULL,         },
-	{ S_NORMAL,   "S_NORMAL",   default_trans, default_action, default_check },
-	{ S_LCDDIM,   "S_LCDDIM",   default_trans, default_action, default_check },
-	{ S_LCDOFF,   "S_LCDOFF",   default_trans, default_action, default_check },
-	{ S_STANDBY,  "S_STANDBY",  NULL,          NULL,           NULL          },
-	{ S_SLEEP,    "S_SLEEP",    default_trans, default_action, default_check },
-	{ S_POWEROFF, "S_POWEROFF", NULL,          NULL,           NULL          },
+	{ S_START,    "S_START",    NULL,          NULL,           NULL,          NULL            },
+	{ S_NORMAL,   "S_NORMAL",   default_trans, default_action, default_check, del_normal_cond },
+	{ S_LCDDIM,   "S_LCDDIM",   default_trans, default_action, default_check, del_dim_cond    },
+	{ S_LCDOFF,   "S_LCDOFF",   default_trans, default_action, default_check, del_off_cond    },
+	{ S_STANDBY,  "S_STANDBY",  NULL,          NULL,           NULL,          NULL            },
+	{ S_SLEEP,    "S_SLEEP",    default_trans, default_action, default_check, NULL            },
+	{ S_POWEROFF, "S_POWEROFF", NULL,          NULL,           NULL,          NULL            },
 };
 
 static int trans_table[S_END][EVENT_END] = {
@@ -415,18 +419,9 @@ static int refresh_app_cond()
 
 static void makeup_trans_condition(void)
 {
-	enum state_t iter;
-	for (iter = S_START; iter < S_END; iter++) {
-		switch (iter) {
-		case S_LCDDIM:
-		case S_LCDOFF:
-		case S_SLEEP:
-			check_processes(iter);
-			break;
-		default:
-			break;
-		}
-	}
+	check_processes(S_NORMAL);
+	check_processes(S_LCDDIM);
+	check_processes(S_LCDOFF);
 	refresh_app_cond();
 }
 
@@ -778,273 +773,184 @@ int custom_lcdon(int timeout)
 	return 0;
 }
 
+static void proc_change_state_action(enum state_t next, int timeout)
+{
+	struct state *st;
+
+	pm_old_state = pm_cur_state;
+	pm_cur_state = next;
+
+	st = &states[pm_cur_state];
+
+	if (st && st->action) {
+		if (timeout < 0)
+			st->action(st->timeout);
+		else
+			st->action(timeout);
+	}
+}
+
 static int proc_change_state(unsigned int cond, pid_t pid)
 {
-	int next_state = 0;
-	struct state *st;
-	int i;
-	char pname[PATH_MAX];
+	enum state_t next;
 
-	for (i = S_NORMAL; i < S_END; i++) {
-		if ((cond >> (SHIFT_CHANGE_STATE + i)) & 0x1) {
-			next_state = i;
-			break;
-		}
+	next = GET_COND_STATE(cond);
+	if (pm_cur_state == next) {
+		_I("current state (%d) == next state (%d)", pm_cur_state, next);
+		return 0;
 	}
 
-	get_pname(pid, pname);
+	_I("Change State to %s (%d)", states[next].name, pid);
 
-	_I("Change State to %s (%d)", states[next_state].name, pid);
-
-	if (next_state == S_NORMAL) {
-		if (check_lcd_on() == true)
+	switch (next) {
+	case S_NORMAL:
+		if (check_lcd_on())
 			lcd_on_direct(LCD_ON_BY_EVENT);
-	} else if (next_state == S_LCDOFF) {
+		update_display_locktime(LOCK_SCREEN_CONTROL_TIMEOUT);
+		proc_change_state_action(next, -1);
+		break;
+	case S_LCDDIM:
+		proc_change_state_action(next, -1);
+		break;
+	case S_LCDOFF:
 		if (backlight_ops.get_lcd_power() != DPMS_OFF)
 			lcd_off_procedure();
-	}
-
-	if (next_state == S_LCDOFF)
-		if (set_custom_lcdon_timeout(0) == true)
+		if (set_custom_lcdon_timeout(0))
 			update_display_time();
-
-	switch (next_state) {
-	case S_NORMAL:
-		update_display_locktime(LOCK_SCREEN_CONTROL_TIMEOUT);
-		/* fall through */
-	case S_LCDDIM:
-		/* fall through */
-	case S_LCDOFF:
-		/* state transition */
-		pm_old_state = pm_cur_state;
-		pm_cur_state = next_state;
-		st = &states[pm_cur_state];
-
-		/* enter action */
-		if (st->action) {
-			st->action(st->timeout);
-		}
+		proc_change_state_action(next, -1);
 		break;
 	case S_SLEEP:
 		_I("Dangerous requests.");
 		/* at first LCD_OFF and then goto sleep */
 		/* state transition */
-		pm_old_state = pm_cur_state;
-		pm_cur_state = S_LCDOFF;
-		st = &states[pm_cur_state];
-		if (st->action) {
-			st->action(TIMEOUT_NONE);
-		}
+		proc_change_state_action(S_LCDOFF, TIMEOUT_NONE);
 		delete_condition(S_LCDOFF);
-		pm_old_state = pm_cur_state;
-		pm_cur_state = S_SLEEP;
-		st = &states[pm_cur_state];
-		if (st->action) {
-			st->action(TIMEOUT_NONE);
-		}
+		proc_change_state_action(S_SLEEP, TIMEOUT_NONE);
 		break;
 
 	default:
-		return -1;
+		return -EINVAL;
 	}
 
 	return 0;
 }
 
 /* update transition condition for application requrements */
-static int proc_condition(PMMsg *data)
+static void update_lock_timer(PMMsg *data,
+		PmLockNode *node, Ecore_Timer *timeout_id)
 {
-	PmLockNode *tmp = NULL;
-	unsigned int val = data->cond;
-	pid_t pid = data->pid;
-	Ecore_Timer *cond_timeout_id = NULL;
-	bool holdkey_block = 0;
-	int val_timeout;
-
-	if (val == 0)
-		return 0;
-	/* for debug */
-	char pname[PATH_MAX];
 	time_t now;
 
+	if (data->timeout > 0) {
+		time(&now);
+		node->time = now;
+	}
+
+	if (node->timeout_id) {
+		ecore_timer_del(node->timeout_id);
+		node->timeout_id = timeout_id;
+	}
+}
+
+static void proc_condition_lock(PMMsg *data)
+{
+	PmLockNode *tmp;
+	Ecore_Timer *cond_timeout_id = NULL;
+	char pname[PATH_MAX];
+	pid_t pid = data->pid;
+	enum state_t state;
+	int holdkey_block;
+
+	state = GET_COND_STATE(data->cond);
+	if (!state)
+		return;
+
 	get_pname(pid, pname);
-	val_timeout = val >> SHIFT_CHANGE_TIMEOUT;
-	if (val_timeout & (CUSTOM_TIMEOUT_BIT | CUSTOM_HOLDKEY_BIT)) {
-		if (data->timeout == 0 && data->timeout2 == 0) {
-			_I("LCD timeout changed : default setting");
-			get_lcd_timeout_from_settings();
-			if (get_lock_screen_state() == VCONFKEY_IDLE_LOCK) {
-				_I("LOCK state : setting lock timeout!");
-				states[S_NORMAL].timeout = lock_screen_timeout;
-			}
-			custom_normal_timeout = custom_dim_timeout = 0;
-			if (!(val_timeout & CUSTOM_HOLDKEY_BIT))
-				custom_change_pid = -1;
-		} else {
-			_I("LCD timeout changed : normal(%d s), dim(%d s)",
-				data->timeout, data->timeout2);
-			custom_normal_timeout = SEC_TO_MSEC(data->timeout);
-			states[S_NORMAL].timeout = custom_normal_timeout;
-			custom_dim_timeout = SEC_TO_MSEC(data->timeout2);
-			states[S_LCDDIM].timeout = custom_dim_timeout;
-			custom_change_pid = pid;
-		}
 
-		if (val_timeout & CUSTOM_HOLDKEY_BIT) {
-			custom_holdkey_block = true;
-			custom_change_pid = pid;
-			_I("hold key disabled !");
-		} else {
-			custom_holdkey_block = false;
-			_I("hold key enabled !");
-		}
+	if (state == S_LCDOFF &&
+		pm_cur_state == S_SLEEP)
+		proc_change_state(data->cond, getpid());
+
+	if (data->timeout > 0) {
+		/* To pass a pid_t data through the timer infrastructure
+		 * without memory allocation, a pid_t data becomes typecast
+		 * to intptr_t and void *(64bit) type. */
+		cond_timeout_id = ecore_timer_add(
+				MSEC_TO_SEC((double)data->timeout),
+				states[state].timeout_cb,
+				(void*)((intptr_t)pid));
+		if (!cond_timeout_id)
+			_E("Failed to register display timer");
 	}
 
-	if (val & MASK_NORMAL) {
-		if (data->timeout > 0) {
-			/*
-			 * To pass a pid_t data through the timer infrastructure
-			 * without memory allocation, a pid_t data becomes typecast
-			 * to intptr_t and void *(64bit) type.
-			 */
-			cond_timeout_id =
-			    ecore_timer_add(MSEC_TO_SEC((double)data->timeout),
-				    (Ecore_Task_Cb)del_normal_cond, (void*)((intptr_t)pid));
-		}
-		holdkey_block = GET_HOLDKEY_BLOCK_STATE(val);
-		tmp = find_node(S_NORMAL, pid);
-		if (tmp == NULL) {
-			add_node(S_NORMAL, pid, cond_timeout_id, holdkey_block);
-		} else {
-			if (data->timeout > 0) {
-				time(&now);
-				tmp->time = now;
-			}
-			if (tmp->timeout_id) {
-				ecore_timer_del(tmp->timeout_id);
-				tmp->timeout_id = cond_timeout_id;
-			}
-			tmp->holdkey_block = holdkey_block;
-		}
-		/* for debug */
-		_SD("[%s] locked by pid %d - process %s holdkeyblock %d\n",
-		    "S_NORMAL", pid, pname, holdkey_block);
-		set_lock_time(pname, S_NORMAL);
+	holdkey_block = GET_COND_FLAG(data->cond) & PM_FLAG_BLOCK_HOLDKEY;
+
+	tmp = find_node(state + 1, pid);
+	if (!tmp)
+		add_node(state + 1, pid, cond_timeout_id, holdkey_block);
+	else {
+		update_lock_timer(data, tmp, cond_timeout_id);
+		tmp->holdkey_block = holdkey_block;
 	}
-	if (val & MASK_DIM) {
-		if (data->timeout > 0) {
-			/*
-			 * To pass a pid_t data through the timer infrastructure
-			 * without memory allocation, a pid_t data becomes typecast
-			 * to intptr_t and void *(64bit) type.
-			 */
-			cond_timeout_id =
-			    ecore_timer_add(MSEC_TO_SEC((double)data->timeout),
-				    (Ecore_Task_Cb)del_dim_cond, (void*)((intptr_t)pid));
-		}
-		holdkey_block = GET_HOLDKEY_BLOCK_STATE(val);
-		tmp = find_node(S_LCDDIM, pid);
-		if (tmp == NULL) {
-			add_node(S_LCDDIM, pid, cond_timeout_id, holdkey_block);
-		} else {
-			if (data->timeout > 0) {
-				time(&now);
-				tmp->time = now;
-			}
-			if (tmp->timeout_id) {
-				ecore_timer_del(tmp->timeout_id);
-				tmp->timeout_id = cond_timeout_id;
-			}
-			tmp->holdkey_block = holdkey_block;
-		}
-		/* for debug */
-		_SD("[%s] locked by pid %d - process %s holdkeyblock %d\n",
-		    "S_LCDDIM", pid, pname, holdkey_block);
-		set_lock_time(pname, S_LCDDIM);
-	}
-	if (val & MASK_OFF) {
-		/*
-		 * pm-state must be changed to LCDOFF,
-		 * to guarantee of LCDOFF-lock
-		 * when system resumes from suspend state.
-		 */
-		if (pm_cur_state == S_SLEEP)
-			proc_change_state(S_LCDOFF <<
-			    (SHIFT_CHANGE_STATE + S_LCDOFF), getpid());
-		if (data->timeout > 0) {
-			/*
-			 * To pass a pid_t data through the timer infrastructure
-			 * without memory allocation, a pid_t data becomes typecast
-			 * to intptr_t and void *(64bit) type.
-			 */
-			cond_timeout_id =
-			    ecore_timer_add(MSEC_TO_SEC((double)data->timeout),
-				    (Ecore_Task_Cb)del_off_cond, (void*)((intptr_t)pid));
-		}
-		tmp = find_node(S_LCDOFF, pid);
-		if (tmp == NULL) {
-			add_node(S_LCDOFF, pid, cond_timeout_id, 0);
-		} else {
-			if (data->timeout > 0) {
-				time(&now);
-				tmp->time = now;
-			}
-			if (tmp->timeout_id) {
-				ecore_timer_del(tmp->timeout_id);
-				tmp->timeout_id = cond_timeout_id;
-			}
-			tmp->holdkey_block = 0;
-		}
+
+	if (state == S_LCDOFF)
 		set_process_active(EINA_TRUE, pid);
 
-		/* for debug */
-		_SD("[%s] locked by pid %d - process %s\n", "S_LCDOFF", pid,
-			pname);
-		set_lock_time(pname, S_LCDOFF);
-	}
+	/* for debug */
+	_SD("[%s] locked by pid %d - process %s holdkeyblock %d\n",
+			states[state].name, pid, pname, holdkey_block);
+	set_lock_time(pname, state);
+}
 
-	/* UNLOCK(GRANT) condition processing */
-	val = val >> SHIFT_UNLOCK;
-	if (val & MASK_NORMAL) {
-		tmp = find_node(S_NORMAL, pid);
-		del_node(S_NORMAL, tmp);
-		_SD("[%s] unlocked by pid %d - process %s\n", "S_NORMAL",
-			pid, pname);
-		set_unlock_time(pname, S_NORMAL);
-	}
-	if (val & MASK_DIM) {
-		tmp = find_node(S_LCDDIM, pid);
-		del_node(S_LCDDIM, tmp);
-		_SD("[%s] unlocked by pid %d - process %s\n", "S_LCDDIM",
-			pid, pname);
-		set_unlock_time(pname, S_LCDDIM);
-	}
-	if (val & MASK_OFF) {
-		tmp = find_node(S_LCDOFF, pid);
-		del_node(S_LCDOFF, tmp);
+static void proc_condition_unlock(PMMsg *data)
+{
+	pid_t pid = data->pid;
+	enum state_t state;
+	PmLockNode *tmp;
+	char pname[PATH_MAX];
+
+	state = GET_COND_STATE(data->cond);
+	if (!state)
+		return;
+
+	get_pname(pid, pname);
+
+	tmp = find_node(state, pid);
+	del_node(state, tmp);
+
+	if (state == S_LCDOFF)
 		set_process_active(EINA_FALSE, pid);
 
-		_SD("[%s] unlocked by pid %d - process %s\n", "S_LCDOFF",
-			pid, pname);
-		set_unlock_time(pname, S_LCDOFF);
-	}
-	val = val >> 8;
-	if (val != 0) {
-		if ((val & 0x1)) {
-			reset_timeout(states[pm_cur_state].timeout);
-			_I("reset timeout (%d ms)",
-			    states[pm_cur_state].timeout);
-		}
-	} else {
+	_SD("[%s] unlocked by pid %d - process %s\n",
+			states[state].name, pid, pname);
+	set_unlock_time(pname, state);
+}
+
+static int proc_condition(PMMsg *data)
+{
+	unsigned int flags;
+
+	if (IS_COND_REQUEST_LOCK(data->cond))
+		proc_condition_lock(data);
+
+	if (IS_COND_REQUEST_UNLOCK(data->cond))
+		proc_condition_unlock(data);
+
+	flags = GET_COND_FLAG(data->cond);
+	if (flags == 0) {
 		/* guard time for suspend */
 		if (pm_cur_state == S_LCDOFF) {
 			reset_timeout(states[S_LCDOFF].timeout);
-			_I("margin timeout (%d ms)",
-			    states[S_LCDOFF].timeout);
+			_I("Margin timeout (%d ms)", states[S_LCDOFF].timeout);
+		}
+	} else {
+		if (flags & PM_FLAG_RESET_TIMER) {
+			reset_timeout(states[pm_cur_state].timeout);
+			_I("Reset timeout (%d ms)", states[pm_cur_state].timeout);
 		}
 	}
 
-	if (timeout_src_id == 0)
+	if (!timeout_src_id)
 		states[pm_cur_state].trans(EVENT_TIMEOUT);
 
 	return 0;
@@ -1710,13 +1616,12 @@ static int poll_callback(int condition, PMMsg *data)
 			states[pm_cur_state].trans(EVENT_INPUT);
 			last_t = now;
 		}
-	} else if (condition == PM_CONTROL_EVENT) {
-		if (data->cond & MASK_BIT
-			|| ((data->cond >> SHIFT_UNLOCK) & MASK_BIT)
-			|| (data->cond >> SHIFT_CHANGE_TIMEOUT))
-			proc_condition(data);
+	}
 
-		if (data->cond & CHANGE_STATE_BIT)
+	if (condition == PM_CONTROL_EVENT) {
+		proc_condition(data);
+
+		if (IS_COND_REQUEST_CHANGE(data->cond))
 			proc_change_state(data->cond, data->pid);
 	}
 
@@ -1738,8 +1643,7 @@ static int update_setting(int key_idx, int val)
 		if (pm_cur_state == S_NORMAL || pm_cur_state == S_LCDDIM)
 			states[pm_cur_state].trans(EVENT_INPUT);
 		else if (pm_cur_state == S_SLEEP && hallic_open)
-			proc_change_state(S_LCDOFF <<
-			    (SHIFT_CHANGE_STATE + S_LCDOFF), getpid());
+			proc_change_state(S_LCDOFF, getpid());
 		break;
 	case SETTING_LOW_BATT:
 		if (low_battery_state(val)) {
