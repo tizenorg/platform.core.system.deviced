@@ -303,6 +303,8 @@ static int standby_action(int timeout)
 		pm_cur_state != S_SLEEP)
 		set_setting_pmstate(pm_cur_state);
 
+	backlight_ops.off(0);
+
 	return 0;
 }
 

@@ -273,6 +273,8 @@ static DBusMessage *edbus_changestate(E_DBus_Object *obj, DBusMessage *msg)
 		state = LCD_DIM;
 	else if (!strcmp(state_str, PM_LCDOFF_STR))
 		state = LCD_OFF;
+	else if (!strcmp(state_str, PM_STANDBY_STR))
+		state = STANDBY;
 	else if (!strcmp(state_str, PM_SUSPEND_STR))
 		state = SUSPEND;
 	else {
