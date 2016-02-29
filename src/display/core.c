@@ -126,7 +126,7 @@ static int trans_table[S_END][EVENT_END] = {
 	{ S_LCDDIM,   S_NORMAL   }, /* S_NORMAL */
 	{ S_LCDOFF,   S_NORMAL   }, /* S_LCDDIM */
 	{ S_SLEEP,    S_NORMAL   }, /* S_LCDOFF */
-	{ S_STANDBY,  S_STANDBY  }, /* S_STANDBY */
+	{ S_SLEEP,    S_STANDBY  }, /* S_STANDBY */
 	{ S_LCDOFF,   S_NORMAL   }, /* S_SLEEP */
 	{ S_POWEROFF, S_POWEROFF }, /* S_POWEROFF */
 };
@@ -921,6 +921,8 @@ static void proc_condition_lock(PMMsg *data)
 	_SD("[%s] locked by pid %d - process %s holdkeyblock %d\n",
 			states[state].name, pid, pname, holdkey_block);
 	set_lock_time(pname, state);
+
+	device_notify(DEVICE_NOTIFIER_DISPLAY_LOCK, (void *)true);
 }
 
 static void proc_condition_unlock(PMMsg *data)
@@ -945,6 +947,8 @@ static void proc_condition_unlock(PMMsg *data)
 	_SD("[%s] unlocked by pid %d - process %s\n",
 			states[state].name, pid, pname);
 	set_unlock_time(pname, state);
+
+	device_notify(DEVICE_NOTIFIER_DISPLAY_LOCK, (void *)false);
 }
 
 static int proc_condition(PMMsg *data)
