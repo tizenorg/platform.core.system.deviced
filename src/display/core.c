@@ -376,41 +376,6 @@ static int refresh_app_cond()
 	return 0;
 }
 
-static void condition_background_remove(enum state_t s_index)
-{
-	PmLockNode *t;
-	PmLockNode *prev;
-
-	t = cond_head[s_index];
-	prev = NULL;
-
-	while (t != NULL) {
-		if (t->background == false) {
-			prev = t;
-			t = t->next;
-			continue;
-		}
-
-		/* delete node */
-		if (prev != NULL)
-			prev->next = t->next;
-		else
-			cond_head[s_index] = cond_head[s_index]->next;
-
-		/* delete timer */
-		if (t->timeout_id)
-			ecore_timer_del(t->timeout_id);
-
-		free(t);
-		if (prev != NULL)
-			t = prev->next;
-		else
-			t = cond_head[s_index];
-	}
-
-	refresh_app_cond();
-}
-
 static void makeup_trans_condition(void)
 {
 	enum state_t iter;
@@ -419,11 +384,13 @@ static void makeup_trans_condition(void)
 		case S_LCDDIM:
 		case S_LCDOFF:
 		case S_SLEEP:
-			condition_background_remove(iter);
+			check_processes(iter);
+			break;
 		default:
 			break;
 		}
 	}
+	refresh_app_cond();
 }
 
 static PmLockNode *find_node(enum state_t s_index, pid_t pid)
