@@ -118,6 +118,22 @@ struct state states[S_END] = {
 static const char state_string[5][10] =
 	{ "S_START", "S_NORMAL", "S_LCDDIM", "S_LCDOFF", "S_SLEEP" };
 
+enum signal_type {
+	SIGNAL_INVALID = 0,
+	SIGNAL_PRE,
+	SIGNAL_POST,
+	SIGNAL_MAX,
+};
+
+static const char *lcdon_sig_lookup[SIGNAL_MAX] = {
+        [SIGNAL_PRE]  = "LCDOn",
+        [SIGNAL_POST] = "LCDOnCompleted",
+};
+static const char *lcdoff_sig_lookup[SIGNAL_MAX] = {
+        [SIGNAL_PRE]  = "LCDOff",
+        [SIGNAL_POST] = "LCDOffCompleted",
+};
+
 static int trans_table[S_END][EVENT_END] = {
 	/* Timeout , Input */
 	{S_START, S_START},	/* S_START */
@@ -146,8 +162,6 @@ static int trans_table[S_END][EVENT_END] = {
 
 #define ACTIVE_ACT "active"
 #define INACTIVE_ACT "inactive"
-#define SIGNAL_LCD_ON "LCDOn"
-#define SIGNAL_LCD_OFF "LCDOff"
 
 #define LOCK_SCREEN_WATING_TIME		0.3	/* 0.3 second */
 #define LONG_PRESS_INTERVAL             2       /* 2 seconds */
@@ -240,9 +254,15 @@ static inline void set_standby_state(bool state)
 		standby_state = state;
 }
 
-void broadcast_lcd_on(enum device_flags flags)
+static void broadcast_lcd_on(enum signal_type type, enum device_flags flags)
 {
 	char *arr[1];
+	const char *signal;
+
+	if (type <= SIGNAL_INVALID || type >= SIGNAL_MAX) {
+		_E("invalid signal type %d", type);
+		return;
+	}
 
 	if (flags & LCD_ON_BY_GESTURE)
 		arr[0] = GESTURE_STR;
@@ -255,14 +275,25 @@ void broadcast_lcd_on(enum device_flags flags)
 	else
 		arr[0] = UNKNOWN_STR;
 
+	signal = lcdon_sig_lookup[type];
+	_I("lcdstep : broadcast %s %s", signal, arr[0]);
 	broadcast_edbus_signal(DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
-	    SIGNAL_LCD_ON, "s", arr);
+		signal, "s", arr);
 }
 
-void broadcast_lcd_off(void)
+static void broadcast_lcd_off(enum signal_type type, enum device_flags flags)
 {
+	const char *signal;
+
+	if (type <= SIGNAL_INVALID || type >= SIGNAL_MAX) {
+		_E("invalid signal type %d", type);
+		return;
+	}
+
+	signal = lcdoff_sig_lookup[type];
+	_I("lcdstep : broadcast %s", signal);
 	broadcast_edbus_signal(DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
-	    SIGNAL_LCD_OFF, NULL, NULL);
+		signal, NULL, NULL);
 }
 
 static unsigned long get_lcd_on_flags(void)
@@ -287,7 +318,7 @@ void lcd_on_procedure(int state, enum device_flags flag)
 
 	/* send LCDOn dbus signal */
 	if (!lcdon_broadcast) {
-		broadcast_lcd_on(flags);
+		broadcast_lcd_on(SIGNAL_PRE, flags);
 		lcdon_broadcast = true;
 	}
 
@@ -301,6 +332,8 @@ void lcd_on_procedure(int state, enum device_flags flag)
 
 	DD_LIST_FOREACH(lcdon_ops, l, ops)
 		ops->start(flags);
+
+	broadcast_lcd_on(SIGNAL_POST, flags);
 
 	if (CHECK_OPS(keyfilter_ops, backlight_enable))
 		keyfilter_ops->backlight_enable(true);
@@ -318,7 +351,7 @@ inline void lcd_off_procedure(void)
 	}
 
 	if (lcdon_broadcast) {
-		broadcast_lcd_off();
+		broadcast_lcd_off(SIGNAL_PRE, flags);
 		lcdon_broadcast = false;
 	}
 	if (CHECK_OPS(keyfilter_ops, backlight_enable))
@@ -326,6 +359,8 @@ inline void lcd_off_procedure(void)
 
 	DD_LIST_REVERSE_FOREACH(lcdon_ops, l, ops)
 		ops->stop(flags);
+
+	broadcast_lcd_off(SIGNAL_POST, flags);
 }
 
 void set_stay_touchscreen_off(int val)
