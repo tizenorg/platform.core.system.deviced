@@ -7,6 +7,7 @@ SET(SHARED_SRCS
 
 INCLUDE(FindPkgConfig)
 pkg_check_modules(libshared REQUIRED
+	gio-2.0
 	dlog
 	dbus-1)
 
