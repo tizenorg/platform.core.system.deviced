@@ -56,10 +56,6 @@ License:    Apache-2.0 and BSD-2-Clause and BSD-4-Clause
 Source0:    %{name}-%{version}.tar.gz
 Source1:    deviced.manifest
 Source2:    libdeviced.manifest
-Source3:    sysman.manifest
-Source4:    libslp-pm.manifest
-Source5:    haptic.manifest
-Source6:    devman.manifest
 
 BuildRequires:  cmake
 BuildRequires:  libattr-devel
@@ -134,96 +130,6 @@ Requires:   libdeviced = %{version}-%{release}
 %description -n libdeviced-devel
 Deviced library for device control (devel)
 
-%package -n sysman
-Summary:    Sysman library
-License:    Apache-2.0
-Group:      System/Libraries
-Requires:   libdeviced = %{version}-%{release}
-
-%description -n sysman
-sysman library.
-
-%package -n sysman-devel
-Summary:    Sysman devel library
-License:    Apache-2.0
-Group:      System/Development
-Requires:   sysman = %{version}-%{release}
-
-%description -n sysman-devel
-sysman devel library.
-
-%package -n sysman-internal-devel
-Summary:    Sysman internal devel library
-License:    Apache-2.0
-Group:      System/Development
-Requires:   sysman = %{version}-%{release}
-
-%description -n sysman-internal-devel
-sysman internal devel library.
-
-%package -n libslp-pm
-Summary:    Power manager client
-Group:      System/Libraries
-Requires:   libdeviced = %{version}-%{release}
-
-%description -n libslp-pm
-power-manager library.
-
-%package -n libslp-pm-devel
-Summary:    Power manager client (devel)
-Group:      System/Development
-Requires:   libslp-pm = %{version}-%{release}
-
-%description -n libslp-pm-devel
-power-manager devel library.
-
-%package -n libhaptic
-Summary:    Haptic library
-Group:      Development/Libraries
-
-%description -n libhaptic
-Haptic library for device control
-
-%package -n libhaptic-devel
-Summary:    Haptic library for (devel)
-Group:      Development/Libraries
-Requires:   libhaptic = %{version}-%{release}
-
-%description -n libhaptic-devel
-Haptic library for device control (devel)
-
-%package -n libhaptic-plugin-devel
-Summary:    Haptic plugin library for (devel)
-Group:      Development/Libraries
-Requires:   libhaptic = %{version}-%{release}
-
-%description -n libhaptic-plugin-devel
-Haptic plugin library for device control (devel)
-
-%package -n libdevman
-Summary:    Device manager library
-Group:      Development/Libraries
-Requires:   libdeviced = %{version}-%{release}
-
-%description -n libdevman
-Device manager library for device control
-
-%package -n libdevman-devel
-Summary:    Device manager library for (devel)
-Group:      Development/Libraries
-Requires:   libdevman = %{version}-%{release}
-
-%description -n libdevman-devel
-Device manager library for device control (devel)
-
-%package -n libdevman-haptic-devel
-Summary:    Haptic Device manager library for (devel)
-Group:      Development/Libraries
-Requires:   libdevman-devel = %{version}-%{release}
-
-%description -n libdevman-haptic-devel
-Haptic Device manager library for device control (devel)
-
 %prep
 %setup -q
 %if %{with emulator}
@@ -276,10 +182,6 @@ Haptic Device manager library for device control (devel)
 %build
 cp %{SOURCE1} .
 cp %{SOURCE2} .
-cp %{SOURCE3} .
-cp %{SOURCE4} .
-cp %{SOURCE5} .
-cp %{SOURCE6} .
 make %{?jobs:-j%jobs}
 
 %install
@@ -315,22 +217,6 @@ systemctl daemon-reload
 %post -n libdeviced -p /sbin/ldconfig
 
 %postun -n libdeviced -p /sbin/ldconfig
-
-%post -n sysman -p /sbin/ldconfig
-
-%postun -n sysman -p /sbin/ldconfig
-
-%post -n libslp-pm -p /sbin/ldconfig
-
-%postun -n libslp-pm -p /sbin/ldconfig
-
-%post -n libhaptic -p /sbin/ldconfig
-
-%postun -n libhaptic -p /sbin/ldconfig
-
-%post -n libdevman -p /sbin/ldconfig
-
-%postun -n libdevman -p /sbin/ldconfig
 
 %files -n deviced
 %manifest %{name}.manifest
@@ -392,70 +278,3 @@ systemctl daemon-reload
 %{_includedir}/deviced/*.h
 %{_libdir}/libdeviced.so
 %{_libdir}/pkgconfig/deviced.pc
-
-%files -n sysman
-%manifest sysman.manifest
-%defattr(-,root,root,-)
-%{_libdir}/libsysman.so.*
-
-%files -n sysman-devel
-%defattr(-,root,root,-)
-%{_includedir}/sysman/sysman.h
-%{_includedir}/sysman/sysman_managed.h
-%{_includedir}/sysman/SLP_sysman_PG.h
-%{_libdir}/pkgconfig/sysman.pc
-%{_libdir}/libsysman.so
-
-%files -n sysman-internal-devel
-%defattr(-,root,root,-)
-%{_includedir}/sysman/sysman-internal.h
-
-%files -n libslp-pm
-%defattr(-,root,root,-)
-%manifest libslp-pm.manifest
-%{_libdir}/libpmapi.so.*
-
-%files -n libslp-pm-devel
-%defattr(-,root,root,-)
-%{_includedir}/pmapi/pmapi.h
-%{_includedir}/pmapi/pmapi_managed.h
-%{_includedir}/pmapi/SLP_pm_PG.h
-%{_libdir}/pkgconfig/pmapi.pc
-%{_libdir}/libpmapi.so
-
-%files -n libhaptic
-%defattr(-,root,root,-)
-%{_libdir}/libhaptic.so.*
-%manifest haptic.manifest
-
-%files -n libhaptic-devel
-%defattr(-,root,root,-)
-%{_includedir}/haptic/haptic.h
-%{_libdir}/libhaptic.so
-%{_libdir}/pkgconfig/haptic.pc
-
-%files -n libhaptic-plugin-devel
-%defattr(-,root,root,-)
-%{_includedir}/haptic/haptic_module.h
-%{_includedir}/haptic/haptic_plugin_intf.h
-%{_includedir}/haptic/SLP_haptic_PG.h
-%{_libdir}/pkgconfig/haptic-plugin.pc
-
-%files -n libdevman
-%{_bindir}/display_wd
-%{_libdir}/libdevman.so.*
-%manifest devman.manifest
-
-%files -n libdevman-devel
-%{_includedir}/devman/devman.h
-%{_includedir}/devman/devman_image.h
-%{_includedir}/devman/devman_managed.h
-%{_includedir}/devman/devman_haptic.h
-%{_includedir}/devman/SLP_devman_PG.h
-%{_libdir}/pkgconfig/devman.pc
-%{_libdir}/libdevman.so
-
-%files -n libdevman-haptic-devel
-%{_includedir}/devman/devman_haptic_ext.h
-%{_includedir}/devman/devman_haptic_ext_core.h
-%{_libdir}/pkgconfig/devman_haptic.pc
