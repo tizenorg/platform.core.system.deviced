@@ -19,6 +19,10 @@
 #ifndef __USB_CLIENT_H__
 #define __USB_CLIENT_H__
 
+#define MODE_NONE      "NONE"
+#define MODE_DEFAULT   "DEFAULT"
+#define MODE_TETHERING "TETHERING"
+
 #define USB_CONFIG_OPS_REGISTER(dev)    \
 static void __CONSTRUCTOR__ usb_config_init(void)   \
 {   \
@@ -42,9 +46,12 @@ struct usb_config_plugin_ops {
 	void (*deinit)(char *name);
 	int  (*enable)(char *name);
 	int  (*disable)(char *name);
+	int  (*change)(char *name);
 };
 
 void add_usb_config(const struct usb_config_ops *ops);
 void remove_usb_config(const struct usb_config_ops *ops);
+
+int usb_change_mode(char *name);
 
 #endif /* __USB_CLIENT_H__ */

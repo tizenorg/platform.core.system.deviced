@@ -27,6 +27,7 @@
 #include "display/poll.h"
 #include "extcon/extcon.h"
 #include "usb.h"
+#include "usb-tethering.h"
 
 enum usb_state {
 	USB_DISCONNECTED,
@@ -109,6 +110,8 @@ static void usb_config_deinit(void)
 
 static int usb_config_enable(void)
 {
+	char *mode;
+
 	if (!config_plugin) {
 		_E("There is no usb config plugin");
 		return -ENOENT;
@@ -119,7 +122,12 @@ static int usb_config_enable(void)
 		return -ENOENT;
 	}
 
-	return config_plugin->enable(NULL);
+	if (usb_tethering_state())
+		mode = MODE_TETHERING;
+	else
+		mode = MODE_DEFAULT;
+
+	return config_plugin->enable(mode);
 }
 
 static int usb_config_disable(void)
@@ -167,6 +175,37 @@ static void usb_change_state(int val)
 		vconf_set_int(VCONFKEY_SETAPPL_USB_MODE_INT, legacy_mode);
 		old_mode = mode;
 	}
+}
+
+int usb_change_mode(char *name)
+{
+	int ret;
+
+	if (!name)
+		return -EINVAL;
+
+	if (!config_plugin) {
+		_E("There is no usb config plugin");
+		return -ENOENT;
+	}
+
+	if (config_plugin->change == NULL) {
+		_E("There is no usb config change function");
+		return -ENOENT;
+	}
+
+	_I("USB mode change to (%s) is requested", name);
+	usb_change_state(VCONFKEY_SYSMAN_USB_CONNECTED);
+
+	ret = config_plugin->change(name);
+	if (ret < 0) {
+		_E("Failed to change usb mode (%d)", ret);
+		return ret;
+	}
+
+	usb_change_state(VCONFKEY_SYSMAN_USB_AVAILABLE);
+
+	return 0;
 }
 
 static int usb_state_changed(int status)
@@ -227,6 +266,8 @@ static void usb_init(void *data)
 	if (ret < 0)
 		_E("Failed to initialize usb configuation");
 
+	add_usb_tethering_handler();
+
 	ret = usb_state_changed(extcon_usb_ops.status);
 	if (ret < 0)
 		_E("Failed to update usb status(%d)", ret);
@@ -234,6 +275,7 @@ static void usb_init(void *data)
 
 static void usb_exit(void *data)
 {
+	remove_usb_tethering_handler();
 	usb_config_deinit();
 	usb_config_module_unload();
 }
