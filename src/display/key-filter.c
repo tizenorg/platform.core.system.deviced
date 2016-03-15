@@ -115,9 +115,7 @@ static void longkey_pressed()
 
 	if (display_has_caps(caps, DISPLAY_CAPA_LCDON)) {
 		/* change state - LCD on */
-		recv_data.pid = getpid();
-		recv_data.cond = 0x100;
-		(*pm_callback)(PM_CONTROL_EVENT, &recv_data);
+		pm_change_internal(getpid(), LCD_NORMAL);
 		(*pm_callback)(INPUT_POLL_EVENT, NULL);
 	}
 
@@ -315,9 +313,7 @@ static int lcdoff_powerkey(void)
 			delete_condition(S_NORMAL);
 			delete_condition(S_LCDDIM);
 			update_lcdoff_source(VCONFKEY_PM_LCDOFF_BY_POWERKEY);
-			recv_data.pid = getpid();
-			recv_data.cond = 0x400;
-			(*pm_callback)(PM_CONTROL_EVENT, &recv_data);
+			pm_change_internal(getpid(), LCD_OFF);
 		}
 	} else {
 		ignore = false;
@@ -423,9 +419,7 @@ static int process_screenlock_key(struct input_event *pinput)
 		update_lcdoff_source(VCONFKEY_PM_LCDOFF_BY_POWERKEY);
 
 		/* LCD off forcly */
-		recv_data.pid = -1;
-		recv_data.cond = 0x400;
-		(*pm_callback)(PM_CONTROL_EVENT, &recv_data);
+		pm_change_internal(-1, LCD_OFF);
 	}
 
 	return true;
