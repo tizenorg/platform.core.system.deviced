@@ -132,10 +132,53 @@ static int load_base_config(struct parse_result *result, void *user_data)
 	return 0;
 }
 
+static int get_operation_ops(char *cmd, char **buf, size_t len)
+{
+	char *f, *t;
+	int i;
+	bool fin;
+
+	if (!cmd)
+		return -EINVAL;
+
+	if (strlen(cmd) == 0)
+		return 0;
+
+	i = 0;
+	t = f = cmd;
+	fin = false;
+	while (!fin) {
+		if (*t != '\0' && *t != '\n' &&
+			*t != '\t' && *t != ' ') {
+			t++;
+			continue;
+		}
+
+		if (*t == '\0' || i >= len - 2)
+			fin = true;
+
+		if (f == t) {
+			f = ++t;
+			continue;
+		}
+
+		*t = '\0';
+		buf[i++] = f;
+		f = ++t;
+	}
+
+	if (i > 0)
+		buf[i++] = NULL;
+
+	return i;
+}
+
 static int load_operation_config(struct parse_result *result, void *user_data)
 {
 	struct oper_data *data = user_data;
-	int ret;
+	int ret, num;
+	char *buf[BUF_MAX];
+	char cmd[BUF_MAX];
 
 	if (!data || !result)
 		return -EINVAL;
@@ -146,7 +189,13 @@ static int load_operation_config(struct parse_result *result, void *user_data)
 	if (strncmp(result->name, data->name, strlen(result->name)))
 		return 0;
 
-	ret = launch_app_cmd(result->value);
+	snprintf(cmd, sizeof(cmd), "%s", result->value);
+
+	num = get_operation_ops(cmd, buf, ARRAY_SIZE(buf));
+	if (num <= 0)
+		return num;
+
+	ret = run_child(num, (const char **)buf);
 
 	_I("Execute(%s: %d)", result->value, ret);
 
