@@ -87,8 +87,10 @@ int handle_timezone(char *str)
 	int ret;
 	struct stat sts;
 	time_t now;
-	struct tm *ts;
+	struct tm ts;
+	struct tm *ts2;
 	const char *sympath, *tzpath;
+	char buf[256];
 
 	if (str == NULL)
 		return -1;
@@ -105,8 +107,11 @@ int handle_timezone(char *str)
 
 	/* FIXME for debugging purpose */
 	time(&now);
-	ts = localtime(&now);
-	_D("cur local time is %s", asctime(ts));
+	ts2 = localtime_r(&now, &ts);
+	if (ts2) {
+		asctime_r(&ts, buf);
+		_D("cur local time is %s", buf);
+	}
 
 	/* unlink current link
 	 * eg. rm /opt/etc/localtime */
@@ -126,7 +131,7 @@ int handle_timezone(char *str)
 	 * eg. ln -s /usr/share/zoneinfo/Asia/Seoul /opt/etc/localtime */
 	ret = symlink(tzpath, sympath);
 	if (ret < 0) {
-		_E("symlink error : [%d]%s", ret, strerror(errno));
+		_E("symlink error : [%d]%s", ret, errno);
 		return -1;
 	}
 	_D("symlink success");
@@ -134,8 +139,11 @@ int handle_timezone(char *str)
 	tzset();
 
 	/* FIXME for debugging purpose */
-	ts = localtime(&now);
-	_D("new local time is %s", asctime(ts));
+	ts2 = localtime_r(&now, &ts);
+	if (ts2) {
+		asctime_r(&ts, buf);
+		_D("new local time is %s", buf);
+	}
 	return 0;
 }
 
