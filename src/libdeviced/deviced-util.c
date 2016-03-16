@@ -37,6 +37,7 @@
 API int deviced_get_pid(const char *execpath)
 {
 	DIR *dp;
+	struct dirent entry;
 	struct dirent *dentry;
 	int pid = -1, fd;
 	char buf[BUFF_MAX];
@@ -49,7 +50,8 @@ API int deviced_get_pid(const char *execpath)
 		return -1;
 	}
 
-	while ((dentry = readdir(dp)) != NULL) {
+	readdir_r(dp, &entry, &dentry);
+	while (dentry != NULL) {
 		if (!isdigit(dentry->d_name[0]))
 			continue;
 

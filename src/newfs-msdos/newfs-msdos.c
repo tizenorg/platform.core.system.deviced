@@ -605,7 +605,7 @@ int main(int argc, char *argv[])
     if (!opt_N) {
 	gettimeofday(&tv, NULL);
 	now = tv.tv_sec;
-	tm = localtime(&now);
+	localtime_r(&now, tm);
 	if (!(img = malloc(bpb.bps)))
 	    err(1, "%u", bpb.bps);
 	dir = bpb.res + (bpb.spf ? bpb.spf : bpb.bspf) * bpb.nft;
@@ -666,7 +666,7 @@ int main(int argc, char *argv[])
 			  (u_int)tm->tm_min));
 		mk4(bsx->volid, x);
 		mklabel(bsx->label, opt_L ? opt_L : "NO NAME");
-		sprintf(buf, "FAT%u", fat);
+		snprintf(buf, sizeof(buf), "FAT%u", fat);
 		setstr(bsx->type, buf, sizeof(bsx->type));
 		if (!opt_B) {
 		    x1 += sizeof(struct bsx);
@@ -775,9 +775,10 @@ getdiskinfo(int fd, const char *fname, const char *dtype, __unused int oflag,
 	    struct bpb *bpb)
 {
     struct hd_geometry geom;
+    char buf[256];
 
     if (ioctl(fd, BLKSSZGET, &bpb->bps)) {
-        fprintf(stderr, "Error getting bytes / sector (%s)\n", strerror(errno));
+        fprintf(stderr, "Error getting bytes / sector (%s)\n", strerror_r(errno, buf, 256));
         exit(1);
     }
 
