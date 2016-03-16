@@ -910,9 +910,9 @@ static void proc_condition_lock(PMMsg *data)
 
 	holdkey_block = GET_COND_FLAG(data->cond) & PM_FLAG_BLOCK_HOLDKEY;
 
-	tmp = find_node(state + 1, pid);
+	tmp = find_node(state, pid);
 	if (!tmp)
-		add_node(state + 1, pid, cond_timeout_id, holdkey_block);
+		add_node(state, pid, cond_timeout_id, holdkey_block);
 	else {
 		update_lock_timer(data, tmp, cond_timeout_id);
 		tmp->holdkey_block = holdkey_block;
