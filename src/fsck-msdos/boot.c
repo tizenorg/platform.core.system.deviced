@@ -167,7 +167,7 @@ readboot(dosfs, boot)
 
 			pwarn("Primary/Backup bootblock miscompare\n");
 
-                        strncpy(tmp, "", strlen("") + 1);
+                        strcpy(tmp, "");
                         pwarn("Primary:\n");
 			for (i = 0; i < 79; i++) {
 				char tmp2[16];
