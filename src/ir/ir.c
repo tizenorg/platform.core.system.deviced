@@ -26,27 +26,6 @@
 
 static struct ir_device *ir_dev;
 
-static DBusMessage *edbus_ir_is_available(E_DBus_Object *obj, DBusMessage *msg)
-{
-	DBusMessageIter iter;
-	DBusMessage *reply;
-	int ret = 0;
-	bool val;
-
-	if (!ir_dev)
-		goto exit;
-
-	ret = ir_dev->is_available(&val);
-	if (ret >= 0)
-		ret = val;
-
-exit:
-	reply = dbus_message_new_method_return(msg);
-	dbus_message_iter_init_append(reply, &iter);
-	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
-	return reply;
-}
-
 static DBusMessage *edbus_ir_transmit(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
@@ -79,7 +58,6 @@ exit:
 }
 
 static const struct edbus_method edbus_methods[] = {
-	{ "IRIsAvailable", NULL, "i", edbus_ir_is_available},
 	{ "TransmitIR", "ai", "i", edbus_ir_transmit},
 };
 
