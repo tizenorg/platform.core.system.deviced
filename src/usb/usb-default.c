@@ -50,6 +50,13 @@ static char config_rootpath[BUF_MAX];
 static char config_load[BUF_MAX];
 static char config_default[BUF_MAX];
 
+static char curr_mode[BUF_MAX];
+
+static void update_curr_mode(char *name)
+{
+	snprintf(curr_mode, sizeof(curr_mode), "%s", name);
+}
+
 static int write_file(char *path, char *val)
 {
 	FILE *fp;
@@ -196,7 +203,8 @@ static int usb_load_configuration(char *enable)
 
 static int usb_update_configuration(char *name)
 {
-	if (!name)
+	if (!name ||
+		!strncmp(name, MODE_DEFAULT, sizeof(MODE_DEFAULT)))
 		name = config_default;
 
 	return config_parse(USB_SETTING,
@@ -225,6 +233,10 @@ static int usb_enable(char *name)
 {
 	int ret;
 
+	if (!name ||
+		!strncmp(name, MODE_DEFAULT, sizeof(MODE_DEFAULT)))
+		name = config_default;
+
 	ret = usb_load_configuration(CONFIG_DISABLE);
 	if (ret < 0) {
 		_E("Failed to disable usb config");
@@ -237,18 +249,65 @@ static int usb_enable(char *name)
 		return ret;
 	}
 
-	return usb_execute_operation(name, KEY_START);
+	ret = usb_execute_operation(name, KEY_START);
+	if (ret < 0) {
+		_E("Failed to execute operation to start (%s, ret:%d)", name, ret);
+		return ret;
+	}
+
+	update_curr_mode(name);
+
+	return 0;
 }
 
 static int usb_disable(char *name)
 {
-	return usb_execute_operation(name, KEY_STOP);
+	int ret;
+
+	if (!name)
+		name = curr_mode;
+
+	ret = usb_load_configuration(CONFIG_DISABLE);
+	if (ret < 0)
+		_E("Failed to disable usb config(%d)", ret);
+
+	ret = usb_execute_operation(name, KEY_STOP);
+	if (ret < 0)
+		_E("Failed to execute operation to stop (%s)", name);
+
+	update_curr_mode(MODE_NONE);
+
+	return 0;
+}
+
+static int usb_change(char *name)
+{
+	int ret;
+
+	if (!name ||
+		!strncmp(name, MODE_DEFAULT, sizeof(MODE_DEFAULT)))
+		name = config_default;
+
+	ret = usb_disable(curr_mode);
+	if (ret < 0) {
+		_E("Failed to disable (%d)", curr_mode);
+		return ret;
+	}
+
+	ret = usb_update_configuration(name);
+	if (ret < 0) {
+		_E("Failed to update usb configuration(%d)", ret);
+		return ret;
+	}
+
+	return usb_enable(name);
 }
 
 static const struct usb_config_plugin_ops default_plugin = {
 	.init      = usb_init,
 	.enable    = usb_enable,
 	.disable   = usb_disable,
+	.change    = usb_change,
 };
 
 static bool usb_valid(void)
