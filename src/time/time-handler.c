@@ -120,8 +120,7 @@ int handle_timezone(char *str)
 	} else {
 		ret = unlink(sympath);
 		if (ret < 0) {
-			_E("unlink error : [%d]%s", ret,
-				  strerror(errno));
+			_E("unlink error : [%d](errno:%d)", ret, errno);
 			return -1;
 		}
 		_D("unlink success");
@@ -131,7 +130,7 @@ int handle_timezone(char *str)
 	 * eg. ln -s /usr/share/zoneinfo/Asia/Seoul /opt/etc/localtime */
 	ret = symlink(tzpath, sympath);
 	if (ret < 0) {
-		_E("symlink error : [%d]%s", ret, errno);
+		_E("symlink error : [%d](errno:%d)", ret, errno);
 		return -1;
 	}
 	_D("symlink success");
