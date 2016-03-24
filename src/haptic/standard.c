@@ -50,6 +50,11 @@
 #define MAX_DATA 16
 #define FF_INFO_MAGIC 0xDEADFEED
 
+#ifdef WEARABLE_CIRCLE
+#define CIRCLE_ON_PATH		"/sys/class/sec/motor/motor_on"
+#define CIRCLE_OFF_PATH		"/sys/class/sec/motor/motor_off"
+#endif
+
 struct ff_info_header {
 	unsigned int magic;
 	int iteration;
@@ -320,6 +325,11 @@ static int open_device(int device_index, int *device_handle)
 	if (!device_handle)
 		return -EINVAL;
 
+#ifdef WEARABLE_CIRCLE
+	*device_handle = 1;
+	return 0;
+#endif
+
 	/* if it is the first element */
 	n = DD_LIST_LENGTH(ff_list);
 	if (n == 0 && !ff_fd) {
@@ -366,6 +376,10 @@ static int close_device(int device_handle)
 {
 	struct ff_info *info;
 	int r, n;
+
+#ifdef WEARABLE_CIRCLE
+	return 0;
+#endif
 
 	info = read_from_list(device_handle);
 	if (!info)
@@ -664,6 +678,17 @@ static const struct haptic_plugin_ops default_plugin = {
 static bool is_valid(void)
 {
 	int ret;
+
+#ifdef WEARABLE_CIRCLE
+	if ((access(CIRCLE_ON_PATH, R_OK) != 0) ||
+		(access(CIRCLE_OFF_PATH, R_OK) != 0)) {
+		_E("Do not support wearable haptic device");
+		return false;
+	}
+
+	_I("Support wearable haptic device");
+	return true;
+#endif
 
 	ret = ff_find_device();
 	if (ret < 0) {
