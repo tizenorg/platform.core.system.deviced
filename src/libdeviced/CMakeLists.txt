@@ -22,6 +22,7 @@ INCLUDE(FindPkgConfig)
 pkg_check_modules(libpkgs REQUIRED
 	vconf
 	dlog
+	storage
 	dbus-1
 	dbus-glib-1
 	edbus)
