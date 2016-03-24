@@ -19,6 +19,10 @@ ENDIF()
 ########################################################
 # Deviced Macros
 ########################################################
+IF("${PROFILE}" STREQUAL "wearable")
+	ADD_DEFINITIONS("-DWEARABLE_CIRCLE")
+ENDIF()
+
 MACRO(ADD_SOURCE DIR OUT)
 	FILE(GLOB ALL_SRCS "${DIR}/*.c")
 	FOREACH(SRC ${ALL_SRCS})
@@ -235,6 +239,7 @@ ENDIF()
 IF(BLOCK_MODULE STREQUAL on)
 	INSTALL_CONF(src/block block)
 	INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/scripts/mmc-smack-label DESTINATION bin)
+	INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/scripts/mmc-vfat-setting DESTINATION bin)
 ENDIF()
 
 IF(DISPLAY_MODULE STREQUAL on)
