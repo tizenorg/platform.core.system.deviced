@@ -33,11 +33,22 @@
 #include "core/config-parser.h"
 #include "haptic.h"
 
+#ifdef WEARABLE_CIRCLE
+#include <Ecore.h>
+#include <sys/types.h>
+#include <fcntl.h>
+#endif
+
 #ifndef DATADIR
 #define DATADIR		"/usr/share/deviced"
 #endif
 
 #define HAPTIC_CONF_PATH			"/etc/deviced/haptic.conf"
+
+#ifdef WEARABLE_CIRCLE
+#define CIRCLE_ON_PATH		"/sys/class/sec/motor/motor_on"
+#define CIRCLE_OFF_PATH		"/sys/class/sec/motor/motor_off"
+#endif
 
 /* hardkey vibration variable */
 #define HARDKEY_VIB_ITERATION		1
@@ -149,6 +160,57 @@ static int convert_magnitude_by_conf(int level)
 	return DEFAULT_FEEDBACK_LEVEL * HAPTIC_FEEDBACK_STEP;
 }
 
+#ifdef WEARABLE_CIRCLE
+Ecore_Timer *timer;
+
+static int circle_stop();
+static Eina_Bool timer_cb(void *data)
+{
+	Ecore_Timer *t = (Ecore_Timer *)data;
+	circle_stop();
+	t = NULL;
+
+	return ECORE_CALLBACK_CANCEL;
+}
+
+static int circle_stop()
+{
+	int fd;
+	char buf[8];
+
+	fd = open(CIRCLE_OFF_PATH, O_RDONLY);
+	if (fd < 0)
+		return -ENODEV;
+	read(fd, buf, 8);
+	close(fd);
+	if (timer) {
+		ecore_timer_del(timer);
+		timer = NULL;
+	}
+	return 0;
+}
+
+static int circle_play(int duration)
+{
+	int fd;
+	char buf[8];
+
+	if (timer) {
+		ecore_timer_del(timer);
+		timer = NULL;
+	}
+
+	fd = open(CIRCLE_ON_PATH, O_RDONLY);
+	if (fd < 0)
+		return -ENODEV;
+	read(fd, buf, 8);
+	close(fd);
+	ecore_timer_add(duration/1000.f, timer_cb, timer);
+
+	return 0;
+}
+#endif
+
 static DBusMessage *edbus_get_count(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
@@ -258,9 +320,14 @@ static DBusMessage *edbus_open_device(E_DBus_Object *obj, DBusMessage *msg)
 		goto exit;
 	}
 
+#ifdef WEARABLE_CIRCLE
+	ret = 1;
+	goto exit;
+#endif
 	ret = h_ops->open_device(index, &handle);
 	if (ret < 0)
 		goto exit;
+
 
 	sender = dbus_message_get_sender(msg);
 	if (!sender) {
@@ -316,6 +383,10 @@ static DBusMessage *edbus_close_device(E_DBus_Object *obj, DBusMessage *msg)
 		goto exit;
 	}
 
+#ifdef WEARABLE_CIRCLE
+	goto exit;
+#endif
+
 	ret = h_ops->close_device(handle);
 	if (ret < 0)
 		goto exit;
@@ -365,6 +436,11 @@ static DBusMessage *edbus_vibrate_monotone(E_DBus_Object *obj, DBusMessage *msg)
 		ret = -EINVAL;
 		goto exit;
 	}
+
+#ifdef WEARABLE_CIRCLE
+	ret = circle_play(duration);
+	goto exit;
+#endif
 
 	ret = h_ops->vibrate_monotone(handle, duration, level, priority, &e_handle);
 	if (ret >= 0)
@@ -436,6 +512,11 @@ static DBusMessage *edbus_stop_device(E_DBus_Object *obj, DBusMessage *msg)
 		ret = -EINVAL;
 		goto exit;
 	}
+
+#ifdef WEARABLE_CIRCLE
+	ret = circle_stop();
+	goto exit;
+#endif
 
 	ret = h_ops->stop_device(handle);
 

@@ -50,6 +50,11 @@
 #define MAX_DATA 16
 #define FF_INFO_MAGIC 0xDEADFEED
 
+#ifdef WEARABLE_CIRCLE
+#define CIRCLE_ON_PATH		"/sys/class/sec/motor/motor_on"
+#define CIRCLE_OFF_PATH		"/sys/class/sec/motor/motor_off"
+#endif
+
 struct ff_info_header {
 	unsigned int magic;
 	int iteration;
@@ -664,6 +669,17 @@ static const struct haptic_plugin_ops default_plugin = {
 static bool is_valid(void)
 {
 	int ret;
+
+#ifdef WEARABLE_CIRCLE
+	if ((access(CIRCLE_ON_PATH, R_OK) != 0) ||
+		(access(CIRCLE_OFF_PATH, R_OK) != 0)) {
+		_E("Do not support wearable haptic device");
+		return false;
+	}
+
+	_I("Support wearable haptic device");
+	return true;
+#endif
 
 	ret = ff_find_device();
 	if (ret < 0) {

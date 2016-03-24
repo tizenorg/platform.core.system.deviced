@@ -19,6 +19,12 @@ ENDIF()
 ########################################################
 # Deviced Macros
 ########################################################
+IF("${PROFILE}" STREQUAL "wearable")
+	IF("${ARCH}" STREQUAL "arm")
+		ADD_DEFINITIONS("-DWEARABLE_CIRCLE")
+	ENDIF()
+ENDIF()
+
 MACRO(ADD_SOURCE DIR OUT)
 	FILE(GLOB ALL_SRCS "${DIR}/*.c")
 	FOREACH(SRC ${ALL_SRCS})
