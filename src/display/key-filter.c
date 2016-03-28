@@ -124,7 +124,11 @@ static void longkey_pressed()
 		return;
 	}
 
+#ifdef PROFILE_MOBILE
+	opt = PWROFF_POPUP_ACT;
+#else
 	opt = POWEROFF_ACT;
+#endif
 	power_execute(opt);
 }
 
