@@ -124,7 +124,7 @@ static void longkey_pressed()
 		return;
 	}
 
-	opt = POWEROFF_ACT;
+	opt = PWROFF_POPUP_ACT;
 	power_execute(opt);
 }
 
