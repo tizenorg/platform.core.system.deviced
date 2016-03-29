@@ -14,7 +14,6 @@
 %define ir_module off
 %define led_module off
 %define power_module on
-%define storage_module on
 %define telephony_module off
 %define touchscreen_module off
 %define tzip_module off
@@ -86,7 +85,7 @@ BuildRequires:  pkgconfig(xext)
 BuildRequires:  pkgconfig(libinput)
 BuildRequires:	pkgconfig(capi-system-sensor)
 %endif
-%if %{?storage_module} == on
+%if %{?block_module} == on
 BuildRequires:	pkgconfig(storage)
 %endif
 %if %{?telephony_module} == on
@@ -181,7 +180,6 @@ Deviced library for device control (devel)
 	-DIR_MODULE=%{ir_module} \
 	-DLED_MODULE=%{led_module} \
 	-DPOWER_MODULE=%{power_module} \
-	-DSTORAGE_MODULE=%{storage_module} \
 	-DTELEPHONY_MODULE=%{telephony_module} \
 	-DTOUCHSCREEN_MODULE=%{touchscreen_module} \
 	-DTZIP_MODULE=%{tzip_module} \
@@ -254,12 +252,10 @@ systemctl daemon-reload
 %{_bindir}/mmc-smack-label
 %endif
 %config %{_sysconfdir}/deviced/block.conf
+%config %{_sysconfdir}/deviced/storage.conf
 %endif
 %if %{?display_module} == on
 %config %{_sysconfdir}/deviced/display.conf
-%endif
-%if %{?storage_module} == on
-%config %{_sysconfdir}/deviced/storage.conf
 %endif
 %if %{?usb_module} == on
 %config %{_sysconfdir}/deviced/usb-setting.conf

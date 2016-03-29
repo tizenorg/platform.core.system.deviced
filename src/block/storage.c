@@ -27,6 +27,7 @@
 #include <sys/shm.h>
 #include <time.h>
 #include <storage.h>
+#include <tzplatform_config.h>
 
 #include "device-node.h"
 #include "core/log.h"
@@ -40,7 +41,6 @@
 #define MEMORY_STATUS_TMP_PATH  "/tmp"
 #define MEMNOTI_TMP_CRITICAL_VALUE (20)
 
-#define MEMORY_STATUS_USR_PATH  "/opt/usr"
 #define MEMORY_MEGABYTE_VALUE   1048576
 
 #define MEMNOTI_WARNING_VALUE  (5) /* 5% under */
@@ -187,7 +187,7 @@ static int storage_get_memory_size(char *path, struct statvfs *s)
 
 static void get_storage_status(char *path, struct statvfs *s)
 {
-	if (strcmp(path, MEMORY_STATUS_USR_PATH) == 0)
+	if (strcmp(path, tzplatform_getenv(TZ_SYS_HOME)) == 0)
 		storage_get_internal_memory_size(s);
 	else
 		storage_get_memory_size(path, s);
@@ -249,7 +249,7 @@ static Eina_Bool check_storage_status(void *data)
 
 static int init_storage_config_info_all(void)
 {
-	init_storage_config_info(MEMORY_STATUS_USR_PATH, &storage_internal_info);
+	init_storage_config_info(tzplatform_getenv(TZ_SYS_HOME), &storage_internal_info);
 	init_storage_config_info(MEMORY_STATUS_TMP_PATH, &storage_tmp_info);
 	memnoti_timer = ecore_timer_add(MEMNOTI_TIMER_INTERVAL,
 				check_storage_status, NULL);
@@ -295,7 +295,7 @@ static DBusMessage *edbus_get_storage_status(E_DBus_Object *obj, DBusMessage *ms
 		goto out;
 	}
 
-	if (!strcmp(path, MEMORY_STATUS_USR_PATH))
+	if (!strcmp(path, tzplatform_getenv(TZ_SYS_HOME)))
 		storage_get_internal_memory_size(&s);
 	else
 		storage_get_memory_size(path, &s);
