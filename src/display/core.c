@@ -1821,15 +1821,15 @@ static void init_lcd_operation(void)
 {
 	const struct device_ops *ops = NULL;
 
-	ops = find_device("display");
-	if (!check_default(ops))
-		DD_LIST_APPEND(lcdon_ops, ops);
-
 	ops = find_device("touchscreen");
 	if (!check_default(ops))
 		DD_LIST_APPEND(lcdon_ops, ops);
 
 	ops = find_device("touchkey");
+	if (!check_default(ops))
+		DD_LIST_APPEND(lcdon_ops, ops);
+
+	ops = find_device("display");
 	if (!check_default(ops))
 		DD_LIST_APPEND(lcdon_ops, ops);
 }
