@@ -514,6 +514,7 @@ struct _tv_states {
 	int (*action)(int timeout);
 } tv_states[] = {
 	{ S_LCDON,    "S_LCDON",    lcdon_check,    lcdon_trans,    lcdon_action    },
+	{ S_LCDDIM,   "S_LCDDIM",   NULL,           NULL,           NULL            },
 	{ S_LCDOFF,   "S_LCDOFF",   lcdoff_check,   lcdoff_trans,   lcdoff_action   },
 	{ S_STANDBY,  "S_STANDBY",  standby_check,  standby_trans,  standby_action  },
 	{ S_SUSPEND,  "S_SUSPEND",  suspend_check,  suspend_trans,  suspend_action  },
