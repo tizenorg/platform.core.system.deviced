@@ -69,6 +69,13 @@ static enum state_t get_state(int s_bits)
 	}
 }
 
+static bool state_supported(enum state_t st)
+{
+	if (states[st].trans)
+		return true;
+	return false;
+}
+
 int pm_lock_internal(pid_t pid, int s_bits, int flag, int timeout)
 {
 	int cond;
@@ -79,6 +86,9 @@ int pm_lock_internal(pid_t pid, int s_bits, int flag, int timeout)
 	cond = get_state(s_bits);
 	if (cond < 0)
 		return cond;
+
+	if (!state_supported(cond))
+		return -ENOTSUP;
 
 	cond = SET_COND_REQUEST(cond, PM_REQUEST_LOCK);
 
@@ -109,6 +119,9 @@ int pm_unlock_internal(pid_t pid, int s_bits, int flag)
 	if (cond < 0)
 		return cond;
 
+	if (!state_supported(cond))
+		return -ENOTSUP;
+
 	cond = SET_COND_REQUEST(cond, PM_REQUEST_UNLOCK);
 
 	if (flag & PM_KEEP_TIMER)
@@ -136,6 +149,9 @@ int pm_change_internal(pid_t pid, int s_bits)
 	cond = get_state(s_bits);
 	if (cond < 0)
 		return cond;
+
+	if (!state_supported(cond))
+		return -ENOTSUP;
 
 	cond = SET_COND_REQUEST(cond, PM_REQUEST_CHANGE);
 
