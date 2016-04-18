@@ -38,6 +38,7 @@ static const struct control_device {
 	/* Add id & ops to provide start/stop control */
 	{ DEVICE_CONTROL_MMC,               "mmc" },
 	{ DEVICE_CONTROL_USBCLIENT,   "usbclient" },
+	{ DEVICE_CONTROL_BLOCK,           "block" },
 };
 
 static int control_handler(int argc, char **argv)

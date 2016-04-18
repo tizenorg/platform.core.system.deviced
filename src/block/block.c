@@ -123,6 +123,8 @@ static bool smack;
 static int pfds[2];
 static Ecore_Fd_Handler *phandler;
 static E_DBus_Interface *iface;
+static bool block_control = false;
+static bool block_boot = false;
 
 static pthread_mutex_t glob_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -1889,6 +1891,8 @@ static int booting_done(void *data)
 {
 	/* if there is the attached device, try to mount */
 	block_init_from_udev_enumerate();
+	block_control = true;
+	block_boot = true;
 	return 0;
 }
 
@@ -2481,16 +2485,32 @@ static void block_exit(void *data)
 
 	/* remove remaining blocks */
 	remove_whole_block_device();
+
+	block_control = false;
 }
 
 static int block_start(enum device_flags flags)
 {
 	int ret;
 
+	if (!block_boot) {
+		_E("Cannot be started. Booting is not ready");
+		return -ENODEV;
+	}
+
+	if (block_control) {
+		_I("Already started");
+		return 0;
+	}
+
 	/* register mmc uevent control routine */
 	ret = register_udev_uevent_control(&uh);
 	if (ret < 0)
 		_E("fail to register block uevent : %d", ret);
+
+	block_init_from_udev_enumerate();
+
+	block_control = true;
 
 	_I("start");
 	return 0;
@@ -2498,11 +2518,23 @@ static int block_start(enum device_flags flags)
 
 static int block_stop(enum device_flags flags)
 {
+	if (!block_boot) {
+		_E("Cannot be stopped. Booting is not ready");
+		return -ENODEV;
+	}
+
+	if (!block_control) {
+		_I("Already stopped");
+		return 0;
+	}
+
 	/* unregister mmc uevent control routine */
 	unregister_udev_uevent_control(&uh);
 
 	/* remove the existing blocks */
 	remove_whole_block_device();
+
+	block_control = false;
 
 	_I("stop");
 	return 0;
