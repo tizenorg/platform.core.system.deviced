@@ -35,6 +35,7 @@
 #include <time.h>
 #include <assert.h>
 #include <vconf.h>
+#include <ctype.h>
 #include <tzplatform_config.h>
 
 #include "core/log.h"
@@ -308,27 +309,88 @@ static void signal_device_changed(struct block_device *bdev,
 			"issssssisibi", arr);
 }
 
+static int get_mmc_mount_node(char *devnode, char *node, size_t len)
+{
+	char *name = devnode;
+	char *pt;
+	int dev = -1, part = -1;
+
+	if (!name)
+		return -EINVAL;
+
+	sscanf(name, "mmcblk%dp%d", &dev, &part);
+	if (dev < 0)
+		return -EINVAL;
+
+	if (part < 0)
+		snprintf(node, len, "Sdcard%c", dev + 'A' - 1);
+	else
+		snprintf(node, len, "Sdcard%c%d", dev + 'A' - 1, part);
+
+	return 0;
+}
+
+static int get_scsi_mount_node(char *devnode, char *node, size_t len)
+{
+	char dev[64], *name;
+	int i;
+
+	if (!devnode)
+		return -EINVAL;
+
+	snprintf(dev, sizeof(dev), "%s", devnode);
+
+	if (!strstr(dev, "sd"))
+		return -EINVAL;
+
+	name = dev;
+	name += strlen("sd");
+	if (!name)
+		return -EINVAL;
+
+	for (i = 0 ; i < strlen(name) ; i++)
+		name[i] = toupper(name[i]);
+	snprintf(node, len, "UsbDrive%s", name);
+
+	return 0;
+}
+
 static char *generate_mount_path(struct block_data *data)
 {
-	const char *str, *node;
+	const char *str;
+	char *name, node[64];
+	int ret;
 
-	if (!data)
+	if (!data || !data->devnode)
 		return NULL;
 
-	/* For libstorage API
-	 * If it's a primary partition and mmc device,
-	 * use 'sdcard' node as mount point. */
-	if (data->primary && data->block_type == BLOCK_MMC_DEV)
-		node = "sdcard";
-	else if (data->fs_uuid_enc)
-		node = data->fs_uuid_enc;
-	else
+	name = strrchr(data->devnode, '/');
+	if (!name)
+		goto out;
+	name++;
+
+	switch (data->block_type) {
+	case BLOCK_MMC_DEV:
+		ret = get_mmc_mount_node(name, node, sizeof(node));
+		break;
+	case BLOCK_SCSI_DEV:
+		ret = get_scsi_mount_node(name, node, sizeof(node));
+		break;
+	default:
+		_E("Invalid block type (%d)", data->block_type);
 		return NULL;
+	}
+	if (ret < 0)
+		goto out;
 
 	str = tzplatform_mkpath(TZ_SYS_MEDIA, node);
 	if (!str)
 		return NULL;
 	return strdup(str);
+
+out:
+	_E("Invalid devnode (%s)", data->devnode ? data->devnode : "NULL");
+	return NULL;
 }
 
 static bool check_primary_partition(const char *devnode)
