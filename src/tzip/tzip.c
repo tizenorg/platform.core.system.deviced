@@ -666,7 +666,7 @@ static DBusMessage *edbus_request_mount_tzip(E_DBus_Object *obj, DBusMessage *ms
 		g_async_queue_push(async_queue, (gpointer)msgdata);
 		ret = 0;
 	} else
-		ret = -ENOMEM;
+		ret = -EAGAIN;
 
 out:
 	if (ret < 0 && msgdata) {
