@@ -36,6 +36,8 @@
 
 #define CASE_SENSITIVE	1
 
+#define MAX_CHUNK_SIZE	4096
+
 /* structure for storing a file info */
 struct tzip_file_info {
 	char *name;

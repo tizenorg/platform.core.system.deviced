@@ -556,21 +556,101 @@ void tzip_unlock(void)
 	sem_post(&tzip_sem);
 }
 
+static int seek_offset(struct tzip_handle *handle, off_t offset)
+{
+	/* seek and read buffer */
+	char *tmp_buf = NULL;
+	size_t diff_size;
+	size_t buf_size;
+	size_t chunk_count;
+	int i;
+	int bytes_read;
+	int ret;
+
+	if (!handle || !handle->file_info)
+		return -EINVAL;
+
+	if (offset == handle->offset)
+		return 0;
+
+	if (offset > handle->offset) {
+		/* read from current position */
+		diff_size = offset - handle->offset;
+		_I("Read from current position (%jd) till offset  (%jd)", handle->offset, offset);
+	} else {
+		/* read from the begining*/
+		_I("Read from the begining till offset  (%jd)", offset);
+		if (offset < 0)
+			diff_size = handle->offset + offset;
+		else
+			diff_size = offset;
+
+		ret = unzSetOffset(handle->zipfile, 0);
+		if (ret < 0) {
+			_E("unzSetOffset Failed");
+			return -EINVAL;
+		}
+	}
+
+	/* dont read more than MAX_CHUNK_SIZE at once */
+	if (diff_size < MAX_CHUNK_SIZE)
+		buf_size = diff_size;
+	else
+		buf_size = MAX_CHUNK_SIZE;
+
+	tmp_buf = (char *)malloc(buf_size);
+	if (!tmp_buf) {
+		_E("Malloc failed");
+		return -ENOMEM;
+	}
+
+	/* chunk_count will have total number of chunks to read to reach offset position */
+	chunk_count = diff_size/buf_size;
+	chunk_count += 1;
+
+	for (i = 0; i < chunk_count; i++) {
+		/* adjust last chunk size according to offset */
+		if (chunk_count > 1 && chunk_count == i + 1)
+			buf_size = diff_size - (buf_size * i);
+
+		bytes_read = 0;
+		do {
+			ret = unzReadCurrentFile(handle->zipfile,
+					tmp_buf+bytes_read, buf_size - bytes_read);
+			if (ret < 0) {
+				_E("unzReadCurrentFile Failed(%d)", ret);
+				ret = -EINVAL;
+				goto out;
+			}
+			bytes_read += ret;
+		} while (bytes_read < buf_size && ret != 0);
+	}
+
+	ret = 0;
+
+out:
+	free(tmp_buf);
+	return ret;
+}
+
 int read_zipfile(struct tzip_handle *handle, char *buf,
 			size_t size, off_t offset)
 {
 	int bytes_read;
 	int ret;
 
+	if (!handle || !handle->file_info)
+		return -EINVAL;
+
 	if (offset > handle->file_info->uncompressed_size) {
 		_E("Invalid Offset (%jd) for file size (%d)", offset, handle->file_info->uncompressed_size);
 		return -EINVAL;
 	}
 
-	if (offset > 0 && offset != handle->offset) {
-		/* seek operation is not supported in tzip */
-		_E("Offset Mismatch [%jd, %jd]", offset, handle->offset);
-		return -EINVAL;
+	ret = seek_offset(handle, offset);
+	if (ret < 0) {
+		_E("Failed to seek offset (%d)", ret);
+		return ret;
 	}
 
 	bytes_read = 0;
