@@ -250,8 +250,10 @@ static int tzip_read(const char *path, char *buf, size_t size, off_t offset,
 #endif
 
 	_D("Read - Path : %s  size : %zd offset : %jd ", path, size, offset);
+	sem_wait(&handle->lock);
 	ret = read_zipfile(handle, buf, size, offset);
-
+	sem_post(&handle->lock);
+	_I("Read ret = %d", ret);
 	return ret;
 }
 
@@ -274,6 +276,9 @@ static int tzip_release(const char *path, struct fuse_file_info *fi)
 #else
 	handle = (struct tzip_handle *)(fi->fh);
 #endif
+
+	if (sem_destroy(&handle->lock) == -1)
+		_E("sem_destroy failed");
 
 	unzCloseCurrentFile(handle->zipfile);
 	unzClose(handle->zipfile);

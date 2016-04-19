@@ -556,40 +556,106 @@ void tzip_unlock(void)
 	sem_post(&tzip_sem);
 }
 
-static int seek_offset(struct tzip_handle *handle, off_t offset)
+int reset_zipfile(struct tzip_handle *handle)
 {
-	/* seek and read buffer */
+	int ret;
+
+	if (!handle)
+		return -EINVAL;
+
+	ret = unzCloseCurrentFile(handle->zipfile);
+	if (ret != UNZ_OK) {
+		_E("unzOpenCurrentFile Failed");
+		return -EINVAL;
+	}
+
+	if (unzLocateFile(handle->zipfile, handle->file, CASE_SENSITIVE) != UNZ_OK) {
+		_E("File :[%s] Not Found : unzLocateFile failed", handle->file);
+		return -ENOENT;
+	}
+
+	ret = unzOpenCurrentFile(handle->zipfile);
+	if (ret != UNZ_OK) {
+		_E("unzOpenCurrentFile Failed");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int seek_from_current_offset(struct tzip_handle *handle,
+		char *buf, size_t size, off_t offset)
+{
+	 int diff_size;
+	 int bytes_read;
+	 int ret;
+
+	if (!handle)
+		return -EINVAL;
+
+	if (offset <= handle->offset)
+		return -EINVAL;
+
+	/* read from current position */
+	diff_size = offset - handle->offset;
+	_I("Read from current position (%jd) till offset (%jd)", handle->offset, offset);
+
+	free(handle->pbuf);
+	handle->pbuf = (char *)malloc(diff_size);
+	if (!handle->pbuf) {
+		_E("Malloc failed");
+		return -ENOMEM;
+	}
+
+	bytes_read = 0;
+	do {
+		ret = unzReadCurrentFile(handle->zipfile,
+				handle->pbuf+bytes_read, diff_size - bytes_read);
+		if (ret < 0) {
+			_E("unzReadCurrentFile Failed");
+			ret = -EINVAL;
+			goto out;
+		}
+		bytes_read += ret;
+
+	} while (bytes_read < diff_size && ret != 0);
+
+	if (bytes_read == diff_size) {
+		handle->from = handle->offset;
+		handle->to = offset;
+		return 0;
+	}
+
+	ret = 0;
+
+out:
+	free(handle->pbuf);
+	handle->pbuf = NULL;
+
+	return ret;;
+}
+
+static int seek_from_begining(struct tzip_handle *handle,
+		char *buf, size_t size, off_t offset)
+{
 	char *tmp_buf = NULL;
-	size_t diff_size;
 	size_t buf_size;
 	size_t chunk_count;
+	int diff_size;
 	int i;
 	int bytes_read;
 	int ret;
 
-	if (!handle || !handle->file_info)
+	/* read from the begining*/
+	_I("Read from the begining till offset (%jd)", offset);
+	if (offset < 0)
+		diff_size = handle->offset + offset;
+	else
+		diff_size = offset;
+
+	if (reset_zipfile(handle)) {
+		_E("reset_zipfile Failed");
 		return -EINVAL;
-
-	if (offset == handle->offset)
-		return 0;
-
-	if (offset > handle->offset) {
-		/* read from current position */
-		diff_size = offset - handle->offset;
-		_I("Read from current position (%jd) till offset  (%jd)", handle->offset, offset);
-	} else {
-		/* read from the begining*/
-		_I("Read from the begining till offset  (%jd)", offset);
-		if (offset < 0)
-			diff_size = handle->offset + offset;
-		else
-			diff_size = offset;
-
-		ret = unzSetOffset(handle->zipfile, 0);
-		if (ret < 0) {
-			_E("unzSetOffset Failed");
-			return -EINVAL;
-		}
 	}
 
 	/* dont read more than MAX_CHUNK_SIZE at once */
@@ -606,7 +672,8 @@ static int seek_offset(struct tzip_handle *handle, off_t offset)
 
 	/* chunk_count will have total number of chunks to read to reach offset position */
 	chunk_count = diff_size/buf_size;
-	chunk_count += 1;
+	if (diff_size % buf_size)
+		chunk_count += 1;
 
 	for (i = 0; i < chunk_count; i++) {
 		/* adjust last chunk size according to offset */
@@ -616,7 +683,7 @@ static int seek_offset(struct tzip_handle *handle, off_t offset)
 		bytes_read = 0;
 		do {
 			ret = unzReadCurrentFile(handle->zipfile,
-					tmp_buf+bytes_read, buf_size - bytes_read);
+				    tmp_buf+bytes_read, buf_size - bytes_read);
 			if (ret < 0) {
 				_E("unzReadCurrentFile Failed(%d)", ret);
 				ret = -EINVAL;
@@ -624,6 +691,11 @@ static int seek_offset(struct tzip_handle *handle, off_t offset)
 			}
 			bytes_read += ret;
 		} while (bytes_read < buf_size && ret != 0);
+
+		if (!ret) {
+			_E("EOF reached");
+			break;
+		}
 	}
 
 	ret = 0;
@@ -631,6 +703,34 @@ static int seek_offset(struct tzip_handle *handle, off_t offset)
 out:
 	free(tmp_buf);
 	return ret;
+}
+
+static int seek_offset(struct tzip_handle *handle,
+		char *buf, size_t size, off_t offset)
+{
+	/* seek and read buffer */
+	if (!handle || !handle->file_info)
+		return -EINVAL;
+
+	if (offset == handle->offset)
+		return 0;
+
+	/* seek and read buffer */
+	if (offset >= handle->from &&
+		(offset + size) <= handle->to &&
+		handle->pbuf) {
+		_I("Have already read this chunk");
+		memcpy(buf, handle->pbuf + (offset - handle->from), size);
+		return size;
+	}
+
+	if (offset > handle->offset)
+		return seek_from_current_offset(handle, buf, size, offset);
+
+	if (offset != 0)
+		return seek_from_begining(handle, buf, size, offset);
+
+	return 0;
 }
 
 int read_zipfile(struct tzip_handle *handle, char *buf,
@@ -647,7 +747,11 @@ int read_zipfile(struct tzip_handle *handle, char *buf,
 		return -EINVAL;
 	}
 
-	ret = seek_offset(handle, offset);
+	/* seek and read buffer */
+	_I("offset (%jd) handle->from(%jd) (offset + size) (%jd) handle->to (%jd) handle->offset (%jd)",
+			offset, handle->from, (offset + size), handle->to, handle->offset);
+
+	ret = seek_offset(handle, buf, size, offset);
 	if (ret < 0) {
 		_E("Failed to seek offset (%d)", ret);
 		return ret;
