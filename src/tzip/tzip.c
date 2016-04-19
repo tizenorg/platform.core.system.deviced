@@ -309,6 +309,8 @@ static void *tzip_thread(void *arg)
 	size_t len;
 	ssize_t read;
 	char *saveptr = NULL;
+	char *argv[4] = {"deviced", "-o","allow_other", NULL};
+	struct fuse_args args = FUSE_ARGS_INIT(3, argv);
 
 	ret = mkdir(TZIP_ROOT_PATH, 0755);
 	if (ret < 0 && errno != EEXIST) {
@@ -317,7 +319,7 @@ static void *tzip_thread(void *arg)
 	}
 
 	tzip_lock();
-	channel = fuse_mount(TZIP_ROOT_PATH, NULL);
+	channel = fuse_mount(TZIP_ROOT_PATH, &args);
 	if (!channel) {
 		_E("Trying to mount after cleaning up previous instance %p ", TZIP_ROOT_PATH);
 		fuse_unmount(TZIP_ROOT_PATH, NULL);
