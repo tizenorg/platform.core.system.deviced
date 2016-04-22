@@ -76,6 +76,7 @@ struct tzip_msg_data {
 	char type; /* 'm' for mount , 'u' for unmount */
 	char *zippath;
 	char *mountpath;
+	char *smack;
 };
 
 struct tzip_dir_info *get_dir_files(const char *dir);
@@ -84,10 +85,9 @@ int remove_mount_entry(const char *mount_path);
 int get_path_prop(const char *path, struct stat *stbuf);
 struct tzip_mount_entry *get_mount_entry(const char *mount_path);
 struct tzip_mount_entry *find_mount_entry(const char *mount_path, int *dir_status);
-void tzip_lock_init(void);
-void tzip_lock_deinit(void);
 void tzip_lock(void);
 void tzip_unlock(void);
+void tzip_lock_init(void);
 
 /* local function declrations */
 int get_file_info(const char *file_path, struct tzip_file_info *file_info);

@@ -39,13 +39,11 @@ static GHashTable *hashmap;
 struct tzip_mount_entry *get_mount_entry(const char *mount_path)
 {
 	struct tzip_mount_entry *entry;
-	entry = (struct tzip_mount_entry *)g_hash_table_lookup(
-			hashmap, mount_path);
+	entry = (struct tzip_mount_entry *)g_hash_table_lookup(hashmap, mount_path);
 	return entry;
 }
 
-struct tzip_mount_entry *find_mount_entry(
-		const char *mount_path, int *dir_status)
+struct tzip_mount_entry *find_mount_entry(const char *mount_path, int *dir_status)
 {
 	int len, mlen;
 	GHashTableIter iter;
@@ -72,18 +70,16 @@ struct tzip_mount_entry *find_mount_entry(
 			if (strncmp(mount_path, path, len) == 0) {
 				/*
 				* Dont break, till exact match is found for node->path.
-				* Just mark *dir_status = 1  to indicate
-				* parent directory match is found
+				* Just mark *dir_status = 1  to indicate parent directory match is found
 				*/
 				*dir_status = 1;
 			}
-		} else if (mlen == len &&
-				strncmp(mount_path, path, mlen) == 0) {
+		} else if (mlen == len && strncmp(mount_path, path, mlen) == 0) {
 			/* Break, exact match is found for node->path */
 			*dir_status = 1;
 			return get_mount_entry(path);
 		} else if (strncmp(mount_path, path, mlen) == 0 &&
-				mount_path[mlen] == DIR_DELIMETER) {
+		    mount_path[mlen] == DIR_DELIMETER) {
 			/* Break, mount directory found for a given file or directory */
 			*dir_status = 1;
 			return get_mount_entry(path);
@@ -93,13 +89,11 @@ struct tzip_mount_entry *find_mount_entry(
 	return NULL;
 }
 
-struct tzip_dir_info *get_dir_list(
-		struct tzip_mount_entry *entry, const char *dir_name)
+struct tzip_dir_info *get_dir_list(struct tzip_mount_entry *entry, const char *dir_name)
 {
 	struct tzip_dir_info *dinfo;
 
-	dinfo = (struct tzip_dir_info *)g_hash_table_lookup(
-			entry->dir_hash, dir_name);
+	dinfo = (struct tzip_dir_info *)g_hash_table_lookup(entry->dir_hash, dir_name);
 
 	if (!dinfo)
 		_D("Empty Folder  %s", dir_name);
@@ -122,7 +116,7 @@ void fileinfo_to_stat(unz_file_info *file_info, struct stat *file_stat, mode_t m
 		if (file_info->tmu_date.tm_year > 1900)
 			newdate.tm_year = file_info->tmu_date.tm_year - 1900;
 		else
-			newdate.tm_year = file_info->tmu_date.tm_year ;
+			newdate.tm_year = file_info->tmu_date.tm_year;
 		newdate.tm_isdst = -1;
 
 		file_time = mktime(&newdate);
@@ -144,46 +138,39 @@ void fileinfo_to_stat(unz_file_info *file_info, struct stat *file_stat, mode_t m
 }
 
 int add_dir_info(struct tzip_mount_entry *entry, const char *parent_dir,
-		const char *filename, unz_file_info *file_info, mode_t mode)
+	const char *filename, unz_file_info *file_info, mode_t mode)
 {
-	struct tzip_file_info *finfo = NULL;
-	struct tzip_dir_info *dinfo = NULL;
-	int len;
+	struct tzip_file_info *finfo;
+	struct tzip_dir_info *dinfo;
 
 	/* create parent directory if does not exist */
 	if (!entry->dir_hash) {
 		/* first entry, initialize dir_hash table */
-		entry->dir_hash = g_hash_table_new_full(
-				g_str_hash, g_str_equal, NULL, NULL);
+		entry->dir_hash = g_hash_table_new_full(g_str_hash, g_str_equal, NULL, NULL);
 	}
 
-	dinfo = (struct tzip_dir_info *)g_hash_table_lookup(
-			entry->dir_hash, parent_dir);
+	dinfo = (struct tzip_dir_info *)g_hash_table_lookup(entry->dir_hash, parent_dir);
 	if (!dinfo) {
 		/* new parent directory node, add */
-		dinfo = (struct tzip_dir_info *)malloc(
-				sizeof(struct tzip_dir_info));
+		dinfo = (struct tzip_dir_info *)malloc(sizeof(struct tzip_dir_info));
 		if (!dinfo) {
 			_E("Malloc failed");
 			return -ENOMEM;
 		}
-
-		dinfo->file_hash =  g_hash_table_new_full(
-				g_str_hash, g_str_equal, NULL, NULL);
+		dinfo->file_hash =  g_hash_table_new_full(g_str_hash, g_str_equal, NULL, NULL);
 		if (!dinfo->file_hash) {
 			_E("Malloc failed");
 			free(dinfo);
 			return -ENOMEM;
 		}
 
-		len = strlen(parent_dir) + 1;
-		dinfo->name = (char *)malloc(len);
+		dinfo->name = (char *)malloc(strlen(parent_dir)+1);
 		if (!dinfo->name) {
 			_E("Malloc failed");
 			free(dinfo);
 			return -ENOMEM;
 		}
-		snprintf(dinfo->name, len, "%s", parent_dir);
+		strcpy(dinfo->name, parent_dir);
 		g_hash_table_insert(entry->dir_hash, dinfo->name, dinfo);
 		fileinfo_to_stat(NULL, &dinfo->stat, S_IFDIR);
 	}
@@ -195,14 +182,13 @@ int add_dir_info(struct tzip_mount_entry *entry, const char *parent_dir,
 		return -ENOMEM;
 	}
 
-	len = strlen(filename) + 1;
-	finfo->name = (char *)malloc(len);
+	finfo->name = (char *)malloc(strlen(filename) + 1);
 	if (!finfo->name) {
 		free(finfo);
 		_E("Malloc failed");
 		return -ENOMEM;
 	}
-	strncpy(finfo->name, filename, len);
+	strcpy(finfo->name, filename);
 
 	fileinfo_to_stat(file_info, &finfo->stat, mode);
 
@@ -211,8 +197,7 @@ int add_dir_info(struct tzip_mount_entry *entry, const char *parent_dir,
 	return 0;
 }
 
-int extract_zipfile_details(
-		struct tzip_mount_entry *entry, const char *zip_path)
+int extract_zipfile_details(struct tzip_mount_entry *entry, const char *zip_path)
 {
 	char *dir_name;
 	uLong i;
@@ -225,15 +210,15 @@ int extract_zipfile_details(
 	unzFile *zipfile = unzOpen(zip_path);
 	if (!zipfile) {
 		_E("unzOpen Failed %s ", zip_path);
-		return -EINVAL ;
+		return -EINVAL;
 	}
 
 	/* Get info about the zip file */
 	unz_global_info global_info;
 	if (unzGetGlobalInfo(zipfile, &global_info) != UNZ_OK) {
+		unzClose(zipfile);
 		_E("unzGetGlobalInfo Failed");
-		ret = -EINVAL;
-		goto out;
+		return -EINVAL;
 	}
 
 	/* Loop to extract all files */
@@ -245,13 +230,12 @@ int extract_zipfile_details(
 		ret = unzGetCurrentFileInfo(zipfile, &file_info, filename,
 				MAX_FILENAME_LEN, NULL, 0, NULL, 0);
 		if (ret != UNZ_OK) {
+			unzClose(zipfile);
 			_E("unzGetCurrentFileInfo Failed");
-			ret = -EINVAL;
-			goto out;
+			return -EINVAL;
 		}
 
 		_D("unzGetCurrentFileInfo file name - %s", filename);
-
 		/* Check if this entry is a directory or file. */
 		const size_t filename_length = strlen(filename);
 
@@ -270,8 +254,7 @@ int extract_zipfile_details(
 			ret = add_dir_info(entry, ".", filename, &file_info, mode);
 		} else {
 			*dir_name = 0;
-			ret = add_dir_info(entry, filename,
-					dir_name+1, &file_info, mode);
+			ret = add_dir_info(entry, filename, dir_name+1, &file_info, mode);
 		}
 		if (ret)
 			break;
@@ -281,13 +264,12 @@ int extract_zipfile_details(
 			ret = unzGoToNextFile(zipfile);
 			if (ret != UNZ_OK) {
 				_E("unzGoToNextFile Failed");
-				ret = -EINVAL ;
+				ret = -EINVAL;
 				break;
 			}
 		}
 	}
 
-out:
 	unzClose(zipfile);
 	return ret;
 }
@@ -296,7 +278,6 @@ int add_mount_entry(const char *zip_path, const char *mount_path)
 {
 	struct tzip_mount_entry *entry = NULL;
 	int ret = 0;
-	int len;
 
 	/* check if this mount path is already there, return error if yes */
 	entry = get_mount_entry(mount_path);
@@ -304,48 +285,38 @@ int add_mount_entry(const char *zip_path, const char *mount_path)
 		_E("mount_path : %s already exists ", mount_path);
 		return -EEXIST;
 	}
-
-	entry = (struct tzip_mount_entry *)malloc(
-			sizeof(struct tzip_mount_entry));
+	entry = (struct tzip_mount_entry *)malloc(sizeof(struct tzip_mount_entry));
 	if (!entry) {
 		_E("Malloc failed");
 		return -ENOMEM;
 	}
 	entry->dir_hash = NULL;
 
-	len = strlen(mount_path) + 1;
-	entry->path = (char *)malloc(len);
+	entry->path = (char *)malloc(strlen(mount_path)+1);
 	if (!entry->path) {
+		free(entry);
 		_E("Malloc failed");
-		ret = -ENOMEM;
-		goto out;
+		return -ENOMEM;
 	}
-	snprintf(entry->path, len, "%s", mount_path);
+	strcpy(entry->path, mount_path);
 
-	len = strlen(zip_path) + 1;
-	entry->zip_path = (char *)malloc(len);
+	entry->zip_path = (char *)malloc(strlen(zip_path)+1);
 	if (!entry->zip_path) {
+		free(entry->path);
+		free(entry);
 		_E("Malloc failed");
-		ret = -ENOMEM;
-		goto out;
+		return -ENOMEM;
 	}
 
-	strncpy(entry->zip_path, zip_path, len);
+	strcpy(entry->zip_path, zip_path);
 
 	g_hash_table_insert(hashmap, entry->path, entry);
 
 	/* pasrse zip file and update list */
 	ret = extract_zipfile_details(entry, zip_path);
-	if (ret) {
+	if (ret)
 		free_mount_node(entry);
-		return ret;
-	}
 
-out:
-	if (ret < 0 && entry) {
-		free(entry->path);
-		free(entry);
-	}
 	return ret;
 }
 
@@ -400,8 +371,7 @@ int get_file_info(const char *file_path, struct tzip_file_info *flist)
 	file_name = file_name+1;
 	_D("File name : %s ", file_name);
 
-	finfo = (struct tzip_file_info *)g_hash_table_lookup(
-			dinfo->file_hash, file_name);
+	finfo = (struct tzip_file_info *)g_hash_table_lookup(dinfo->file_hash, file_name);
 	if (!finfo) {
 		_E("File %s not found", file_path);
 		return -ENOENT;
@@ -503,8 +473,13 @@ void free_mount_node(struct tzip_mount_entry *entry)
 	gpointer fkey, fval;
 	gpointer dkey, dval;
 
-	if (!entry->dir_hash)
-		goto out;
+	if (!entry->dir_hash) {
+		g_hash_table_remove(hashmap, entry->path);
+		free(entry->path);
+		free(entry->zip_path);
+		free(entry);
+		return;
+	}
 
 	g_hash_table_iter_init(&d_iter, entry->dir_hash);
 	while (g_hash_table_iter_next(&d_iter, &dkey, &dval)) {
@@ -525,25 +500,18 @@ void free_mount_node(struct tzip_mount_entry *entry)
 		free(dinfo);
 	}
 
-out:
 	g_hash_table_remove(hashmap, entry->path);
 	free(entry->path);
 	free(entry->zip_path);
-	if (entry->dir_hash)
-		g_hash_table_destroy(entry->dir_hash);
+	g_hash_table_destroy(entry->dir_hash);
 	free(entry);
+	return;
 }
 
 void tzip_lock_init(void)
 {
 	 if (sem_init(&tzip_sem, 0, 1) == -1)
 		_E("sem_init failed");
-}
-
-void tzip_lock_deinit(void)
-{
-	 if (sem_destroy(&tzip_sem) == -1)
-		_E("sem_destroy failed");
 }
 
 void tzip_lock(void)
@@ -560,207 +528,140 @@ int reset_zipfile(struct tzip_handle *handle)
 {
 	int ret;
 
-	if (!handle)
-		return -EINVAL;
-
 	ret = unzCloseCurrentFile(handle->zipfile);
 	if (ret != UNZ_OK) {
 		_E("unzOpenCurrentFile Failed");
 		return -EINVAL;
 	}
-
 	if (unzLocateFile(handle->zipfile, handle->file, CASE_SENSITIVE) != UNZ_OK) {
 		_E("File :[%s] Not Found : unzLocateFile failed", handle->file);
 		return -ENOENT;
 	}
-
 	ret = unzOpenCurrentFile(handle->zipfile);
 	if (ret != UNZ_OK) {
 		_E("unzOpenCurrentFile Failed");
 		return -EINVAL;
 	}
-
 	return 0;
 }
-
-static int seek_from_current_offset(struct tzip_handle *handle,
-		char *buf, size_t size, off_t offset)
-{
-	 int diff_size;
-	 int bytes_read;
-	 int ret;
-
-	if (!handle)
-		return -EINVAL;
-
-	if (offset <= handle->offset)
-		return -EINVAL;
-
-	/* read from current position */
-	diff_size = offset - handle->offset;
-	_I("Read from current position (%jd) till offset (%jd)", handle->offset, offset);
-
-	free(handle->pbuf);
-	handle->pbuf = (char *)malloc(diff_size);
-	if (!handle->pbuf) {
-		_E("Malloc failed");
-		return -ENOMEM;
-	}
-
-	bytes_read = 0;
-	do {
-		ret = unzReadCurrentFile(handle->zipfile,
-				handle->pbuf+bytes_read, diff_size - bytes_read);
-		if (ret < 0) {
-			_E("unzReadCurrentFile Failed");
-			ret = -EINVAL;
-			goto out;
-		}
-		bytes_read += ret;
-
-	} while (bytes_read < diff_size && ret != 0);
-
-	if (bytes_read == diff_size) {
-		handle->from = handle->offset;
-		handle->to = offset;
-		return 0;
-	}
-
-	ret = 0;
-
-out:
-	free(handle->pbuf);
-	handle->pbuf = NULL;
-
-	return ret;;
-}
-
-static int seek_from_begining(struct tzip_handle *handle,
-		char *buf, size_t size, off_t offset)
-{
-	char *tmp_buf = NULL;
-	size_t buf_size;
-	size_t chunk_count;
-	int diff_size;
-	int i;
-	int bytes_read;
-	int ret;
-
-	/* read from the begining*/
-	_I("Read from the begining till offset (%jd)", offset);
-	if (offset < 0)
-		diff_size = handle->offset + offset;
-	else
-		diff_size = offset;
-
-	if (reset_zipfile(handle)) {
-		_E("reset_zipfile Failed");
-		return -EINVAL;
-	}
-
-	/* dont read more than MAX_CHUNK_SIZE at once */
-	if (diff_size < MAX_CHUNK_SIZE)
-		buf_size = diff_size;
-	else
-		buf_size = MAX_CHUNK_SIZE;
-
-	tmp_buf = (char *)malloc(buf_size);
-	if (!tmp_buf) {
-		_E("Malloc failed");
-		return -ENOMEM;
-	}
-
-	/* chunk_count will have total number of chunks to read to reach offset position */
-	chunk_count = diff_size/buf_size;
-	if (diff_size % buf_size)
-		chunk_count += 1;
-
-	for (i = 0; i < chunk_count; i++) {
-		/* adjust last chunk size according to offset */
-		if (chunk_count > 1 && chunk_count == i + 1)
-			buf_size = diff_size - (buf_size * i);
-
-		bytes_read = 0;
-		do {
-			ret = unzReadCurrentFile(handle->zipfile,
-					tmp_buf+bytes_read, buf_size - bytes_read);
-			if (ret < 0) {
-				_E("unzReadCurrentFile Failed(%d)", ret);
-				ret = -EINVAL;
-				goto out;
-			}
-			bytes_read += ret;
-		} while (bytes_read < buf_size && ret != 0);
-
-		if (!ret) {
-			_E("EOF reached");
-			break;
-		}
-	}
-
-	ret = 0;
-
-out:
-	free(tmp_buf);
-	return ret;
-}
-
-static int seek_offset(struct tzip_handle *handle,
-		char *buf, size_t size, off_t offset)
-{
-	/* seek and read buffer */
-	if (!handle || !handle->file_info)
-		return -EINVAL;
-
-	if (offset == handle->offset)
-		return 0;
-
-	/* seek and read buffer */
-	if (offset >= handle->from &&
-		(offset + size) <= handle->to &&
-		handle->pbuf) {
-		_I("Have already read this chunk");
-		memcpy(buf, handle->pbuf + (offset - handle->from), size);
-		return size;
-	}
-
-	if (offset > handle->offset)
-		return seek_from_current_offset(handle, buf, size, offset);
-
-	if (offset != 0)
-		return seek_from_begining(handle, buf, size, offset);
-
-	return 0;
-}
-
 int read_zipfile(struct tzip_handle *handle, char *buf,
 			size_t size, off_t offset)
 {
 	int bytes_read;
 	int ret;
 
-	if (!handle || !handle->file_info)
-		return -EINVAL;
-
 	if (offset > handle->file_info->uncompressed_size) {
 		_E("Invalid Offset (%jd) for file size (%d)", offset, handle->file_info->uncompressed_size);
 		return -EINVAL;
 	}
 
-	/* seek and read buffer */
-	_I("offset (%jd) handle->from(%jd) (offset + size) (%jd) handle->to (%jd) handle->offset (%jd)",
-			offset, handle->from, (offset + size), handle->to, handle->offset);
+	if (offset != handle->offset) {
+		int diff_size;
+		/* seek and read buffer */
+		_D("offset (%jd) handle->from(%jd)  (offset + size) (%jd) handle->to (%jd) handle->offset (%jd)",
+		    offset, handle->from, (offset + size), handle->to, handle->offset);
+		if (offset >= handle->from && (offset + size) <= handle->to && handle->pbuf) {
+			_D("Have already read this chunk");
+			memcpy(buf, handle->pbuf + (offset - handle->from), size);
+			return size;
+		}
 
-	ret = seek_offset(handle, buf, size, offset);
-	if (ret < 0) {
-		_E("Failed to seek offset (%d)", ret);
-		return ret;
+		if (offset > handle->offset) {
+			/* read from current position */
+			diff_size = offset - handle->offset;
+			_D("Read from current position (%jd) till offset  (%jd)", handle->offset, offset);
+			if (handle->pbuf)
+				free(handle->pbuf);
+
+			handle->pbuf = (char *)malloc(diff_size);
+			if (!handle->pbuf) {
+				_E("Malloc failed");
+				return -ENOMEM;
+			}
+
+			bytes_read = 0;
+			do {
+				ret = unzReadCurrentFile(handle->zipfile,
+					    handle->pbuf+bytes_read, diff_size - bytes_read);
+				if (ret < 0) {
+					_E("unzReadCurrentFile Failed");
+					free(handle->pbuf);
+					handle->pbuf = NULL;
+					return -EINVAL;
+				}
+				bytes_read += ret;
+			} while (bytes_read < diff_size && ret != 0);
+
+			if (bytes_read == diff_size) {
+				handle->from = handle->offset;
+				handle->to = offset;
+			} else {
+				free(handle->pbuf);
+				handle->pbuf = NULL;
+			}
+		} else if (offset) {
+			char *tmp_buf;
+			int buf_size;
+			int chunk_count;
+			int i;
+
+			/* read from the begining*/
+			_D("Read from the begining till offset  (%jd)", offset);
+			if (offset < 0)
+				diff_size = handle->offset + offset;
+			else
+				diff_size = offset;
+
+			if (reset_zipfile(handle)) {
+				_E("reset_zipfile Failed");
+				return -EINVAL;
+			}
+
+			/* dont read more than MAX_CHUNK_SIZE at once */
+			if (diff_size < MAX_CHUNK_SIZE)
+				buf_size = diff_size;
+			else
+				buf_size = MAX_CHUNK_SIZE;
+
+			tmp_buf = (char *)malloc(buf_size);
+			if (!tmp_buf) {
+				_E("Malloc failed");
+				return -ENOMEM;
+			}
+
+			/* chunk_count will have total number of chunks to read to reach offset position */
+			chunk_count = diff_size/buf_size;
+			if (diff_size % buf_size) {
+				chunk_count += 1;
+			}
+
+			for (i = 0; i < chunk_count; i++) {
+				/* adjust last chunk size according to offset */
+				if (chunk_count > 1 && chunk_count == i + 1)
+					buf_size = diff_size - (buf_size * i);
+				bytes_read = 0;
+				do {
+					ret = unzReadCurrentFile(handle->zipfile,
+						    tmp_buf+bytes_read, buf_size - bytes_read);
+					if (ret < 0) {
+						_E("unzReadCurrentFile Failed");
+						free(tmp_buf);
+						return -EINVAL;
+					}
+					bytes_read += ret;
+				} while (bytes_read < buf_size && ret != 0);
+				if (!ret) {
+					_E("EOF reached");
+					break;
+				}
+			}
+			free(tmp_buf);
+		}
 	}
 
 	bytes_read = 0;
 	do {
-		ret = unzReadCurrentFile(handle->zipfile,
-				buf + bytes_read, size - bytes_read);
+		ret = unzReadCurrentFile(handle->zipfile, buf + bytes_read, size - bytes_read);
 		if (ret < 0) {
 			_E("unzReadCurrentFile Failed");
 			return -EINVAL;
@@ -796,33 +697,35 @@ int tzip_store_mount_info(const char *zip_path, const char *mount_path)
 
 	if (!zip_path || !mount_path) {
 		_E("Invalid Arguments path : %p buf %p ", zip_path, mount_path);
-		return -ENOENT;
+		ret = ENOENT;
+		return ret;
 	}
 	_D("zip_path - : [%s]  mount_path : [%s] ", zip_path, mount_path);
 
 	fp = fopen(TZIP_INFO_FILE, "a+");
 	if (fp == NULL) {
-		_E("fopen() Failed!!!");
-		return -EIO;
+		_E("fopen() Failed!!!\n");
+		ret = -EIO;
+		return ret;
 	}
-
-	len = sizeof(char) * (strlen(zip_path) + strlen(mount_path) + 3);
-	file_entry = (char *)malloc(len);
+	file_entry = (char *)malloc(sizeof(char)*(strlen(zip_path) + strlen(mount_path) + 3));
 	if (!file_entry) {
+		fclose(fp);
 		_E("Malloc failed");
 		ret = -ENOMEM;
-		goto out;
+		return ret;
 	}
-	snprintf(file_entry, len, "%s:%s\n", zip_path, mount_path);
+	sprintf(file_entry, "%s:%s\n", zip_path, mount_path);
 
 	len = strlen(file_entry);
 	if (fwrite(file_entry, sizeof(char), len, fp) != len) {
 		_E(" fwrite Failed !!!! ");
+		free(file_entry);
+		fclose(fp);
 		ret = -EIO;
-		goto out;
+		return ret;
 	}
 
-out:
 	free(file_entry);
 	fclose(fp);
 	return ret;
@@ -832,49 +735,50 @@ int tzip_remount_zipfs(const char *src_file, const char *mount_point)
 {
 	int ret = 0;
 	char *tzip_path;
-	int path_len, mp_len;
 
 	if (!src_file || !mount_point) {
 		_E("Invalid Arguments src_file : %p mount_point %p ", src_file, mount_point);
-		return -EINVAL;
+		ret = -EINVAL;
+		return ret;
 	}
+
+	tzip_lock();
 
 	ret = add_mount_entry(src_file, mount_point);
 	if (ret) {
 		_E("Failed to add_mount_entry %s", mount_point);
+		tzip_unlock();
 		return ret;
 	}
 
-	path_len = sizeof(TZIP_ROOT_PATH); /* strlen(TZIP_ROOT_PATH) + 1 */
-	mp_len = strlen(mount_point);
-	tzip_path = (char *)malloc(path_len + mp_len);
+	tzip_path = (char *)malloc(strlen(TZIP_ROOT_PATH) + strlen(mount_point) + 1);
 	if (!tzip_path) {
 		_E("Malloc failed");
+		remove_mount_entry(mount_point);
+		tzip_unlock();
 		ret = -ENOMEM;
-		goto out;
+		return ret;
 	}
-	strncpy(tzip_path, TZIP_ROOT_PATH, path_len);
-	strncat(tzip_path, mount_point, mp_len);
+	strcpy(tzip_path, TZIP_ROOT_PATH);
+	strcat(tzip_path, mount_point);
 
 	_D("creating sym link : %s and %s", tzip_path, mount_point);
 	ret = unlink(mount_point);
 	if (ret) {
 		_E("unlink failed");
-		ret = -errno;
-		goto out;
-	}
-
-	ret = symlink(tzip_path, mount_point);
-	if (ret) {
-		_E("symlink failed");
-		ret = -errno;
-		goto out;
-	}
-
-out:
-	if (ret < 0)
 		remove_mount_entry(mount_point);
+		ret = -errno;
+	} else {
+		ret = symlink(tzip_path, mount_point);
+		if (ret) {
+			_E("symlink failed");
+			remove_mount_entry(mount_point);
+			ret = -errno;
+		}
+	}
 	free(tzip_path);
+	tzip_unlock();
+
 	_D("Exit : %d", ret);
 	return ret;
 }

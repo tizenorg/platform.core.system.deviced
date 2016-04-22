@@ -36,15 +36,15 @@
 #include <glib.h>
 #include <sys/stat.h>
 #include <assert.h>
+#include <attr/xattr.h>
 
-#include "tzip.h"
 #include "tzip-utility.h"
 
 static pthread_t thread;
 static pthread_t mount_thread;
 static pthread_attr_t attr;
-static struct fuse *fuse_handle = NULL;
-static struct fuse_chan *channel = NULL;
+static struct fuse *fuse_handle;
+static struct fuse_chan *channel;
 static GAsyncQueue *async_queue;
 
 static int tzip_getattr(const char *path, struct stat *stbuf)
@@ -62,7 +62,7 @@ static int tzip_getattr(const char *path, struct stat *stbuf)
 	res = get_path_prop(path, stbuf);
 	tzip_unlock();
 
-	_D("Exit : %d \n", res);
+	_D("Exit : %d", res);
 
 	return res;
 }
@@ -74,7 +74,6 @@ static int tzip_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	GHashTableIter iter;
 	gpointer key, value;
 	char *name;
-	int ret;
 
 	if (!path || !buf) {
 		_E("Invalid Arguments path : %p buf %p ", path, buf);
@@ -87,9 +86,9 @@ static int tzip_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	tzip_lock();
 	flist = get_dir_files(path);
 	if (flist == NULL) {
+		tzip_unlock();
 		_E("No Files in Dir : %s ", path);
-		ret = 0;
-		goto out_unlock;
+		return 0;
 	}
 
 	g_hash_table_iter_init(&iter, flist->file_hash);
@@ -97,28 +96,23 @@ static int tzip_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		name = (char *)key;
 		filler(buf, name, NULL, 0);
 	}
-
-	ret = 0;
-
-out_unlock:
 	tzip_unlock();
 
-	return ret;
+	return 0;
 }
 
 static int tzip_open(const char *path, struct fuse_file_info *fi)
 {
 	int ret;
-	char *file = NULL;
-	char *zippath = NULL;
+	char *file;
+	char *zippath;
 	int dir_status;
-	struct tzip_mount_entry *entry = NULL;
-	struct tzip_handle *handle = NULL;
-	unz_file_info *file_info = NULL;
+	struct tzip_mount_entry *entry;
+	struct tzip_handle *handle;
+	unz_file_info *file_info;
 	unz_global_info global_info;
-	unzFile *zipfile = NULL;
+	unzFile *zipfile;
 	int len;
-	int file_len;
 
 	if (!path || !fi) {
 		_E("Invalid Arguments  path : %p fi : %p", path, fi);
@@ -130,101 +124,107 @@ static int tzip_open(const char *path, struct fuse_file_info *fi)
 	entry = find_mount_entry(path, &dir_status);
 	if (!entry) {
 		_E("Mount Entry Not Found ");
-		ret = -ENOENT;
-		goto out_unlock;
+		tzip_unlock();
+		return -ENOENT;
 	}
 
-	len = strlen(entry->zip_path) + 1;
-	zippath = (char *)malloc(len);
+	zippath = (char *)malloc(strlen(entry->zip_path)+1);
 	if (!zippath) {
+		tzip_unlock();
 		_E("Malloc failed");
-		ret = -ENOMEM;
-		goto out_unlock;
+		return -ENOMEM;
 	}
-	snprintf(zippath, len, "%s", entry->zip_path);
+	strcpy(zippath, entry->zip_path);
 
 	len = strlen(entry->path);
-	file_len = strlen(path) - len + 1;
-	file = (char *)malloc(file_len);
+	file = (char *)malloc(strlen(path) - len + 1);
 	if (!file) {
+		free(zippath);
+		tzip_unlock();
 		_E("Malloc failed");
-		ret = -ENOMEM;
-		goto out_unlock;
+		return -ENOMEM;
 	}
-	strncpy(file, path + len + 1, file_len);
+	strcpy(file, path + len + 1);
 	tzip_unlock();
 
 	zipfile = unzOpen(zippath);
 	if (!zipfile) {
 		_E("unzOpen Failed");
-		ret = -ENOENT;
-		goto out;
+		free(zippath);
+		free(file);
+		return -ENOENT;
 	}
 
 	/* Get info about the zip file */
 	if (unzGetGlobalInfo(zipfile, &global_info) != UNZ_OK) {
+		unzClose(zipfile);
+		free(zippath);
+		free(file);
 		_E("unzGetGlobalInfo Failed");
-		ret = -EINVAL;
-		goto out;
+		return -EINVAL;
 	}
 
 	if (unzLocateFile(zipfile, file, CASE_SENSITIVE) != UNZ_OK) {
+		unzClose(zipfile);
+		free(zippath);
 		_E("File :[%s] Not Found : unzLocateFile failed", file);
-		ret = -ENOENT;
-		goto out;
+		free(file);
+		return -ENOENT;
 	}
 
 	file_info = (unz_file_info *)malloc(sizeof(unz_file_info));
 	if (!file_info) {
+		unzClose(zipfile);
+		free(zippath);
+		free(file);
 		_E("Malloc failed");
-		ret = -ENOMEM;
-		goto out;
+		return -ENOMEM;
 	}
 
 	ret = unzGetCurrentFileInfo(zipfile, file_info, (char *)file,
 			strlen(file), NULL, 0, NULL, 0);
 	if (ret != UNZ_OK) {
+		unzClose(zipfile);
+		free(zippath);
+		free(file);
+		free(file_info);
 		_E("unzGetCurrentFileInfo Failed");
-		ret = -EINVAL;
-		goto out;
+		return -EINVAL;
 	}
 
 	ret = unzOpenCurrentFile(zipfile);
 	if (ret != UNZ_OK) {
+		unzClose(zipfile);
+		free(zippath);
+		free(file);
+		free(file_info);
 		_E("unzOpenCurrentFile Failed");
-		ret = -EINVAL;
-		goto out;
+		return -EINVAL;
 	}
 	handle = (struct tzip_handle *)malloc(sizeof(struct tzip_handle));
 	if (!handle) {
 		unzCloseCurrentFile(zipfile);
+		unzClose(zipfile);
+		free(zippath);
+		free(file);
+		free(file_info);
 		_E("Malloc failed");
-		ret = -ENOMEM;
-		goto out;
+		return -ENOMEM;
 	}
 	handle->file_info = file_info;
 	handle->zipfile = zipfile;
 	handle->offset = 0;
 	handle->path = zippath;
 	handle->file = file;
+	handle->pbuf = NULL;
+	handle->from = 0;
+	handle->to = 0;
+	 if (sem_init(&handle->lock, 0, 1) == -1)
+		_E("sem_init failed");
 
-#ifdef ARCH_32BIT
-	int hd = (int)handle;
-	fi->fh = (uint64_t)hd;
-#else
-	fi->fh = (uint64_t)handle;
-#endif
+	ret = (int)handle;
+	fi->fh = (uint64_t)ret;
 	return 0;
-
-out_unlock:
-	tzip_unlock();
-out:
-	free(zippath);
-	free(file);
-	free(file_info);
-	if (zipfile)
-		unzClose(zipfile);
-	return ret;
 }
 
 static int tzip_read(const char *path, char *buf, size_t size, off_t offset,
@@ -241,25 +241,21 @@ static int tzip_read(const char *path, char *buf, size_t size, off_t offset,
 		_E("Invalid Zip Handle ");
 		return -EINVAL;
 	}
-
-#ifdef ARCH_32BIT
-	int hd = (int)fi->fh;
-	handle = (struct tzip_handle *)hd;
-#else
-	handle = (struct tzip_handle *)(fi->fh);
-#endif
+	ret = (int)fi->fh;
+	handle = (struct tzip_handle *)ret;
 
 	_D("Read - Path : %s  size : %zd offset : %jd ", path, size, offset);
 	sem_wait(&handle->lock);
 	ret = read_zipfile(handle, buf, size, offset);
 	sem_post(&handle->lock);
-	_I("Read ret = %d", ret);
+	_D("Read ret = %d", ret);
 	return ret;
 }
 
 static int tzip_release(const char *path, struct fuse_file_info *fi)
 {
 	struct tzip_handle *handle;
+	int ret;
 
 	if (!path) {
 		_E("Invalid Arguments path : %p", path);
@@ -269,13 +265,8 @@ static int tzip_release(const char *path, struct fuse_file_info *fi)
 		_E("Invalid Zip Handle ");
 		return -EINVAL;
 	}
-
-#ifdef ARCH_32BIT
-	int hd = (int)fi->fh;
-	handle = (struct tzip_handle *)hd;
-#else
-	handle = (struct tzip_handle *)(fi->fh);
-#endif
+	ret = (int)fi->fh;
+	handle = (struct tzip_handle *)ret;
 
 	if (sem_destroy(&handle->lock) == -1)
 		_E("sem_destroy failed");
@@ -285,6 +276,8 @@ static int tzip_release(const char *path, struct fuse_file_info *fi)
 	free(handle->file);
 	free(handle->path);
 	free(handle->file_info);
+	if (handle->pbuf)
+		free(handle->pbuf);
 	free(handle);
 
 	return 0;
@@ -308,8 +301,8 @@ static void *tzip_thread(void *arg)
 	char *mount_info = NULL;
 	size_t len;
 	ssize_t read;
-	char *saveptr = NULL;
-	char *argv[4] = {"deviced", "-o","allow_other", NULL};
+	char *saveptr;
+	char *argv[4] = {"deviced", "-o", "allow_other", NULL};
 	struct fuse_args args = FUSE_ARGS_INIT(3, argv);
 
 	ret = mkdir(TZIP_ROOT_PATH, 0755);
@@ -327,7 +320,8 @@ static void *tzip_thread(void *arg)
 		channel = fuse_mount(TZIP_ROOT_PATH, NULL);
 		if (!channel) {
 			_E("Failed at mount_point %p ", TZIP_ROOT_PATH);
-			goto out_unlock;
+			tzip_unlock();
+			return NULL;
 		}
 	}
 
@@ -335,14 +329,16 @@ static void *tzip_thread(void *arg)
 					&tzip_oper, sizeof(tzip_oper), NULL);
 	if (!fuse_handle) {
 		_E("Failed at  fuse_new");
-		goto out_unlock;
+		tzip_unlock();
+		return NULL;
 	}
 
 	/* initialize string hash table */
 	hash = hashmap_init();
 	if (!hash) {
 		_E("Failed at  hashmap_init");
-		goto out_unlock;
+		tzip_unlock();
+		return NULL;
 	}
 	fp = fopen(TZIP_INFO_FILE, "r");
 	if (fp) {
@@ -361,21 +357,138 @@ static void *tzip_thread(void *arg)
 		fclose(fp);
 	}
 	tzip_unlock();
-
 	if (fuse_loop_mt(fuse_handle)) {
 		_E("Failed at  fuse_loop_mt");
-		goto out;
+		return NULL;
 	}
 
-	tzip_lock();
-	fuse_destroy(fuse_handle);
-	fuse_handle = NULL;
-
-out_unlock:
-	tzip_unlock();
-out:
 	return NULL;
 }
+
+int tzip_mount_zipfs(const char *src_file, const char *mount_point, const char *smack)
+{
+	int ret = 0;
+	char *tzip_path;
+
+	tzip_lock();
+	ret = add_mount_entry(src_file, mount_point);
+	if (ret) {
+		_E("Failed to add_mount_entry %s", mount_point);
+		tzip_unlock();
+		return ret;
+	}
+
+	tzip_path = (char *)malloc(strlen(TZIP_ROOT_PATH) + strlen(mount_point) + 1);
+	if (!tzip_path) {
+		_E("Malloc failed");
+		remove_mount_entry(mount_point);
+		tzip_unlock();
+		return -ENOMEM;
+	}
+	strcpy(tzip_path, TZIP_ROOT_PATH);
+	strcat(tzip_path, mount_point);
+
+	_D("creating sym link : %s and %s", tzip_path, mount_point);
+	ret = symlink(tzip_path, mount_point);
+	if (ret) {
+		_E("symlink failed");
+		remove_mount_entry(mount_point);
+		ret = -errno;
+	} else {
+		ret = tzip_store_mount_info(src_file, mount_point);
+		if (ret != 0) {
+			_E("Failed to store_mount_info %s", mount_point);
+		}
+		if (smack) {
+			ret = lsetxattr(mount_point, "security.SMACK64", smack, strlen(smack), 0);
+			if (ret < 0) {
+				_E("setting smack label using lsetxattr() failed");
+				remove_mount_entry(mount_point);
+				ret = -errno;
+			}
+		}
+	}
+
+	tzip_unlock();
+	free(tzip_path);
+	_D("Exit : %d", ret);
+	return ret;
+}
+
+int tzip_unmount_zipfs(const char *mount_point)
+{
+	int ret = 0;
+	char *tzip_path;
+
+	tzip_lock();
+	ret = remove_mount_entry(mount_point);
+	if (ret) {
+		_E("Failed to remove_mount_entry %s", mount_point);
+		tzip_unlock();
+		return ret;
+	}
+
+	tzip_path = (char *)malloc(strlen(TZIP_ROOT_PATH) + strlen(mount_point) + 1);
+	if (!tzip_path) {
+		_E("Malloc failed");
+		tzip_unlock();
+		return -ENOMEM;
+	}
+	strcpy(tzip_path, TZIP_ROOT_PATH);
+	strcat(tzip_path, mount_point);
+
+	_D("deleting sym link : %s and %s", tzip_path, mount_point);
+	ret = unlink(mount_point);
+	if (ret) {
+		_E("unlink failed");
+		ret = -errno;
+	}
+	tzip_unlock();
+	free(tzip_path);
+	_D("Exit : %d", ret);
+	return ret;
+}
+
+int tzip_is_mounted(const char *mount_point)
+{
+	struct tzip_mount_entry *entry = NULL;
+	int ret = 0;
+	char *tzip_path;
+	struct stat sb;
+
+	if (!mount_point) {
+		_E("Invalid Arguments mount_point %p ", mount_point);
+		return -EINVAL;
+	}
+
+	if (!get_hashmap()) {
+		_E("tzip init is not done yet");
+		return 0;
+	}
+
+	entry = get_mount_entry(mount_point);
+	if (!entry) {
+		_E("mount_path : %s does not exists ", mount_point);
+		return 0;
+	}
+
+	tzip_path = (char *)malloc(strlen(TZIP_ROOT_PATH) + strlen(mount_point) + 1);
+	if (!tzip_path) {
+		_E("Malloc failed");
+		return -ENOMEM;
+	}
+	strcpy(tzip_path, TZIP_ROOT_PATH);
+	strcat(tzip_path, mount_point);
+
+	if (stat(tzip_path, &sb) == -1 || stat(mount_point, &sb) == -1)
+		ret = 0;
+	else
+		ret = 1;
+
+	free(tzip_path);
+	return ret;
+}
+
 
 static void *tzip_mount_thread(void *arg)
 {
@@ -392,9 +505,12 @@ static void *tzip_mount_thread(void *arg)
 		assert(msgdata);
 
 		if (msgdata->type == 'm') {
-			ret = tzip_mount_zipfs(msgdata->zippath, msgdata->mountpath);
+			ret = tzip_mount_zipfs(msgdata->zippath, msgdata->mountpath,
+				msgdata->smack);
 			free(msgdata->zippath);
 			free(msgdata->mountpath);
+			if (msgdata->smack)
+				free(msgdata->smack);
 		} else if (msgdata->type == 'u') {
 			ret = tzip_unmount_zipfs(msgdata->mountpath);
 			free(msgdata->mountpath);
@@ -414,171 +530,27 @@ void tzip_server_init(void)
 	if (pthread_attr_init(&attr) != 0)
 		_E("pthread_attr_init Failed");
 
-	if (pthread_create(&thread, &attr, &tzip_thread, NULL))
+	if (pthread_create(&thread, &attr, &tzip_thread, NULL)) {
 		_E("pthread_create Failed");
+	}
 
-	if (pthread_create(&mount_thread, &attr, &tzip_mount_thread, NULL))
+	if (pthread_create(&mount_thread, &attr, &tzip_mount_thread, NULL)) {
 		_E("pthread_create Failed");
+	}
 }
 
 void tzip_server_exit(void)
 {
-	if (!fuse_handle || !channel)
+	if (!fuse_handle || !channel) {
+		_E("Invalid Argument ");
 		return;
+	}
 
-	tzip_lock();
 	fuse_exit(fuse_handle);
 	fuse_unmount(TZIP_ROOT_PATH, channel);
+	fuse_destroy(fuse_handle);
+	fuse_handle = NULL;
 	channel = NULL;
-	tzip_unlock();
-}
-
-static int tzip_check_mount_point(const char *mount_point)
-{
-	int ret;
-
-	if (unlink(mount_point) == 0)
-		return 0;
-
-	ret = errno;
-	if (ret == ENOENT)
-		return 0;
-
-	_E("Failed to remove previous symlink file(errno:%d)", ret);
-	return ret;
-}
-
-int tzip_mount_zipfs(const char *src_file, const char *mount_point)
-{
-	int ret = 0;
-	char *tzip_path = NULL;
-	int path_len, mp_len;
-
-	tzip_lock();
-
-	ret = add_mount_entry(src_file, mount_point);
-	if (ret) {
-		_E("Failed to add_mount_entry %s", mount_point);
-		goto out;
-	}
-
-	ret = tzip_check_mount_point(mount_point);
-	if (ret < 0) {
-		_E("Failed to mount via tzip (ret:%d)", ret);
-		remove_mount_entry(mount_point);
-		goto out;
-	}
-
-	path_len = sizeof(TZIP_ROOT_PATH); /* strlen(TZIP_ROOT_PATH) + 1 */
-	mp_len = strlen(mount_point);
-	tzip_path = (char *)malloc(path_len + mp_len);
-	if (!tzip_path) {
-		_E("Malloc failed");
-		remove_mount_entry(mount_point);
-		ret = -ENOMEM;
-		goto out;
-	}
-	strncpy(tzip_path, TZIP_ROOT_PATH, path_len);
-	strncat(tzip_path, mount_point, mp_len);
-
-	_D("creating sym link : %s and %s", tzip_path, mount_point);
-	ret = symlink(tzip_path, mount_point);
-	if (ret) {
-		_E("symlink failed");
-		remove_mount_entry(mount_point);
-		ret = -errno;
-	} else {
-		ret = tzip_store_mount_info(src_file, mount_point);
-		if (ret != 0)
-			_E("Failed to store_mount_info %s", mount_point);
-	}
-
-out:
-	tzip_unlock();
-	free(tzip_path);
-	_D("Exit : %d", ret);
-	return ret;
-}
-
-int tzip_unmount_zipfs(const char *mount_point)
-{
-	int ret = 0;
-	char *tzip_path = NULL;
-	int path_len, mp_len;
-
-	tzip_lock();
-	ret = remove_mount_entry(mount_point);
-	if (ret) {
-		_E("Failed to remove_mount_entry %s", mount_point);
-		goto out_unlock;
-	}
-
-	path_len = sizeof(TZIP_ROOT_PATH); /* strlen(TZIP_ROOT_PATH) + 1 */
-	mp_len = strlen(mount_point);
-	tzip_path = (char *)malloc(path_len + mp_len);
-	if (!tzip_path) {
-		_E("Malloc failed");
-		ret = -ENOMEM;
-		goto out_unlock;
-	}
-	strncpy(tzip_path, TZIP_ROOT_PATH, path_len);
-	strncat(tzip_path, mount_point, mp_len);
-
-	_D("deleting sym link : %s and %s", tzip_path, mount_point);
-	ret = unlink(mount_point);
-	if (ret) {
-		_E("unlink failed");
-		ret = -errno;
-	}
-
-out_unlock:
-	tzip_unlock();
-	free(tzip_path);
-	_D("Exit : %d", ret);
-	return ret;
-}
-
-int tzip_is_mounted(const char *mount_point)
-{
-	struct tzip_mount_entry *entry = NULL;
-	int ret = 0;
-	char *tzip_path;
-	struct stat sb;
-	int path_len, mp_len;
-
-	if (!mount_point) {
-		_E("Invalid Arguments mount_point %p ", mount_point);
-		return -EINVAL;
-	}
-
-	if (!get_hashmap()) {
-		_E("tzip init is not done yet");
-		return 0;
-	}
-
-	entry = get_mount_entry(mount_point);
-	if (!entry) {
-		_E("mount_path : %s does not exists ", mount_point);
-		return 0;
-	}
-
-	path_len = sizeof(TZIP_ROOT_PATH); /* strlen(TZIP_ROOT_PATH) + 1 */
-	mp_len = strlen(mount_point);
-	tzip_path = (char *)malloc(path_len + mp_len);
-	if (!tzip_path) {
-		_E("Malloc failed");
-		return -ENOMEM;
-	}
-	strncpy(tzip_path, TZIP_ROOT_PATH, path_len);
-	strncat(tzip_path, mount_point, mp_len);
-
-	if (stat(tzip_path, &sb) == -1 || stat(mount_point, &sb) == -1)
-		ret = 0;
-	else
-		ret = 1;
-
-	free(tzip_path);
-	return ret;
 }
 
 static DBusMessage *edbus_request_mount_tzip(E_DBus_Object *obj, DBusMessage *msg)
@@ -588,23 +560,24 @@ static DBusMessage *edbus_request_mount_tzip(E_DBus_Object *obj, DBusMessage *ms
 	DBusMessage *reply;
 	char *zippath;
 	char *mountpath;
+	char *smack;
 	int ret;
-	struct tzip_msg_data *msgdata = NULL;
+	struct tzip_msg_data *msgdata;
 
 	dbus_error_init(&err);
 
 	if (!dbus_message_get_args(msg, &err,
-		    DBUS_TYPE_STRING, &mountpath,
-		    DBUS_TYPE_STRING, &zippath, DBUS_TYPE_INVALID)) {
+		    DBUS_TYPE_STRING, &mountpath, DBUS_TYPE_STRING, &zippath,
+		    DBUS_TYPE_STRING, &smack, DBUS_TYPE_INVALID)) {
 		_E("there is no message");
 		ret = -EINVAL;
-		goto out;
+		goto error;
 	}
 
 	if (!mountpath || !zippath) {
 		_E("invalid input");
 		ret = -EINVAL;
-		goto out;
+		goto error;
 	}
 
 	if (!fuse_handle)
@@ -614,32 +587,55 @@ static DBusMessage *edbus_request_mount_tzip(E_DBus_Object *obj, DBusMessage *ms
 	if (!msgdata) {
 		_E("Malloc failed");
 		ret = -ENOMEM;
-		goto out;
+		goto error;
 	}
 
 	msgdata->type = 'm';
 	msgdata->zippath = strdup(zippath);
-	msgdata->mountpath = strdup(mountpath);
-	if (!msgdata->zippath ||
-		!msgdata->mountpath) {
+	if (!msgdata->zippath) {
 		_E("Malloc failed");
 		ret = -ENOMEM;
-		goto out;
+		free(msgdata);
+		goto error;
+	}
+
+	msgdata->mountpath = strdup(mountpath);
+	if (!msgdata->mountpath) {
+		_E("Malloc failed");
+		ret = -ENOMEM;
+		free(msgdata->zippath);
+		free(msgdata);
+		goto error;
+	}
+
+	if (smack) {
+		msgdata->smack = strdup(smack);
+		if (!msgdata->smack) {
+			_E("Malloc failed");
+			ret = -ENOMEM;
+			free(msgdata->zippath);
+			free(msgdata->mountpath);
+			free(msgdata);
+			goto error;
+		}
+	} else {
+		/* Use default smack */
+		msgdata->smack = NULL;
 	}
 
 	if (async_queue) {
 		g_async_queue_push(async_queue, (gpointer)msgdata);
 		ret = 0;
-	} else
+	} else {
 		ret = -EAGAIN;
-
-out:
-	if (ret < 0 && msgdata) {
 		free(msgdata->zippath);
 		free(msgdata->mountpath);
+		if (msgdata->smack)
+			free(msgdata->smack);
 		free(msgdata);
 	}
 
+error:
 	reply = dbus_message_new_method_return(msg);
 	dbus_message_iter_init_append(reply, &iter);
 	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
@@ -653,7 +649,7 @@ static DBusMessage *edbus_request_unmount_tzip(E_DBus_Object *obj, DBusMessage *
 	DBusMessage *reply;
 	char *mountpath;
 	int ret;
-	struct tzip_msg_data *msgdata = NULL;
+	struct tzip_msg_data *msgdata;
 
 	dbus_error_init(&err);
 
@@ -661,13 +657,13 @@ static DBusMessage *edbus_request_unmount_tzip(E_DBus_Object *obj, DBusMessage *
 		    DBUS_TYPE_STRING, &mountpath, DBUS_TYPE_INVALID)) {
 		_E("there is no message");
 		ret = -EINVAL;
-		goto out;
+		goto error;
 	}
 
 	if (!mountpath) {
 		_E("invalid input");
 		ret = -EINVAL;
-		goto out;
+		goto error;
 	}
 
 	if (!fuse_handle)
@@ -677,7 +673,7 @@ static DBusMessage *edbus_request_unmount_tzip(E_DBus_Object *obj, DBusMessage *
 	if (!msgdata) {
 		_E("Malloc failed");
 		ret = -ENOMEM;
-		goto out;
+		goto error;
 	}
 
 	msgdata->type = 'u';
@@ -685,21 +681,20 @@ static DBusMessage *edbus_request_unmount_tzip(E_DBus_Object *obj, DBusMessage *
 	if (!msgdata->mountpath) {
 		_E("Malloc failed");
 		ret = -ENOMEM;
-		goto out;
+		free(msgdata);
+		goto error;
 	}
 
 	if (async_queue) {
 		g_async_queue_push(async_queue, (gpointer)msgdata);
 		ret = 0;
-	} else
+	} else {
 		ret = -ENOMEM;
-
-out:
-	if (ret < 0 && msgdata) {
 		free(msgdata->mountpath);
 		free(msgdata);
 	}
 
+error:
 	reply = dbus_message_new_method_return(msg);
 	dbus_message_iter_init_append(reply, &iter);
 	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
@@ -720,12 +715,12 @@ static DBusMessage *edbus_request_ismounted_tzip(E_DBus_Object *obj, DBusMessage
 		    DBUS_TYPE_STRING, &mountpath, DBUS_TYPE_INVALID)) {
 		_E("there is no message");
 		ret = -EINVAL;
-		goto out;
+		goto error;
 	}
 
 	ret = tzip_is_mounted(mountpath);
 
-out:
+error:
 	reply = dbus_message_new_method_return(msg);
 	dbus_message_iter_init_append(reply, &iter);
 	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
@@ -733,7 +728,7 @@ out:
 }
 
 static const struct edbus_method edbus_methods[] = {
-	{ "Mount", "ss", "i", edbus_request_mount_tzip },
+	{ "Mount", "sss", "i", edbus_request_mount_tzip },
 	{ "Unmount", "s", "i", edbus_request_unmount_tzip },
 	{ "IsMounted", "s", "i", edbus_request_ismounted_tzip },
 	/* Add methods here */
@@ -747,13 +742,6 @@ static int booting_done(void *data)
 	return 0;
 }
 
-static int tzip_poweroff(void *data)
-{
-	_I("TZIP poweroff");
-	tzip_server_exit();
-	return 0;
-}
-
 static void tzip_init(void *data)
 {
 	int ret;
@@ -762,8 +750,6 @@ static void tzip_init(void *data)
 	tzip_lock_init();
 
 	register_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
-	register_notifier(DEVICE_NOTIFIER_POWEROFF, tzip_poweroff);
-
 	ret = register_edbus_interface_and_method(DEVICED_PATH_TZIP,
 			DEVICED_INTERFACE_TZIP,
 			edbus_methods, ARRAY_SIZE(edbus_methods));
@@ -775,17 +761,15 @@ static void tzip_exit(void *data)
 {
 	_D("tzip_exit ");
 	tzip_server_exit();
-	unregister_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
-	unregister_notifier(DEVICE_NOTIFIER_POWEROFF, tzip_poweroff);
-
-	tzip_lock_deinit();
+	register_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
 }
 
 static const struct device_ops tzip_device_ops = {
-	.name	= "tzip",
-	.init	= tzip_init,
-	.exit	= tzip_exit,
+	.name     = "tzip",
+	.init     = tzip_init,
+	.exit  = tzip_exit,
 };
 
 DEVICE_OPS_REGISTER(&tzip_device_ops)
+
 
