@@ -30,9 +30,10 @@ extern "C" {
  * @since_tizen 3.0
  * @param[in] zip_file The input zip file
  * @param[in] mount_path The mount path
+ * @param[in] smack Smack label for mount path
  * @return @c 0 if the mount operation is successful, \n @c negative error code if the mount operation fails
  */
-int tzip_mount_zipfs(const char *zip_file, const char *mount_path);
+int tzip_mount_zipfs(const char *zip_file, const char *mount_path, const char *smack);
 
 /**
  * @brief unmounts a already mounted path

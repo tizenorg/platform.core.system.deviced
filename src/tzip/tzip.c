@@ -36,6 +36,7 @@
 #include <glib.h>
 #include <sys/stat.h>
 #include <assert.h>
+#include <attr/xattr.h>
 
 #include "tzip.h"
 #include "tzip-utility.h"
@@ -385,9 +386,12 @@ static void *tzip_mount_thread(void *arg)
 		assert(msgdata);
 
 		if (msgdata->type == 'm') {
-			ret = tzip_mount_zipfs(msgdata->zippath, msgdata->mountpath);
+			ret = tzip_mount_zipfs(msgdata->zippath, msgdata->mountpath,
+				msgdata->smack);
 			free(msgdata->zippath);
 			free(msgdata->mountpath);
+			if (msgdata->smack)
+				free(msgdata->smack);
 		} else if (msgdata->type == 'u') {
 			ret = tzip_unmount_zipfs(msgdata->mountpath);
 			free(msgdata->mountpath);
@@ -422,6 +426,8 @@ void tzip_server_exit(void)
 	tzip_lock();
 	fuse_exit(fuse_handle);
 	fuse_unmount(TZIP_ROOT_PATH, channel);
+	fuse_destroy(fuse_handle);
+	fuse_handle = NULL;
 	channel = NULL;
 	tzip_unlock();
 }
@@ -441,7 +447,7 @@ static int tzip_check_mount_point(const char *mount_point)
 	return ret;
 }
 
-int tzip_mount_zipfs(const char *src_file, const char *mount_point)
+int tzip_mount_zipfs(const char *src_file, const char *mount_point, const char *smack)
 {
 	int ret = 0;
 	char *tzip_path = NULL;
@@ -484,6 +490,15 @@ int tzip_mount_zipfs(const char *src_file, const char *mount_point)
 		ret = tzip_store_mount_info(src_file, mount_point);
 		if (ret != 0)
 			_E("Failed to store_mount_info %s", mount_point);
+
+		if (smack) {
+			ret = lsetxattr(mount_point, "security.SMACK64", smack, strlen(smack), 0);
+			if (ret < 0) {
+				_E("setting smack label using lsetxattr() failed");
+				remove_mount_entry(mount_point);
+				ret = -errno;
+			}
+		}
 	}
 
 out:
@@ -581,6 +596,7 @@ static DBusMessage *edbus_request_mount_tzip(E_DBus_Object *obj, DBusMessage *ms
 	DBusMessage *reply;
 	char *zippath;
 	char *mountpath;
+	char *smack;
 	int ret;
 	struct tzip_msg_data *msgdata = NULL;
 
@@ -588,7 +604,9 @@ static DBusMessage *edbus_request_mount_tzip(E_DBus_Object *obj, DBusMessage *ms
 
 	if (!dbus_message_get_args(msg, &err,
 		    DBUS_TYPE_STRING, &mountpath,
-		    DBUS_TYPE_STRING, &zippath, DBUS_TYPE_INVALID)) {
+		    DBUS_TYPE_STRING, &zippath,
+			DBUS_TYPE_STRING, &smack,
+			DBUS_TYPE_INVALID)) {
 		_E("there is no message");
 		ret = -EINVAL;
 		goto out;
@@ -620,6 +638,16 @@ static DBusMessage *edbus_request_mount_tzip(E_DBus_Object *obj, DBusMessage *ms
 		goto out;
 	}
 
+	if (smack) {
+		msgdata->smack = strdup(smack);
+		if (!msgdata->smack) {
+			_E("Malloc failed");
+			ret = -ENOMEM;
+			goto out;
+		}
+	} else /* Use default smack */
+		msgdata->smack = NULL;
+
 	if (async_queue) {
 		g_async_queue_push(async_queue, (gpointer)msgdata);
 		ret = 0;
@@ -630,6 +658,8 @@ out:
 	if (ret < 0 && msgdata) {
 		free(msgdata->zippath);
 		free(msgdata->mountpath);
+		if (msgdata->smack)
+			free(msgdata->smack);
 		free(msgdata);
 	}
 
@@ -726,7 +756,7 @@ out:
 }
 
 static const struct edbus_method edbus_methods[] = {
-	{ "Mount", "ss", "i", edbus_request_mount_tzip },
+	{ "Mount", "sss", "i", edbus_request_mount_tzip },
 	{ "Unmount", "s", "i", edbus_request_unmount_tzip },
 	{ "IsMounted", "s", "i", edbus_request_ismounted_tzip },
 	/* Add methods here */
