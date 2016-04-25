@@ -65,6 +65,10 @@ struct tzip_handle {
 	char *path;
 	char *file;
 	off_t offset;
+	off_t from;
+	off_t to;
+	char *pbuf;
+	sem_t lock;
 };
 
 /* structure containing message queue data */
@@ -94,6 +98,7 @@ int add_dir_info(struct tzip_mount_entry *mnode, const char *parent_dir, const c
 void fileinfo_to_stat(unz_file_info *file_info, struct stat *file_stat, mode_t mode);
 struct tzip_dir_info *get_dir_list(struct tzip_mount_entry *dir_node, const char *dir_name);
 void free_mount_node(struct tzip_mount_entry *mount_node);
+int reset_zipfile(struct tzip_handle *handle);
 int read_zipfile(struct tzip_handle *handle, char *buf, size_t size, off_t offset);
 GHashTable *hashmap_init(void);
 GHashTable *get_hashmap(void);

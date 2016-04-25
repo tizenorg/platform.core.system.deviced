@@ -208,6 +208,11 @@ static int tzip_open(const char *path, struct fuse_file_info *fi)
 	handle->offset = 0;
 	handle->path = zippath;
 	handle->file = file;
+	handle->pbuf = NULL;
+	handle->from = 0;
+	handle->to = 0;
+	if (sem_init(&handle->lock, 0, 1) == -1)
+		_E("sem_init failed");
 
 #ifdef ARCH_32BIT
 	int hd = (int)handle;
@@ -251,8 +256,10 @@ static int tzip_read(const char *path, char *buf, size_t size, off_t offset,
 #endif
 
 	_D("Read - Path : %s  size : %zd offset : %jd ", path, size, offset);
+	sem_wait(&handle->lock);
 	ret = read_zipfile(handle, buf, size, offset);
-
+	sem_post(&handle->lock);
+	_D("Read ret = %d", ret);
 	return ret;
 }
 
@@ -276,11 +283,16 @@ static int tzip_release(const char *path, struct fuse_file_info *fi)
 	handle = (struct tzip_handle *)(fi->fh);
 #endif
 
+	if (sem_destroy(&handle->lock) == -1)
+		_E("sem_destroy failed");
+
 	unzCloseCurrentFile(handle->zipfile);
 	unzClose(handle->zipfile);
 	free(handle->file);
 	free(handle->path);
 	free(handle->file_info);
+	if (handle->pbuf)
+		free(handle->pbuf);
 	free(handle);
 
 	return 0;

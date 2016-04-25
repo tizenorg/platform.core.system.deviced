@@ -556,6 +556,26 @@ void tzip_unlock(void)
 	sem_post(&tzip_sem);
 }
 
+int reset_zipfile(struct tzip_handle *handle)
+{
+	int ret;
+
+	ret = unzCloseCurrentFile(handle->zipfile);
+	if (ret != UNZ_OK) {
+		_E("unzOpenCurrentFile Failed");
+		return -EINVAL;
+	}
+	if (unzLocateFile(handle->zipfile, handle->file, CASE_SENSITIVE) != UNZ_OK) {
+		_E("File :[%s] Not Found : unzLocateFile failed", handle->file);
+		return -ENOENT;
+	}
+	ret = unzOpenCurrentFile(handle->zipfile);
+	if (ret != UNZ_OK) {
+		_E("unzOpenCurrentFile Failed");
+		return -EINVAL;
+	}
+	return 0;
+}
 int read_zipfile(struct tzip_handle *handle, char *buf,
 			size_t size, off_t offset)
 {
@@ -568,64 +588,106 @@ int read_zipfile(struct tzip_handle *handle, char *buf,
 	}
 
 	if (offset != handle->offset) {
+		int diff_size;
 		/* seek and read buffer */
-		char *tmp_buf;
-		size_t diff_size;
-		size_t buf_size;
-		size_t chunk_count;
-		int i;
+		_D("offset (%jd) handle->from(%jd)  (offset + size) (%jd) handle->to (%jd) handle->offset (%jd)",
+		    offset, handle->from, (offset + size), handle->to, handle->offset);
+		if (offset >= handle->from && (offset + size) <= handle->to && handle->pbuf) {
+			_D("Have already read this chunk");
+			memcpy(buf, handle->pbuf + (offset - handle->from), size);
+			return size;
+		}
 
 		if (offset > handle->offset) {
 			/* read from current position */
 			diff_size = offset - handle->offset;
 			_D("Read from current position (%jd) till offset  (%jd)", handle->offset, offset);
-		} else {
+			if (handle->pbuf)
+				free(handle->pbuf);
+
+			handle->pbuf = (char *)malloc(diff_size);
+			if (!handle->pbuf) {
+				_E("Malloc failed");
+				return -ENOMEM;
+			}
+
+			bytes_read = 0;
+			do {
+				ret = unzReadCurrentFile(handle->zipfile,
+					    handle->pbuf+bytes_read, diff_size - bytes_read);
+				if (ret < 0) {
+					_E("unzReadCurrentFile Failed");
+					free(handle->pbuf);
+					handle->pbuf = NULL;
+					return -EINVAL;
+				}
+				bytes_read += ret;
+			} while (bytes_read < diff_size && ret != 0);
+
+			if (bytes_read == diff_size) {
+				handle->from = handle->offset;
+				handle->to = offset;
+			} else {
+				free(handle->pbuf);
+				handle->pbuf = NULL;
+			}
+		} else if (offset) {
+			char *tmp_buf;
+			int buf_size;
+			int chunk_count;
+			int i;
+
 			/* read from the begining*/
 			_D("Read from the begining till offset  (%jd)", offset);
 			if (offset < 0)
 				diff_size = handle->offset + offset;
 			else
 				diff_size = offset;
-			ret = unzSetOffset(handle->zipfile, 0);
-			if (ret < 0) {
-				_E("unzSetOffset Failed");
+
+			if (reset_zipfile(handle)) {
+				_E("reset_zipfile Failed");
 				return -EINVAL;
 			}
-		}
 
-		/* dont read more than MAX_CHUNK_SIZE at once */
-		if (diff_size < MAX_CHUNK_SIZE)
-			buf_size = diff_size;
-		else
-			buf_size = MAX_CHUNK_SIZE;
+			/* dont read more than MAX_CHUNK_SIZE at once */
+			if (diff_size < MAX_CHUNK_SIZE)
+				buf_size = diff_size;
+			else
+				buf_size = MAX_CHUNK_SIZE;
 
-		tmp_buf = (char *)malloc(buf_size);
-		if (!tmp_buf) {
-			_E("Malloc failed");
-			return -ENOMEM;
-		}
+			tmp_buf = (char *)malloc(buf_size);
+			if (!tmp_buf) {
+				_E("Malloc failed");
+				return -ENOMEM;
+			}
 
-		/* chunk_count will have total number of chunks to read to reach offset position */
-		chunk_count = diff_size/buf_size;
-		chunk_count += 1;
+			/* chunk_count will have total number of chunks to read to reach offset position */
+			chunk_count = diff_size/buf_size;
+			if (diff_size % buf_size)
+				chunk_count += 1;
 
-		for (i = 0; i < chunk_count; i++) {
-			/* adjust last chunk size according to offset */
-			if (chunk_count > 1 && chunk_count == i + 1)
-				buf_size = diff_size - (buf_size * i);
-			bytes_read = 0;
-			do {
-				ret = unzReadCurrentFile(handle->zipfile,
-					    tmp_buf+bytes_read, buf_size - bytes_read);
-				if (ret < 0) {
-					_E("unzReadCurrentFile Failed");
-					free(tmp_buf);
-					return -EINVAL;
+			for (i = 0; i < chunk_count; i++) {
+				/* adjust last chunk size according to offset */
+				if (chunk_count > 1 && chunk_count == i + 1)
+					buf_size = diff_size - (buf_size * i);
+				bytes_read = 0;
+				do {
+					ret = unzReadCurrentFile(handle->zipfile,
+						    tmp_buf+bytes_read, buf_size - bytes_read);
+					if (ret < 0) {
+						_E("unzReadCurrentFile Failed");
+						free(tmp_buf);
+						return -EINVAL;
+					}
+					bytes_read += ret;
+				} while (bytes_read < buf_size && ret != 0);
+				if (!ret) {
+					_E("EOF reached");
+					break;
 				}
-				bytes_read += ret;
-			} while (bytes_read < buf_size && ret != 0);
+			}
+			free(tmp_buf);
 		}
-		free(tmp_buf);
 	}
 
 	bytes_read = 0;
