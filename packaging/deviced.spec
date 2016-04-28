@@ -194,6 +194,10 @@ rm -rf %{buildroot}
 %if %{?sdb_prestart} == on
 %install_service basic.target.wants sdb-prestart.service
 %endif
+%if %{?usbhost_module} == on
+mkdir -p %{buildroot}%{_prefix}/lib/udev/rules.d
+install -m 644 udev/99-usbhost.rules %{buildroot}%{_prefix}/lib/udev/rules.d/99-usbhost.rules
+%endif
 
 %post
 #memory type vconf key init
@@ -252,6 +256,9 @@ systemctl daemon-reload
 %if %{?usb_module} == on
 %config %{_sysconfdir}/deviced/usb-setting.conf
 %config %{_sysconfdir}/deviced/usb-operation.conf
+%endif
+%if %{?usbhost_module} == on
+%{_prefix}/lib/udev/rules.d/99-usbhost.rules
 %endif
 
 %{_unitdir}/sdb-prestart.service
