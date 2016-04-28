@@ -121,7 +121,7 @@ static bool check_fd(int *fd)
 		return true;
 
 	ffd = open(ff_path, O_RDWR);
-	if (!ffd)
+	if (ffd <= 0)
 		return false;
 
 	*fd = ffd;
