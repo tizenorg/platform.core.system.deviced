@@ -51,7 +51,7 @@ static int read_from_file(const char *path, char *buf, size_t size)
 
 	count = read(fd, buf, size);
 
-	if (count > 0) {
+	if ((int)count != -1 && count > 0) {
 		count = (count < size) ? count : size - 1;
 		while (count > 0 && buf[count - 1] == '\n')
 			count--;
