@@ -372,7 +372,7 @@ static DBusMessage *edbus_getbrightness(E_DBus_Object *obj, DBusMessage *msg)
 
 	reply = dbus_message_new_method_return(msg);
 	dbus_message_iter_init_append(reply, &iter);
-	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &brt);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
 	return reply;
 }
 
