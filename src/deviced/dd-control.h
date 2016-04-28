@@ -48,6 +48,7 @@ enum control_device_type {
 /* Add device define here  */
 	DEVICE_CONTROL_MMC,
 	DEVICE_CONTROL_USBCLIENT,
+	DEVICE_CONTROL_BLOCK,
 	DEVICE_CONTROL_MAX,
 };
 
