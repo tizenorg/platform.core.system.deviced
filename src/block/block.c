@@ -2385,10 +2385,84 @@ out:
 	return reply;
 }
 
+static DBusMessage *request_device_info_by_id(E_DBus_Object *obj,
+		DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	struct block_device *bdev;
+	struct block_data *data;
+	dd_list *elem;
+	int ret;
+	int block_id;
+	bool found;
+	char *str_null = "";
+
+	if (!obj || !msg)
+		return NULL;
+
+	reply = dbus_message_new_method_return(msg);
+	if (!reply)
+		goto out;
+
+	ret = dbus_message_get_args(msg, NULL,
+			DBUS_TYPE_INT32, &block_id,
+			DBUS_TYPE_INVALID);
+	if (!ret)
+		goto out;
+
+	found = false;
+	DD_LIST_FOREACH(block_dev_list, elem, bdev) {
+		data = bdev->data;
+		if (!data)
+			continue;
+		if (data->id != block_id)
+			continue;
+		found = true;
+		break;
+	}
+
+	if (!found)
+		goto out;
+
+	dbus_message_iter_init_append(reply, &iter);
+
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32,
+			&(data->block_type));
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING,
+			data->devnode ? &(data->devnode) : &str_null);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING,
+			data->syspath ? &(data->syspath) : &str_null);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING,
+			data->fs_usage ? &(data->fs_usage) : &str_null);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING,
+			data->fs_type ? &(data->fs_type) : &str_null);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING,
+			data->fs_version ? &(data->fs_version) : &str_null);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING,
+			data->fs_uuid_enc ? &(data->fs_uuid_enc) : &str_null);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32,
+			&(data->readonly));
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING,
+			data->mount_point ? &(data->mount_point) : &str_null);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32,
+			&(data->state));
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_BOOLEAN,
+			&(data->primary));
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32,
+			&(data->flags));
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32,
+			&(data->id));
+
+out:
+	return reply;
+}
+
 static const struct edbus_method manager_methods[] = {
 	{ "ShowDeviceList", NULL, NULL, request_show_device_list },
 	{ "GetDeviceList" , "s", "a(issssssisibii)" , request_get_device_list },
 	{ "GetDeviceList2", "s", "a(issssssisibi)", request_get_device_list_2 },
+	{ "GetDeviceInfoByID" , "i", "(issssssisibii)" , request_device_info_by_id },
 };
 
 static const struct edbus_method device_methods[] = {
