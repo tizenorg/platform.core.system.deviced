@@ -24,6 +24,7 @@
 #include "core/common.h"
 #include "core/config-parser.h"
 #include "core/launch.h"
+#include "shared/deviced-systemd.h"
 #include "usb.h"
 
 #define USB_SETTING     "/etc/deviced/usb-setting.conf"
@@ -33,17 +34,22 @@
 #define KEY_ROOTPATH    "rootpath"
 #define KEY_LOAD        "load"
 #define KEY_DEFAULT     "default"
-#define KEY_START       "start"
-#define KEY_STOP        "stop"
+#define KEY_START_STR   "Start"
+#define KEY_STOP_STR    "Stop"
 
 #define CONFIG_ENABLE   "1"
 #define CONFIG_DISABLE  "0"
 
 #define BUF_MAX 128
 
+typedef enum {
+	KEY_STOP,
+	KEY_START,
+} operation_key_e;
+
 struct oper_data {
 	char *type;
-	char *name;
+	operation_key_e key;
 };
 
 static char config_rootpath[BUF_MAX];
@@ -143,6 +149,7 @@ static int load_operation_config(struct parse_result *result, void *user_data)
 {
 	struct oper_data *data = user_data;
 	int ret;
+	operation_key_e key;
 
 	if (!data || !result)
 		return -EINVAL;
@@ -150,28 +157,40 @@ static int load_operation_config(struct parse_result *result, void *user_data)
 	if (strncmp(result->section, data->type, strlen(result->section)))
 		return 0;
 
-	if (strncmp(result->name, data->name, strlen(result->name)))
+	if (!strncmp(result->name, KEY_START_STR, strlen(KEY_START_STR)))
+		key = KEY_START;
+	else if (!strncmp(result->name, KEY_STOP_STR, strlen(KEY_STOP_STR)))
+		key = KEY_STOP;
+	else {
+		_E("Invalid name (%s)", result->name);
+		return -EINVAL;
+	}
+
+	if (key != data->key)
 		return 0;
 
-	ret = launch_app_cmd(result->value);
+	if (strstr(result->name, "Service")) {
+		if (key == KEY_START)
+			ret = deviced_systemd_start_unit(result->value);
+		if (key == KEY_STOP)
+			ret = deviced_systemd_stop_unit(result->value);
+	} else
+		ret = launch_app_cmd(result->value);
 
-	_I("Execute(%s: %d)", result->value, ret);
+	_I("Execute(%s %s: %d)", result->name, result->value, ret);
 
 	return ret;
 }
 
-static int usb_execute_operation(char *type, char *name)
+static int usb_execute_operation(char *type, operation_key_e key)
 {
 	int ret;
 	struct oper_data data;
 
-	if (!name)
-		return -EINVAL;
-
 	if (!type)
 		type = config_default;
 
-	data.name = name;
+	data.key = key;
 	data.type = type;
 
 	ret = config_parse(USB_OPERATION,
