@@ -346,7 +346,6 @@ static void signal_device_changed(struct block_device *bdev,
 static int get_mmc_mount_node(char *devnode, char *node, size_t len)
 {
 	char *name = devnode;
-	char *pt;
 	int dev = -1, part = -1;
 
 	if (!name)
