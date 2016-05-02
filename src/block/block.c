@@ -75,6 +75,9 @@
 
 #define BLOCK_CONF_FILE         "/etc/deviced/block.conf"
 
+/* Minimum value of block id */
+#define BLOCK_ID_MIN 10
+
 enum block_dev_operation {
 	BLOCK_DEV_MOUNT,
 	BLOCK_DEV_UNMOUNT,
@@ -212,6 +215,32 @@ static void broadcast_block_info(enum block_dev_operation op,
 	}
 }
 
+static int block_get_new_id(void)
+{
+	static int id = BLOCK_ID_MIN;
+	struct block_device *bdev;
+	dd_list *elem;
+	bool found;
+	int i;
+
+	for (i = 0 ; i < INT_MAX ; i++) {
+		found = false;
+		DD_LIST_FOREACH(block_dev_list, elem, bdev) {
+			if (bdev->data->id == id) {
+				found = true;
+				break;
+			}
+		}
+		if (!found)
+			return id++;
+
+		if (++id == INT_MAX)
+			id = BLOCK_ID_MIN;
+	}
+
+	return -ENOENT;
+}
+
 static void signal_device_blocked(struct block_device *bdev)
 {
 	struct block_data *data;
@@ -244,12 +273,13 @@ static void signal_device_changed(struct block_device *bdev,
 		enum block_dev_operation op)
 {
 	struct block_data *data;
-	char *arr[12];
+	char *arr[13];
 	char str_block_type[32];
 	char str_readonly[32];
 	char str_state[32];
 	char str_primary[32];
 	char str_flags[32];
+	char str_id[32];
 	char *str_null = "";
 	const char *object_path;
 	int flags;
@@ -295,6 +325,8 @@ static void signal_device_changed(struct block_device *bdev,
 	arr[10] = str_primary;
 	snprintf(str_flags, sizeof(str_flags), "%d", flags);
 	arr[11] = str_flags;
+	snprintf(str_id, sizeof(str_id), "%d", data->id);
+	arr[12] = str_id;
 
 	object_path = e_dbus_object_path_get(bdev->object);
 	if (!object_path) {
@@ -304,7 +336,7 @@ static void signal_device_changed(struct block_device *bdev,
 	broadcast_edbus_signal(object_path,
 			DEVICED_INTERFACE_BLOCK,
 			BLOCK_DEVICE_CHANGED,
-			"issssssisib", arr);
+			"issssssisibii", arr);
 	broadcast_edbus_signal(object_path,
 			DEVICED_INTERFACE_BLOCK,
 			BLOCK_DEVICE_CHANGED_2,
@@ -468,6 +500,8 @@ static struct block_data *make_block_data(const char *devnode,
 
 	data->mount_point = generate_mount_path(data);
 	BLOCK_FLAG_CLEAR_ALL(data);
+
+	data->id = block_get_new_id();
 
 	return data;
 }
@@ -1853,6 +1887,7 @@ static void show_block_device_list(void)
 				 "mount" : "unmount"));
 		_D("\tPrimary: %s",
 				(data->primary ? "true" : "false"));
+		_D("\tID: %d", data->id);
 	}
 }
 
@@ -2112,6 +2147,10 @@ static int add_device_to_iter(struct block_data *data, DBusMessageIter *iter)
 			&(data->state));
 	dbus_message_iter_append_basic(&piter, DBUS_TYPE_BOOLEAN,
 			&(data->primary));
+	dbus_message_iter_append_basic(&piter, DBUS_TYPE_INT32,
+			&(data->flags));
+	dbus_message_iter_append_basic(&piter, DBUS_TYPE_INT32,
+			&(data->id));
 	dbus_message_iter_close_container(iter, &piter);
 
 	return 0;
@@ -2254,7 +2293,7 @@ static DBusMessage *request_get_device_list(E_DBus_Object *obj,
 	}
 
 	dbus_message_iter_init_append(reply, &iter);
-	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY, "(issssssisib)", &aiter);
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY, "(issssssisibii)", &aiter);
 
 	DD_LIST_FOREACH(block_dev_list, elem, bdev) {
 		data = bdev->data;
@@ -2348,7 +2387,7 @@ out:
 
 static const struct edbus_method manager_methods[] = {
 	{ "ShowDeviceList", NULL, NULL, request_show_device_list },
-	{ "GetDeviceList" , "s", "a(issssssisib)" , request_get_device_list },
+	{ "GetDeviceList" , "s", "a(issssssisibii)" , request_get_device_list },
 	{ "GetDeviceList2", "s", "a(issssssisibi)", request_get_device_list_2 },
 };
 
@@ -2356,7 +2395,7 @@ static const struct edbus_method device_methods[] = {
 	{ "Mount",    "s",  "i", handle_block_mount },
 	{ "Unmount",  "i",  "i", handle_block_unmount },
 	{ "Format",   "i",  "i", handle_block_format },
-	{ "GetDeviceInfo"  , NULL, "(issssssisib)" , get_device_info },
+	{ "GetDeviceInfo"  , NULL, "(issssssisibii)" , get_device_info },
 	{ "GetDeviceInfo2" , NULL, "(issssssisibi)", get_device_info_2 },
 };
 
@@ -2389,7 +2428,7 @@ static int init_block_object_iface(void)
 				BLOCK_DEVICE_BLOCKED);
 
 	r = e_dbus_interface_signal_add(iface,
-			BLOCK_DEVICE_CHANGED, "issssssisib");
+			BLOCK_DEVICE_CHANGED, "issssssisibii");
 	if (r < 0)
 		_E("fail to register %s signal to iface",
 				BLOCK_DEVICE_CHANGED);

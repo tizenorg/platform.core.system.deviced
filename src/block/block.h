@@ -80,6 +80,7 @@ struct block_data {
 	enum mount_state state;
 	bool primary;   /* the first partition */
 	int flags;
+	int id;  /* libstorage uses the id as the storage_id */
 };
 
 struct block_dev_ops {
