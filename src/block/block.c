@@ -74,6 +74,9 @@
 #define BLOCK_TYPE_SCSI         "scsi"
 #define BLOCK_TYPE_ALL          "all"
 
+#define BLOCK_MMC_NODE_PREFIX   "SDCard"
+#define BLOCK_SCSI_NODE_PREFIX  "USBDrive"
+
 #define BLOCK_CONF_FILE         "/etc/deviced/block.conf"
 
 /* Minimum value of block id */
@@ -359,9 +362,9 @@ static int get_mmc_mount_node(char *devnode, char *node, size_t len)
 	sscanf(name, "mmcblk%dp%d", &dev, &part);
 	if (dev >= 0) {
 		if (part < 0)
-			snprintf(node, len, "Sdcard%c", dev + 'A' - 1);
+			snprintf(node, len, "%s%c", BLOCK_MMC_NODE_PREFIX, dev + 'A' - 1);
 		else
-			snprintf(node, len, "Sdcard%c%d", dev + 'A' - 1, part);
+			snprintf(node, len, "%s%c%d", BLOCK_MMC_NODE_PREFIX, dev + 'A' - 1, part);
 		return 0;
 	}
 
@@ -371,7 +374,7 @@ static int get_mmc_mount_node(char *devnode, char *node, size_t len)
 		return -EINVAL;
 	for (i = 0 ; i < strlen(emul) ; i++)
 		emul[i] = toupper(emul[i]);
-	snprintf(node, len, "Sdcard%s", emul);
+	snprintf(node, len, "%s%s", BLOCK_MMC_NODE_PREFIX, emul);
 	return 0;
 }
 
@@ -395,7 +398,7 @@ static int get_scsi_mount_node(char *devnode, char *node, size_t len)
 
 	for (i = 0 ; i < strlen(name) ; i++)
 		name[i] = toupper(name[i]);
-	snprintf(node, len, "UsbDrive%s", name);
+	snprintf(node, len, "%s%s", BLOCK_SCSI_NODE_PREFIX, name);
 
 	return 0;
 }
