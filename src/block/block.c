@@ -53,6 +53,7 @@
  */
 #define MMC_PATH            "*/mmcblk[1-9]*"
 #define MMC_PARTITION_PATH  "mmcblk[1-9]p[0-9]"
+#define MMC_LINK_PATH       "*/sdcard/*"
 #define SCSI_PATH           "*/sd[a-z]*"
 #define SCSI_PARTITION_PATH "sd[a-z][0-9]"
 
@@ -435,8 +436,9 @@ static bool check_primary_partition(const char *devnode)
 	int i;
 
 	/* if no partition */
-	if (!fnmatch("*/mmcblk[1-9]", devnode, 0) ||
-	    !fnmatch("*/sd[a-z]", devnode, 0))
+	if (!fnmatch(MMC_LINK_PATH, devnode, 0) ||
+		!fnmatch(MMC_PATH, devnode, 0) ||
+		!fnmatch(SCSI_PATH, devnode, 0))
 		return true;
 
 	snprintf(str, sizeof(str), "%s", devnode);
@@ -491,7 +493,9 @@ static struct block_data *make_block_data(const char *devnode,
 	data->primary = check_primary_partition(devnode);
 
 	/* TODO should we know block dev type? */
-	if (!fnmatch(MMC_PATH, devnode, 0))
+	if (!fnmatch(MMC_LINK_PATH, devnode, 0))
+		data->block_type = BLOCK_MMC_DEV;
+	else if (!fnmatch(MMC_PATH, devnode, 0))
 		data->block_type = BLOCK_MMC_DEV;
 	else if (!fnmatch(SCSI_PATH, devnode, 0))
 		data->block_type = BLOCK_SCSI_DEV;
@@ -1804,7 +1808,7 @@ static int block_init_from_udev_enumerate(void)
 {
 	struct udev *udev;
 	struct udev_enumerate *enumerate;
-	struct udev_list_entry *list_entry;
+	struct udev_list_entry *list_entry, *list_sub_entry;
 	struct udev_device *dev;
 	const char *syspath;
 	const char *devnode;
@@ -1841,13 +1845,25 @@ static int block_init_from_udev_enumerate(void)
 		if (!dev)
 			continue;
 
-		devnode = udev_device_get_devnode(dev);
-		if (!devnode)
-			continue;
+		devnode = NULL;
+		udev_list_entry_foreach(list_sub_entry,
+				udev_device_get_devlinks_list_entry(dev)) {
+			const char *devlink = udev_list_entry_get_name(list_sub_entry);
+			if (!fnmatch(MMC_LINK_PATH, devlink, 0)) {
+				devnode = devlink;
+				break;
+			}
+		}
 
-		if (fnmatch(MMC_PATH, devnode, 0) &&
-		    fnmatch(SCSI_PATH, devnode, 0))
-			continue;
+		if (!devnode) {
+			devnode = udev_device_get_devnode(dev);
+			if (!devnode)
+				continue;
+
+			if (fnmatch(MMC_PATH, devnode, 0) &&
+			    fnmatch(SCSI_PATH, devnode, 0))
+				continue;
+		}
 
 		_D("%s device add", devnode);
 		add_block_device(dev, devnode);
@@ -1936,14 +1952,25 @@ static void uevent_block_handler(struct udev_device *dev)
 {
 	const char *devnode;
 	const char *action;
+	struct udev_list_entry *list_entry;
 
-	devnode = udev_device_get_devnode(dev);
-	if (!devnode)
-		return;
+	udev_list_entry_foreach(list_entry, udev_device_get_devlinks_list_entry(dev)) {
+		const char *devlink = udev_list_entry_get_name(list_entry);
+		if (!fnmatch(MMC_LINK_PATH, devlink, 0)) {
+			devnode = devlink;
+			break;
+		}
+	}
 
-	if (fnmatch(MMC_PATH, devnode, 0) &&
-	    fnmatch(SCSI_PATH, devnode, 0))
-		return;
+	if (!devnode) {
+		devnode = udev_device_get_devnode(dev);
+		if (!devnode)
+			return;
+
+		if (fnmatch(MMC_PATH, devnode, 0) &&
+		    fnmatch(SCSI_PATH, devnode, 0))
+			return;
+	}
 
 	action = udev_device_get_action(dev);
 	if (!action)
