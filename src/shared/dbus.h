@@ -166,9 +166,9 @@
 /* Notification */
 #define POPUP_PATH_NOTI                     POPUP_OBJECT_PATH"/Noti"
 #define POPUP_INTERFACE_NOTI                POPUP_INTERFACE_NAME".Noti"
-/* Power off */
-#define POPUP_PATH_POWEROFF                 POPUP_OBJECT_PATH"/Poweroff"
-#define POPUP_INTERFACE_POWEROFF            POPUP_INTERFACE_NAME".Poweroff"
+/* Power key longpress */
+#define POPUP_PATH_POWERKEY                 POPUP_OBJECT_PATH"/Powerkey"
+#define POPUP_INTERFACE_POWERKEY            POPUP_INTERFACE_NAME".Powerkey"
 /* Low battery */
 #define POPUP_PATH_LOWBAT                   POPUP_OBJECT_PATH"/Lowbat"
 #define POPUP_INTERFACE_LOWBAT              POPUP_INTERFACE_NAME".Lowbat"

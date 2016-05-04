@@ -23,7 +23,7 @@
 #include "core/edbus-handler.h"
 #include "core/common.h"
 
-#define APP_POWEROFF "poweroff"
+#define APP_POWERKEY "powerkey"
 #define APP_DEFAULT  "system"
 #define APP_KEY_TYPE "_SYSPOPUP_CONTENT_"
 
