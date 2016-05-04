@@ -24,6 +24,7 @@
 #include <device-node.h>
 #include <bundle.h>
 #include <eventsystem.h>
+#include <hw/battery.h>
 
 #include "core/devices.h"
 #include "core/device-notifier.h"
@@ -76,6 +77,8 @@ static Ecore_Timer *power_timer;
 static Ecore_Timer *abnormal_timer;
 
 static int booting_done(void *data);
+
+static struct battery_device *battery_dev;
 
 static void lowbat_execute(void *data)
 {
@@ -686,6 +689,69 @@ static void uevent_power_handler(struct udev_device *dev)
 	process_power_supply(&battery.capacity);
 }
 
+static void battery_print_info(struct battery_info *info)
+{
+	if (!info)
+		return;
+	_I("Battery state updated:");
+	_I("   Status(%s)", info->status);
+	_I("   Health(%s)", info->health);
+	_I("   Power Source(%s)", info->power_source);
+	_I("   Online(%d)", info->online);
+	_I("   Present(%d)", info->present);
+	_I("   Capacity(%d)", info->capacity);
+	_I("   Current Now(%d)", info->current_now);
+	_I("   Current Average(%d)", info->current_average);
+	_I("   Charge Full (%s)", battery.charge_full == CHARGING_FULL ? "Full" : "Not Full");
+	switch (battery.charge_now) {
+	case CHARGER_CHARGING:
+		_I("   Charge Now(Charging)");
+		break;
+	case CHARGER_DISCHARGING:
+		_I("   Charge Now(Discharging)");
+		break;
+	case CHARGER_ABNORMAL:
+		_I("   Charge Now(Abnormal)");
+		break;
+	default:
+		break;
+	}
+	_I("   BatPresent(%s)", battery.present == PRESENT_NORMAL ? "Normal" : "Abnormal");
+	_I("   Temperature(%s)", battery.temp == TEMP_LOW ? "Low" : "High");
+	_I("   OVP(%s)", battery.ovp == OVP_NORMAL ? "Normal": "Abnormal");
+}
+
+static void battery_changed(struct battery_info *info, void *data)
+{
+	int ret;
+
+	if (!info)
+		return;
+
+	if (info->status)
+		check_charge_status(info->status);
+
+	if (info->health)
+		check_health_status(info->health);
+
+	battery.online = info->online;
+	battery.present = info->present;
+	battery.capacity = info->capacity;
+
+	battery_print_info(info);
+
+	ret = booting_done(NULL);
+	if (ret) {
+		if (battery.online > POWER_SUPPLY_TYPE_BATTERY)
+			power_supply_noti(DEVICE_NOTI_BATT_CHARGE, DEVICE_NOTI_ON);
+		else
+			power_supply_noti(DEVICE_NOTI_BATT_CHARGE, DEVICE_NOTI_OFF);
+	}
+
+	process_power_supply(&battery.capacity);
+
+}
+
 static int lowbat_read(int *val)
 {
 	int r;
@@ -700,6 +766,14 @@ static int lowbat_read(int *val)
 	return 0;
 }
 
+static void battery_get_capacity(struct battery_info *info, void *data)
+{
+	int *capa = data;
+
+	if (info && info->capacity >= 0)
+		*capa = info->capacity;
+}
+
 static void power_supply_status_init(void)
 {
 	static int charge_now = -1;
@@ -708,10 +782,19 @@ static void power_supply_status_init(void)
 	int pct;
 	int r;
 
-	r = lowbat_read(&pct);
-	if (r < 0) {
-		_E("fail to read capacity data : %d", r);
-		return;
+	if (battery_dev && battery_dev->get_current_state) {
+		pct = -1;
+		r = battery_dev->get_current_state(battery_get_capacity, &pct);
+		if (r < 0 || pct < 0) {
+			_E("Failed to get battery capacity (capa:%d, ret:%d)", pct, r);
+			return;
+		}
+	} else {
+		r = lowbat_read(&pct);
+		if (r < 0) {
+			_E("fail to read capacity data : %d", r);
+			return;
+		}
 	}
 
 	battery.capacity = pct;
@@ -1005,41 +1088,69 @@ static int load_uevent(struct parse_result *result, void *user_data)
 
 static int power_supply_probe(void *data)
 {
-	/**
-	 * find power-supply class.
-	 * if there is no power-supply class,
-	 * deviced does not activate a battery module.
-	 */
-	if (access(POWER_PATH, R_OK) != 0) {
-		/**
-		 * Set battery vconf as -ENOTSUP
-		 * These vconf key used by runtime-info and capi-system-device.
-		 */
-		vconf_set_int(VCONFKEY_SYSMAN_CHARGER_STATUS, -ENOTSUP);
-		vconf_set_int(VCONFKEY_SYSMAN_BATTERY_CHARGE_NOW, -ENOTSUP);
-		vconf_set_int(VCONFKEY_SYSMAN_BATTERY_LEVEL_STATUS, -ENOTSUP);
+	struct hw_info *info;
+	int ret;
 
-		_E("there is no power-supply class");
+	if (battery_dev)
+		return 0;
+
+	ret = hw_get_info(BATTERY_HARDWARE_DEVICE_ID,
+			(const struct hw_info **)&info);
+
+	if (ret < 0) { /* There is no HAL for battery */
+		if (access(POWER_PATH, R_OK) == 0)
+			return 0; /* Just power_supply uevent is used */
+		goto out;
+	}
+
+	if (!info->open) {
+		_E("Failed to open battery device; open(NULL)");
 		return -ENODEV;
 	}
 
+	ret = info->open(info, NULL, (struct hw_common**)&battery_dev);
+	if (ret < 0) {
+		_E("Failed to get battery device structure (%d)", ret);
+		return ret;
+	}
+
+	_I("battery device structure load success");
 	return 0;
+
+out:
+	/**
+	 * Set battery vconf as -ENOTSUP
+	 * These vconf key used by runtime-info and capi-system-device.
+	 */
+	vconf_set_int(VCONFKEY_SYSMAN_CHARGER_STATUS, -ENOTSUP);
+	vconf_set_int(VCONFKEY_SYSMAN_BATTERY_CHARGE_NOW, -ENOTSUP);
+	vconf_set_int(VCONFKEY_SYSMAN_BATTERY_LEVEL_STATUS, -ENOTSUP);
+	_I("There is no battery device(%d)", ret);
+	return -ENODEV;
 }
 
 static void power_supply_init(void *data)
 {
 	int ret;
 
-	ret = config_parse(POWER_SUPPLY_UEVENT, load_uevent, &battery);
-	if (ret < 0)
-		_E("Failed to load %s, %d Use default value!",
-				POWER_SUPPLY_UEVENT, ret);
+	if (battery_dev) {
+		if (battery_dev->register_changed_event)
+			battery_dev->register_changed_event(battery_changed, NULL);
+
+		if (battery_dev->get_current_state)
+			battery_dev->get_current_state(battery_changed, NULL);
+	} else {
+		ret = config_parse(POWER_SUPPLY_UEVENT, load_uevent, &battery);
+		if (ret < 0)
+			_E("Failed to load %s, %d Use default value!",
+					POWER_SUPPLY_UEVENT, ret);
+
+		/* register power subsystem */
+		register_kernel_uevent_control(&uh);
+	}
 
 	/* process check battery timer until booting done */
 	power_supply_timer_start();
-
-	/* register power subsystem */
-	register_kernel_uevent_control(&uh);
 
 	register_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
 	register_notifier(DEVICE_NOTIFIER_LCD, display_changed);
