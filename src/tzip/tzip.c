@@ -376,8 +376,10 @@ static void *tzip_thread(void *arg)
 	}
 
 	tzip_lock();
-	fuse_destroy(fuse_handle);
-	fuse_handle = NULL;
+	if (fuse_handle) {
+		fuse_destroy(fuse_handle);
+		fuse_handle = NULL;
+	}
 
 out_unlock:
 	tzip_unlock();
