@@ -2576,6 +2576,32 @@ static int load_config(struct parse_result *result, void *user_data)
 	return 0;
 }
 
+#ifdef BLOCK_TMPFS
+static int mount_root_path_tmpfs(void)
+{
+	int ret;
+	char *root;
+
+	root = tzplatform_getenv(TZ_SYS_MEDIA);
+	if (!root)
+		return -ENOTSUP;
+
+	if (access(root, F_OK) != 0)
+		return -ENODEV;
+
+	ret = mount("tmpfs", root, "tmpfs", 0, "smackfsroot=System::Shared");
+	if (ret < 0) {
+		ret = -errno;
+		_E("tmpfs mount failed (%d)", ret);
+		return ret;
+	}
+
+	return 0;
+}
+#else
+#define mount_root_path_tmpfs() 0
+#endif
+
 static void block_init(void *data)
 {
 	int ret;
@@ -2584,6 +2610,10 @@ static void block_init(void *data)
 	ret = config_parse(BLOCK_CONF_FILE, load_config, NULL);
 	if (ret < 0)
 		_E("fail to load %s, Use default value", BLOCK_CONF_FILE);
+
+	ret = mount_root_path_tmpfs();
+	if (ret < 0)
+		_E("Failed to mount tmpfs to root mount path (%d)", ret);
 
 	/* register block manager object and interface */
 	ret = register_edbus_interface_and_method(DEVICED_PATH_BLOCK_MANAGER,
