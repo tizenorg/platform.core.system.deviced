@@ -175,8 +175,8 @@ static int poweroff(void)
 
 static int pwroff_popup(void)
 {
-	return launch_system_app(APP_POWEROFF,
-			2, APP_KEY_TYPE, APP_POWEROFF);
+	return launch_system_app(APP_POWERKEY,
+			2, APP_KEY_TYPE, APP_POWERKEY);
 }
 
 static int power_reboot(void)

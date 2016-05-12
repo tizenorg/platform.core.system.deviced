@@ -32,7 +32,7 @@ static const struct app_dbus_match {
 	const char *method;
 } app_match[] = {
 	{ APP_DEFAULT , POPUP_BUS_NAME, POPUP_PATH_SYSTEM  , POPUP_INTERFACE_SYSTEM  , POPUP_METHOD },
-	{ APP_POWEROFF, POPUP_BUS_NAME, POPUP_PATH_POWEROFF, POPUP_INTERFACE_POWEROFF, POPUP_METHOD },
+	{ APP_POWERKEY, POPUP_BUS_NAME, POPUP_PATH_POWERKEY, POPUP_INTERFACE_POWERKEY, POPUP_METHOD },
 };
 
 int launch_system_app(char *type, int num, ...)
