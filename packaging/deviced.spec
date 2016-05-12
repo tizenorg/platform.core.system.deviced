@@ -52,7 +52,7 @@ Summary:    Deviced
 Version:    1.0.0
 Release:    1
 Group:      System/Management
-License:    Apache-2.0 and BSD-2-Clause and BSD-4-Clause
+License:    Apache-2.0
 Source0:    %{name}-%{version}.tar.gz
 Source1:    deviced.manifest
 Source2:    libdeviced.manifest
@@ -96,6 +96,11 @@ BuildRequires:	pkgconfig(minizip)
 Requires: %{name}-tools = %{version}-%{release}
 %{?systemd_requires}
 Requires(post): /usr/bin/vconftool
+
+%if %{?block_module} == on
+Requires: /usr/bin/fsck_msdosfs
+Requires: /usr/bin/newfs_msdos
+%endif
 
 %description
 deviced
@@ -241,10 +246,6 @@ systemctl daemon-reload
 %endif
 %if %{?block_module} == on
 %{_bindir}/mmc-smack-label
-%{_bindir}/fsck_msdosfs
-%{_bindir}/newfs_msdos
-%{_datadir}/license/fsck_msdosfs
-%{_datadir}/license/newfs_msdos
 %config %{_sysconfdir}/deviced/block.conf
 %endif
 %if %{?display_module} == on
