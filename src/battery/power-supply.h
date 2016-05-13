@@ -85,6 +85,11 @@ struct battery_status {
 	int online;
 	int temp;
 	int ovp;
+	int current_now;
+	int current_average;
+	char status_s[32];
+	char health_s[32];
+	char power_source_s[32];
 };
 
 extern struct battery_status battery;
