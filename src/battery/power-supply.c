@@ -728,15 +728,31 @@ static void battery_changed(struct battery_info *info, void *data)
 	if (!info)
 		return;
 
-	if (info->status)
+	if (info->status) {
+		snprintf(battery.status_s, sizeof(battery.status_s),
+				"%s", info->status);
 		check_charge_status(info->status);
+	} else
+		battery.status_s[0] = '\0';
 
-	if (info->health)
+	if (info->health) {
+		snprintf(battery.health_s, sizeof(battery.health_s),
+				"%s", info->health);
 		check_health_status(info->health);
+	} else
+		battery.health_s[0] = '\0';
+
+	if (info->power_source)
+		snprintf(battery.power_source_s, sizeof(battery.power_source_s),
+				"%s", info->power_source);
+	else
+		battery.power_source_s[0] = '\0';
 
 	battery.online = info->online;
 	battery.present = info->present;
 	battery.capacity = info->capacity;
+	battery.current_now = info->current_now;
+	battery.current_average = info->current_average;
 
 	battery_print_info(info);
 
@@ -1018,6 +1034,95 @@ out:
 	return reply;
 }
 
+static void battery_get_info(struct battery_info *info, void *data)
+{
+	struct battery_info *bat = data;
+
+	if (!info || !bat)
+		return;
+
+	bat->status = strdup(info->status);
+	bat->health = strdup(info->health);
+	bat->power_source = strdup(info->power_source);
+	bat->online = info->online;
+	bat->present = info->present;
+	bat->capacity = info->capacity;
+	bat->current_now = info->current_now;
+	bat->current_average = info->current_average;
+}
+
+static DBusMessage *dbus_get_battery_info(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	int ret, val;
+	const char *str;
+	struct battery_info info = { 0, };
+
+	if (battery_dev && battery_dev->get_current_state) {
+		ret = battery_dev->get_current_state(battery_get_info, &info);
+		if (ret < 0)
+			_E("Failed to get battery info (%d)", ret);
+
+		battery_changed(&info, NULL);
+	} else {
+		if (battery.charge_status == CHARGE_STATUS_FULL)
+			str = CHARGEFULL_NAME;
+		else if (battery.charge_status == CHARGE_STATUS_CHARGING)
+			str = CHARGENOW_NAME;
+		else if (battery.charge_status == CHARGE_STATUS_DISCHARGING)
+			str = DISCHARGE_NAME;
+		else if (battery.charge_status == CHARGE_STATUS_NOT_CHARGING)
+			str = NOTCHARGE_NAME;
+		else
+			str = "Unknown";
+		snprintf(battery.status_s, sizeof(battery.status_s), "%s", str);
+
+		if (battery.health == HEALTH_GOOD) {
+			if (battery.temp == TEMP_LOW && battery.ovp == OVP_ABNORMAL)
+				str = OVERVOLT_NAME;
+			else
+				str = "Good";
+		} else { /* HEALTH_BAD */
+			if (battery.temp == TEMP_HIGH)
+				str = OVERHEAT_NAME;
+			else /* TEMP_LOW */
+				str = TEMPCOLD_NAME;
+		}
+		snprintf(battery.health_s, sizeof(battery.health_s), "%s", str);
+
+		if (vconf_get_int(VCONFKEY_SYSMAN_USB_STATUS, &val) == 0 &&
+			val != VCONFKEY_SYSMAN_USB_DISCONNECTED)
+			str = POWER_SOURCE_USB;
+		else if (vconf_get_int(VCONFKEY_SYSMAN_CHARGER_STATUS, &val) == 0 &&
+			val == VCONFKEY_SYSMAN_CHARGER_CONNECTED)
+			str = POWER_SOURCE_AC;
+		else
+			str = POWER_SOURCE_NONE;
+		snprintf(battery.power_source_s, sizeof(battery.power_source_s), "%s", str);
+
+		battery.current_now = -1; /* Not supported */
+		battery.current_average = -1; /* Not supported */
+		ret = 0;
+	}
+
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+	str = battery.status_s;
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &str);
+	str = battery.health_s;
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &str);
+	str = battery.power_source_s;
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &str);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &(battery.online));
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &(battery.present));
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &(battery.capacity));
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &(battery.current_now));
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &(battery.current_average));
+	return reply;
+}
+
 static const struct edbus_method edbus_methods[] = {
 	{ CHARGER_STATUS_SIGNAL,      NULL, "i", dbus_get_charger_status },
 	{ CHARGE_NOW_SIGNAL,          NULL, "i", dbus_get_charge_now },
@@ -1027,6 +1132,7 @@ static const struct edbus_method edbus_methods[] = {
 	{ CHARGE_FULL_SIGNAL,         NULL, "i", dbus_is_full },
 	{ CHARGE_HEALTH_SIGNAL,       NULL, "i", dbus_get_health },
 	{ POWER_SUBSYSTEM,       "sisssss", "i", dbus_power_supply_handler },
+	{ "GetBatteryInfo",           NULL, "isssiiiii", dbus_get_battery_info },
 };
 
 static int booting_done(void *data)
