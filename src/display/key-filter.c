@@ -630,7 +630,7 @@ static void key_backlight_enable(bool enable)
 static const struct display_keyfilter_ops normal_keyfilter_ops = {
 	.init			= keyfilter_init,
 	.check			= check_key_filter,
-	.set_powerkey_ignore 	= NULL,
+	.set_powerkey_ignore	= NULL,
 	.powerkey_lcdoff	= NULL,
 	.backlight_enable	= key_backlight_enable,
 };

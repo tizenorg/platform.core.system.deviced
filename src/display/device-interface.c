@@ -602,7 +602,7 @@ int exit_sysfs(void)
 	if (!check_default(ops))
 		ops->start(NORMAL_MODE);
 
-	if(fd != -1)
+	if (fd != -1)
 		close(fd);
 
 	return 0;

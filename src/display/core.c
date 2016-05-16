@@ -139,12 +139,12 @@ enum signal_type {
 };
 
 static const char *lcdon_sig_lookup[SIGNAL_MAX] = {
-        [SIGNAL_PRE]  = "LCDOn",
-        [SIGNAL_POST] = "LCDOnCompleted",
+	[SIGNAL_PRE]  = "LCDOn",
+	[SIGNAL_POST] = "LCDOnCompleted",
 };
 static const char *lcdoff_sig_lookup[SIGNAL_MAX] = {
-        [SIGNAL_PRE]  = "LCDOff",
-        [SIGNAL_POST] = "LCDOffCompleted",
+	[SIGNAL_PRE]  = "LCDOff",
+	[SIGNAL_POST] = "LCDOffCompleted",
 };
 
 #define SHIFT_UNLOCK		4
@@ -186,7 +186,7 @@ struct display_config display_conf = {
 	.lcdoff_timeout		= LCDOFF_TIMEOUT,
 	.brightness_change_step	= BRIGHTNESS_CHANGE_STEP,
 	.lcd_always_on		= LCD_ALWAYS_ON,
-	.framerate_app		= {0,0,0,0},
+	.framerate_app		= {0, 0, 0, 0},
 	.control_display	= 0,
 	.powerkey_doublepress	= 0,
 	.accel_sensor_on	= ACCEL_SENSOR_ON,
@@ -222,7 +222,7 @@ static void set_process_active(bool flag, pid_t pid)
 	if (pid >= INTERNAL_LOCK_BASE)
 		return;
 
-	snprintf(str, sizeof(str),"%d", (int)pid);
+	snprintf(str, sizeof(str), "%d", (int)pid);
 
 	arr[0] = (flag ? ACTIVE_ACT : INACTIVE_ACT);
 	arr[1] = str;
@@ -1074,7 +1074,7 @@ int delete_condition(enum state_t state)
 
 void update_lcdoff_source(int source)
 {
-	switch(source) {
+	switch (source) {
 	case VCONFKEY_PM_LCDOFF_BY_TIMEOUT:
 		_I("LCD OFF by timeout");
 		break;
@@ -1091,17 +1091,17 @@ void update_lcdoff_source(int source)
 #ifdef ENABLE_PM_LOG
 
 typedef struct _pm_history {
-        time_t time;
-        enum pm_log_type log_type;
-        int keycode;
+	time_t time;
+	enum pm_log_type log_type;
+	int keycode;
 } pm_history;
 
 static int max_history_count = MAX_LOG_COUNT;
 static pm_history pm_history_log[MAX_LOG_COUNT] = {{0, }, };
 static int history_count = 0;
 
-static const char history_string[PM_LOG_MAX][15] =
-	{"PRESS", "LONG PRESS", "RELEASE", "LCD ON", "LCD ON FAIL",
+static const char history_string[PM_LOG_MAX][15] = {
+	"PRESS", "LONG PRESS", "RELEASE", "LCD ON", "LCD ON FAIL",
 	"LCD DIM", "LCD DIM FAIL", "LCD OFF", "LCD OFF FAIL", "SLEEP"};
 
 void pm_history_init()
@@ -1113,16 +1113,16 @@ void pm_history_init()
 
 void pm_history_save(enum pm_log_type log_type, int code)
 {
-        time_t now;
+	time_t now;
 
-        time(&now);
-        pm_history_log[history_count].time = now;
-        pm_history_log[history_count].log_type = log_type;
-        pm_history_log[history_count].keycode = code;
-        history_count++;
+	time(&now);
+	pm_history_log[history_count].time = now;
+	pm_history_log[history_count].log_type = log_type;
+	pm_history_log[history_count].keycode = code;
+	history_count++;
 
-        if (history_count >= max_history_count)
-                history_count = 0;
+	if (history_count >= max_history_count)
+		history_count = 0;
 }
 
 void pm_history_print(int fd, int count)
@@ -1177,7 +1177,7 @@ void print_info(int fd)
 	ret = write(fd, buf, strlen(buf));
 	if (ret < 0)
 		_E("write() failed (%d)", errno);
-	snprintf(buf, sizeof(buf),"Timeout Info: Run[%dms] Dim[%dms] Off[%dms]\n",
+	snprintf(buf, sizeof(buf), "Timeout Info: Run[%dms] Dim[%dms] Off[%dms]\n",
 		 states[S_NORMAL].timeout,
 		 states[S_LCDDIM].timeout, states[S_LCDOFF].timeout);
 	ret = write(fd, buf, strlen(buf));
@@ -1356,8 +1356,7 @@ static int default_trans(int evt)
 		if (check_lcdoff_direct() == true) {
 			/* enter next state directly */
 			states[pm_cur_state].trans(EVENT_TIMEOUT);
-		}
-		else {
+		} else {
 			st->action(st->timeout);
 		}
 	}
@@ -1583,7 +1582,7 @@ static int default_check(int curr, int next)
 	trans_cond = trans_condition & MASK_BIT;
 
 	vconf_get_int(VCONFKEY_IDLE_LOCK_STATE, &lock_state);
-	if (lock_state==VCONFKEY_IDLE_LOCK && curr != S_LCDOFF) {
+	if (lock_state == VCONFKEY_IDLE_LOCK && curr != S_LCDOFF) {
 		vconf_get_int(VCONFKEY_CALL_STATE, &app_state);
 		if (app_state == VCONFKEY_CALL_OFF) {
 			_I("default_check:LOCK STATE, it's transitable");
@@ -1719,7 +1718,7 @@ static int update_setting(int key_idx, int val)
 		}
 		backlight_ops.set_default_brt(val);
 		snprintf(buf, sizeof(buf), "%d", val);
-		_D("Brightness set in bl : %d",val);
+		_D("Brightness set in bl : %d", val);
 		launch_evenif_exist(SET_BRIGHTNESS_IN_BOOTLOADER, buf);
 		break;
 	case SETTING_LOCK_SCREEN:

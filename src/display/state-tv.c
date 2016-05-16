@@ -127,7 +127,7 @@ static int lcdon_pre(void *data)
 	 */
 	device_notify(DEVICE_NOTIFIER_POWER_RESUME, NULL);
 
-	if (pm_cur_state == S_STANDBY){
+	if (pm_cur_state == S_STANDBY) {
 		arr[0] = states[S_LCDON].name;
 		_I("send pre state change NORMAL");
 		broadcast_edbus_signal(DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
@@ -512,7 +512,7 @@ struct _tv_states {
 	int (*check)(int curr, int next);
 	int (*trans)(int evt);
 	int (*action)(int timeout);
-} tv_states [] = {
+} tv_states[] = {
 	{ S_LCDON,    "S_LCDON",    lcdon_check,    lcdon_trans,    lcdon_action    },
 	{ S_LCDOFF,   "S_LCDOFF",   lcdoff_check,   lcdoff_trans,   lcdoff_action   },
 	{ S_STANDBY,  "S_STANDBY",  standby_check,  standby_trans,  standby_action  },

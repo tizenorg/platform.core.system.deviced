@@ -50,7 +50,7 @@
 #define AUTOMATIC_DEVIDE_VAL	10
 #define AUTOMATIC_DELAY_TIME	0.5	/* 0.5 sec */
 
-#define RADIAN_VALUE 		(57.2957)
+#define RADIAN_VALUE		(57.2957)
 #define ROTATION_90		90
 #define WORKING_ANGLE_MIN	0
 #define WORKING_ANGLE_MAX	20
@@ -277,7 +277,7 @@ static bool alc_update_brt(bool setting)
 
 static bool alc_handler(void *data)
 {
-	if (pm_cur_state != S_NORMAL){
+	if (pm_cur_state != S_NORMAL) {
 		if (alc_timeout_id > 0)
 			ecore_timer_del(alc_timeout_id);
 		alc_timeout_id = NULL;

@@ -317,7 +317,7 @@ static void *tzip_thread(void *arg)
 	size_t len;
 	ssize_t read;
 	char *saveptr = NULL;
-	char *argv[4] = {"deviced", "-o","allow_other", NULL};
+	char *argv[4] = {"deviced", "-o", "allow_other", NULL};
 	struct fuse_args args = FUSE_ARGS_INIT(3, argv);
 
 	ret = mkdir(TZIP_ROOT_PATH, 0755);

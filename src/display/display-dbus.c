@@ -644,11 +644,11 @@ static DBusMessage *edbus_setautobrightnessmin(E_DBus_Object *obj, DBusMessage *
 	const char *sender;
 
 	sender = dbus_message_get_sender(msg);
-        if (!sender) {
-                _E("invalid sender name!");
-                ret = -EINVAL;
+	if (!sender) {
+		_E("invalid sender name!");
+		ret = -EINVAL;
 		goto error;
-        }
+	}
 	if (!display_info.set_autobrightness_min) {
 		ret = -EIO;
 		goto error;
@@ -962,7 +962,7 @@ static const struct edbus_method edbus_methods[] = {
 	{ "setlcdtimeout",  "iii",   "i", edbus_setlcdtimeout },
 	{ "LockScreenBgOn",   "s",   "i", edbus_lockscreenbgon },
 	{ "GetDisplayCount", NULL,   "i", edbus_getdisplaycount },
-	{ "GetMaxBrightness",NULL,   "i", edbus_getmaxbrightness },
+	{ "GetMaxBrightness", NULL,  "i", edbus_getmaxbrightness },
 	{ "SetMaxBrightness", "i",   "i", edbus_setmaxbrightness },
 	{ "GetBrightness",   NULL,   "i", edbus_getbrightness },
 	{ "SetBrightness",    "i",   "i", edbus_setbrightness },
@@ -976,7 +976,7 @@ static const struct edbus_method edbus_methods[] = {
 	{ "PowerKeyIgnore",   "i",  NULL, edbus_powerkeyignore },
 	{ "PowerKeyLCDOff",  NULL,   "i", edbus_powerkeylcdoff },
 	{ "CustomLCDOn",      "i",   "i", edbus_customlcdon },
-	{ "StayTouchScreenOff","i",  "i", edbus_staytouchscreenoff },
+	{ "StayTouchScreenOff", "i", "i", edbus_staytouchscreenoff },
 	{ "LCDPanelOffMode",  "i",   "i", edbus_lcdpaneloffmode },
 	{ "ActorControl",   "sii",   "i", edbus_actorcontrol },
 	{ "CustomBrightness", NULL,  "i", edbus_getcustombrightness },
