@@ -1962,7 +1962,7 @@ static int block_poweroff(void *data)
 
 static void uevent_block_handler(struct udev_device *dev)
 {
-	const char *devnode;
+	const char *devnode = NULL;
 	const char *action;
 	struct udev_list_entry *list_entry;
 
