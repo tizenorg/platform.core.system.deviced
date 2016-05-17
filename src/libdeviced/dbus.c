@@ -53,7 +53,7 @@ int append_variant(DBusMessageIter *iter, const char *sig, char *param[])
 	for (ch = (char*)sig, i = 0; *ch != '\0'; ++i, ++ch) {
 		switch (*ch) {
 		case 'b':
-			bool_type = (atoi(param[i])) ? TRUE:FALSE;
+			bool_type = (atoi(param[i])) ? TRUE : FALSE;
 			dbus_message_iter_append_basic(iter, DBUS_TYPE_BOOLEAN, &bool_type);
 			break;
 		case 'i':

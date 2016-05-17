@@ -67,7 +67,7 @@ API int deviced_get_pid(const char *execpath)
 		ret = read(fd, buf2, BUFF_MAX);
 		close(fd);
 
-		if (ret < 0 || ret >=BUFF_MAX)
+		if (ret < 0 || ret >= BUFF_MAX)
 			continue;
 
 		buf2[ret] = '\0';

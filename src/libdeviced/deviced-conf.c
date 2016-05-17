@@ -177,7 +177,7 @@ static int copy_cmdline(int pid)
 	if (access(PERMANENT_DIR, R_OK) < 0) {
 		_D("no predefined matrix dir = %s, so created", PERMANENT_DIR);
 		r = mkdir(PERMANENT_DIR, 0777);
-		if(r < 0) {
+		if (r < 0) {
 			_E("permanent directory mkdir is failed");
 			return -1;
 		}
@@ -230,7 +230,7 @@ API int deviced_conf_set_vip(int pid)
 	if (access(VIP_DIR, R_OK) < 0) {
 		_D("no predefined matrix dir = %s, so created", VIP_DIR);
 		r = mkdir(VIP_DIR, 0777);
-		if(r < 0) {
+		if (r < 0) {
 			_E("sysconf_set_vip vip mkdir is failed");
 			return -1;
 		}

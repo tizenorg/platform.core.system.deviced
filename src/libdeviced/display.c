@@ -311,7 +311,7 @@ static void display_change_cb(void *data, DBusMessage *msg, DBusError *unused)
 		dbus_error_free(&err);
 		return;
 	}
-        _D("%s-%s : %d", DEVICED_INTERFACE_DISPLAY, METHOD_CHANGE_STATE, val);
+	_D("%s-%s : %d", DEVICED_INTERFACE_DISPLAY, METHOD_CHANGE_STATE, val);
 }
 
 API int display_change_state(unsigned int s_bits)
@@ -350,7 +350,7 @@ static void display_lock_cb(void *data, DBusMessage *msg, DBusError *unused)
 		dbus_error_free(&err);
 		return;
 	}
-        _D("%s-%s : %d", DEVICED_INTERFACE_DISPLAY, METHOD_LOCK_STATE, val);
+	_D("%s-%s : %d", DEVICED_INTERFACE_DISPLAY, METHOD_LOCK_STATE, val);
 }
 
 API int display_lock_state(unsigned int s_bits, unsigned int flag,
@@ -407,7 +407,7 @@ static void display_unlock_cb(void *data, DBusMessage *msg, DBusError *unused)
 		dbus_error_free(&err);
 		return;
 	}
-        _D("%s-%s : %d", DEVICED_INTERFACE_DISPLAY, METHOD_UNLOCK_STATE, val);
+	_D("%s-%s : %d", DEVICED_INTERFACE_DISPLAY, METHOD_UNLOCK_STATE, val);
 }
 
 API int display_unlock_state(unsigned int s_bits, unsigned int flag)
