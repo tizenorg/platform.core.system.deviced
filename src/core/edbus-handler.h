@@ -20,6 +20,7 @@
 #ifndef __EDBUS_HANDLE_H__
 #define __EDBUS_HANDLE_H__
 
+#include <stdbool.h>
 #include <E_DBus.h>
 #include "shared/dbus.h"
 
@@ -41,8 +42,12 @@ static inline DBusMessage *make_reply_message(DBusMessage *msg, int ret)
 }
 
 E_DBus_Object *register_edbus_object(const char *object_path, void *data);
+E_DBus_Object *register_block_edbus_object(const char *object_path, void *data);
 void unregister_edbus_object(E_DBus_Object *object);
 int register_edbus_interface_and_method(const char *path,
+		const char *interface,
+		const struct edbus_method *edbus_methods, int size);
+int register_block_edbus_interface_and_method(const char *path,
 		const char *interface,
 		const struct edbus_method *edbus_methods, int size);
 int register_edbus_method(const char *path, const struct edbus_method *edbus_methods, int size);
@@ -51,6 +56,8 @@ int register_edbus_signal_handler(const char *path, const char *interface,
 E_DBus_Interface *get_edbus_interface(const char *path);
 pid_t get_edbus_sender_pid(DBusMessage *msg);
 int broadcast_edbus_signal(const char *path, const char *interface,
+		const char *name, const char *sig, char *param[]);
+int broadcast_block_edbus_signal(const char *path, const char *interface,
 		const char *name, const char *sig, char *param[]);
 int register_edbus_watch(const char *sender,
 		void (*func)(const char *sender, void *data), void *data);

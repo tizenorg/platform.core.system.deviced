@@ -267,7 +267,7 @@ static void signal_device_blocked(struct block_device *bdev)
 		return;
 	}
 
-	broadcast_edbus_signal(object_path,
+	broadcast_block_edbus_signal(object_path,
 			DEVICED_INTERFACE_BLOCK,
 			BLOCK_DEVICE_BLOCKED,
 			"ss", arr);
@@ -337,11 +337,11 @@ static void signal_device_changed(struct block_device *bdev,
 		_E("there is no object_path");
 		return;
 	}
-	broadcast_edbus_signal(object_path,
+	broadcast_block_edbus_signal(object_path,
 			DEVICED_INTERFACE_BLOCK,
 			BLOCK_DEVICE_CHANGED,
 			"issssssisibii", arr);
-	broadcast_edbus_signal(object_path,
+	broadcast_block_edbus_signal(object_path,
 			DEVICED_INTERFACE_BLOCK,
 			BLOCK_DEVICE_CHANGED_2,
 			"issssssisibi", arr);
@@ -622,7 +622,7 @@ static E_DBus_Object *make_block_object(const char *devnode,
 	} while (found);
 
 	/* register block object */
-	object = register_edbus_object(object_path, data);
+	object = register_block_edbus_object(object_path, data);
 	if (!object) {
 		_E("Failed to register dbus object");
 		goto error;
@@ -633,7 +633,7 @@ static E_DBus_Object *make_block_object(const char *devnode,
 
 	/* Broadcast outside with BlockManager iface */
 	arr[0] = object_path;
-	broadcast_edbus_signal(DEVICED_PATH_BLOCK_MANAGER,
+	broadcast_block_edbus_signal(DEVICED_PATH_BLOCK_MANAGER,
 			DEVICED_INTERFACE_BLOCK_MANAGER,
 			BLOCK_OBJECT_ADDED,
 			"s", arr);
@@ -653,7 +653,7 @@ static void free_block_object(E_DBus_Object *object)
 
 	/* Broadcast outside with BlockManager iface */
 	arr[0] = (char *)e_dbus_object_path_get(object);
-	broadcast_edbus_signal(DEVICED_PATH_BLOCK_MANAGER,
+	broadcast_block_edbus_signal(DEVICED_PATH_BLOCK_MANAGER,
 			DEVICED_INTERFACE_BLOCK_MANAGER,
 			BLOCK_OBJECT_REMOVED,
 			"s", arr);
@@ -2586,7 +2586,7 @@ static void block_init(void *data)
 		_E("fail to load %s, Use default value", BLOCK_CONF_FILE);
 
 	/* register block manager object and interface */
-	ret = register_edbus_interface_and_method(DEVICED_PATH_BLOCK_MANAGER,
+	ret = register_block_edbus_interface_and_method(DEVICED_PATH_BLOCK_MANAGER,
 			DEVICED_INTERFACE_BLOCK_MANAGER,
 			manager_methods, ARRAY_SIZE(manager_methods));
 	if (ret < 0)
