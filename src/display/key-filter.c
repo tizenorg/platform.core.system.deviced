@@ -174,13 +174,13 @@ static inline void check_key_pair(int code, int new, int *old)
 static inline void broadcast_lcdon_by_powerkey(void)
 {
 	broadcast_edbus_signal(DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
-	    SIGNAL_LCDON_BY_POWERKEY, NULL, NULL);
+	    SIGNAL_LCDON_BY_POWERKEY, NULL, NULL, false);
 }
 
 static inline void broadcast_lcdoff_by_powerkey(void)
 {
 	broadcast_edbus_signal(DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
-	    SIGNAL_LCDOFF_BY_POWERKEY, NULL, NULL);
+	    SIGNAL_LCDOFF_BY_POWERKEY, NULL, NULL, false);
 }
 
 static inline bool switch_on_lcd(void)
@@ -431,7 +431,7 @@ static void sound_vibrate_hardkey(void)
 	device_notify(DEVICE_NOTIFIER_TOUCH_HARDKEY, NULL);
 	/* sound(dbus) */
 	broadcast_edbus_signal(DEVICED_PATH_KEY, DEVICED_INTERFACE_KEY,
-			SIGNAL_CHANGE_HARDKEY, NULL, NULL);
+			SIGNAL_CHANGE_HARDKEY, NULL, NULL, false);
 }
 
 static void process_hardkey_backlight(struct input_event *pinput)

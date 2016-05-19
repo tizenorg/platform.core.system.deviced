@@ -17,7 +17,6 @@
  */
 
 
-#include <stdbool.h>
 #include <assert.h>
 
 #include "core/log.h"
@@ -76,13 +75,15 @@ static dd_list *edbus_handler_list;
 static dd_list *edbus_watch_list;
 static int edbus_init_val;
 static DBusConnection *conn;
+static DBusConnection *conn_block;
 static E_DBus_Connection *edbus_conn;
+static E_DBus_Connection *edbus_conn_block;
 static DBusPendingCall *edbus_request_name;
 
 static DBusHandlerResult message_filter(DBusConnection *connection,
 		DBusMessage *message, void *data);
 
-E_DBus_Object *register_edbus_object(const char *object_path, void *data)
+E_DBus_Object *register_edbus_object(const char *object_path, void *data, bool block)
 {
 	E_DBus_Object *object;
 
@@ -91,7 +92,10 @@ E_DBus_Object *register_edbus_object(const char *object_path, void *data)
 		return NULL;
 	}
 
-	object = e_dbus_object_add(edbus_conn, object_path, data);
+	if (block)
+		object = e_dbus_object_add(edbus_conn_block, object_path, data);
+	else
+		object = e_dbus_object_add(edbus_conn, object_path, data);
 	if (!object) {
 		_E("fail to add object for %s", object_path);
 		return NULL;
@@ -108,14 +112,17 @@ void unregister_edbus_object(E_DBus_Object *object)
 	e_dbus_object_free(object);
 }
 
-static int register_edbus_interface(struct edbus_object *object)
+static int register_edbus_interface(struct edbus_object *object, bool block)
 {
 	if (!object) {
 		_E("object is invalid value!");
 		return -1;
 	}
 
-	object->obj = e_dbus_object_add(edbus_conn, object->path, NULL);
+	if (block)
+		object->obj = e_dbus_object_add(edbus_conn_block, object->path, NULL);
+	else
+		object->obj = e_dbus_object_add(edbus_conn, object->path, NULL);
 	if (!object->obj) {
 		_E("fail to add edbus obj");
 		return -1;
@@ -266,7 +273,7 @@ int register_edbus_signal_handler(const char *path, const char *interface,
 }
 
 int broadcast_edbus_signal(const char *path, const char *interface,
-		const char *name, const char *sig, char *param[])
+		const char *name, const char *sig, char *param[], bool block)
 {
 	DBusMessage *msg;
 	DBusMessageIter iter;
@@ -285,7 +292,10 @@ int broadcast_edbus_signal(const char *path, const char *interface,
 		return -EPERM;
 	}
 
-	r = dbus_connection_send(conn, msg, NULL);
+	if (block)
+		r = dbus_connection_send(conn_block, msg, NULL);
+	else
+		r = dbus_connection_send(conn, msg, NULL);
 	dbus_message_unref(msg);
 
 	if (r != TRUE) {
@@ -620,7 +630,7 @@ static int register_method(E_DBus_Interface *iface,
 
 int register_edbus_interface_and_method(const char *path,
 		const char *interface,
-		const struct edbus_method *edbus_methods, int size)
+		const struct edbus_method *edbus_methods, int size, bool block)
 {
 	struct edbus_object *obj;
 	dd_list *elem;
@@ -651,7 +661,7 @@ int register_edbus_interface_and_method(const char *path,
 		obj->path = strdup(path);
 		obj->interface = strdup(interface);
 
-		ret = register_edbus_interface(obj);
+		ret = register_edbus_interface(obj, block);
 		if (ret < 0) {
 			_E("fail to register %s interface(%d)", obj->path, ret);
 			free(obj->path);
@@ -848,7 +858,31 @@ void edbus_init(void *data)
 
 	retry = 0;
 	do {
+		conn_block = dbus_bus_get_private(DBUS_BUS_SYSTEM, &error);
+		if (conn_block)
+			break;
+		if (retry == EDBUS_INIT_RETRY_COUNT) {
+			_E("fail to get dbus");
+			goto out1;
+		}
+		retry++;
+	} while (retry <= EDBUS_INIT_RETRY_COUNT);
+
+	retry = 0;
+	do {
 		edbus_conn = e_dbus_connection_setup(conn);
+		if (edbus_conn)
+			break;
+		if (retry == EDBUS_INIT_RETRY_COUNT) {
+			_E("fail to get edbus");
+			goto out2;
+		}
+		retry++;
+	} while (retry <= EDBUS_INIT_RETRY_COUNT);
+
+	retry = 0;
+	do {
+		edbus_conn_block = e_dbus_connection_setup(conn_block);
 		if (edbus_conn)
 			break;
 		if (retry == EDBUS_INIT_RETRY_COUNT) {
@@ -871,8 +905,21 @@ void edbus_init(void *data)
 		retry++;
 	} while (retry <= EDBUS_INIT_RETRY_COUNT);
 
+	retry = 0;
+	do {
+		edbus_request_name = e_dbus_request_name(edbus_conn_block, STORAGE_BUS_NAME,
+				DBUS_NAME_FLAG_REPLACE_EXISTING, request_name_cb, NULL);
+		if (edbus_request_name)
+			break;
+		if (retry == EDBUS_INIT_RETRY_COUNT) {
+			_E("fail to request edbus name");
+			goto out3;
+		}
+		retry++;
+	} while (retry <= EDBUS_INIT_RETRY_COUNT);
+
 	for (i = 0; i < ARRAY_SIZE(edbus_objects); i++) {
-		ret = register_edbus_interface(&edbus_objects[i]);
+		ret = register_edbus_interface(&edbus_objects[i], false);
 		if (ret < 0) {
 			_E("fail to add obj & interface for %s",
 				    edbus_objects[i].interface);
@@ -886,8 +933,10 @@ void edbus_init(void *data)
 
 out3:
 	e_dbus_connection_close(edbus_conn);
+	e_dbus_connection_close(edbus_conn_block);
 out2:
 	dbus_connection_set_exit_on_disconnect(conn, FALSE);
+	dbus_connection_set_exit_on_disconnect(conn_block, FALSE);
 out1:
 	e_dbus_shutdown();
 }
@@ -898,5 +947,6 @@ void edbus_exit(void *data)
 	unregister_edbus_watch_all();
 	unregister_edbus_interface_all();
 	e_dbus_connection_close(edbus_conn);
+	e_dbus_connection_close(edbus_conn_block);
 	e_dbus_shutdown();
 }

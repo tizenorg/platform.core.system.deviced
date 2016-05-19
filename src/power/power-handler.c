@@ -252,7 +252,7 @@ static void poweroff_send_broadcast(int status)
 	arr[0] = str_status;
 
 	broadcast_edbus_signal(DEVICED_PATH_POWEROFF, DEVICED_INTERFACE_POWEROFF,
-			SIGNAL_POWEROFF_STATE, "i", arr);
+			SIGNAL_POWEROFF_STATE, "i", arr, false);
 }
 
 static void poweroff_idler_cb(void *data)

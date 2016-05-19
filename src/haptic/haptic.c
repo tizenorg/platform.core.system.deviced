@@ -869,7 +869,7 @@ static void haptic_init(void *data)
 	/* init dbus interface */
 	r = register_edbus_interface_and_method(DEVICED_PATH_HAPTIC,
 			DEVICED_INTERFACE_HAPTIC,
-			edbus_methods, ARRAY_SIZE(edbus_methods));
+			edbus_methods, ARRAY_SIZE(edbus_methods), false);
 	if (r < 0)
 		_E("fail to init edbus interface and method(%d)", r);
 

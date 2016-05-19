@@ -365,7 +365,7 @@ static void extcon_init(void *data)
 	/* register extcon object first */
 	ret = register_edbus_interface_and_method(DEVICED_PATH_EXTCON,
 			DEVICED_INTERFACE_EXTCON,
-			edbus_methods, ARRAY_SIZE(edbus_methods));
+			edbus_methods, ARRAY_SIZE(edbus_methods), false);
 	if (ret < 0)
 		_E("fail to init edbus interface and method(%d)", ret);
 }

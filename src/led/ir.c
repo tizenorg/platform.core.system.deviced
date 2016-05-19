@@ -61,7 +61,7 @@ static void ir_init(void *data)
 	/* init dbus interface */
 	ret = register_edbus_interface_and_method(DEVICED_PATH_LED,
 			DEVICED_INTERFACE_LED,
-			edbus_methods, ARRAY_SIZE(edbus_methods));
+			edbus_methods, ARRAY_SIZE(edbus_methods), false);
 	if (ret < 0)
 		_E("fail to init edbus interfce and method(%d)", ret);
 }

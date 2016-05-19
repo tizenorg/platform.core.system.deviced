@@ -120,7 +120,7 @@ static void ir_init(void *data)
 
 	ret = register_edbus_interface_and_method(DEVICED_PATH_IR,
 			DEVICED_INTERFACE_IR,
-			edbus_methods, ARRAY_SIZE(edbus_methods));
+			edbus_methods, ARRAY_SIZE(edbus_methods), false);
 
 	if (ret < 0)
 		_E("fail to init edbus interface and method(%d)", ret);

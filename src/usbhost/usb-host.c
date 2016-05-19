@@ -136,7 +136,7 @@ static void broadcast_usbhost_signal(enum usbhost_state state,
 	broadcast_edbus_signal(DEVICED_PATH_USBHOST,
 			DEVICED_INTERFACE_USBHOST,
 			SIGNAL_USB_HOST_CHANGED,
-			"isiiiiisss", arr);
+			"isiiiiisss", arr, false);
 }
 
 static int add_usbhost_list(struct udev_device *dev, const char *devpath)
@@ -481,7 +481,7 @@ static void usbhost_init(void *data)
 	/* register usbhost interface and method */
 	ret = register_edbus_interface_and_method(DEVICED_PATH_USBHOST,
 			DEVICED_INTERFACE_USBHOST,
-			edbus_methods, ARRAY_SIZE(edbus_methods));
+			edbus_methods, ARRAY_SIZE(edbus_methods), false);
 	if (ret < 0)
 		_E("fail to register edbus interface and method! %d", ret);
 

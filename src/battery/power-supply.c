@@ -120,7 +120,7 @@ static void abnormal_popup_timer_init(void)
 static void health_status_broadcast(void)
 {
 	broadcast_edbus_signal(DEVICED_PATH_BATTERY, DEVICED_INTERFACE_BATTERY,
-	    SIGNAL_TEMP_GOOD, NULL, NULL);
+	    SIGNAL_TEMP_GOOD, NULL, NULL, false);
 }
 
 
@@ -309,7 +309,7 @@ void power_supply_broadcast(char *sig, int status)
 	arr[0] = str_status;
 
 	broadcast_edbus_signal(DEVICED_PATH_BATTERY, DEVICED_INTERFACE_BATTERY,
-			sig, "i", arr);
+			sig, "i", arr, false);
 }
 
 static void noti_batt_full(void)
@@ -1046,7 +1046,7 @@ static void power_supply_init(void *data)
 
 	ret = register_edbus_interface_and_method(DEVICED_PATH_BATTERY,
 			DEVICED_INTERFACE_BATTERY,
-			edbus_methods, ARRAY_SIZE(edbus_methods));
+			edbus_methods, ARRAY_SIZE(edbus_methods), false);
 	if (ret < 0)
 		_E("fail to init edbus interface and method(%d)", ret);
 

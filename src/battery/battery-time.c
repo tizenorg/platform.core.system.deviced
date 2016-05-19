@@ -272,7 +272,7 @@ static void broadcast_battery_time(char *signal, int time)
 	param[0] = buf;
 
 	broadcast_edbus_signal(DEVICED_PATH_BATTERY, DEVICED_INTERFACE_BATTERY,
-	    signal, "i", param);
+	    signal, "i", param, false);
 }
 
 static void update_time(enum state_a a_index, int seconds)
@@ -466,7 +466,7 @@ static void battery_init(void *data)
 	/* init dbus interface */
 	ret = register_edbus_interface_and_method(DEVICED_PATH_BATTERY,
 			DEVICED_INTERFACE_BATTERY,
-			edbus_methods, ARRAY_SIZE(edbus_methods));
+			edbus_methods, ARRAY_SIZE(edbus_methods), false);
 	if (ret < 0)
 		_E("fail to init edbus interface and method(%d)", ret);
 

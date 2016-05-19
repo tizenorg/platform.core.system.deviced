@@ -211,7 +211,7 @@ int set_timezone_action(int argc, char **argv)
 static void time_changed_broadcast(void)
 {
 	broadcast_edbus_signal(DEVICED_PATH_TIME, DEVICED_INTERFACE_TIME,
-			TIME_CHANGE_SIGNAL, NULL, NULL);
+			TIME_CHANGE_SIGNAL, NULL, NULL, false);
 }
 
 static int timerfd_check_start(void)

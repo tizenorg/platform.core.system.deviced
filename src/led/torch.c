@@ -51,7 +51,7 @@ static void flash_state_broadcast(int val)
 	arr[0] = str_state;
 
 	broadcast_edbus_signal(DEVICED_PATH_LED, DEVICED_INTERFACE_LED,
-			SIGNAL_FLASH_STATE, "i", arr);
+			SIGNAL_FLASH_STATE, "i", arr, false);
 }
 
 static DBusMessage *edbus_get_brightness(E_DBus_Object *obj, DBusMessage *msg)
@@ -213,7 +213,7 @@ static void torch_init(void *data)
 	/* init dbus interface */
 	ret = register_edbus_interface_and_method(DEVICED_PATH_LED,
 			DEVICED_INTERFACE_LED,
-			edbus_methods, ARRAY_SIZE(edbus_methods));
+			edbus_methods, ARRAY_SIZE(edbus_methods), false);
 	if (ret < 0)
 		_E("fail to init edbus interface and method(%d)", ret);
 }

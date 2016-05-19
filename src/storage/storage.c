@@ -97,7 +97,7 @@ static void memnoti_send_broadcast(char *signal, int status)
 	snprintf(str_status, sizeof(str_status), "%d", status);
 	arr[0] = str_status;
 	broadcast_edbus_signal(DEVICED_PATH_LOWMEM, DEVICED_INTERFACE_LOWMEM,
-			signal, "i", arr);
+			signal, "i", arr, false);
 }
 
 static int memnoti_popup(enum memnoti_level level)

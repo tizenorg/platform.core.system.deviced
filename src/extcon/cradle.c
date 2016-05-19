@@ -47,7 +47,7 @@ static void cradle_send_broadcast(int status)
 	arr[0] = str_status;
 
 	broadcast_edbus_signal(DEVICED_PATH_SYSNOTI, DEVICED_INTERFACE_SYSNOTI,
-			SIGNAL_CRADLE_STATE, "i", arr);
+			SIGNAL_CRADLE_STATE, "i", arr, false);
 }
 
 static int cradle_update(int status)
