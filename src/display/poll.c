@@ -36,6 +36,7 @@
 #define __HOLDKEY_BLOCK_BIT              0x1
 #define HOLDKEY_BLOCK_BIT               (__HOLDKEY_BLOCK_BIT << LOCK_FLAG_SHIFT)
 
+PMMsg recv_data;
 
 int check_dimstay(int next_state, int flag)
 {
@@ -147,4 +148,3 @@ int pm_change_internal(pid_t pid, int s_bits)
 
 	return 0;
 }
-
