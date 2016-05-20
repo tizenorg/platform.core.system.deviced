@@ -77,6 +77,7 @@
 #define UNKNOWN_STR		"unknown"
 
 unsigned int pm_status_flag;
+static int trans_condition;
 
 static void (*power_saving_func) (int onoff);
 static enum device_ops_status status = DEVICE_OPS_STATUS_UNINIT;

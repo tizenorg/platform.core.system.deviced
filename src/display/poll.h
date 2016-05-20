@@ -136,8 +136,7 @@ typedef struct {
 	unsigned int timeout2;
 } PMMsg;
 
-PMMsg recv_data;
-int (*pm_callback) (int, PMMsg *);
+extern int (*pm_callback) (int, PMMsg *);
 
 int init_input(void);
 int exit_input(void);

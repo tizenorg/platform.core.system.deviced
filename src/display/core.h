@@ -93,8 +93,8 @@ enum state_t {
  *   states      : state definitions
  *   trans_table : state transition table
  */
-int pm_cur_state;
-int pm_old_state;
+extern int pm_cur_state;
+extern int pm_old_state;
 
 /*
  * @brief State structure
@@ -107,7 +107,8 @@ struct state {
 	int (*check) (int curr, int next); /**< transition check function */
 	Ecore_Task_Cb timeout_cb;
 	int timeout;
-} states[S_END];
+};
+extern struct state states[S_END];
 
 /*
  * @brief Configuration structure
@@ -160,8 +161,6 @@ extern const struct display_keyfilter_ops *keyfilter_ops;
 
 /* If the bit in a condition variable is set,
  *  we cannot transit the state until clear this bit. */
-int trans_condition;
-pid_t idle_pid;
 int check_processes(enum state_t prohibit_state);
 extern struct state state[S_END];
 void reset_lcd_timeout(const char *sender, void *data);
