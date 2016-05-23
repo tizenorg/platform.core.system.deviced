@@ -36,6 +36,7 @@
 %endif
 %if "%{?profile}" == "wearable"
 %define battery_module on
+%define block_module on
 %define haptic_module on
 %define telephony_module on
 %define touchscreen_module on
