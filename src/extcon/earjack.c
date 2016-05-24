@@ -76,7 +76,11 @@ static int earjack_update(int status)
 }
 
 static struct extcon_ops earjack_extcon_ops = {
+#ifdef EMULATOR
+	.name   = "earjack",
+#else
 	.name   = EXTCON_CABLE_HEADPHONE_OUT,
+#endif
 	.update = earjack_update,
 };
 

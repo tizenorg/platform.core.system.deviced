@@ -228,6 +228,48 @@ error:
 	return make_reply_message(msg, ret);
 }
 
+static DBusMessage *dbus_device_changed(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusError err;
+	pid_t pid;
+	int ret = 0;
+	int argc;
+	char *type_str;
+	char *argv[2];
+
+	dbus_error_init(&err);
+
+	if (!dbus_message_get_args(msg, &err,
+				DBUS_TYPE_STRING, &type_str,
+				DBUS_TYPE_INT32, &argc,
+				DBUS_TYPE_STRING, &argv[0],
+				DBUS_TYPE_STRING, &argv[1], DBUS_TYPE_INVALID)) {
+		_E("there is no message");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	_I("extcon (%s, %d, %s, %s)", type_str, argc, argv[0], argv[1]);
+
+	if (argc < 0) {
+		_E("message is invalid!");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	pid = get_edbus_sender_pid(msg);
+	if (kill(pid, 0) == -1) {
+		_E("%d process does not exist, dbus ignored!", pid);
+		ret = -ESRCH;
+		goto out;
+	}
+
+	extcon_update(argv[0], argv[1]);
+
+out:
+	return make_reply_message(msg, ret);
+}
+
 static DBusMessage *dbus_enable_device(E_DBus_Object *obj, DBusMessage *msg)
 {
 	char *device;
@@ -271,6 +313,7 @@ static struct uevent_handler uh = {
 
 static const struct edbus_method edbus_methods[] = {
 	{ "GetStatus", "s",  "i", dbus_get_extcon_status },
+	{ "device_changed", "siss", "i", dbus_device_changed }, /* for Emulator */
 	{ "enable",    "s", NULL, dbus_enable_device },  /* for devicectl */
 	{ "disable",   "s", NULL, dbus_disable_device }, /* for devicectl */
 };
@@ -292,6 +335,10 @@ static int extcon_probe(void *data)
 {
 	struct hw_info *info;
 	int ret;
+
+#ifdef EMULATOR
+	return 0;
+#endif
 
 	if (extcon_dev)
 		return 0;
