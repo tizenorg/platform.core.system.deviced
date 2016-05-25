@@ -6,7 +6,7 @@
 
 # display, extcon, power, usb are always enable
 %define battery_module off
-%define block_module off
+%define block_module on
 %define display_module on
 %define extcon_module on
 %define haptic_module off
@@ -25,7 +25,6 @@
 
 %if "%{?profile}" == "mobile"
 %define battery_module on
-%define block_module on
 %define haptic_module on
 %define ir_module on
 %define led_module on
@@ -36,14 +35,12 @@
 %endif
 %if "%{?profile}" == "wearable"
 %define battery_module on
-%define block_module on
 %define haptic_module on
 %define telephony_module on
 %define touchscreen_module on
 %define tzip_module on
 %endif
 %if "%{?profile}" == "tv"
-%define block_module on
 %define sdb_prestart off
 %define usbhost_module on
 %endif
