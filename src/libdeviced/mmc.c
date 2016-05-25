@@ -85,9 +85,6 @@ static void mount_mmc_cb(void *data, DBusMessage *msg, DBusError *err)
 
 	_I("Mount State : %d", mmc_ret);
 
-//	if (mmc_ret == ODE_MOUNT_STATE)
-//		return;
-
 exit:
 	(mmc_data->mmc_cb)(mmc_ret, mmc_data->user_data);
 }
