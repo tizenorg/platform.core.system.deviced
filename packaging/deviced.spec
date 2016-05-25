@@ -6,7 +6,7 @@
 
 # display, extcon, power, usb are always enable
 %define battery_module off
-%define block_module off
+%define block_module on
 %define display_module on
 %define extcon_module on
 %define haptic_module off
