@@ -179,7 +179,7 @@ static int load_operation_config(struct parse_result *result, void *user_data)
 
 	_I("Execute(%s %s: %d)", result->name, result->value, ret);
 
-	return ret;
+	return 0;
 }
 
 static int usb_execute_operation(char *type, operation_key_e key)
