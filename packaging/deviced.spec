@@ -24,6 +24,9 @@
 #Just For debugging
 %define sdb_prestart off
 
+# Support two pattern combination vibration
+%define standard_mix off
+
 %if "%{?profile}" == "mobile"
 %define battery_module on
 %define haptic_module on
@@ -180,6 +183,7 @@ Deviced library for device control (devel)
 	-DDISPLAY_MODULE=%{display_module} \
 	-DEXTCON_MODULE=%{extcon_module} \
 	-DHAPTIC_MODULE=%{haptic_module} \
+	-DSTANDARD_MIX=%{standard_mix} \
 	-DIR_MODULE=%{ir_module} \
 	-DLED_MODULE=%{led_module} \
 	-DPOWER_MODULE=%{power_module} \

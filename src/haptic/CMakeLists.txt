@@ -25,9 +25,8 @@ SET(VERSION 0.1.0)
 SET(SRCS
 	main.c
 	haptic.c
-	standard.c
-	emulator.c
 	external.c
+	emulator.c
 	edbus-handler.c
 	${CMAKE_SOURCE_DIR}/src/core/common.c
 	${CMAKE_SOURCE_DIR}/src/core/config-parser.c
@@ -38,6 +37,11 @@ SET(SRCS
 	${CMAKE_SOURCE_DIR}/src/core/log.c
 	${CMAKE_SOURCE_DIR}/src/shared/dbus.c
 )
+IF(STANDARD_MIX STREQUAL on)
+	SET(SRCS ${SRCS} standard-mix.c)
+ELSE()
+	SET(SRCS ${SRCS} standard.c)
+ENDIF()
 
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/src)
 
