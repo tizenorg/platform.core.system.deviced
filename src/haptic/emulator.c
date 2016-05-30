@@ -1,5 +1,5 @@
 /*
- * deviced
+ * deviced-vibrator
  *
  * Copyright (c) 2012 - 2013 Samsung Electronics Co., Ltd.
  *

@@ -845,7 +845,7 @@ static const struct edbus_method edbus_methods[] = {
 	/* Add methods here */
 };
 
-static int haptic_probe(void *data)
+int haptic_probe(void)
 {
 	/**
 	 * load haptic module.
@@ -855,7 +855,7 @@ static int haptic_probe(void *data)
 	return haptic_module_load();
 }
 
-static void haptic_init(void *data)
+void haptic_init(void)
 {
 	int r;
 
@@ -867,8 +867,8 @@ static void haptic_init(void *data)
 	}
 
 	/* init dbus interface */
-	r = register_edbus_interface_and_method(DEVICED_PATH_HAPTIC,
-			DEVICED_INTERFACE_HAPTIC,
+	r = register_edbus_interface_and_method(VIBRATOR_PATH_HAPTIC,
+			VIBRATOR_INTERFACE_HAPTIC,
 			edbus_methods, ARRAY_SIZE(edbus_methods));
 	if (r < 0)
 		_E("fail to init edbus interface and method(%d)", r);
@@ -882,7 +882,7 @@ static void haptic_init(void *data)
 		vconf_notify_key_changed(VCONFKEY_RECORDER_STATE, sound_capturing_cb, NULL);
 }
 
-static void haptic_exit(void *data)
+void haptic_exit(void)
 {
 	struct haptic_ops *ops;
 	dd_list *elem;
@@ -929,12 +929,3 @@ static int haptic_stop(void)
 	haptic_disabled = true;
 	return 0;
 }
-
-static const struct device_ops haptic_device_ops = {
-	.name     = "haptic",
-	.probe    = haptic_probe,
-	.init     = haptic_init,
-	.exit     = haptic_exit,
-};
-
-DEVICE_OPS_REGISTER(&haptic_device_ops)

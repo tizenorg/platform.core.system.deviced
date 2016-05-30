@@ -171,7 +171,7 @@ API int haptic_get_count(int *device_number)
 
 	/* request to deviced to get haptic count */
 	ret = dbus_method_sync(DEVICED_BUS_NAME,
-			DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
+			VIBRATOR_PATH_HAPTIC, VIBRATOR_INTERFACE_HAPTIC,
 			METHOD_GET_COUNT, NULL, NULL);
 	if (ret < 0)
 		return HAPTIC_ERROR_OPERATION_FAILED;
@@ -204,7 +204,7 @@ API int haptic_open(haptic_device_e device_index, haptic_device_h *device_handle
 
 	/* request to deviced to open haptic device */
 	ret = dbus_method_sync(DEVICED_BUS_NAME,
-			DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
+			VIBRATOR_PATH_HAPTIC, VIBRATOR_INTERFACE_HAPTIC,
 			METHOD_OPEN_DEVICE, "i", arr);
 	if (ret < 0)
 		return HAPTIC_ERROR_OPERATION_FAILED;
@@ -230,7 +230,7 @@ API int haptic_close(haptic_device_h device_handle)
 
 	/* request to deviced to open haptic device */
 	ret = dbus_method_sync(DEVICED_BUS_NAME,
-			DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
+			VIBRATOR_PATH_HAPTIC, VIBRATOR_INTERFACE_HAPTIC,
 			METHOD_CLOSE_DEVICE, "u", arr);
 	if (ret < 0)
 		return HAPTIC_ERROR_OPERATION_FAILED;
@@ -297,7 +297,7 @@ API int haptic_vibrate_monotone_with_detail(haptic_device_h device_handle,
 
 	/* request to deviced to open haptic device */
 	ret = dbus_method_sync(DEVICED_BUS_NAME,
-			DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
+			VIBRATOR_PATH_HAPTIC, VIBRATOR_INTERFACE_HAPTIC,
 			METHOD_VIBRATE_MONOTONE, "uiii", arr);
 	if (ret < 0)
 		return HAPTIC_ERROR_OPERATION_FAILED;
@@ -459,7 +459,7 @@ API int haptic_vibrate_buffers_with_detail(haptic_device_h device_handle,
 
 	/* request to deviced to open haptic device */
 	ret = dbus_method_sync(DEVICED_BUS_NAME,
-			DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
+			VIBRATOR_PATH_HAPTIC, VIBRATOR_INTERFACE_HAPTIC,
 			METHOD_VIBRATE_BUFFER, "uayiii", arr);
 	if (ret < 0)
 		return HAPTIC_ERROR_OPERATION_FAILED;
@@ -492,7 +492,7 @@ API int haptic_stop_all_effects(haptic_device_h device_handle)
 
 	/* request to deviced to open haptic device */
 	ret = dbus_method_sync(DEVICED_BUS_NAME,
-			DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
+			VIBRATOR_PATH_HAPTIC, VIBRATOR_INTERFACE_HAPTIC,
 			METHOD_STOP_DEVICE, "u", arr);
 	if (ret < 0)
 		return HAPTIC_ERROR_OPERATION_FAILED;
@@ -523,7 +523,7 @@ API int haptic_get_effect_state(haptic_device_h device_handle, haptic_effect_h e
 
 	/* request to deviced to open haptic device */
 	ret = dbus_method_sync(DEVICED_BUS_NAME,
-			DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
+			VIBRATOR_PATH_HAPTIC, VIBRATOR_INTERFACE_HAPTIC,
 			METHOD_GET_STATE, "i", arr);
 	if (ret < 0)
 		return HAPTIC_ERROR_OPERATION_FAILED;
@@ -586,7 +586,7 @@ API int haptic_create_effect(unsigned char *vibe_buffer,
 
 	/* request to deviced to open haptic device */
 	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
-			DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
+			VIBRATOR_PATH_HAPTIC, VIBRATOR_INTERFACE_HAPTIC,
 			METHOD_CREATE_EFFECT, "iayi", arr);
 	if (!msg)
 		return HAPTIC_ERROR_OPERATION_FAILED;
@@ -602,7 +602,7 @@ API int haptic_create_effect(unsigned char *vibe_buffer,
 	}
 
 	if (ret_val < 0) {
-		_E("%s-%s failed : %d", DEVICED_INTERFACE_HAPTIC, METHOD_CREATE_EFFECT, ret_val);
+		_E("%s-%s failed : %d", VIBRATOR_INTERFACE_HAPTIC, METHOD_CREATE_EFFECT, ret_val);
 		goto err;
 	}
 
@@ -717,7 +717,7 @@ API int haptic_get_buffers_duration(haptic_device_h device_handle, const unsigne
 
 	/* request to deviced to open haptic device */
 	ret = dbus_method_sync(DEVICED_BUS_NAME,
-			DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
+			VIBRATOR_PATH_HAPTIC, VIBRATOR_INTERFACE_HAPTIC,
 			METHOD_GET_DURATION, "uay", arr);
 	if (ret < 0)
 		return HAPTIC_ERROR_OPERATION_FAILED;
@@ -762,7 +762,7 @@ API int haptic_save_led(const unsigned char *vibe_buffer, int max_bufsize, const
 
 	/* request to deviced to open haptic device */
 	ret = dbus_method_sync(DEVICED_BUS_NAME,
-			DEVICED_PATH_HAPTIC, DEVICED_INTERFACE_HAPTIC,
+			VIBRATOR_PATH_HAPTIC, VIBRATOR_INTERFACE_HAPTIC,
 			METHOD_SAVE_BINARY, "ays", arr);
 	if (ret < 0)
 		return HAPTIC_ERROR_OPERATION_FAILED;

@@ -1,0 +1,13 @@
+[Unit]
+Description=System Vibrator Daemon
+After=deviced.service
+
+[Service]
+BusName=org.tizen.system.vibrator
+ExecStart=/usr/bin/deviced-vibrator
+Restart=always
+RestartSec=0
+KillSignal=SIGUSR1
+
+[Install]
+WantedBy=multi-user.target
