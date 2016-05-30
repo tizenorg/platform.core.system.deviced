@@ -1,5 +1,5 @@
 /*
- * deviced
+ * deviced-vibrator
  *
  * Copyright (c) 2012 - 2013 Samsung Electronics Co., Ltd.
  *
@@ -495,6 +495,45 @@ exit:
 	return reply;
 }
 
+static DBusMessage *edbus_vibrate_effect(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	unsigned int handle;
+	char *pattern;
+	int level, priority, ret = 0;
+
+	if (!CHECK_VALID_OPS(h_ops, ret))
+		goto exit;
+
+	if (haptic_disabled)
+		goto exit;
+
+	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_UINT32, &handle,
+				DBUS_TYPE_STRING, &pattern,
+				DBUS_TYPE_INT32, &level,
+				DBUS_TYPE_INT32, &priority, DBUS_TYPE_INVALID)) {
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	/* convert as per conf value */
+	level = convert_magnitude_by_conf(level);
+	if (level < 0) {
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	ret = h_ops->vibrate_effect(handle, pattern,
+			level, priority);
+
+exit:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+	return reply;
+}
+
 static DBusMessage *edbus_stop_device(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
@@ -663,6 +702,36 @@ static DBusMessage *edbus_show_handle_list(E_DBus_Object *obj, DBusMessage *msg)
 	}
 
 	return dbus_message_new_method_return(msg);
+}
+
+static DBusMessage *edbus_pattern_is_supported(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	char *data;
+	int ret = 0;
+
+	if (!CHECK_VALID_OPS(h_ops, ret))
+		goto exit;
+
+	if (haptic_disabled)
+		goto exit;
+
+	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &data,
+				DBUS_TYPE_INVALID)) {
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	ret = h_ops->is_supported(data);
+
+	_I("%s is supported : %d", data, ret);
+
+exit:
+	reply = dbus_message_new_method_return(msg);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+	return reply;
 }
 
 static int haptic_internal_init(void)
@@ -837,11 +906,13 @@ static const struct edbus_method edbus_methods[] = {
 	{ "StopDevice",         "u",   "i", edbus_stop_device },
 	{ "VibrateMonotone", "uiii",   "i", edbus_vibrate_monotone },
 	{ "VibrateBuffer", "uayiii",   "i", edbus_vibrate_buffer },
+	{ "VibrateEffect",   "usii",   "i", edbus_vibrate_effect },
 	{ "GetState",           "i",   "i", edbus_get_state },
 	{ "GetDuration",      "uay",   "i", edbus_get_duration },
 	{ "CreateEffect",    "iayi", "ayi", edbus_create_effect },
 	{ "SaveBinary",       "ays",   "i", edbus_save_binary },
 	{ "ShowHandleList",    NULL,  NULL, edbus_show_handle_list },
+	{ "IsSupported",        "s",   "i", edbus_pattern_is_supported },
 	/* Add methods here */
 };
 

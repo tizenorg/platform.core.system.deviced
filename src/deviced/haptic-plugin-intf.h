@@ -28,6 +28,8 @@ struct haptic_plugin_ops {
 	int (*close_device) (int);
 	int (*vibrate_monotone) (int, int, int, int, int*);
 	int (*vibrate_buffer) (int, const unsigned char*, int, int, int, int*);
+	int (*vibrate_effect) (int, const char*, int, int);
+	int (*is_supported) (const char*);
 	int (*stop_device) (int);
 	int (*get_device_state) (int, int*);
 	int (*create_effect) (unsigned char*, int, haptic_module_effect_element*, int);

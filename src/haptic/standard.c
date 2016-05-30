@@ -1,5 +1,5 @@
 /*
- * deviced
+ * deviced-vibrator
  *
  * Copyright (c) 2012 - 2013 Samsung Electronics Co., Ltd.
  *
@@ -32,6 +32,7 @@
 
 #include "core/log.h"
 #include "core/list.h"
+#include "core/config-parser.h"
 #include "haptic.h"
 
 #define MAX_MAGNITUDE			0xFFFF
@@ -50,6 +51,7 @@
 #define MAX_DATA 16
 #define FF_INFO_MAGIC 0xDEADFEED
 
+#define VIBRATION_CONF_PATH				"/usr/share/feedback/vibration.conf"
 #ifdef WEARABLE_CIRCLE
 #define CIRCLE_ON_PATH		"/sys/class/sec/motor/motor_on"
 #define CIRCLE_OFF_PATH		"/sys/class/sec/motor/motor_off"
@@ -80,9 +82,29 @@ struct ff_info {
 	int currentindex;
 };
 
+struct vibration_config {
+	char *pattern;
+	dd_list *data;
+};
+
+struct duration_data {
+	int duration;
+	int wait;
+};
+
+struct haptic_data {
+	dd_list *vibration_data;
+	unsigned int handle;
+	int level;
+	int priority;
+	bool stop;
+};
+
 static int ff_fd;
 static dd_list *ff_list;
 static dd_list *handle_list;
+static dd_list *vib_conf_list;
+static Ecore_Timer *duration_timer;
 static char ff_path[PATH_MAX];
 static int unique_number;
 
@@ -567,6 +589,57 @@ static int vibrate_custom_buffer(int device_handle, const unsigned char *vibe_bu
 	return 0;
 }
 
+static Eina_Bool haptic_duration_play(void *data)
+{
+	dd_list *head, *n, *next;
+	struct haptic_data *h_data;
+	struct duration_data *node;
+	int ret = 0;
+
+	if (!data)
+		goto out;
+
+	if (duration_timer) {
+		ecore_timer_del(duration_timer);
+		duration_timer = NULL;
+	}
+
+	h_data = (struct haptic_data *)data;
+	if (h_data->stop) {
+		h_data->stop = false;
+		free(h_data);
+		goto out;
+	}
+
+	head = h_data->vibration_data;
+	DD_LIST_FOREACH_SAFE(head, n, next, node) {
+		_D("Play: %dms and Wait: %dms", node->duration, node->wait);
+		if (!node->duration) {
+			free(h_data);
+			break;
+		}
+
+		if (node->wait && next) {
+			h_data->vibration_data = next;
+			duration_timer = ecore_timer_add((node->duration + node->wait)/1000.0f, haptic_duration_play, (void *)h_data);
+		}
+
+		ret = vibrate_monotone(h_data->handle, node->duration, h_data->level, h_data->priority, NULL);
+		if (!next) {
+			free(h_data);
+			goto out;
+		}
+		break;
+	}
+	if (ret != 0) {
+		_D("auto stop vibration");
+		if (h_data)
+			h_data->stop = true;
+	}
+out:
+	return ECORE_CALLBACK_CANCEL;
+}
+
 static int vibrate_buffer(int device_handle, const unsigned char *vibe_buffer, int iteration, int feedback, int priority, int *effect_handle)
 {
 	int magic = 0;
@@ -582,6 +655,65 @@ static int vibrate_buffer(int device_handle, const unsigned char *vibe_buffer, i
 		return vibrate_custom_buffer(device_handle, vibe_buffer, iteration, feedback, priority, effect_handle);
 	} else
 		return vibrate_monotone(device_handle, 300, feedback, priority, effect_handle);
+}
+
+static int vibrate_effect(int device_handle, const char *pattern, int feedback, int priority)
+{
+	dd_list *elem;
+	struct vibration_config *conf;
+	struct haptic_data *data;
+	size_t len;
+
+	if (device_handle < 0)
+		return -EINVAL;
+
+	len = strlen(pattern) + 1;
+	DD_LIST_FOREACH(vib_conf_list, elem, conf) {
+		if (!conf->pattern)
+			continue;
+		if (strncmp(conf->pattern, pattern, len))
+			continue;
+
+		data = (struct haptic_data *)malloc(sizeof(struct haptic_data));
+		if (!data) {
+			_E("fail to alloc");
+			return -ENOMEM;
+		}
+		data->vibration_data = conf->data;
+		data->handle = device_handle;
+		data->level = feedback;
+		data->priority = priority;
+		data->stop = false;
+		_D("Play %s", conf->pattern);
+		haptic_duration_play((void *)data);
+		break;
+	}
+
+	return 0;
+}
+
+static int is_supported(const char *pattern)
+{
+	dd_list *elem;
+	struct vibration_config *conf;
+	size_t len;
+	int ret;
+
+	if (!pattern)
+		return -EINVAL;
+
+	len = strlen(pattern) + 1;
+	ret = 0;
+	DD_LIST_FOREACH(vib_conf_list, elem, conf) {
+		if (!conf->pattern)
+			continue;
+		if (!strncmp(conf->pattern, pattern, len)) {
+			ret = true;
+			break;
+		}
+	}
+
+	return ret;
 }
 
 static int stop_device(int device_handle)
@@ -659,12 +791,96 @@ static const struct haptic_plugin_ops default_plugin = {
 	.close_device        = close_device,
 	.vibrate_monotone    = vibrate_monotone,
 	.vibrate_buffer      = vibrate_buffer,
+	.vibrate_effect      = vibrate_effect,
+	.is_supported        = is_supported,
 	.stop_device         = stop_device,
 	.get_device_state    = get_device_state,
 	.create_effect       = create_effect,
 	.get_buffer_duration = get_buffer_duration,
 	.convert_binary      = convert_binary,
 };
+
+static int vibration_load_config(struct parse_result *result, void *user_data)
+{
+	struct vibration_config *conf;
+	struct duration_data *data;
+	char *value;
+	char *check;
+	int len;
+
+	if (!result)
+		return 0;
+
+	if (!MATCH(result->section, "Vibration"))
+		return 0;
+
+
+	if (!result->name || !result->value)
+		return 0;
+
+	conf = (struct vibration_config *)calloc(1, sizeof(struct vibration_config));
+	if (!conf) {
+		_E("fail to alloc");
+		return -ENOMEM;
+	}
+
+	conf->pattern = strdup(result->name);
+	if (!conf->pattern)
+		_E("fail to copy %s pattern data", result->name);
+
+	value = result->value;
+
+	len = strlen(value);
+	if (len == 0) {
+		data = (struct duration_data *)malloc(sizeof(struct duration_data));
+		if (!data) {
+			_E("not enough memory");
+			free(conf->pattern);
+			free(conf);
+			return -ENOMEM;
+		}
+		data->duration = 0;
+		data->wait = 0;
+
+		DD_LIST_APPEND(conf->data, data);
+		DD_LIST_APPEND(vib_conf_list, conf);
+		return 0;
+	}
+
+	do {
+		data = (struct duration_data *)malloc(sizeof(struct duration_data));
+		if (!data) {
+			_E("not enough memory");
+			free(conf->pattern);
+			free(conf);
+			return -ENOMEM;
+		}
+		data->duration = 0;
+		data->wait = 0;
+
+		check = strchr(value, 'D');
+		if (check) {
+			*check = '\0';
+			data->duration = strtol(value, NULL, 10);
+			len = len - strlen(value) - 1;
+			value = check + 1;
+		}
+		check = strchr(value, 'W');
+		if (check) {
+			*check = '\0';
+			data->wait = strtol(value, NULL, 10);
+			len = len - strlen(value) - 1;
+			value = check + 1;
+		}
+		DD_LIST_APPEND(conf->data, data);
+		if (data->duration == 0 && data->wait == 0)
+			break;
+	} while (value && len > 0);
+
+	DD_LIST_APPEND(vib_conf_list, conf);
+
+	return 0;
+}
 
 static bool is_valid(void)
 {
@@ -686,6 +902,9 @@ static bool is_valid(void)
 		_E("Do not support standard haptic device");
 		return false;
 	}
+	ret = config_parse(VIBRATION_CONF_PATH, vibration_load_config, NULL);
+	if (ret < 0)
+		_E("failed to load configuration file(%s) : %d", VIBRATION_CONF_PATH, ret);
 
 	_I("Support standard haptic device");
 	return true;
