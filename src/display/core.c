@@ -2145,6 +2145,11 @@ static void display_init(void *data)
 		if (display_conf.input_support)
 			if (CHECK_OPS(keyfilter_ops, init))
 				keyfilter_ops->init();
+
+		if (power_ops.get_power_lock_support &&
+			power_ops.get_power_lock_support() &&
+			power_ops.enable_autosleep)
+			power_ops.enable_autosleep();
 	}
 }
 
