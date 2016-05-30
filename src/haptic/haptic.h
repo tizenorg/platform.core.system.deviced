@@ -49,4 +49,8 @@ struct haptic_ops {
 void add_haptic(const struct haptic_ops *ops);
 void remove_haptic(const struct haptic_ops *ops);
 
+int haptic_probe(void);
+void haptic_init(void);
+void haptic_exit(void);
+
 #endif /* __HAPTIC_H__ */

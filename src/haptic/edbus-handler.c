@@ -1,0 +1,721 @@
+/*
+ * deviced-vibrator
+ *
+ * Copyright (c) 2016 Samsung Electronics Co., Ltd.
+ *
+ * Licensed under the Apache License, Version 2.0 (the License);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+#include <stdbool.h>
+#include <assert.h>
+
+#include "core/log.h"
+#include "core/common.h"
+#include "core/device-idler.h"
+#include "core/device-notifier.h"
+#include "core/list.h"
+#include "edbus-handler.h"
+
+#define EDBUS_INIT_RETRY_COUNT 5
+#define NAME_OWNER_CHANGED "NameOwnerChanged"
+#define NAME_OWNER_MATCH "type='signal',sender='org.freedesktop.DBus'," \
+	"path='/org/freedesktop/DBus',interface='org.freedesktop.DBus'," \
+	"member='NameOwnerChanged',arg0='%s'"
+
+/* -1 is a default timeout value, it's converted to 25*1000 internally. */
+#define DBUS_REPLY_TIMEOUT	(-1)
+#define RETRY_MAX 5
+
+struct edbus_list {
+	char *signal_name;
+	E_DBus_Signal_Handler *handler;
+};
+
+static struct edbus_object {
+	char *path;
+	char *interface;
+	E_DBus_Object *obj;
+	E_DBus_Interface *iface;
+} edbus_objects[] = {
+	{ VIBRATOR_PATH_CORE, VIBRATOR_INTERFACE_CORE, NULL, NULL },
+	/* Add new object & interface here*/
+};
+
+struct watch_func_info {
+	bool deleted;
+	void (*func)(const char *sender, void *data);
+	void *data;
+};
+
+struct watch_info {
+	bool deleted;
+	char *sender;
+	dd_list *func_list;
+};
+
+static dd_list *edbus_object_list;
+static dd_list *edbus_owner_list;
+static dd_list *edbus_watch_list;
+static int edbus_init_val;
+static DBusConnection *conn;
+static E_DBus_Connection *edbus_conn;
+static DBusPendingCall *edbus_request_name;
+
+static DBusHandlerResult message_filter(DBusConnection *connection,
+		DBusMessage *message, void *data);
+static int register_edbus_interface(struct edbus_object *object)
+{
+	if (!object) {
+		_E("object is invalid value!");
+		return -1;
+	}
+
+	object->obj = e_dbus_object_add(edbus_conn, object->path, NULL);
+	if (!object->obj) {
+		_E("fail to add edbus obj");
+		return -1;
+	}
+
+	object->iface = e_dbus_interface_new(object->interface);
+	if (!object->iface) {
+		_E("fail to add edbus interface");
+		return -1;
+	}
+
+	e_dbus_object_interface_attach(object->obj, object->iface);
+
+	return 0;
+}
+
+E_DBus_Interface *get_edbus_interface(const char *path)
+{
+	struct edbus_object *obj;
+	dd_list *elem;
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(edbus_objects); i++)
+		if (!strcmp(path, edbus_objects[i].path))
+			return edbus_objects[i].iface;
+
+	/* find matched obj */
+	DD_LIST_FOREACH(edbus_object_list, elem, obj) {
+		if (strncmp(obj->path, path, strlen(obj->path)) == 0)
+			return obj->iface;
+	}
+
+	return NULL;
+}
+
+static void print_watch_item(void)
+{
+	struct watch_info *watch;
+	struct watch_func_info *finfo;
+	dd_list *n;
+	dd_list *e;
+
+	DD_LIST_FOREACH(edbus_watch_list, n, watch) {
+		_D("watch sender : %s, deleted : %d",
+				watch->sender, watch->deleted);
+		DD_LIST_FOREACH(watch->func_list, e, finfo)
+			_D("\tfunc : %p, deleted : %d",
+					finfo->func, finfo->deleted);
+	}
+}
+
+static bool get_valid_watch_item(void)
+{
+	struct watch_info *watch;
+	dd_list *elem;
+
+	DD_LIST_FOREACH(edbus_watch_list, elem, watch) {
+		if (!watch->deleted)
+			return true;
+	}
+
+	return false;
+}
+
+static void watch_idler_cb(void *data)
+{
+	struct watch_info *watch;
+	struct watch_func_info *finfo;
+	dd_list *n;
+	dd_list *next;
+	dd_list *elem;
+	dd_list *enext;
+	char match[256];
+
+	DD_LIST_FOREACH_SAFE(edbus_watch_list, n, next, watch) {
+		if (!watch->deleted)
+			continue;
+
+		/* remove dbus match */
+		snprintf(match, sizeof(match), NAME_OWNER_MATCH, watch->sender);
+		dbus_bus_remove_match(conn, match, NULL);
+
+		_I("%s is not watched by dbus!", watch->sender);
+
+		/* remove watch func list */
+		DD_LIST_FOREACH_SAFE(watch->func_list, elem, enext, finfo)
+			free(finfo);
+
+		/* remove watch item */
+		DD_LIST_FREE_LIST(watch->func_list);
+		DD_LIST_REMOVE_LIST(edbus_watch_list, n);
+		free(watch->sender);
+		free(watch);
+	}
+
+	/* if the last request, remove message filter */
+	if (!get_valid_watch_item())
+		dbus_connection_remove_filter(conn, message_filter, NULL);
+}
+
+static DBusHandlerResult message_filter(DBusConnection *connection,
+		DBusMessage *message, void *data)
+{
+	int ret;
+	const char *iface, *member;
+	const char *sender;
+	struct watch_info *watch;
+	struct watch_func_info *finfo;
+	dd_list *n;
+	int len;
+
+	if (dbus_message_get_type(message) != DBUS_MESSAGE_TYPE_SIGNAL)
+		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+
+	iface = dbus_message_get_interface(message);
+	member = dbus_message_get_member(message);
+
+	if (strncmp(iface, DBUS_INTERFACE_DBUS,
+				sizeof(DBUS_INTERFACE_DBUS)))
+		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+
+	if (strncmp(member, NAME_OWNER_CHANGED,
+				sizeof(NAME_OWNER_CHANGED)))
+		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+
+	ret = dbus_message_get_args(message, NULL,
+			DBUS_TYPE_STRING, &sender,
+			DBUS_TYPE_INVALID);
+	if (!ret) {
+		_E("no message");
+		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+	}
+
+	len = strlen(sender) + 1;
+	DD_LIST_FOREACH(edbus_watch_list, n, watch) {
+		if (!watch->deleted &&
+		    !strncmp(watch->sender, sender, len))
+			break;
+	}
+
+	if (!watch)
+		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+
+	DD_LIST_FOREACH(watch->func_list, n, finfo) {
+		if (!finfo->deleted &&
+		    finfo->func)
+			finfo->func(watch->sender, finfo->data);
+	}
+
+	/* no interest in this item anymore */
+	watch->deleted = true;
+
+	print_watch_item();
+	add_idle_request(watch_idler_cb, NULL);
+	return DBUS_HANDLER_RESULT_HANDLED;
+}
+
+static struct watch_info *get_matched_watch_item(const char *sender)
+{
+	int len;
+	dd_list *n;
+	struct watch_info *watch;
+
+	if (!sender)
+		return NULL;
+
+	len = strlen(sender) + 1;
+	/* check the sender&type is already registered */
+	DD_LIST_FOREACH(edbus_watch_list, n, watch) {
+		if (!watch->deleted &&
+		    !strncmp(watch->sender, sender, len))
+			return watch;
+	}
+
+	return NULL;
+}
+
+static struct watch_info *add_watch_item(const char *sender)
+{
+	DBusError err;
+	struct watch_info *watch;
+	char match[256];
+	int ret;
+
+	if (!sender)
+		return NULL;
+
+	watch = calloc(1, sizeof(struct watch_info));
+	if (!watch)
+		return NULL;
+
+	watch->sender = strdup(sender);
+	if (!watch->sender)
+		goto out;
+
+	dbus_error_init(&err);
+	/* add name owner changed match string */
+	snprintf(match, sizeof(match), NAME_OWNER_MATCH, watch->sender);
+	dbus_bus_add_match(conn, match, &err);
+
+	if (dbus_error_is_set(&err)) {
+		_E("fail to add match for %s [%s:%s]",
+				sender, err.name, err.message);
+		dbus_error_free(&err);
+		goto out;
+	}
+
+	/* if the first request, add message filter */
+	if (!get_valid_watch_item()) {
+		ret = dbus_connection_add_filter(conn,
+				message_filter, NULL, NULL);
+		if (!ret) {
+			_E("fail to add message filter!");
+			dbus_bus_remove_match(conn, match, NULL);
+			goto out;
+		}
+		_I("success to add message filter!");
+	}
+
+	/* Add watch to watch list */
+	DD_LIST_APPEND(edbus_watch_list, watch);
+	_I("%s is watched by dbus!", sender);
+	return watch;
+
+out:
+	if (watch) {
+		free(watch->sender);
+		free(watch);
+	}
+
+	return NULL;
+}
+
+int register_edbus_watch(const char *sender,
+		void (*func)(const char *sender, void *data), void *data)
+{
+	struct watch_info *watch;
+	struct watch_func_info *finfo;
+	dd_list *elem;
+	bool isnew = false;
+
+	if (!sender || !func) {
+		_E("invalid argument : sender(NULL) || func(NULL)");
+		return -EINVAL;
+	}
+
+	watch = get_matched_watch_item(sender);
+	if (!watch) {
+		/* create new watch item */
+		watch = add_watch_item(sender);
+		if (!watch) {
+			_E("fail to add watch item");
+			return -EPERM;
+		}
+		isnew = true;
+	}
+
+	/* find the same callback */
+	DD_LIST_FOREACH(watch->func_list, elem, finfo) {
+		if (finfo->func == func) {
+			_E("there is already the same callback");
+			goto out;
+		}
+	}
+
+	finfo = calloc(1, sizeof(struct watch_func_info));
+	if (!finfo) {
+		_E("fail to allocate watch func info");
+		goto out;
+	}
+
+	finfo->func = func;
+	finfo->data = data;
+
+	/* add callback function to the watch list */
+	DD_LIST_APPEND(watch->func_list, finfo);
+
+	_I("register watch func(%p) of %s", func, sender);
+	return 0;
+out:
+	if (isnew)
+		watch->deleted = true;
+
+	return -EPERM;
+}
+
+int unregister_edbus_watch(const char *sender,
+		void (*func)(const char *sender, void *data))
+{
+	struct watch_info *watch;
+	struct watch_func_info *finfo;
+	dd_list *elem;
+	bool matched = false;
+
+	if (!sender || !func) {
+		_E("invalid argument : sender(NULL) || func(NULL)");
+		return -EINVAL;
+	}
+
+	watch = get_matched_watch_item(sender);
+	if (!watch) {
+		_E("fail to get matched watch item");
+		return -ENODEV;
+	}
+
+	/* check the no interest function */
+	DD_LIST_FOREACH(watch->func_list, elem, finfo) {
+		if (finfo->func == func)
+			finfo->deleted = true;
+		if (!finfo->deleted)
+			matched = true;
+	}
+
+	/* if it is the last item */
+	if (!matched)
+		watch->deleted = true;
+
+	_I("unregister watch func(%p) of %s", func, sender);
+	return 0;
+}
+
+static void unregister_edbus_watch_all(void)
+{
+	dd_list *n, *next;
+	struct watch_info *watch;
+
+	DD_LIST_FOREACH_SAFE(edbus_watch_list, n, next, watch)
+		watch->deleted = true;
+
+	add_idle_request(watch_idler_cb, NULL);
+}
+
+static int register_method(E_DBus_Interface *iface,
+		const struct edbus_method *edbus_methods, int size)
+{
+	int ret;
+	int i;
+
+	assert(iface);
+	assert(edbus_methods);
+
+	for (i = 0; i < size; i++) {
+		ret = e_dbus_interface_method_add(iface,
+				    edbus_methods[i].member,
+				    edbus_methods[i].signature,
+				    edbus_methods[i].reply_signature,
+				    edbus_methods[i].func);
+		if (!ret) {
+			_E("fail to add method %s!", edbus_methods[i].member);
+			return -EINVAL;
+		}
+	}
+
+	return 0;
+}
+
+int register_edbus_interface_and_method(const char *path,
+		const char *interface,
+		const struct edbus_method *edbus_methods, int size)
+{
+	struct edbus_object *obj;
+	dd_list *elem;
+	int ret;
+
+	if (!path || !interface || !edbus_methods || size < 1) {
+		_E("invalid parameter");
+		return -EINVAL;
+	}
+
+	/* find matched obj */
+	DD_LIST_FOREACH(edbus_object_list, elem, obj) {
+		if (strncmp(obj->path, path, strlen(obj->path)) == 0 &&
+		    strncmp(obj->interface, interface, strlen(obj->interface)) == 0) {
+			_I("found matched item : obj(%p)", obj);
+			break;
+		}
+	}
+
+	/* if there is no matched obj */
+	if (!obj) {
+		obj = malloc(sizeof(struct edbus_object));
+		if (!obj) {
+			_E("fail to allocate %s interface", path);
+			return -ENOMEM;
+		}
+
+		obj->path = strdup(path);
+		obj->interface = strdup(interface);
+
+		ret = register_edbus_interface(obj);
+		if (ret < 0) {
+			_E("fail to register %s interface(%d)", obj->path, ret);
+			free(obj->path);
+			free(obj->interface);
+			free(obj);
+			return ret;
+		}
+
+		DD_LIST_APPEND(edbus_object_list, obj);
+	}
+
+	ret = register_method(obj->iface, edbus_methods, size);
+	if (ret < 0) {
+		_E("fail to register %s method(%d)", obj->path, ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+int unregister_edbus_interface_all(void)
+{
+	struct edbus_object *obj;
+	dd_list *elem, *n;
+
+	DD_LIST_FOREACH_SAFE(edbus_object_list, elem, n, obj) {
+		DD_LIST_REMOVE(edbus_object_list, obj);
+		free(obj->path);
+		free(obj->interface);
+		free(obj);
+	}
+
+	return 0;
+}
+
+int register_edbus_method(const char *path, const struct edbus_method *edbus_methods, int size)
+{
+	E_DBus_Interface *iface;
+	int ret;
+
+	if (!path || !edbus_methods || size < 1) {
+		_E("invalid parameter");
+		return -EINVAL;
+	}
+
+	iface = get_edbus_interface(path);
+	if (!iface) {
+		_E("fail to get edbus interface!");
+		return -ENODEV;
+	}
+
+	ret = register_method(iface, edbus_methods, size);
+	if (ret < 0) {
+		_E("fail to register %s method(%d)", path, ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+static void request_name_cb(void *data, DBusMessage *msg, DBusError *error)
+{
+	DBusError err;
+	unsigned int val;
+	int r;
+
+	if (!msg) {
+		_D("invalid DBusMessage!");
+		return;
+	}
+
+	dbus_error_init(&err);
+	r = dbus_message_get_args(msg, &err, DBUS_TYPE_UINT32, &val, DBUS_TYPE_INVALID);
+	if (!r) {
+		_E("no message : [%s:%s]", err.name, err.message);
+		dbus_error_free(&err);
+		return;
+	}
+
+	_I("Request Name reply : %d", val);
+}
+
+static void check_owner_name(void)
+{
+	DBusError err;
+	DBusMessage *msg;
+	DBusMessageIter iter;
+	char *pa[1];
+	char exe_name[PATH_MAX];
+	char *entry;
+	dd_list *n;
+	int pid;
+
+	DD_LIST_FOREACH(edbus_owner_list, n, entry) {
+		pa[0] = entry;
+		msg = dbus_method_sync_with_reply(E_DBUS_FDO_BUS,
+			E_DBUS_FDO_PATH,
+			E_DBUS_FDO_INTERFACE,
+			"GetConnectionUnixProcessID", "s", pa);
+
+		if (!msg) {
+			_E("invalid DBusMessage!");
+			return;
+		}
+
+		dbus_error_init(&err);
+		dbus_message_iter_init(msg, &iter);
+
+		dbus_message_iter_get_basic(&iter, &pid);
+		if (get_cmdline_name(pid, exe_name, PATH_MAX) != 0)
+			goto out;
+		_I("%s(%d)", exe_name, pid);
+
+out:
+		dbus_message_unref(msg);
+		dbus_error_free(&err);
+	}
+}
+
+static void check_owner_list(void)
+{
+	DBusError err;
+	DBusMessage *msg;
+	DBusMessageIter array, item;
+	char *pa[1];
+	char *name;
+	char *entry;
+
+	pa[0] = VIBRATOR_BUS_NAME;
+	msg = dbus_method_sync_with_reply(E_DBUS_FDO_BUS,
+			E_DBUS_FDO_PATH,
+			E_DBUS_FDO_INTERFACE,
+			"ListQueuedOwners", "s", pa);
+
+	if (!msg) {
+		_E("invalid DBusMessage!");
+		return;
+	}
+
+	dbus_error_init(&err);
+	dbus_message_iter_init(msg, &array);
+
+	if (dbus_message_iter_get_arg_type(&array) != DBUS_TYPE_ARRAY)
+		goto out;
+	dbus_message_iter_recurse(&array, &item);
+	while (dbus_message_iter_get_arg_type(&item) == DBUS_TYPE_STRING) {
+		dbus_message_iter_get_basic(&item, &name);
+		entry = strndup(name, strlen(name));
+		DD_LIST_APPEND(edbus_owner_list, entry);
+		if (!edbus_owner_list) {
+			_E("append failed");
+			free(entry);
+			goto out;
+		}
+		dbus_message_iter_next(&item);
+	}
+
+out:
+	dbus_message_unref(msg);
+	dbus_error_free(&err);
+}
+
+void edbus_init(void *data)
+{
+	DBusError error;
+	int retry = 0;
+	int i, ret;
+
+	dbus_threads_init_default();
+	dbus_error_init(&error);
+
+	do {
+		edbus_init_val = e_dbus_init();
+		if (edbus_init_val)
+			break;
+		if (retry == EDBUS_INIT_RETRY_COUNT) {
+			_E("fail to init edbus");
+			return;
+		}
+		retry++;
+	} while (retry <= EDBUS_INIT_RETRY_COUNT);
+
+	retry = 0;
+	do {
+		conn = dbus_bus_get(DBUS_BUS_SYSTEM, &error);
+		if (conn)
+			break;
+		if (retry == EDBUS_INIT_RETRY_COUNT) {
+			_E("fail to get dbus");
+			goto out1;
+		}
+		retry++;
+	} while (retry <= EDBUS_INIT_RETRY_COUNT);
+
+	retry = 0;
+	do {
+		edbus_conn = e_dbus_connection_setup(conn);
+		if (edbus_conn)
+			break;
+		if (retry == EDBUS_INIT_RETRY_COUNT) {
+			_E("fail to get edbus");
+			goto out2;
+		}
+		retry++;
+	} while (retry <= EDBUS_INIT_RETRY_COUNT);
+
+	retry = 0;
+	do {
+		edbus_request_name = e_dbus_request_name(edbus_conn, VIBRATOR_BUS_NAME,
+				DBUS_NAME_FLAG_REPLACE_EXISTING, request_name_cb, NULL);
+		if (edbus_request_name)
+			break;
+		if (retry == EDBUS_INIT_RETRY_COUNT) {
+			_E("fail to request edbus name");
+			goto out3;
+		}
+		retry++;
+	} while (retry <= EDBUS_INIT_RETRY_COUNT);
+
+	for (i = 0; i < ARRAY_SIZE(edbus_objects); i++) {
+		ret = register_edbus_interface(&edbus_objects[i]);
+		if (ret < 0) {
+			_E("fail to add obj & interface for %s",
+				    edbus_objects[i].interface);
+			return;
+		}
+		_D("add new obj for %s", edbus_objects[i].interface);
+	}
+	check_owner_list();
+	check_owner_name();
+	return;
+
+out3:
+	e_dbus_connection_close(edbus_conn);
+out2:
+	dbus_connection_set_exit_on_disconnect(conn, FALSE);
+out1:
+	e_dbus_shutdown();
+}
+
+void edbus_exit(void *data)
+{
+	unregister_edbus_watch_all();
+	unregister_edbus_interface_all();
+	e_dbus_connection_close(edbus_conn);
+	e_dbus_shutdown();
+}

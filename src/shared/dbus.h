@@ -69,9 +69,6 @@
 /* ODE service: request ode popup result operatioins about storage */
 #define DEVICED_PATH_ODE                    DEVICED_OBJECT_PATH"/Ode"
 #define DEVICED_INTERFACE_ODE               DEVICED_INTERFACE_NAME".ode"
-/* Haptic service: operatioins about haptic */
-#define DEVICED_PATH_HAPTIC                 DEVICED_OBJECT_PATH"/Haptic"
-#define DEVICED_INTERFACE_HAPTIC            DEVICED_INTERFACE_NAME".haptic"
 /* Lowmem service: get critical low status operations about Lowmem */
 #define DEVICED_PATH_LOWMEM                 DEVICED_OBJECT_PATH"/Lowmem"
 #define DEVICED_INTERFACE_LOWMEM            DEVICED_INTERFACE_NAME".lowmem"
@@ -145,6 +142,19 @@
 /* Tzip service: Archive file system */
 #define DEVICED_PATH_TZIP                    DEVICED_OBJECT_PATH"/Tzip"
 #define DEVICED_INTERFACE_TZIP               DEVICED_INTERFACE_NAME".Tzip"
+
+/*
+ * Vibrator daemon
+ */
+#define VIBRATOR_BUS_NAME                   "org.tizen.system.vibrator"
+#define VIBRATOR_OBJECT_PATH                "/Org/Tizen/System/Vibrator"
+#define VIBRATOR_INTERFACE_NAME              VIBRATOR_BUS_NAME
+/* Core service: get/set device status operations about device */
+#define VIBRATOR_PATH_CORE                   VIBRATOR_OBJECT_PATH"/Core"
+#define VIBRATOR_INTERFACE_CORE              VIBRATOR_INTERFACE_NAME".core"
+
+#define VIBRATOR_PATH_HAPTIC                 VIBRATOR_OBJECT_PATH"/Haptic"
+#define VIBRATOR_INTERFACE_HAPTIC            VIBRATOR_INTERFACE_NAME".haptic"
 
 /*
  * Resource daemon

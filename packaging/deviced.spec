@@ -194,6 +194,11 @@ rm -rf %{buildroot}
 %install_service multi-user.target.wants deviced.service
 %install_service sockets.target.wants deviced.socket
 %install_service graphical.target.wants zbooting-done.service
+
+%if %{?haptic_module} == on
+%install_service multi-user.target.wants deviced-vibrator.service
+%endif
+
 %if %{?sdb_prestart} == on
 %install_service basic.target.wants sdb-prestart.service
 %endif
@@ -209,12 +214,18 @@ users_gid=$(getent group %{TZ_SYS_USER_GROUP} | cut -f3 -d':')
 systemctl daemon-reload
 if [ "$1" == "1" ]; then
     systemctl restart deviced.service
+%if %{?haptic_module} == on
+    systemctl restart deviced-vibrator.service
+%endif
     systemctl restart zbooting-done.service
 fi
 
 %preun
 if [ "$1" == "0" ]; then
     systemctl stop deviced.service
+%if %{?haptic_module} == on
+    systemctl stop deviced-vibrator.service
+%endif
     systemctl stop zbooting-done.service
 fi
 
@@ -233,6 +244,11 @@ systemctl daemon-reload
 %{_bindir}/deviced
 %{_bindir}/movi_format.sh
 %{_unitdir}/multi-user.target.wants/deviced.service
+%if %{?haptic_module} == on
+%{_unitdir}/deviced-vibrator.service
+%{_unitdir}/multi-user.target.wants/deviced-vibrator.service
+%{_bindir}/deviced-vibrator
+%endif
 %{_unitdir}/sockets.target.wants/deviced.socket
 %{_unitdir}/graphical.target.wants/zbooting-done.service
 %{_unitdir}/deviced.service
