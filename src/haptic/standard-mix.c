@@ -51,7 +51,10 @@
 #define MAX_DATA 16
 #define FF_INFO_MAGIC 0xDEADFEED
 
-#define VIBRATION_CONF_PATH				"/usr/share/feedback/vibration.conf"
+#define VIBRATION_CONF_PATH					"/usr/share/feedback/vibration.conf"
+#define VIBRATION_DURATION_CONF_PATH				"/usr/share/feedback/vibration_duration.conf"
+#define VIBRATION_WAITING_CONF_PATH				"/usr/share/feedback/vibration_waiting.conf"
+
 #ifdef WEARABLE_CIRCLE
 #define CIRCLE_ON_PATH		"/sys/class/sec/motor/motor_on"
 #define CIRCLE_OFF_PATH		"/sys/class/sec/motor/motor_off"
@@ -82,21 +85,27 @@ struct ff_info {
 	int currentindex;
 };
 
-struct vibration_config {
+struct vibration_table {
 	char *pattern;
-	dd_list *data;
+	char *duration;
+	char *waiting;
 };
 
-struct duration_data {
-	int duration;
-	int wait;
+struct vibration_config {
+	char *pattern;
+	int *data;
+	int data_len;
 };
 
 struct haptic_data {
-	dd_list *vibration_data;
 	unsigned int handle;
+	int *duration_config;
+	int *waiting_config;
 	int level;
 	int priority;
+	int duration_len;
+	int waiting_len;
+	int index;
 	bool stop;
 };
 
@@ -104,6 +113,8 @@ static int ff_fd;
 static dd_list *ff_list;
 static dd_list *handle_list;
 static dd_list *vib_conf_list;
+static dd_list *vib_duration_conf_list;
+static dd_list *vib_waiting_conf_list;
 static Ecore_Timer *duration_timer;
 static char ff_path[PATH_MAX];
 static int unique_number;
@@ -591,13 +602,17 @@ static int vibrate_custom_buffer(int device_handle, const unsigned char *vibe_bu
 
 static Eina_Bool haptic_duration_play(void *data)
 {
-	dd_list *head, *n, *next;
 	struct haptic_data *h_data;
-	struct duration_data *node;
 	int ret = 0;
+	int index;
+	unsigned int v_handle;
+	int level;
+	int priority;
+	int duration;
+
 
 	if (!data)
-		goto out;
+		return ECORE_CALLBACK_CANCEL;
 
 	if (duration_timer) {
 		ecore_timer_del(duration_timer);
@@ -608,35 +623,41 @@ static Eina_Bool haptic_duration_play(void *data)
 	if (h_data->stop) {
 		h_data->stop = false;
 		free(h_data);
-		goto out;
+		return ECORE_CALLBACK_CANCEL;
 	}
 
-	head = h_data->vibration_data;
-	DD_LIST_FOREACH_SAFE(head, n, next, node) {
-		_D("Play: %dms and Wait: %dms", node->duration, node->wait);
-		if (!node->duration) {
-			free(h_data);
-			break;
-		}
+	index = h_data->index;
+	v_handle = h_data->handle;
+	level = h_data->level;
+	priority = h_data->priority;
+	duration = h_data->duration_config[index];
 
-		if (node->wait && next) {
-			h_data->vibration_data = next;
-			duration_timer = ecore_timer_add((node->duration + node->wait)/1000.0f, haptic_duration_play, (void *)h_data);
-		}
+	if (!h_data->duration_config[index])
+		return ECORE_CALLBACK_CANCEL;
 
-		ret = vibrate_monotone(h_data->handle, node->duration, h_data->level, h_data->priority, NULL);
-		if (!next) {
+	h_data->index++;
+	if (index > h_data->waiting_len - 1) {
+		if (h_data->index <= h_data->duration_len - 1) {
+			duration_timer = ecore_timer_add(duration/1000.0f, haptic_duration_play, (void *)h_data);
+			_D("timer : %d", duration);
+		} else
 			free(h_data);
-			goto out;
-		}
-		break;
+	} else {
+		if (h_data->index <= h_data->duration_len - 1) {
+			duration_timer = ecore_timer_add((duration + h_data->waiting_config[index])/1000.0f, haptic_duration_play, (void *)h_data);
+			_D("timer : %d", (duration + h_data->waiting_config[index]));
+		} else
+			free(h_data);
 	}
+
+	_D("duration: %d", duration);
+
+	ret = vibrate_monotone(v_handle, duration, level, priority, NULL);
 	if (ret != 0) {
 		_D("auto stop vibration");
 		if (h_data)
 			h_data->stop = true;
 	}
-out:
 	return ECORE_CALLBACK_CANCEL;
 }
 
@@ -659,19 +680,41 @@ static int vibrate_buffer(int device_handle, const unsigned char *vibe_buffer, i
 
 static int vibrate_effect(int device_handle, const char *pattern, int feedback, int priority)
 {
-	dd_list *elem;
-	struct vibration_config *conf;
+	dd_list *elem1, *elem2;
+	struct vibration_table *conf_table;
+	struct vibration_config *conf_duration, *conf_waiting;
 	struct haptic_data *data;
-	size_t len;
+	char *duration = NULL, *waiting = NULL;
+	int len1, len2;
 
-	if (device_handle < 0)
+	if (!device_handle)
 		return -EINVAL;
 
-	len = strlen(pattern) + 1;
-	DD_LIST_FOREACH(vib_conf_list, elem, conf) {
-		if (!conf->pattern)
+	if (!pattern)
+		return -EINVAL;
+
+	len1 = strlen(pattern) + 1;
+	DD_LIST_FOREACH(vib_conf_list, elem1, conf_table) {
+		if (!conf_table->pattern)
 			continue;
-		if (strncmp(conf->pattern, pattern, len))
+		if (strncmp(conf_table->pattern, pattern, len1))
+			continue;
+		duration = conf_table->duration;
+		waiting = conf_table->waiting;
+	}
+
+	if (!duration)
+		return -ENOTSUP;
+
+	len1 = strlen(duration) + 1;
+	if (!waiting)
+		len2 = 0;
+	else
+		len2 = strlen(waiting) + 1;
+	DD_LIST_FOREACH(vib_duration_conf_list, elem1, conf_duration) {
+		if (!conf_duration->pattern)
+			continue;
+		if (strncmp(conf_duration->pattern, duration, len1))
 			continue;
 
 		data = (struct haptic_data *)malloc(sizeof(struct haptic_data));
@@ -679,12 +722,27 @@ static int vibrate_effect(int device_handle, const char *pattern, int feedback, 
 			_E("fail to alloc");
 			return -ENOMEM;
 		}
-		data->vibration_data = conf->data;
+		data->duration_len = 0;
+		data->waiting_len = 0;
+
+		DD_LIST_FOREACH(vib_waiting_conf_list, elem2, conf_waiting) {
+			if (!waiting)
+				break;
+			if (!conf_waiting->pattern)
+				continue;
+			if (strncmp(conf_waiting->pattern, waiting, len2))
+				continue;
+			data->waiting_config = conf_waiting->data;
+			data->waiting_len = conf_waiting->data_len;
+			break;
+		}
 		data->handle = device_handle;
 		data->level = feedback;
 		data->priority = priority;
-		data->stop = false;
-		_D("Play %s", conf->pattern);
+		data->duration_config = conf_duration->data;
+		data->duration_len = conf_duration->data_len;
+		data->index = 0;
+
 		haptic_duration_play((void *)data);
 		break;
 	}
@@ -695,15 +753,14 @@ static int vibrate_effect(int device_handle, const char *pattern, int feedback, 
 static int is_supported(const char *pattern)
 {
 	dd_list *elem;
-	struct vibration_config *conf;
-	size_t len;
-	int ret;
+	struct vibration_table *conf;
+	int ret = 0;
+	int len;
 
 	if (!pattern)
 		return -EINVAL;
 
 	len = strlen(pattern) + 1;
-	ret = 0;
 	DD_LIST_FOREACH(vib_conf_list, elem, conf) {
 		if (!conf->pattern)
 			continue;
@@ -800,13 +857,14 @@ static const struct haptic_plugin_ops default_plugin = {
 	.convert_binary      = convert_binary,
 };
 
-static int vibration_load_config(struct parse_result *result, void *user_data)
+static int vibration_duration_load_config(struct parse_result *result, void *user_data)
 {
 	struct vibration_config *conf;
-	struct duration_data *data;
 	char *value;
 	char *check;
+	int count = 0;
 	int len;
+	int i;
 
 	if (!result)
 		return 0;
@@ -836,56 +894,157 @@ static int vibration_load_config(struct parse_result *result, void *user_data)
 		len = strlen(value);
 
 	if (len == 0) {
-		data = (struct duration_data *)malloc(sizeof(struct duration_data));
-		if (!data) {
-			_E("not enough memory");
-			free(conf->pattern);
-			free(conf);
-			return -ENOMEM;
-		}
-		data->duration = 0;
-		data->wait = 0;
+		DD_LIST_APPEND(vib_duration_conf_list, conf);
+		return 0;
+	}
 
-		DD_LIST_APPEND(conf->data, data);
+	check = strchr(value, ',');
+	while (check != NULL) {
+		count++;
+		check = strchr(check + 1, ',');
+	}
+
+	int *duration = (int *)malloc((count + 1) * sizeof(int));
+	for (i = 0; i <= count; i++) {
+		duration[i] = 0;
+		check = strchr(value, ',');
+		if (check) {
+			*check = '\0';
+			duration[i] = strtol(value, NULL, 10);
+			value = check + 1;
+		} else {
+			duration[i] = strtol(value, NULL, 10);
+			break;
+		}
+		if (duration[i] == 0)
+			break;
+	}
+	conf->data = duration;
+	conf->data_len = count + 1;
+
+	DD_LIST_APPEND(vib_duration_conf_list, conf);
+
+	return 0;
+}
+
+static int vibration_waiting_load_config(struct parse_result *result, void *user_data)
+{
+	struct vibration_config *conf;
+	char *value;
+	char *check;
+	int count = 0;
+	int len;
+	int i;
+
+	if (!result)
+		return 0;
+
+	if (!MATCH(result->section, "Vibration"))
+		return 0;
+
+
+	if (!result->name || !result->value)
+		return 0;
+
+	conf = (struct vibration_config *)calloc(1, sizeof(struct vibration_config));
+	if (!conf) {
+		_E("fail to alloc");
+		return -ENOMEM;
+	}
+
+	conf->pattern = strdup(result->name);
+	if (!conf->pattern)
+		_E("fail to copy %s pattern data", result->name);
+
+	value = result->value;
+
+	if (!value)
+		len = 0;
+	else
+		len = strlen(value);
+
+	if (len == 0) {
+		DD_LIST_APPEND(vib_waiting_conf_list, conf);
+		return 0;
+	}
+
+	check = strchr(value, ',');
+	while (check != NULL) {
+		count++;
+		check = strchr(check + 1, ',');
+	}
+
+	int *waiting = (int *)malloc((count + 1) * sizeof(int));
+	for (i = 0; i <= count; i++) {
+		waiting[i] = 0;
+		check = strchr(value, ',');
+		if (check) {
+			*check = '\0';
+			waiting[i] = strtol(value, NULL, 10);
+			value = check + 1;
+		} else {
+			waiting[i] = strtol(value, NULL, 10);
+			break;
+		}
+		if (waiting[i] == 0)
+			break;
+	}
+	conf->data = waiting;
+	conf->data_len = count + 1;
+
+	DD_LIST_APPEND(vib_waiting_conf_list, conf);
+
+	return 0;
+}
+
+static int vibration_table_load_config(struct parse_result *result, void *user_data)
+{
+	struct vibration_table *conf;
+	char *value;
+	char *check;
+	int len;
+
+	if (!result)
+		return 0;
+
+	if (!MATCH(result->section, "Vibration"))
+		return 0;
+
+
+	if (!result->name || !result->value)
+		return 0;
+
+	conf = (struct vibration_table *)calloc(1, sizeof(struct vibration_table));
+	if (!conf) {
+		_E("fail to alloc");
+		return -ENOMEM;
+	}
+
+	conf->pattern = strdup(result->name);
+	if (!conf->pattern)
+		_E("fail to copy %s pattern data", result->name);
+
+	value = result->value;
+
+	if (!value)
+		len = 0;
+	else
+		len = strlen(value);
+
+	if (len == 0) {
 		DD_LIST_APPEND(vib_conf_list, conf);
 		return 0;
 	}
 
-	do {
-		data = (struct duration_data *)malloc(sizeof(struct duration_data));
-		if (!data) {
-			_E("not enough memory");
-			free(conf->pattern);
-			free(conf);
-			return -ENOMEM;
-		}
-		data->duration = 0;
-		data->wait = 0;
+	check = strchr(value, ',');
 
-		check = strchr(value, 'D');
-		if (check) {
-			*check = '\0';
-			data->duration = strtol(value, NULL, 10);
-			if (!value)
-				len = len - 1;
-			else
-				len = len - strlen(value) - 1;
-			value = check + 1;
-		}
-		check = strchr(value, 'W');
-		if (check) {
-			*check = '\0';
-			data->wait = strtol(value, NULL, 10);
-			if (!value)
-				len = len - 1;
-			else
-				len = len - strlen(value) - 1;
-			value = check + 1;
-		}
-		DD_LIST_APPEND(conf->data, data);
-		if (data->duration == 0 && data->wait == 0)
-			break;
-	} while (value && len > 0);
+	if (check) {
+		*check = '\0';
+		conf->duration = strdup(value);
+		value = check + 1;
+		conf->waiting = strdup(value);
+	} else
+		conf->duration = strdup(value);
 
 	DD_LIST_APPEND(vib_conf_list, conf);
 
@@ -912,9 +1071,15 @@ static bool is_valid(void)
 		_E("Do not support standard haptic device");
 		return false;
 	}
-	ret = config_parse(VIBRATION_CONF_PATH, vibration_load_config, NULL);
+	ret = config_parse(VIBRATION_CONF_PATH, vibration_table_load_config, NULL);
 	if (ret < 0)
-		_E("failed to load configuration file(%s) : %d", VIBRATION_CONF_PATH, ret);
+		_E("failed to load configuration file(%s) : %d", VIBRATION_DURATION_CONF_PATH, ret);
+	ret = config_parse(VIBRATION_DURATION_CONF_PATH, vibration_duration_load_config, NULL);
+	if (ret < 0)
+		_E("failed to load configuration file(%s) : %d", VIBRATION_DURATION_CONF_PATH, ret);
+	ret = config_parse(VIBRATION_WAITING_CONF_PATH, vibration_waiting_load_config, NULL);
+	if (ret < 0)
+		_E("failed to load configuration file(%s) : %d", VIBRATION_WAITING_CONF_PATH, ret);
 
 	_I("Support standard haptic device");
 	return true;
