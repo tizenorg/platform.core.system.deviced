@@ -1436,16 +1436,66 @@ static bool check_removed(struct block_device *bdev, dd_list **queue, struct ope
 	return removed;
 }
 
+static bool check_unmount(struct block_device *bdev, dd_list **queue, struct operation_queue **op)
+{
+	struct operation_queue *temp;
+	dd_list *l;
+	bool unmounted = false;
+
+	if (!bdev)
+		return unmounted;
+
+	if (!queue)
+		return unmounted;
+
+	if (!op)
+		return unmounted;
+
+	pthread_mutex_lock(&bdev->mutex);
+	DD_LIST_FOREACH(*queue, l, temp) {
+		if (temp->op == BLOCK_DEV_UNMOUNT) {
+			unmounted = true;
+			_D("Operation queue has unmount operation");
+			break;
+		}
+	}
+	pthread_mutex_unlock(&bdev->mutex);
+
+	if (!unmounted)
+		return unmounted;
+
+	pthread_mutex_lock(&bdev->mutex);
+
+	DD_LIST_FOREACH(*queue, l, temp) {
+		if (temp->op == BLOCK_DEV_UNMOUNT) {
+			*op = temp;
+			break;
+		}
+		temp->done = true;
+		block_send_dbus_reply((*op)->msg, 0);
+
+		if (pipe_trigger(BLOCK_DEV_DEQUEUE, bdev, 0) < 0)
+			_E("fail to trigger pipe");
+	}
+
+	pthread_mutex_unlock(&bdev->mutex);
+
+	return unmounted;
+}
+
 static void trigger_operation(struct block_device *bdev)
 {
 	struct operation_queue *op;
+	struct timespec time = {0,};
 	dd_list *queue;
 	int ret = 0;
+	int i, len;
 	bool continue_th;
 	char devnode[PATH_MAX];
 	char name[16];
 	enum block_dev_operation operation;
 	bool removed = false;
+	bool unmounted = false;
 
 	assert(bdev);
 
@@ -1455,12 +1505,23 @@ static void trigger_operation(struct block_device *bdev)
 	queue = bdev->op_queue;
 
 	snprintf(devnode, sizeof(devnode), "%s", bdev->data->devnode);
+	time.tv_nsec = 500 * NANO_SECOND_MULTIPLIER;
 
 	do {
-		op = DD_LIST_NTH(queue, 0);
+		i = 0;
+		len = DD_LIST_LENGTH(queue);
+		do {
+			op = DD_LIST_NTH(queue, i);
+			if (!op)
+				break;
+			if (!op->done)
+				break;
+			i++;
+		} while(i < len);
 		if (!op) {
 			_D("Operation queue is empty");
-			break;
+			nanosleep(&time, NULL);
+			continue;
 		}
 
 		operation = op->op;
@@ -1469,9 +1530,18 @@ static void trigger_operation(struct block_device *bdev)
 			get_operation_char(operation, name, sizeof(name)), devnode);
 
 		removed = false;
+		unmounted = false;
 		if (operation == BLOCK_DEV_INSERT) {
 			removed = check_removed(bdev, &queue, &op);
 			if (removed) {
+				operation = op->op;
+				_D("Trigger operation again (%s, %s)",
+					get_operation_char(operation, name, sizeof(name)), devnode);
+			}
+		}
+		if (operation == BLOCK_DEV_MOUNT) {
+			unmounted = check_unmount(bdev, &queue, &op);
+			if (unmounted) {
 				operation = op->op;
 				_D("Trigger operation again (%s, %s)",
 					get_operation_char(operation, name, sizeof(name)), devnode);
@@ -1967,6 +2037,11 @@ static DBusMessage *request_mount_block(E_DBus_Object *obj,
 	if (!bdev) {
 		_E("Failed to find (%s) in the device list", bdev->data->devnode);
 		ret = -ENOENT;
+		goto out;
+	}
+
+	if (bdev->data->state == BLOCK_MOUNT) {
+		ret = -EEXIST;
 		goto out;
 	}
 
