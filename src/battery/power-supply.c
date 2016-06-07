@@ -211,8 +211,8 @@ static int send_full_noti(enum charge_full_type state)
 	case CHARGING_FULL:
 		for (retry = RETRY_MAX; retry > 0; retry--) {
 			ret = dbus_method_async_with_reply(POPUP_BUS_NAME,
-					POPUP_PATH_BATTERY,
-					POPUP_INTERFACE_BATTERY,
+					POPUP_PATH_NOTI,
+					POPUP_INTERFACE_NOTI,
 					METHOD_FULL_NOTI_ON,
 					NULL, NULL, full_noti_cb, -1, NULL);
 			if (ret == 0) {
@@ -229,8 +229,8 @@ static int send_full_noti(enum charge_full_type state)
 		arr[0] = str_id;
 		for (retry = RETRY_MAX; retry > 0; retry--) {
 			ret = dbus_method_async(POPUP_BUS_NAME,
-					POPUP_PATH_BATTERY,
-					POPUP_INTERFACE_BATTERY,
+					POPUP_PATH_NOTI,
+					POPUP_INTERFACE_NOTI,
 					METHOD_FULL_NOTI_OFF,
 					"i", arr);
 			if (ret == 0) {
@@ -252,8 +252,8 @@ static int send_charge_noti(void)
 
 	for (retry = RETRY_MAX; retry > 0; retry--) {
 		ret = dbus_method_async(POPUP_BUS_NAME,
-				POPUP_PATH_BATTERY,
-				POPUP_INTERFACE_BATTERY,
+				POPUP_PATH_NOTI,
+				POPUP_INTERFACE_NOTI,
 				METHOD_CHARGE_NOTI_ON,
 				NULL, NULL);
 		if (ret == 0) {

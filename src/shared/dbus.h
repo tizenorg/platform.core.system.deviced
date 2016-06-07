@@ -199,9 +199,6 @@
 /* ODE */
 #define POPUP_PATH_ODE                      POPUP_OBJECT_PATH"/Ode"
 #define POPUP_INTERFACE_ODE                 POPUP_INTERFACE_NAME".Ode"
-/* Battery */
-#define POPUP_PATH_BATTERY                  POPUP_OBJECT_PATH"/Battery"
-#define POPUP_INTERFACE_BATTERY             POPUP_INTERFACE_NAME".Battery"
 /* Servant */
 #define POPUP_PATH_SERVANT                  POPUP_OBJECT_PATH"/Servant"
 #define POPUP_IFACE_SERVANT                 POPUP_INTERFACE_NAME".Servant"
