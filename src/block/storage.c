@@ -167,7 +167,7 @@ static void storage_status_broadcast(struct storage_config_info *info, double to
 		info->current_noti_level = MEMNOTI_LEVEL_NORMAL;
 }
 
-static int storage_get_memory_size(char *path, struct statvfs *s)
+static int storage_get_memory_size(const char *path, struct statvfs *s)
 {
 	int ret;
 
@@ -185,7 +185,7 @@ static int storage_get_memory_size(char *path, struct statvfs *s)
 	return 0;
 }
 
-static void get_storage_status(char *path, struct statvfs *s)
+static void get_storage_status(const char *path, struct statvfs *s)
 {
 	if (strcmp(path, tzplatform_getenv(TZ_SYS_HOME)) == 0)
 		storage_get_internal_memory_size(s);
@@ -193,7 +193,7 @@ static void get_storage_status(char *path, struct statvfs *s)
 		storage_get_memory_size(path, s);
 }
 
-static void init_storage_config_info(char *path, struct storage_config_info *info)
+static void init_storage_config_info(const char *path, struct storage_config_info *info)
 {
 	struct statvfs s;
 	double dAvail = 0.0;
