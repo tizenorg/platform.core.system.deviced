@@ -84,6 +84,9 @@
 /* For 2.4 Backward Compatibility */
 #define EXT_PRIMARY_SD_FIXID	1
 
+/* Maximum number of thread */
+#define THREAD_MAX 5
+
 enum block_dev_operation {
 	BLOCK_DEV_MOUNT,
 	BLOCK_DEV_UNMOUNT,
@@ -104,7 +107,7 @@ struct block_device {
 	pthread_mutex_t mutex;
 	struct block_data *data;
 	dd_list *op_queue;
-	bool th_alive;
+	int thread_id;		/* Current thread ID */
 };
 
 struct format_data {
@@ -123,9 +126,17 @@ static struct block_conf {
 	bool multimount;
 } block_conf[BLOCK_MMC_DEV + 1];
 
+static struct manage_thread {
+	dd_list *th_node_list;	/* list of devnode which thread dealt with. Only main thread access */
+	pthread_t th;
+	int num_dev;		/* number of devices which thread holds. Only main thread access */
+	int op_len;		/* number of operation of thread */
+	int thread_id;
+	bool start_th;
+} th_manager[THREAD_MAX];
+
 static dd_list *fs_head;
 static dd_list *block_dev_list;
-static dd_list *block_rm_list;
 static dd_list *block_ops_list;
 static bool smack;
 static int pfds[2];
@@ -300,7 +311,7 @@ static void signal_device_changed(struct block_device *bdev,
 		break;
 	}
 
-	/* Broadcast outside with Block iface */
+	/* Broadcast outside with BlockManager iface */
 	snprintf(str_block_type, sizeof(str_block_type),
 			"%d", data->block_type);
 	arr[0] = str_block_type;
@@ -597,7 +608,7 @@ static struct block_device *make_block_device(struct block_data *data)
 
 	pthread_mutex_init(&bdev->mutex, NULL);
 	bdev->data = data;
-	bdev->th_alive = false;
+	bdev->thread_id = -1;
 
 	return bdev;
 }
@@ -606,14 +617,20 @@ static void free_block_device(struct block_device *bdev)
 {
 	dd_list *l, *next;
 	struct operation_queue *op;
+	int thread_id = bdev->thread_id;
 
 	if (!bdev)
 		return;
+
+	if (thread_id < 0 || thread_id >= THREAD_MAX)
+		return;
+	th_manager[thread_id].num_dev--;
 
 	pthread_mutex_lock(&bdev->mutex);
 	free_block_data(bdev->data);
 
 	DD_LIST_FOREACH_SAFE(bdev->op_queue, l, next, op) {
+		th_manager[thread_id].op_len--;
 		DD_LIST_REMOVE(bdev->op_queue, op);
 		free(op);
 	}
@@ -749,10 +766,8 @@ static Eina_Bool pipe_cb(void *data, Ecore_Fd_Handler *fdh)
 	signal_device_changed(pdata.bdev, pdata.op);
 
 	if (pdata.op == BLOCK_DEV_REMOVE) {
-		pthread_mutex_lock(&glob_mutex);
-		DD_LIST_REMOVE(block_rm_list, pdata.bdev);
+		DD_LIST_REMOVE(block_dev_list, pdata.bdev);
 		free_block_device(pdata.bdev);
-		pthread_mutex_unlock(&glob_mutex);
 	}
 
 out:
@@ -1304,8 +1319,13 @@ static void remove_operation(struct block_device *bdev)
 	struct operation_queue *op;
 	dd_list *l, *next;
 	char name[16];
+	int thread_id;
 
 	assert(bdev);
+
+	thread_id = bdev->thread_id;
+	if (thread_id < 0 || thread_id >= THREAD_MAX)
+		return;
 
 	/* LOCK
 	 * during removing queue and checking the queue length */
@@ -1317,6 +1337,7 @@ static void remove_operation(struct block_device *bdev)
 					get_operation_char(op->op, name, sizeof(name)),
 					bdev->data->devnode);
 
+			th_manager[thread_id].op_len--;
 			DD_LIST_REMOVE(bdev->op_queue, op);
 			free(op);
 		}
@@ -1449,11 +1470,8 @@ static bool check_unmount(struct block_device *bdev, dd_list **queue, struct ope
 static void trigger_operation(struct block_device *bdev)
 {
 	struct operation_queue *op;
-	struct timespec time = {0,};
 	dd_list *queue;
 	int ret = 0;
-	int i, len;
-	bool continue_th;
 	char devnode[PATH_MAX];
 	char name[16];
 	enum block_dev_operation operation;
@@ -1468,24 +1486,21 @@ static void trigger_operation(struct block_device *bdev)
 	queue = bdev->op_queue;
 
 	snprintf(devnode, sizeof(devnode), "%s", bdev->data->devnode);
-	time.tv_nsec = 500 * NANO_SECOND_MULTIPLIER;
 
 	do {
-		i = 0;
-		len = DD_LIST_LENGTH(queue);
-		do {
-			op = DD_LIST_NTH(queue, i);
-			if (!op)
-				break;
-			if (!op->done)
-				break;
-			i++;
-		} while(i < len);
-		if (!op || i == len) {
+		pthread_mutex_lock(&bdev->mutex);
+		op = DD_LIST_NTH(queue, 0);
+		if (!op) {
 			_D("Operation queue is empty");
-			nanosleep(&time, NULL);
+			pthread_mutex_unlock(&bdev->mutex);
+			break;
+		}
+		if (op->done) {
+			queue = DD_LIST_NEXT(queue);
+			pthread_mutex_unlock(&bdev->mutex);
 			continue;
 		}
+		pthread_mutex_unlock(&bdev->mutex);
 
 		operation = op->op;
 
@@ -1545,13 +1560,6 @@ static void trigger_operation(struct block_device *bdev)
 
 		queue = DD_LIST_NEXT(queue);
 
-		continue_th = true;
-		if (!queue || DD_LIST_LENGTH(queue) == 0 ||
-			operation == BLOCK_DEV_REMOVE) {
-			bdev->th_alive = false;
-			continue_th = false;
-		}
-
 		pthread_mutex_unlock(&bdev->mutex);
 		/* UNLOCK */
 
@@ -1563,21 +1571,72 @@ static void trigger_operation(struct block_device *bdev)
 				_E("fail to trigger pipe");
 		}
 
-		_D("block (%s) thread (%s)", devnode,
-			(continue_th ? "Continue" : "Stop"));
+	} while(true);
 
-	} while (continue_th);
-
-	_D("Stop block (%s) thread", devnode);
 }
 
 static void *block_th_start(void *arg)
 {
-	struct block_device *bdev = (struct block_device *)arg;
-	assert(bdev);
+	struct block_device *temp;
+	struct timespec time = {0,};
+	struct manage_thread *th = (struct manage_thread *)arg;
+	dd_list *elem;
 
-	trigger_operation(bdev);
+	assert(th);
+	if (th->thread_id < 0 || th->thread_id >= THREAD_MAX) {
+		_D("Thread Number: %d", th->thread_id);
+		return NULL;
+	}
+
+	time.tv_nsec = 500 * NANO_SECOND_MULTIPLIER;
+	do {
+		if (th_manager[th->thread_id].op_len == 0) {
+			_D("Operation queue of thread is empty");
+			nanosleep(&time, NULL);
+			continue;
+		}
+
+		DD_LIST_FOREACH(block_dev_list, elem, temp) {
+			if (temp->thread_id == th->thread_id) {
+				trigger_operation(temp);
+			}
+		}
+
+	} while (true);
 	return NULL;
+}
+
+static int find_thread(char *devnode)
+{
+	dd_list *elem;
+	char *th_node;
+	int i, len, min, min_num;
+
+	len = strlen(devnode);
+	min_num = 1000;
+	min = -1;
+	for (i = 0; i < THREAD_MAX; i++) {
+		DD_LIST_FOREACH(th_manager[i].th_node_list, elem, th_node) {
+			if (!th_node)
+				continue;
+			if (!strncmp(th_node, devnode, len))
+				return i;
+		}
+		if (th_manager[i].num_dev < min_num) {
+			min_num = th_manager[i].num_dev;
+			min = i;
+		}
+	}
+
+	th_node = strdup(devnode);
+	if (min >= 0 && min < THREAD_MAX) {
+		DD_LIST_APPEND(th_manager[min].th_node_list, th_node);
+		return min;
+	}
+
+	// TODO return error or 0?
+	DD_LIST_APPEND(th_manager[0].th_node_list, th_node);
+	return 0;
 }
 
 /* Only Main thread is permmited */
@@ -1586,8 +1645,8 @@ static int add_operation(struct block_device *bdev,
 		DBusMessage *msg, void *data)
 {
 	struct operation_queue *op;
-	pthread_t th;
 	int ret;
+	int thread_id;
 	bool start_th;
 	char name[16];
 
@@ -1618,25 +1677,39 @@ static int add_operation(struct block_device *bdev,
 
 	DD_LIST_APPEND(bdev->op_queue, op);
 
-	start_th = false;
-	if (DD_LIST_LENGTH(bdev->op_queue) == 1 ||
-		bdev->th_alive == false) {
-		bdev->th_alive = true;
-		start_th = true;
+	if (operation == BLOCK_DEV_INSERT) {
+		thread_id = find_thread(bdev->data->devnode);
+		if (thread_id < 0 || thread_id >= THREAD_MAX) {
+			pthread_mutex_unlock(&bdev->mutex);
+			_E("Fail to find thread to add");
+			return -EPERM;
+		}
+		th_manager[thread_id].num_dev++;
+		bdev->thread_id = thread_id;
+	} else
+		thread_id = bdev->thread_id;
+
+	if (thread_id < 0 || thread_id >= THREAD_MAX) {
+		_E("Fail to find thread to add");
+		pthread_mutex_unlock(&bdev->mutex);
+		return -EPERM;
 	}
+	start_th = th_manager[thread_id].start_th;
+	th_manager[thread_id].op_len++;
 
 	pthread_mutex_unlock(&bdev->mutex);
 	/* UNLOCK */
 
 	if (start_th) {
 		_D("Start New thread for block device");
-		ret = pthread_create(&th, NULL, block_th_start, bdev);
+		th_manager[thread_id].start_th = false;
+		ret = pthread_create(&(th_manager[thread_id].th), NULL, block_th_start, &th_manager[thread_id]);
 		if (ret != 0) {
 			_E("fail to create thread for %s", bdev->data->devnode);
 			return -EPERM;
 		}
 
-		pthread_detach(th);
+		pthread_detach(th_manager[thread_id].th);
 	}
 
 	return 0;
@@ -1777,12 +1850,6 @@ static int remove_block_device(struct udev_device *dev, const char *devnode)
 
 	BLOCK_FLAG_SET(bdev->data, UNMOUNT_UNSAFE);
 
-	DD_LIST_REMOVE(block_dev_list, bdev);
-
-	pthread_mutex_lock(&glob_mutex);
-	DD_LIST_APPEND(block_rm_list, bdev);
-	pthread_mutex_unlock(&glob_mutex);
-
 	ret = add_operation(bdev, BLOCK_DEV_UNMOUNT, NULL, (void *)UNMOUNT_FORCE);
 	if (ret < 0) {
 		_E("Failed to add operation (unmount %s)", devnode);
@@ -1910,10 +1977,6 @@ static void remove_whole_block_device(void)
 
 	DD_LIST_FOREACH_SAFE(block_dev_list, elem, next, bdev) {
 		DD_LIST_REMOVE(block_dev_list, bdev);
-
-		pthread_mutex_lock(&glob_mutex);
-		DD_LIST_APPEND(block_rm_list, bdev);
-		pthread_mutex_unlock(&glob_mutex);
 
 		r = add_operation(bdev, BLOCK_DEV_UNMOUNT, NULL, (void *)UNMOUNT_NORMAL);
 		if (r < 0)
@@ -2442,6 +2505,7 @@ static int mount_root_path_tmpfs(void)
 static void block_init(void *data)
 {
 	int ret;
+	int i;
 
 	/* load config */
 	ret = config_parse(BLOCK_CONF_FILE, load_config, NULL);
@@ -2472,6 +2536,13 @@ static void block_init(void *data)
 	/* register notifier */
 	register_notifier(DEVICE_NOTIFIER_POWEROFF, block_poweroff);
 	register_notifier(DEVICE_NOTIFIER_BOOTING_DONE, booting_done);
+
+	for (i = 0; i < THREAD_MAX; i++) {
+		th_manager[i].num_dev = 0;
+		th_manager[i].op_len = 0;
+		th_manager[i].start_th = true;
+		th_manager[i].thread_id = i;
+	}
 }
 
 static void block_exit(void *data)
