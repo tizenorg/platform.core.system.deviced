@@ -105,7 +105,10 @@ static int mmc_check_smack(const char *mount_point)
 	char buf[NAME_MAX] = {0,};
 
 	snprintf(buf, sizeof(buf), "%s", mount_point);
+
+#ifdef BLOCK_SET_PERMISSION
 	launch_evenif_exist(FS_EXT4_SMACK_LABEL, buf);
+#endif
 
 	if (mmc_popup_pid > 0) {
 		_E("will be killed mmc-popup(%d)", mmc_popup_pid);

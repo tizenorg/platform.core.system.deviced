@@ -31,8 +31,12 @@
 
 #define FS_VFAT_NAME	"mkdosfs"
 
+#ifdef BLOCK_SET_PERMISSION
 /* guid 10001 - group priv_externalstorage */
 #define FS_VFAT_MOUNT_OPT  "uid=0,gid=10001,dmask=0007,fmask=0117,iocharset=iso8859-1,utf8,shortname=mixed"
+#else
+#define FS_VFAT_MOUNT_OPT  "iocharset=iso8859-1,utf8,shortname=mixed"
+#endif
 
 static const char *vfat_arg[] = {
 	"/usr/bin/newfs_msdos",
