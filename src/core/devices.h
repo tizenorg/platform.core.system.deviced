@@ -38,6 +38,10 @@ enum device_flags {
 	LCD_ON_BY_POWER_KEY           = 0x00200000,
 	LCD_ON_BY_EVENT               = 0x00400000,
 	LCD_ON_BY_TOUCH               = 0x00800000,
+	LCD_OFF_BY_POWER_KEY          = 0x01000000,
+	LCD_OFF_BY_TIMEOUT            = 0x02000000,
+	LCD_OFF_BY_EVENT              = 0x04000000,
+	LCD_OFF_LATE_MODE             = 0x08000000,
 };
 
 struct device_ops {

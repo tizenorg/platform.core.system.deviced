@@ -73,6 +73,7 @@
 #define POWER_KEY_STR		"powerkey"
 #define TOUCH_STR		"touch"
 #define EVENT_STR		"event"
+#define TIMEOUT_STR		"timeout"
 #define UNKNOWN_STR		"unknown"
 
 unsigned int pm_status_flag;
@@ -312,6 +313,7 @@ static void broadcast_lcd_on(enum signal_type type, enum device_flags flags)
 
 static void broadcast_lcd_off(enum signal_type type, enum device_flags flags)
 {
+	char *arr[1];
 	const char *signal;
 
 	if (type <= SIGNAL_INVALID || type >= SIGNAL_MAX) {
@@ -320,9 +322,19 @@ static void broadcast_lcd_off(enum signal_type type, enum device_flags flags)
 	}
 
 	signal = lcdoff_sig_lookup[type];
+
+	if (flags & LCD_OFF_BY_POWER_KEY)
+		arr[0] = POWER_KEY_STR;
+	else if (flags & LCD_OFF_BY_TIMEOUT)
+		arr[0] = TIMEOUT_STR;
+	else if (flags & LCD_OFF_BY_EVENT)
+		arr[0] = EVENT_STR;
+	else
+		arr[0] = UNKNOWN_STR;
+
 	_I("lcdstep : broadcast %s", signal);
 	broadcast_edbus_signal(DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
-		signal, NULL, NULL);
+		signal, "s", arr);
 }
 
 static unsigned long get_lcd_on_flags(void)
@@ -368,11 +380,12 @@ void lcd_on_procedure(int state, enum device_flags flag)
 		keyfilter_ops->backlight_enable(true);
 }
 
-inline void lcd_off_procedure(void)
+inline void lcd_off_procedure(enum device_flags flag)
 {
 	dd_list *l = NULL;
 	const struct device_ops *ops = NULL;
 	unsigned long flags = NORMAL_MODE;
+	flags |= flag;
 
 	if (lcdon_broadcast) {
 		broadcast_lcd_off(SIGNAL_PRE, flags);
@@ -839,7 +852,7 @@ static int default_proc_change_state(unsigned int cond, pid_t pid)
 		break;
 	case S_LCDOFF:
 		if (backlight_ops.get_lcd_power() != DPMS_OFF)
-			lcd_off_procedure();
+			lcd_off_procedure(LCD_OFF_BY_EVENT);
 		if (set_custom_lcdon_timeout(0))
 			update_display_time();
 		default_proc_change_state_action(next, -1);
@@ -1502,12 +1515,12 @@ static int default_action(int timeout)
 			stop_lock_timer();
 			/* lcd off state : turn off the backlight */
 			if (backlight_ops.get_lcd_power() != DPMS_OFF)
-				lcd_off_procedure();
+				lcd_off_procedure(LCD_OFF_BY_TIMEOUT);
 		}
 
 		if (backlight_ops.get_lcd_power() != DPMS_OFF
 		    || lcd_paneloff_mode)
-			lcd_off_procedure();
+			lcd_off_procedure(LCD_OFF_BY_TIMEOUT);
 		break;
 
 	case S_SLEEP:
@@ -1515,7 +1528,7 @@ static int default_action(int timeout)
 			stop_lock_timer();
 
 		if (backlight_ops.get_lcd_power() != DPMS_OFF)
-			lcd_off_procedure();
+			lcd_off_procedure(LCD_OFF_BY_TIMEOUT);
 
 		if (!power_ops.get_power_lock_support()) {
 			/* sleep state : set system mode to SUSPEND */

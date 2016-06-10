@@ -192,7 +192,7 @@ int custom_lcdon(int timeout);
 void set_stay_touchscreen_off(int val);
 void set_lcd_paneloff_mode(int val);
 void lcd_on_direct(enum device_flags flags);
-void lcd_off_procedure(void);
+void lcd_off_procedure(enum device_flags flag);
 int check_holdkey_block(enum state_t state);
 
 /* poll.c */

@@ -208,7 +208,7 @@ static inline void switch_off_lcd(void)
 
 	broadcast_lcdoff_by_powerkey();
 
-	lcd_off_procedure();
+	lcd_off_procedure(LCD_OFF_BY_POWER_KEY);
 }
 
 static void process_combination_key(struct input_event *pinput)
