@@ -78,7 +78,6 @@ struct _backlight_ops {
 
 struct _power_ops {
 	int (*suspend)(void);
-	int (*enable_autosleep)(void);
 	int (*power_lock)(void);
 	int (*power_unlock)(void);
 	int (*get_power_lock_support)(void);
