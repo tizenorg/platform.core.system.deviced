@@ -69,6 +69,8 @@
 #define BLOCK_DEVICE_BLOCKED    "DeviceBlocked"
 #define BLOCK_DEVICE_CHANGED    "DeviceChanged"
 #define BLOCK_DEVICE_CHANGED_2  "DeviceChanged2"
+#define BLOCK_DEVICE_ADDED      "DeviceAdded"
+#define BLOCK_DEVICE_REMOVED    "DeviceRemoved"
 
 #define BLOCK_TYPE_MMC          "mmc"
 #define BLOCK_TYPE_SCSI         "scsi"
@@ -304,7 +306,8 @@ static void signal_device_changed(struct block_device *bdev,
 		BLOCK_GET_FORMAT_FLAGS(data, flags);
 		break;
 	default:
-		return;
+		flags = 0;
+		break;
 	}
 
 	/* Broadcast outside with Block iface */
@@ -337,14 +340,27 @@ static void signal_device_changed(struct block_device *bdev,
 		_E("there is no object_path");
 		return;
 	}
-	broadcast_block_edbus_signal(object_path,
-			DEVICED_INTERFACE_BLOCK,
-			BLOCK_DEVICE_CHANGED,
-			"issssssisibii", arr);
-	broadcast_block_edbus_signal(object_path,
-			DEVICED_INTERFACE_BLOCK,
-			BLOCK_DEVICE_CHANGED_2,
-			"issssssisibi", arr);
+
+	if (op == BLOCK_DEV_INSERT)
+		broadcast_block_edbus_signal(object_path,
+				DEVICED_INTERFACE_BLOCK,
+				BLOCK_DEVICE_ADDED,
+				"issssssisibii", arr);
+	else if (op == BLOCK_DEV_REMOVE)
+		broadcast_block_edbus_signal(object_path,
+				DEVICED_INTERFACE_BLOCK,
+				BLOCK_DEVICE_REMOVED,
+				"issssssisibii", arr);
+	else {
+		broadcast_block_edbus_signal(object_path,
+				DEVICED_INTERFACE_BLOCK,
+				BLOCK_DEVICE_CHANGED,
+				"issssssisibii", arr);
+		broadcast_block_edbus_signal(object_path,
+				DEVICED_INTERFACE_BLOCK,
+				BLOCK_DEVICE_CHANGED_2,
+				"issssssisibi", arr);
+	}
 }
 
 static int get_mmc_mount_node(char *devnode, char *node, size_t len)
@@ -811,9 +827,7 @@ static Eina_Bool pipe_cb(void *data, Ecore_Fd_Handler *fdh)
 	broadcast_block_info(pdata.op, pdata.bdev->data, pdata.result);
 
 	/* Broadcast outside with Block iface */
-	if (pdata.op != BLOCK_DEV_INSERT &&
-		pdata.op != BLOCK_DEV_REMOVE)
-		signal_device_changed(pdata.bdev, pdata.op);
+	signal_device_changed(pdata.bdev, pdata.op);
 
 	if (pdata.op == BLOCK_DEV_REMOVE) {
 		pthread_mutex_lock(&glob_mutex);
@@ -2551,6 +2565,18 @@ static int init_block_object_iface(void)
 	if (r < 0)
 		_E("fail to register %s signal to iface",
 				BLOCK_DEVICE_CHANGED_2);
+
+	r = e_dbus_interface_signal_add(iface,
+			BLOCK_DEVICE_ADDED, "issssssisibii");
+	if (r < 0)
+		_E("fail to register %s signal to iface",
+				BLOCK_DEVICE_ADDED);
+
+	r = e_dbus_interface_signal_add(iface,
+			BLOCK_DEVICE_REMOVED, "issssssisibii");
+	if (r < 0)
+		_E("fail to register %s signal to iface",
+				BLOCK_DEVICE_REMOVED);
 
 	return 0;
 }
