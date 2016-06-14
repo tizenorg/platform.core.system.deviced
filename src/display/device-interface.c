@@ -48,6 +48,7 @@
 #define LCD_PHASED_CHANGE_STEP		5
 #define LCD_PHASED_DELAY		35000 /* microsecond */
 
+#define POWER_AUTOSLEEP_PATH    "/sys/power/autosleep"
 #define POWER_LOCK_PATH         "/sys/power/wake_lock"
 #define POWER_UNLOCK_PATH       "/sys/power/wake_unlock"
 #define POWER_WAKEUP_PATH       "/sys/power/wakeup_count"
@@ -158,6 +159,12 @@ static int system_suspend(void)
 	ret = sys_set_str(POWER_STATE_PATH, "mem");
 	_I("system resume (result : %d)", ret);
 	return 0;
+}
+
+static int system_enable_autosleep(void)
+{
+	_I("system autosleep enabled");
+	return sys_set_str(POWER_AUTOSLEEP_PATH, "mem");
 }
 
 static int system_power_lock(void)
@@ -520,6 +527,7 @@ static void _init_ops(void)
 	backlight_ops.get_brightness = get_brightness;
 
 	power_ops.suspend = system_suspend;
+	power_ops.enable_autosleep = system_enable_autosleep;
 	power_ops.power_lock = system_power_lock;
 	power_ops.power_unlock = system_power_unlock;
 	power_ops.get_power_lock_support = system_get_power_lock_support;
