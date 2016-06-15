@@ -106,6 +106,7 @@ struct block_device {
 	struct block_data *data;
 	dd_list *op_queue;
 	int thread_id;		/* Current thread ID */
+	bool removed;		/* True when device is physically removed but operation is not precessed yet */
 };
 
 struct format_data {
@@ -606,6 +607,7 @@ static struct block_device *make_block_device(struct block_data *data)
 
 	bdev->data = data;
 	bdev->thread_id = -1;
+	bdev->removed = false;
 
 	return bdev;
 }
@@ -1923,6 +1925,7 @@ static int remove_block_device(struct udev_device *dev, const char *devnode)
 
 	BLOCK_FLAG_SET(bdev->data, UNMOUNT_UNSAFE);
 
+	bdev->removed = true;
 	ret = add_operation(bdev, BLOCK_DEV_UNMOUNT, NULL, (void *)UNMOUNT_FORCE);
 	if (ret < 0) {
 		_E("Failed to add operation (unmount %s)", devnode);
@@ -2021,6 +2024,8 @@ static void show_block_device_list(void)
 		data = bdev->data;
 		if (!data)
 			continue;
+		if (bdev->removed)
+			continue;
 		_D("%s:", data->devnode);
 		_D("\tSyspath: %s", data->syspath);
 		_D("\tBlock type: %s",
@@ -2052,7 +2057,7 @@ static void remove_whole_block_device(void)
 
 	pthread_mutex_lock(&glob_mutex);
 	DD_LIST_FOREACH_SAFE(block_dev_list, elem, next, bdev) {
-		DD_LIST_REMOVE(block_dev_list, bdev);
+		bdev->removed = true;
 		pthread_mutex_unlock(&glob_mutex);
 
 		r = add_operation(bdev, BLOCK_DEV_UNMOUNT, NULL, (void *)UNMOUNT_NORMAL);
@@ -2436,6 +2441,8 @@ static DBusMessage *request_get_device_list(E_DBus_Object *obj,
 		data = bdev->data;
 		if (!data)
 			continue;
+		if (bdev->removed)
+			continue;
 
 		switch (block_type) {
 		case BLOCK_SCSI_DEV:
@@ -2504,6 +2511,8 @@ static DBusMessage *request_get_device_list_2(E_DBus_Object *obj,
 	DD_LIST_FOREACH(block_dev_list, elem, bdev) {
 		data = bdev->data;
 		if (!data)
+			continue;
+		if (bdev->removed)
 			continue;
 
 		switch (block_type) {
