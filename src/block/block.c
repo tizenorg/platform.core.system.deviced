@@ -81,6 +81,8 @@
 
 #define BLOCK_CONF_FILE         "/etc/deviced/block.conf"
 
+#define EXT_PRIMARY_SD_VIRTID	1 // STORAGE_TYPE_EXTERNAL
+
 /* Minimum value of block id */
 #define BLOCK_ID_MIN 10
 
@@ -2469,10 +2471,16 @@ static DBusMessage *request_device_info_by_id(E_DBus_Object *obj,
 		data = bdev->data;
 		if (!data)
 			continue;
-		if (data->id != block_id)
-			continue;
-		found = true;
-		break;
+		if (block_id == EXT_PRIMARY_SD_VIRTID && data->primary == true && data->block_type == BLOCK_MMC_DEV) {
+			found = true;
+			break;
+		}
+		else {
+			if (data->id != block_id)
+				continue;
+			found = true;
+			break;
+		}
 	}
 
 	if (!found)
