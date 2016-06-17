@@ -1431,17 +1431,15 @@ static void block_send_dbus_reply(DBusMessage *msg, int result)
 {
 	DBusMessage *rep;
 	int ret;
-	static DBusConnection *conn = NULL;
+	DBusConnection *conn = NULL;
 
 	if (!msg)
 		return;
 
+	conn = get_block_dbus_connection();
 	if (!conn) {
-		conn = dbus_bus_get(DBUS_BUS_SYSTEM, NULL);
-		if (!conn) {
-			_E("dbus_bus_get error");
-			return;
-		}
+		_E("dbus_bus_get error");
+		return;
 	}
 
 	rep = make_reply_message(msg, result);
@@ -1449,7 +1447,9 @@ static void block_send_dbus_reply(DBusMessage *msg, int result)
 	dbus_message_unref(msg);
 	dbus_message_unref(rep);
 
-	if (ret != TRUE)
+	if (ret == TRUE)
+		_I("Success to send reply");
+	else
 		_E("Failed to send reply");
 }
 
