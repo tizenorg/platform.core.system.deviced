@@ -1555,6 +1555,9 @@ go_suspend:
 	pm_history_save(PM_LOG_SLEEP, pm_cur_state);
 #endif
 	if (power_ops.get_power_lock_support()) {
+		if (power_ops.enable_autosleep)
+			power_ops.enable_autosleep();
+
 		if (power_ops.power_unlock() < 0)
 			_E("power unlock state error!");
 	} else {
@@ -2158,11 +2161,6 @@ static void display_init(void *data)
 		if (display_conf.input_support)
 			if (CHECK_OPS(keyfilter_ops, init))
 				keyfilter_ops->init();
-
-		if (power_ops.get_power_lock_support &&
-			power_ops.get_power_lock_support() &&
-			power_ops.enable_autosleep)
-			power_ops.enable_autosleep();
 	}
 }
 
