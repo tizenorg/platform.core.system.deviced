@@ -83,6 +83,8 @@
 
 /* Minimum value of block id */
 #define BLOCK_ID_MIN 10
+/* For 2.4 Backward Compatibility */
+#define EXT_PRIMARY_SD_FIXID	1
 
 enum block_dev_operation {
 	BLOCK_DEV_MOUNT,
@@ -533,7 +535,11 @@ static struct block_data *make_block_data(const char *devnode,
 	data->mount_point = generate_mount_path(data);
 	BLOCK_FLAG_CLEAR_ALL(data);
 
-	data->id = block_get_new_id();
+	/* for 2.4 backward compatibility */
+	if(data->primary == true && data->block_type == BLOCK_MMC_DEV)
+		data->id = EXT_PRIMARY_SD_FIXID;
+	else
+		data->id = block_get_new_id();
 
 	return data;
 }
