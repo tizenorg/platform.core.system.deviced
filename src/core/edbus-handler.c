@@ -83,6 +83,11 @@ static DBusPendingCall *edbus_request_name;
 static DBusHandlerResult message_filter(DBusConnection *connection,
 		DBusMessage *message, void *data);
 
+DBusConnection *get_block_dbus_connection(void)
+{
+	return conn_block;
+}
+
 E_DBus_Object *register_edbus_object(const char *object_path, void *data)
 {
 	E_DBus_Object *object;

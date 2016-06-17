@@ -41,6 +41,7 @@ static inline DBusMessage *make_reply_message(DBusMessage *msg, int ret)
 	return reply;
 }
 
+DBusConnection *get_block_dbus_connection(void);
 E_DBus_Object *register_edbus_object(const char *object_path, void *data);
 E_DBus_Object *register_block_edbus_object(const char *object_path, void *data);
 void unregister_edbus_object(E_DBus_Object *object);
