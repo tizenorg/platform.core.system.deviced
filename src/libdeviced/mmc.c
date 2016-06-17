@@ -20,6 +20,9 @@
 #include <stdio.h>
 #include <vconf.h>
 #include <errno.h>
+#include <stdbool.h>
+#include <storage.h>
+#include <glib.h>
 
 #include "log.h"
 #include "dbus.h"
@@ -28,13 +31,12 @@
 
 #define METHOD_REQUEST_SECURE_MOUNT		"RequestSecureMount"
 #define METHOD_REQUEST_SECURE_UNMOUNT	"RequestSecureUnmount"
-#define METHOD_REQUEST_MOUNT		"RequestMount"
-#define METHOD_REQUEST_UNMOUNT		"RequestUnmount"
-#define METHOD_REQUEST_FORMAT		"RequestFormat"
 
 #define ODE_MOUNT_STATE 1
 
 #define FORMAT_TIMEOUT	(120*1000)
+#define STORAGE_MMC 1
+#define BUF_MAX 256
 
 API int mmc_secure_mount(const char *mount_point)
 {
@@ -58,6 +60,89 @@ API int mmc_secure_unmount(const char *mount_point)
 	arr[0] = (char *)mount_point;
 	return dbus_method_sync(DEVICED_BUS_NAME, DEVICED_PATH_MMC,
 			DEVICED_INTERFACE_MMC, METHOD_REQUEST_SECURE_UNMOUNT, "s", arr);
+}
+
+static int get_mmc_primary_devnode(char *path, size_t len)
+{
+	DBusMessage *reply;
+	DBusMessageIter iter;
+	DBusMessageIter aiter, piter;
+	char *param[1];
+	int type;
+	char *devnode = NULL;
+	bool primary;
+	int ret;
+
+	param[0] = "mmc";
+	reply = dbus_method_sync_with_reply(
+			STORAGE_BUS_NAME,
+			DEVICED_PATH_BLOCK_MANAGER,
+			DEVICED_INTERFACE_BLOCK_MANAGER,
+			"GetDeviceList", "s", param);
+	if (!reply) {
+		_E("Failed to get mmc storage list");
+		return -EPERM;
+	}
+
+	dbus_message_iter_init(reply, &iter);
+	dbus_message_iter_recurse(&iter, &aiter);
+
+	while (dbus_message_iter_get_arg_type(&aiter) != DBUS_TYPE_INVALID) {
+		devnode = NULL;
+		dbus_message_iter_recurse(&aiter, &piter); /*type*/
+		dbus_message_iter_get_basic(&piter, &type);
+		dbus_message_iter_next(&piter); /* devnode */
+		dbus_message_iter_get_basic(&piter, &devnode);
+		dbus_message_iter_next(&piter); /* syspath */
+		dbus_message_iter_next(&piter); /* fsusage */
+		dbus_message_iter_next(&piter); /* fstype */
+		dbus_message_iter_next(&piter); /* fsversion */
+		dbus_message_iter_next(&piter); /* fsuuid */
+		dbus_message_iter_next(&piter); /* readonly */
+		dbus_message_iter_next(&piter); /* mountpath */
+		dbus_message_iter_next(&piter); /* state */
+		dbus_message_iter_next(&piter); /* primary */
+		dbus_message_iter_get_basic(&piter, &primary);
+		dbus_message_iter_next(&piter); /* flags */
+		dbus_message_iter_next(&piter); /* storage id */
+		dbus_message_iter_next(&aiter);
+
+		if (type == STORAGE_MMC && primary && devnode)
+			break;
+	}
+
+	if (devnode) {
+		_I("MMC Primary devnode (%s)", devnode);
+		snprintf(path, len, "%s", devnode);
+		ret = 0;
+	} else
+		ret = -ENODEV;
+
+	dbus_message_unref(reply);
+	return ret;
+}
+
+static int get_object_path_mmc(char *path, size_t len)
+{
+	int ret;
+	char devpath[BUF_MAX], *devnode;
+
+	if (!path || len == 0)
+		return -EINVAL;
+
+	ret = get_mmc_primary_devnode(devpath, sizeof(devpath));
+	if (ret < 0) {
+		_E("Failed to get mmc devpath (%d)", ret);
+		return -ENODEV;
+	}
+
+	devnode = strstr(devpath, "mmcblk");
+	if (!devnode)
+		return -EINVAL;
+
+	snprintf(path, len, "%s/%s",
+			DEVICED_PATH_BLOCK_DEVICES, devnode);
+	return 0;
 }
 
 static void mount_mmc_cb(void *data, DBusMessage *msg, DBusError *err)
@@ -93,17 +178,30 @@ API int deviced_request_mount_mmc(struct mmc_contents *mmc_data)
 {
 	void (*mount_cb)(void*, DBusMessage*, DBusError*) = NULL;
 	void *data = NULL;
+	int ret;
+	char path[BUF_MAX] = { 0, };
+	char *param[1];
 
-	if (mmc_data != NULL && mmc_data->mmc_cb != NULL) {
+	ret = get_object_path_mmc(path, sizeof(path));
+	if (ret < 0) {
+		_E("Failed to get object path");
+		return ret;
+	}
+
+	if (mmc_data && mmc_data->mmc_cb) {
+		_I("Mount callback exists");
 		mount_cb = mount_mmc_cb;
 		data = mmc_data;
 	}
 
-	return dbus_method_async_with_reply(DEVICED_BUS_NAME,
-			DEVICED_PATH_MMC,
-			DEVICED_INTERFACE_MMC,
-			METHOD_REQUEST_MOUNT,
-			NULL, NULL, mount_cb, -1, data);
+	param[0] = "";
+	ret = dbus_method_async_with_reply(STORAGE_BUS_NAME, path,
+			DEVICED_INTERFACE_BLOCK, "Mount", "s", param,
+			mount_cb, -1, data);
+
+	_I("Mount Request %s", ret == 0 ? "Success" : "Failed");
+
+	return ret;
 }
 
 static void unmount_mmc_cb(void *data, DBusMessage *msg, DBusError *err)
@@ -137,26 +235,37 @@ exit:
 
 API int deviced_request_unmount_mmc(struct mmc_contents *mmc_data, int option)
 {
-	char *arr[1];
-	char buf_opt[32];
 	void (*unmount_cb)(void*, DBusMessage*, DBusError*) = NULL;
 	void *data = NULL;
+	char buf_opt[32];
+	int ret;
+	char path[BUF_MAX] = { 0, };
+	char *param[1];
 
 	if (option < 0 || option > 1)
 		return -EINVAL;
 
-	if (mmc_data != NULL && mmc_data->mmc_cb != NULL) {
+	ret = get_object_path_mmc(path, sizeof(path));
+	if (ret < 0) {
+		_E("Failed to get object path");
+		return ret;
+	}
+
+	if (mmc_data && mmc_data->mmc_cb) {
+		_I("Mount callback exists");
 		unmount_cb = unmount_mmc_cb;
 		data = mmc_data;
 	}
 
 	snprintf(buf_opt, sizeof(buf_opt), "%d", option);
-	arr[0] = buf_opt;
-	return dbus_method_async_with_reply(DEVICED_BUS_NAME,
-			DEVICED_PATH_MMC,
-			DEVICED_INTERFACE_MMC,
-			METHOD_REQUEST_UNMOUNT,
-			"i", arr, unmount_cb, -1, data);
+	param[0] = buf_opt;
+	ret = dbus_method_async_with_reply(STORAGE_BUS_NAME, path,
+			DEVICED_INTERFACE_BLOCK, "Unmount", "i", param,
+			unmount_cb, -1, data);
+
+	_I("Unmount Request %s", ret == 0 ? "Success" : "Failed");
+
+	return ret;
 }
 
 static void format_mmc_cb(void *data, DBusMessage *msg, DBusError *err)
@@ -195,24 +304,35 @@ API int deviced_request_format_mmc(struct mmc_contents *mmc_data)
 
 API int deviced_format_mmc(struct mmc_contents *mmc_data, int option)
 {
-	char *arr[1];
-	char buf_opt[32];
 	void (*format_cb)(void*, DBusMessage*, DBusError*) = NULL;
 	void *data = NULL;
+	char buf_opt[32];
+	int ret;
+	char path[BUF_MAX] = { 0, };
+	char *param[1];
 
 	if (option < 0 || option > 1)
 		return -EINVAL;
 
-	if (mmc_data != NULL && mmc_data->mmc_cb != NULL) {
+	ret = get_object_path_mmc(path, sizeof(path));
+	if (ret < 0) {
+		_E("Failed to get object path");
+		return ret;
+	}
+
+	if (mmc_data && mmc_data->mmc_cb) {
+		_I("Mount callback exists");
 		format_cb = format_mmc_cb;
 		data = mmc_data;
 	}
 
 	snprintf(buf_opt, sizeof(buf_opt), "%d", option);
-	arr[0] = buf_opt;
-	return dbus_method_async_with_reply(DEVICED_BUS_NAME,
-			DEVICED_PATH_MMC,
-			DEVICED_INTERFACE_MMC,
-			METHOD_REQUEST_FORMAT,
-			"i", arr, format_cb, FORMAT_TIMEOUT, data);
+	param[0] = buf_opt;
+	ret = dbus_method_async_with_reply(STORAGE_BUS_NAME, path,
+			DEVICED_INTERFACE_BLOCK, "Format", "i", param,
+			format_cb, FORMAT_TIMEOUT, data);
+
+	_I("Format Request %s", ret == 0 ? "Success" : "Failed");
+
+	return ret;
 }

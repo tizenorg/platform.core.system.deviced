@@ -25,7 +25,8 @@ pkg_check_modules(libpkgs REQUIRED
 	storage
 	dbus-1
 	dbus-glib-1
-	edbus)
+	edbus
+	glib-2.0)
 
 FOREACH(flag ${libpkgs_CFLAGS})
 	SET(EXTRA_LIB_CFLAGS "${EXTRA_LIB_CFLAGS} ${flag}")
