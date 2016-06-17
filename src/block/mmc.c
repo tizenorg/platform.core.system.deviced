@@ -37,6 +37,17 @@ static void mmc_update_state(int state)
 		old = state;
 }
 
+static void mmc_update_mount_state(int state)
+{
+	static int old = -1;
+
+	if (old == state)
+		return;
+
+	if (vconf_set_int(VCONFKEY_SYSMAN_MMC_MOUNT, state) == 0)
+		old = state;
+}
+
 static void mmc_mount(struct block_data *data, int result)
 {
 	int r;
@@ -47,6 +58,7 @@ static void mmc_mount(struct block_data *data, int result)
 
 	if (result < 0) {
 		mmc_update_state(VCONFKEY_SYSMAN_MMC_INSERTED_NOT_MOUNTED);
+		mmc_update_mount_state(VCONFKEY_SYSMAN_MMC_MOUNT_FAILED);
 		return;
 	}
 
@@ -57,6 +69,7 @@ static void mmc_mount(struct block_data *data, int result)
 		_E("setxattr error : %d", errno);
 
 	mmc_update_state(VCONFKEY_SYSMAN_MMC_MOUNTED);
+	mmc_update_mount_state(VCONFKEY_SYSMAN_MMC_MOUNT_COMPLETED);
 }
 
 static void mmc_unmount(struct block_data *data, int result)
@@ -77,8 +90,10 @@ static void mmc_format(struct block_data *data, int result)
 	if (!data || !data->primary)
 		return;
 
-	if (data->state == BLOCK_MOUNT)
+	if (data->state == BLOCK_MOUNT) {
 		mmc_update_state(VCONFKEY_SYSMAN_MMC_MOUNTED);
+		mmc_update_mount_state(VCONFKEY_SYSMAN_MMC_MOUNT_COMPLETED);
+	}
 }
 
 static void mmc_insert(struct block_data *data)
