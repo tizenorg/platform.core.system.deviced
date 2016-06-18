@@ -82,12 +82,12 @@ static int usb_config_init(void)
 {
 	if (!config_plugin) {
 		_E("There is no usb config plugin");
-		return -ENOENT;
+		return 0;
 	}
 
 	if (config_plugin->init == NULL) {
 		_E("There is no usb config init function");
-		return -ENOENT;
+		return 0;
 	}
 
 	return config_plugin->init(NULL);
@@ -114,12 +114,12 @@ static int usb_config_enable(void)
 
 	if (!config_plugin) {
 		_E("There is no usb config plugin");
-		return -ENOENT;
+		return 0;
 	}
 
 	if (config_plugin->enable == NULL) {
 		_E("There is no usb config enable function");
-		return -ENOENT;
+		return 0;
 	}
 
 	if (usb_tethering_state())
@@ -134,12 +134,12 @@ static int usb_config_disable(void)
 {
 	if (!config_plugin) {
 		_E("There is no usb config plugin");
-		return -ENOENT;
+		return 0;
 	}
 
 	if (config_plugin->disable == NULL) {
 		_E("There is no usb config disable function");
-		return -ENOENT;
+		return 0;
 	}
 
 	return config_plugin->disable(NULL);
