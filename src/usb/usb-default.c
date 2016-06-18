@@ -331,9 +331,12 @@ static const struct usb_config_plugin_ops default_plugin = {
 
 static bool usb_valid(void)
 {
-	/* TODO
-	 * add checking default config valid condition */
+#ifdef TARGET
+	_I("This is target device");
 	return true;
+#else
+	return false;
+#endif
 }
 
 static const struct usb_config_plugin_ops *usb_load(void)
