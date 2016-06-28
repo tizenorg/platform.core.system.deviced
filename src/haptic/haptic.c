@@ -166,22 +166,21 @@ Ecore_Timer *timer;
 static int circle_stop();
 static Eina_Bool timer_cb(void *data)
 {
-	Ecore_Timer *t = (Ecore_Timer *)data;
 	circle_stop();
-	t = NULL;
-
 	return ECORE_CALLBACK_CANCEL;
 }
 
 static int circle_stop()
 {
-	int fd;
+	int fd, ret;
 	char buf[8];
 
 	fd = open(CIRCLE_OFF_PATH, O_RDONLY);
 	if (fd < 0)
 		return -ENODEV;
-	read(fd, buf, 8);
+	ret = read(fd, buf, 8);
+	if (ret < 0)
+		_E("Failed to stop");
 	close(fd);
 	if (timer) {
 		ecore_timer_del(timer);
@@ -192,7 +191,7 @@ static int circle_stop()
 
 static int circle_play(int duration)
 {
-	int fd;
+	int fd, ret;
 	char buf[8];
 
 	if (timer) {
@@ -203,7 +202,9 @@ static int circle_play(int duration)
 	fd = open(CIRCLE_ON_PATH, O_RDONLY);
 	if (fd < 0)
 		return -ENODEV;
-	read(fd, buf, 8);
+	ret = read(fd, buf, 8);
+	if (ret < 0)
+		_E("Failed to play");
 	close(fd);
 	ecore_timer_add(duration/1000.f, timer_cb, timer);
 
@@ -235,7 +236,7 @@ static void haptic_name_owner_changed(const char *sender, void *data)
 {
 	dd_list *n;
 	struct haptic_info *info = data;
-	int handle;
+	int *handle;
 
 	_I("%s (sender:%s)", __func__, sender);
 
@@ -243,9 +244,9 @@ static void haptic_name_owner_changed(const char *sender, void *data)
 		return;
 
 	for (n = info->handle_list; n; n = n->next) {
-		handle = (int)n->data;
-		h_ops->stop_device(handle);
-		h_ops->close_device(handle);
+		handle = (int *)n->data;
+		h_ops->stop_device(*handle);
+		h_ops->close_device(*handle);
 	}
 
 	remove_haptic_info(info);
@@ -304,9 +305,10 @@ static DBusMessage *edbus_open_device(E_DBus_Object *obj, DBusMessage *msg)
 {
 	DBusMessageIter iter;
 	DBusMessage *reply;
-	int index, handle, ret;
+	int index, ret;
 	struct haptic_info *info;
 	const char *sender;
+	int *handle;
 
 	/* Load haptic module before booting done */
 	if (!CHECK_VALID_OPS(h_ops, ret)) {
@@ -324,7 +326,8 @@ static DBusMessage *edbus_open_device(E_DBus_Object *obj, DBusMessage *msg)
 	ret = 1;
 	goto exit;
 #endif
-	ret = h_ops->open_device(index, &handle);
+	handle = (int *)malloc(sizeof(int));
+	ret = h_ops->open_device(index, handle);
 	if (ret < 0)
 		goto exit;
 
@@ -332,7 +335,7 @@ static DBusMessage *edbus_open_device(E_DBus_Object *obj, DBusMessage *msg)
 	sender = dbus_message_get_sender(msg);
 	if (!sender) {
 		ret = -EPERM;
-		h_ops->close_device(handle);
+		h_ops->close_device(*handle);
 		goto exit;
 	}
 
@@ -342,14 +345,14 @@ static DBusMessage *edbus_open_device(E_DBus_Object *obj, DBusMessage *msg)
 		if (!info) {
 			_E("fail to create haptic information");
 			ret = -EPERM;
-			h_ops->close_device(handle);
+			h_ops->close_device(*handle);
 			goto exit;
 		}
 	}
 
 	DD_LIST_APPEND(info->handle_list, handle);
 
-	ret = handle;
+	ret = *handle;
 
 exit:
 	reply = dbus_message_new_method_return(msg);
@@ -367,6 +370,8 @@ static DBusMessage *edbus_close_device(E_DBus_Object *obj, DBusMessage *msg)
 	struct haptic_info *info;
 	const char *sender;
 	int cnt;
+	dd_list *elem;
+	int *temp;
 
 	if (!CHECK_VALID_OPS(h_ops, ret))
 		goto exit;
@@ -397,7 +402,12 @@ static DBusMessage *edbus_close_device(E_DBus_Object *obj, DBusMessage *msg)
 		goto exit;
 	}
 
-	DD_LIST_REMOVE(info->handle_list, handle);
+	DD_LIST_FOREACH(info->handle_list, elem, temp) {
+		if (*temp == handle) {
+			DD_LIST_REMOVE(info->handle_list, temp);
+			free(temp);
+		}
+	}
 	cnt = DD_LIST_LENGTH(info->handle_list);
 	if (cnt == 0)
 		remove_haptic_info(info);
@@ -694,11 +704,14 @@ static DBusMessage *edbus_show_handle_list(E_DBus_Object *obj, DBusMessage *msg)
 	dd_list *elem;
 	struct haptic_info *info;
 	int cnt = 0;
+	int *handle;
 
-	_D("    sender\thandle");
+	_D("    sender    handle");
 	DD_LIST_FOREACH(haptic_handle_list, n, info) {
-		for (elem = info->handle_list; elem; elem = elem->next)
-			_D("[%2d]%s\t%d", cnt++, info->sender, (int)elem->data);
+		for (elem = info->handle_list; elem; elem = elem->next) {
+			handle = (int *)elem->data;
+			_D("[%2d]%s    %d", cnt++, info->sender, (int)*handle);
+		}
 	}
 
 	return dbus_message_new_method_return(msg);
