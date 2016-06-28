@@ -21,6 +21,8 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <stdbool.h>
+#include <bundle.h>
+#include <eventsystem.h>
 
 #include "core.h"
 #include "util.h"
@@ -45,6 +47,28 @@ static int custom_normal_timeout = 0;
 static int custom_dim_timeout = 0;
 
 int (*update_pm_setting) (int key_idx, int val);
+
+static void display_state_send_system_event(int state)
+{
+	bundle *b;
+	const char *str;
+
+	if (state == S_NORMAL)
+		str = EVT_VAL_DISPLAY_NORMAL;
+	else if (state == S_LCDDIM)
+		str = EVT_VAL_DISPLAY_DIM;
+	else if (state == S_LCDOFF)
+		str = EVT_VAL_DISPLAY_OFF;
+	else
+		return;
+
+	_I("eventsystem (%s)", str);
+
+	b = bundle_create();
+	bundle_add_str(b, EVT_KEY_DISPLAY_STATE, str);
+	eventsystem_send_system_event(SYS_EVENT_DISPLAY_STATE, b);
+	bundle_free(b);
+}
 
 int set_force_lcdtimeout(int timeout)
 {
@@ -101,6 +125,7 @@ int get_usb_status(int *val)
 
 int set_setting_pmstate(int val)
 {
+	display_state_send_system_event(val);
 	return vconf_set_int(VCONFKEY_PM_STATE, val);
 }
 
