@@ -374,7 +374,7 @@ static int open_device(int device_index, int *device_handle)
 
 	while (found != true) {
 		++unique_number;
-		elem = DD_LIST_FIND(handle_list, unique_number);
+		elem = DD_LIST_FIND(handle_list, (gpointer)(long)unique_number);
 		if (!elem)
 			found = true;
 	}
@@ -383,7 +383,7 @@ static int open_device(int device_index, int *device_handle)
 
 	/* add info to local list */
 	DD_LIST_APPEND(ff_list, info);
-	DD_LIST_APPEND(handle_list, info->handle);
+	DD_LIST_APPEND(handle_list, (gpointer)(long)info->handle);
 
 	*device_handle = info->handle;
 	return 0;
@@ -416,7 +416,7 @@ static int close_device(int device_handle)
 		info->timer = NULL;
 	}
 
-	DD_LIST_REMOVE(handle_list, info->handle);
+	DD_LIST_REMOVE(handle_list, (gpointer)(long)info->handle);
 
 	safe_free(info->ffinfobuffer);
 	/* remove info from local list */
