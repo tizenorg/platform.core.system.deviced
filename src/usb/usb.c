@@ -19,6 +19,8 @@
 
 #include <stdio.h>
 #include <vconf.h>
+#include <bundle.h>
+#include <eventsystem.h>
 
 #include "core/log.h"
 #include "core/list.h"
@@ -145,6 +147,29 @@ static int usb_config_disable(void)
 	return config_plugin->disable(NULL);
 }
 
+static void usb_state_send_system_event(int state)
+{
+	bundle *b;
+	const char *str;
+
+	if (state == VCONFKEY_SYSMAN_USB_DISCONNECTED)
+		str = EVT_VAL_USB_DISCONNECTED;
+	else if (state == VCONFKEY_SYSMAN_USB_CONNECTED)
+		str = EVT_VAL_USB_CONNECTED;
+	else if (state == VCONFKEY_SYSMAN_USB_AVAILABLE)
+		str = EVT_VAL_USB_AVAILABLE;
+	else
+		return;
+
+	_I("system_event (%s)", str);
+
+	b = bundle_create();
+	bundle_add_str(b, EVT_KEY_USB_STATUS, str);
+	eventsystem_send_system_event(SYS_EVENT_USB_STATUS, b);
+	bundle_free(b);
+}
+
+
 static void usb_change_state(int val)
 {
 	static int old_status = -1;
@@ -166,6 +191,7 @@ static void usb_change_state(int val)
 	}
 
 	if (old_status != val) {
+		usb_state_send_system_event(val);
 		vconf_set_int(VCONFKEY_SYSMAN_USB_STATUS, val);
 		old_status = val;
 	}
