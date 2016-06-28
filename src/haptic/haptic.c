@@ -166,22 +166,23 @@ Ecore_Timer *timer;
 static int circle_stop();
 static Eina_Bool timer_cb(void *data)
 {
-	Ecore_Timer *t = (Ecore_Timer *)data;
 	circle_stop();
-	t = NULL;
-
 	return ECORE_CALLBACK_CANCEL;
 }
 
 static int circle_stop()
 {
-	int fd;
+	int fd, ret;
 	char buf[8];
 
 	fd = open(CIRCLE_OFF_PATH, O_RDONLY);
 	if (fd < 0)
 		return -ENODEV;
-	read(fd, buf, 8);
+	ret = read(fd, buf, 8);
+	if (ret < 0) {
+		_E("Failed to stop");
+		return -1;
+	}
 	close(fd);
 	if (timer) {
 		ecore_timer_del(timer);
@@ -192,7 +193,7 @@ static int circle_stop()
 
 static int circle_play(int duration)
 {
-	int fd;
+	int fd, ret;
 	char buf[8];
 
 	if (timer) {
@@ -203,7 +204,11 @@ static int circle_play(int duration)
 	fd = open(CIRCLE_ON_PATH, O_RDONLY);
 	if (fd < 0)
 		return -ENODEV;
-	read(fd, buf, 8);
+	ret = read(fd, buf, 8);
+	if (ret < 0) {
+		_E("Failed to play");
+		return -1;
+	}
 	close(fd);
 	ecore_timer_add(duration/1000.f, timer_cb, timer);
 
@@ -243,7 +248,7 @@ static void haptic_name_owner_changed(const char *sender, void *data)
 		return;
 
 	for (n = info->handle_list; n; n = n->next) {
-		handle = (int)n->data;
+		handle = (int)(long)n->data;
 		h_ops->stop_device(handle);
 		h_ops->close_device(handle);
 	}
@@ -347,7 +352,7 @@ static DBusMessage *edbus_open_device(E_DBus_Object *obj, DBusMessage *msg)
 		}
 	}
 
-	DD_LIST_APPEND(info->handle_list, handle);
+	DD_LIST_APPEND(info->handle_list, (gpointer)(long)handle);
 
 	ret = handle;
 
@@ -397,7 +402,7 @@ static DBusMessage *edbus_close_device(E_DBus_Object *obj, DBusMessage *msg)
 		goto exit;
 	}
 
-	DD_LIST_REMOVE(info->handle_list, handle);
+	DD_LIST_REMOVE(info->handle_list, (gpointer)(long)handle);
 	cnt = DD_LIST_LENGTH(info->handle_list);
 	if (cnt == 0)
 		remove_haptic_info(info);
@@ -695,10 +700,10 @@ static DBusMessage *edbus_show_handle_list(E_DBus_Object *obj, DBusMessage *msg)
 	struct haptic_info *info;
 	int cnt = 0;
 
-	_D("    sender\thandle");
+	_D("    sender    handle");
 	DD_LIST_FOREACH(haptic_handle_list, n, info) {
 		for (elem = info->handle_list; elem; elem = elem->next)
-			_D("[%2d]%s\t%d", cnt++, info->sender, (int)elem->data);
+			_D("[%2d]%s    %d", cnt++, info->sender, (int)(long)elem->data);
 	}
 
 	return dbus_message_new_method_return(msg);
