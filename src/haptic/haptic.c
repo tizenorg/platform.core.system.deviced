@@ -845,6 +845,8 @@ static int parse_section(struct parse_result *result, void *user_data, int index
 		conf->sound_capture = atoi(result->value);
 	} else if (MATCH(result->name, "level")) {
 		conf->level = atoi(result->value);
+		if (conf->level < 0)
+			return -EINVAL;
 		conf->level_arr = calloc(sizeof(int), conf->level);
 		if (!conf->level_arr) {
 			_E("failed to allocate memory for level");
