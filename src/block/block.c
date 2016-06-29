@@ -410,8 +410,6 @@ static int get_scsi_mount_node(char *devnode, char *node, size_t len)
 
 	name = dev;
 	name += strlen("sd");
-	if (!name)
-		return -EINVAL;
 
 	for (i = 0 ; i < strlen(name) ; i++)
 		name[i] = toupper(name[i]);
