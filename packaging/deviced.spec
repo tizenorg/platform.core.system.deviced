@@ -254,7 +254,6 @@ systemctl daemon-reload
 %config %{_sysconfdir}/dbus-1/system.d/deviced.conf
 %{_bindir}/deviced-pre.sh
 %{_bindir}/deviced
-%{_bindir}/movi_format.sh
 %{_unitdir}/multi-user.target.wants/deviced.service
 %if %{?haptic_module} == on
 %{_unitdir}/deviced-vibrator.service
