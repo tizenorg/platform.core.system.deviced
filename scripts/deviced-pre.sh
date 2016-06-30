@@ -1,5 +1,7 @@
 #!/bin/sh
 
+PATH=/bin:/usr/bin:/sbin:/usr/sbin
+
 DEVICED_ENV_F=/run/deviced/deviced_env
 [ -e $DEVICED_ENV_F ] && /bin/rm -f $DEVICED_ENV_F
 [ -d ${DEVICED_ENV_F%/*} ] || /bin/mkdir -p ${DEVICED_ENV_F%/*}

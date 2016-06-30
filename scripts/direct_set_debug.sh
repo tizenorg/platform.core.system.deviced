@@ -1,5 +1,7 @@
 #!/bin/sh
 
+PATH=/bin:/usr/bin:/sbin:/usr/sbin
+
 load_usb_gadget() {
 	echo 0 > /sys/class/usb_mode/usb0/enable
 	echo 04e8 > /sys/class/usb_mode/usb0/idVendor
