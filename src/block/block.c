@@ -37,6 +37,7 @@
 #include <vconf.h>
 #include <ctype.h>
 #include <tzplatform_config.h>
+#include <app2ext_interface.h>
 
 #include "core/log.h"
 #include "core/config-parser.h"
@@ -1107,6 +1108,12 @@ static int block_unmount(struct block_device *bdev,
 	data = bdev->data;
 
 	signal_device_blocked(bdev);
+
+	/* Need to disble app2ext whenever unmounting mmc */
+	if (data->block_type == BLOCK_MMC_DEV && data->primary)
+		if (app2ext_disable_all_external_pkgs() < 0)
+			_E("app2ext_disable_all_external_pkgs() failed");
+
 	/* it must called before unmounting mmc */
 	r = mmc_check_and_unmount(data->mount_point);
 	if (!r)
@@ -1153,6 +1160,11 @@ static int block_unmount(struct block_device *bdev,
 		/* it takes some seconds til other app completely clean up */
 		time.tv_nsec = 500 * NANO_SECOND_MULTIPLIER;
 		nanosleep(&time, NULL);
+
+		/* Need to disble app2ext whenever unmounting mmc */
+		if (data->block_type == BLOCK_MMC_DEV && data->primary)
+			if (app2ext_disable_all_external_pkgs() < 0)
+				_E("app2ext_disable_all_external_pkgs() failed");
 
 		r = mmc_check_and_unmount(data->mount_point);
 		if (!r) {
