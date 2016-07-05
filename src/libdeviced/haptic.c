@@ -170,7 +170,7 @@ API int haptic_get_count(int *device_number)
 	}
 
 	/* request to deviced to get haptic count */
-	ret = dbus_method_sync(DEVICED_BUS_NAME,
+	ret = dbus_method_sync(VIBRATOR_BUS_NAME,
 			VIBRATOR_PATH_HAPTIC, VIBRATOR_INTERFACE_HAPTIC,
 			METHOD_GET_COUNT, NULL, NULL);
 	if (ret < 0)
@@ -203,7 +203,7 @@ API int haptic_open(haptic_device_e device_index, haptic_device_h *device_handle
 	arr[0] = str_index;
 
 	/* request to deviced to open haptic device */
-	ret = dbus_method_sync(DEVICED_BUS_NAME,
+	ret = dbus_method_sync(VIBRATOR_BUS_NAME,
 			VIBRATOR_PATH_HAPTIC, VIBRATOR_INTERFACE_HAPTIC,
 			METHOD_OPEN_DEVICE, "i", arr);
 	if (ret < 0)
@@ -229,7 +229,7 @@ API int haptic_close(haptic_device_h device_handle)
 	arr[0] = str_handle;
 
 	/* request to deviced to open haptic device */
-	ret = dbus_method_sync(DEVICED_BUS_NAME,
+	ret = dbus_method_sync(VIBRATOR_BUS_NAME,
 			VIBRATOR_PATH_HAPTIC, VIBRATOR_INTERFACE_HAPTIC,
 			METHOD_CLOSE_DEVICE, "u", arr);
 	if (ret < 0)
@@ -296,7 +296,7 @@ API int haptic_vibrate_monotone_with_detail(haptic_device_h device_handle,
 	arr[3] = str_priority;
 
 	/* request to deviced to open haptic device */
-	ret = dbus_method_sync(DEVICED_BUS_NAME,
+	ret = dbus_method_sync(VIBRATOR_BUS_NAME,
 			VIBRATOR_PATH_HAPTIC, VIBRATOR_INTERFACE_HAPTIC,
 			METHOD_VIBRATE_MONOTONE, "uiii", arr);
 	if (ret < 0)
@@ -458,7 +458,7 @@ API int haptic_vibrate_buffers_with_detail(haptic_device_h device_handle,
 	arr[5] = str_priority;
 
 	/* request to deviced to open haptic device */
-	ret = dbus_method_sync(DEVICED_BUS_NAME,
+	ret = dbus_method_sync(VIBRATOR_BUS_NAME,
 			VIBRATOR_PATH_HAPTIC, VIBRATOR_INTERFACE_HAPTIC,
 			METHOD_VIBRATE_BUFFER, "uayiii", arr);
 	if (ret < 0)
@@ -491,7 +491,7 @@ API int haptic_stop_all_effects(haptic_device_h device_handle)
 	arr[0] = str_handle;
 
 	/* request to deviced to open haptic device */
-	ret = dbus_method_sync(DEVICED_BUS_NAME,
+	ret = dbus_method_sync(VIBRATOR_BUS_NAME,
 			VIBRATOR_PATH_HAPTIC, VIBRATOR_INTERFACE_HAPTIC,
 			METHOD_STOP_DEVICE, "u", arr);
 	if (ret < 0)
@@ -522,7 +522,7 @@ API int haptic_get_effect_state(haptic_device_h device_handle, haptic_effect_h e
 	arr[0] = str_index;
 
 	/* request to deviced to open haptic device */
-	ret = dbus_method_sync(DEVICED_BUS_NAME,
+	ret = dbus_method_sync(VIBRATOR_BUS_NAME,
 			VIBRATOR_PATH_HAPTIC, VIBRATOR_INTERFACE_HAPTIC,
 			METHOD_GET_STATE, "i", arr);
 	if (ret < 0)
@@ -585,7 +585,7 @@ API int haptic_create_effect(unsigned char *vibe_buffer,
 	arr[3] = str_elemcnt;
 
 	/* request to deviced to open haptic device */
-	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
+	msg = dbus_method_sync_with_reply(VIBRATOR_BUS_NAME,
 			VIBRATOR_PATH_HAPTIC, VIBRATOR_INTERFACE_HAPTIC,
 			METHOD_CREATE_EFFECT, "iayi", arr);
 	if (!msg)
@@ -716,7 +716,7 @@ API int haptic_get_buffers_duration(haptic_device_h device_handle, const unsigne
 	arr[2] = (char *)&bytes;
 
 	/* request to deviced to open haptic device */
-	ret = dbus_method_sync(DEVICED_BUS_NAME,
+	ret = dbus_method_sync(VIBRATOR_BUS_NAME,
 			VIBRATOR_PATH_HAPTIC, VIBRATOR_INTERFACE_HAPTIC,
 			METHOD_GET_DURATION, "uay", arr);
 	if (ret < 0)
@@ -761,7 +761,7 @@ API int haptic_save_led(const unsigned char *vibe_buffer, int max_bufsize, const
 	arr[2] = (char *)file_path;
 
 	/* request to deviced to open haptic device */
-	ret = dbus_method_sync(DEVICED_BUS_NAME,
+	ret = dbus_method_sync(VIBRATOR_BUS_NAME,
 			VIBRATOR_PATH_HAPTIC, VIBRATOR_INTERFACE_HAPTIC,
 			METHOD_SAVE_BINARY, "ays", arr);
 	if (ret < 0)

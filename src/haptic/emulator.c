@@ -73,11 +73,24 @@ static int vibrate_buffer(int device_handle, const unsigned char *vibe_buffer, i
 	return 0;
 }
 
+static int vibrate_effect(int device_handle, const char *pattern, int feedback, int priority)
+{
+	if (device_handle != DEFAULT_HAPTIC_HANDLE)
+		return -EINVAL;
+
+	return 0;
+}
+
 static int stop_device(int device_handle)
 {
 	if (device_handle != DEFAULT_HAPTIC_HANDLE)
 		return -EINVAL;
 
+	return 0;
+}
+
+static int is_supported(const char *pattern)
+{
 	return 0;
 }
 
@@ -117,6 +130,8 @@ static const struct haptic_plugin_ops default_plugin = {
 	.close_device        = close_device,
 	.vibrate_monotone    = vibrate_monotone,
 	.vibrate_buffer      = vibrate_buffer,
+	.vibrate_effect      = vibrate_effect,
+	.is_supported        = is_supported,
 	.stop_device         = stop_device,
 	.get_device_state    = get_device_state,
 	.create_effect       = create_effect,
