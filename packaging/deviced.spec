@@ -92,6 +92,7 @@ BuildRequires:	pkgconfig(capi-system-sensor)
 %endif
 %if %{?block_module} == on
 BuildRequires:	pkgconfig(storage)
+BuildRequires:	pkgconfig(app2sd)
 %endif
 %if %{?telephony_module} == on
 BuildRequires:  pkgconfig(tapi)
