@@ -256,6 +256,7 @@ systemctl daemon-reload
 %{_bindir}/deviced
 %{_unitdir}/multi-user.target.wants/deviced.service
 %if %{?haptic_module} == on
+%config %{_sysconfdir}/dbus-1/system.d/deviced-vibrator.conf
 %{_unitdir}/deviced-vibrator.service
 %{_unitdir}/multi-user.target.wants/deviced-vibrator.service
 %{_bindir}/deviced-vibrator
