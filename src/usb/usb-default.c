@@ -223,7 +223,7 @@ static int usb_load_configuration(char *enable)
 static int usb_update_configuration(char *name)
 {
 	if (!name ||
-		!strncmp(name, MODE_DEFAULT, sizeof(MODE_DEFAULT)))
+		!strncmp(name, USB_MODE_STR_DEFAULT, sizeof(USB_MODE_STR_DEFAULT)))
 		name = config_default;
 
 	return config_parse(USB_SETTING,
@@ -253,7 +253,7 @@ static int usb_enable(char *name)
 	int ret;
 
 	if (!name ||
-		!strncmp(name, MODE_DEFAULT, sizeof(MODE_DEFAULT)))
+		!strncmp(name, USB_MODE_STR_DEFAULT, sizeof(USB_MODE_STR_DEFAULT)))
 		name = config_default;
 
 	ret = usb_load_configuration(CONFIG_DISABLE);
@@ -294,7 +294,7 @@ static int usb_disable(char *name)
 	if (ret < 0)
 		_E("Failed to execute operation to stop (%s)", name);
 
-	update_curr_mode(MODE_NONE);
+	update_curr_mode(USB_MODE_STR_NONE);
 
 	return 0;
 }
@@ -304,7 +304,7 @@ static int usb_change(char *name)
 	int ret;
 
 	if (!name ||
-		!strncmp(name, MODE_DEFAULT, sizeof(MODE_DEFAULT)))
+		!strncmp(name, USB_MODE_STR_DEFAULT, sizeof(USB_MODE_STR_DEFAULT)))
 		name = config_default;
 
 	ret = usb_disable(curr_mode);

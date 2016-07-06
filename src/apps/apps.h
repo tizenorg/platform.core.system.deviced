@@ -29,6 +29,8 @@
 
 int launch_system_app(char *type, int num, ...);
 int launch_message_post(char *type);
+int add_notification(char *type);
+int remove_notification(char *type, int id);
 
 #endif /* __APPS_H__ */
 

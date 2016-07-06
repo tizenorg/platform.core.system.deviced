@@ -28,12 +28,28 @@
 #include "core/device-notifier.h"
 #include "display/poll.h"
 #include "extcon/extcon.h"
+#include "apps/apps.h"
 #include "usb.h"
 #include "usb-tethering.h"
 
 enum usb_state {
 	USB_DISCONNECTED,
 	USB_CONNECTED,
+};
+
+typedef enum {
+	USB_MODE_NONE,
+	USB_MODE_DEFAULT,
+	USB_MODE_TETHERING,
+} usb_mode_e;
+
+static const struct _usb_modes {
+	usb_mode_e mode;
+	const char *mode_str;
+} usb_modes[] = {
+	{ USB_MODE_NONE,        USB_MODE_STR_NONE       },
+	{ USB_MODE_DEFAULT,     USB_MODE_STR_DEFAULT    },
+	{ USB_MODE_TETHERING,   USB_MODE_STR_TETHERING  },
 };
 
 static dd_list *config_list;
@@ -110,9 +126,46 @@ static void usb_config_deinit(void)
 	config_plugin->deinit(NULL);
 }
 
+static usb_mode_e usb_get_selected_mode(void)
+{
+	if (usb_tethering_state())
+		return USB_MODE_TETHERING;
+
+	return USB_MODE_DEFAULT;
+}
+
+static const char *usb_get_mode_str(usb_mode_e mode)
+{
+	int i;
+
+	for (i = 0 ; i < ARRAY_SIZE(usb_modes) ; i++)
+		if (mode == usb_modes[i].mode)
+			return usb_modes[i].mode_str;
+
+	return NULL;
+}
+
+static usb_mode_e usb_get_mode_int(const char *mode)
+{
+	int i;
+	size_t len;
+
+	if (!mode)
+		return USB_MODE_NONE;
+
+	len = sizeof(mode) + 1;
+	for (i = 0 ; i < ARRAY_SIZE(usb_modes) ; i++)
+		if (!strncmp(mode, usb_modes[i].mode_str, len))
+			return usb_modes[i].mode;
+
+	return USB_MODE_NONE;
+}
+
 static int usb_config_enable(void)
 {
 	char *mode;
+	int ret;
+	int mode_e;
 
 	if (!config_plugin) {
 		_E("There is no usb config plugin");
@@ -124,12 +177,18 @@ static int usb_config_enable(void)
 		return 0;
 	}
 
-	if (usb_tethering_state())
-		mode = MODE_TETHERING;
-	else
-		mode = MODE_DEFAULT;
+	mode_e = usb_get_selected_mode();
+	mode = (char *)usb_get_mode_str(mode_e);
+	if (!mode) {
+		_E("Failed to get selected usb mode");
+		return -ENOENT;
+	}
 
-	return config_plugin->enable(mode);
+	ret = config_plugin->enable(mode);
+	if (ret < 0)
+		return ret;
+
+	return mode_e;
 }
 
 static int usb_config_disable(void)
@@ -170,21 +229,39 @@ static void usb_state_send_system_event(int state)
 }
 
 
-static void usb_change_state(int val)
+static void usb_change_state(int val, usb_mode_e mode_e)
 {
 	static int old_status = -1;
 	static int old_mode = -1;
 	int mode, legacy_mode;
+	static int noti_id = -1;
 
 	switch (val) {
 	case VCONFKEY_SYSMAN_USB_DISCONNECTED:
 	case VCONFKEY_SYSMAN_USB_CONNECTED:
 		mode = SET_USB_NONE;
 		legacy_mode = SETTING_USB_NONE_MODE;
+		if (noti_id >= 0) {
+			remove_notification("MediaDeviceNotiOff", noti_id);
+			noti_id = -1;
+		}
 		break;
 	case VCONFKEY_SYSMAN_USB_AVAILABLE:
-		mode = SET_USB_DEFAULT;
-		legacy_mode = SETTING_USB_DEFAULT_MODE;
+		switch (mode_e) {
+		case USB_MODE_TETHERING:
+			mode = SET_USB_RNDIS;
+			legacy_mode = SETTING_USB_TETHERING_MODE;
+			break;
+		case USB_MODE_DEFAULT:
+		default:
+			mode = SET_USB_DEFAULT;
+			legacy_mode = SETTING_USB_DEFAULT_MODE;
+			if (noti_id < 0)
+				noti_id = add_notification("MediaDeviceNotiOn");
+			if (noti_id < 0)
+				_E("Failed to show notification for usb connection");
+			break;
+		}
 		break;
 	default:
 		return;
@@ -206,6 +283,7 @@ static void usb_change_state(int val)
 int usb_change_mode(char *name)
 {
 	int ret;
+	usb_mode_e mode_e;
 
 	if (!name)
 		return -EINVAL;
@@ -221,7 +299,7 @@ int usb_change_mode(char *name)
 	}
 
 	_I("USB mode change to (%s) is requested", name);
-	usb_change_state(VCONFKEY_SYSMAN_USB_CONNECTED);
+	usb_change_state(VCONFKEY_SYSMAN_USB_CONNECTED, USB_MODE_NONE);
 
 	ret = config_plugin->change(name);
 	if (ret < 0) {
@@ -229,7 +307,8 @@ int usb_change_mode(char *name)
 		return ret;
 	}
 
-	usb_change_state(VCONFKEY_SYSMAN_USB_AVAILABLE);
+	mode_e = usb_get_mode_int(name);
+	usb_change_state(VCONFKEY_SYSMAN_USB_AVAILABLE, mode_e);
 
 	return 0;
 }
@@ -247,19 +326,19 @@ static int usb_state_changed(int status)
 	switch (status) {
 	case USB_CONNECTED:
 		_I("USB cable is connected");
-		usb_change_state(VCONFKEY_SYSMAN_USB_CONNECTED);
+		usb_change_state(VCONFKEY_SYSMAN_USB_CONNECTED, USB_MODE_NONE);
 		ret = usb_config_enable();
-		if (ret != 0) {
+		if (ret < 0) {
 			_E("Failed to enable usb config (%d)", ret);
 			break;
 		}
-		usb_change_state(VCONFKEY_SYSMAN_USB_AVAILABLE);
+		usb_change_state(VCONFKEY_SYSMAN_USB_AVAILABLE, ret);
 		pm_lock_internal(INTERNAL_LOCK_USB,
 				LCD_OFF, STAY_CUR_STATE, 0);
 		break;
 	case USB_DISCONNECTED:
 		_I("USB cable is disconnected");
-		usb_change_state(VCONFKEY_SYSMAN_USB_DISCONNECTED);
+		usb_change_state(VCONFKEY_SYSMAN_USB_DISCONNECTED, USB_MODE_NONE);
 		ret = usb_config_disable();
 		if (ret != 0)
 			_E("Failed to disable usb config (%d)", ret);
@@ -302,6 +381,7 @@ static void usb_init(void *data)
 static void usb_exit(void *data)
 {
 	remove_usb_tethering_handler();
+	usb_change_state(VCONFKEY_SYSMAN_USB_DISCONNECTED, USB_MODE_NONE);
 	usb_config_deinit();
 	usb_config_module_unload();
 }

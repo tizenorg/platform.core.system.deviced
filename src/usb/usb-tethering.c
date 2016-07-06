@@ -63,9 +63,9 @@ static int usb_tethering_mode_changed(void *data)
 	on = (bool)data;
 
 	if (on)
-		mode = MODE_TETHERING;
+		mode = USB_MODE_STR_TETHERING;
 	else
-		mode = MODE_DEFAULT;
+		mode = USB_MODE_STR_DEFAULT;
 
 	ret = usb_change_mode(mode);
 	if (ret < 0)
