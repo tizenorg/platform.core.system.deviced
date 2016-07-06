@@ -86,3 +86,31 @@ int launch_message_post(char *type)
 			"MessagePostOn",
 			"s", param);
 }
+
+int add_notification(char *type)
+{
+	if (!type)
+		return -EINVAL;
+
+	return dbus_method_sync(POPUP_BUS_NAME,
+			POPUP_PATH_NOTI,
+			POPUP_INTERFACE_NOTI,
+			type, NULL, NULL);
+}
+
+int remove_notification(char *type, int id)
+{
+	char *param[1];
+	char id_str[16];
+
+	if (!type || id < 0)
+		return -EINVAL;
+
+	snprintf(id_str, sizeof(id_str), "%d", id);
+	param[0] = id_str;
+
+	return dbus_method_sync(POPUP_BUS_NAME,
+			POPUP_PATH_NOTI,
+			POPUP_INTERFACE_NOTI,
+			type, "i", param);
+}

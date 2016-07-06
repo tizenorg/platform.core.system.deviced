@@ -19,9 +19,9 @@
 #ifndef __USB_CLIENT_H__
 #define __USB_CLIENT_H__
 
-#define MODE_NONE      "NONE"
-#define MODE_DEFAULT   "DEFAULT"
-#define MODE_TETHERING "TETHERING"
+#define USB_MODE_STR_NONE      "NONE"
+#define USB_MODE_STR_DEFAULT   "DEFAULT"
+#define USB_MODE_STR_TETHERING "TETHERING"
 
 #define USB_CONFIG_OPS_REGISTER(dev)    \
 static void __CONSTRUCTOR__ usb_config_init(void)   \
