@@ -8,6 +8,8 @@ ExecStart=/usr/bin/deviced-vibrator
 Restart=always
 RestartSec=0
 KillSignal=SIGUSR1
+CapabilityBoundingSet=~CAP_MAC_ADMIN
+CapabilityBoundingSet=~CAP_MAC_OVERRIDE
 
 [Install]
 WantedBy=multi-user.target
