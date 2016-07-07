@@ -489,24 +489,95 @@ static int set_wakeup_count(int cnt)
 	return 0;
 }
 
+static int get_max_brightness(void)
+{
+	static int max = -1;
+	int ret;
+
+	if (max > 0)
+		return max;
+
+	if (!display_dev) {
+		_E("there is no display device");
+		return -ENOENT;
+	}
+
+	if (!display_dev->get_max_brightness) {
+		max = DEFAULT_DISPLAY_MAX_BRIGHTNESS;
+		return max;
+	}
+
+	ret = display_dev->get_max_brightness(&max);
+	if (ret < 0) {
+		_E("Failed to get max brightness (%d)", ret);
+		return ret;
+	}
+
+	return max;
+}
+
 static int set_brightness(int val)
 {
+	int max;
+
 	if (!display_dev || !display_dev->set_brightness) {
 		_E("there is no display device");
 		return -ENOENT;
 	}
+
+	max = get_max_brightness();
+	if (max < 0) {
+		_E("Failed to get max brightness");
+		return max;
+	}
+
+	/* Maximum Brightness to users is 100.
+	 * Thus real brightness need to be calculated */
+	val = val * max / 100;
 
 	return display_dev->set_brightness(val);
 }
 
 static int get_brightness(int *val)
 {
+	int max, brt, ret;
+	int quotient, remainder;
+
 	if (!display_dev || !display_dev->get_brightness) {
 		_E("there is no display device");
 		return -ENOENT;
 	}
 
-	return display_dev->get_brightness(val);
+	max = get_max_brightness();
+	if (max < 0) {
+		_E("Failed to get max brightness");
+		return max;
+	}
+
+	ret = display_dev->get_brightness(&brt);
+	if (ret < 0) {
+		_E("Failed to get brightness (%d)", ret);
+		return ret;
+	}
+
+	/* Maximum Brightness to users is 100.
+	 * Thus the brightness value need to be calculated using real brightness.
+	 *    ex) Let's suppose that the maximum brightness of driver is 255.
+	 *      case 1) When the user sets the brightness to 41,
+	 *              real brightness is
+	 *                 41 * 255 / 100 = 104.55 = 104 (rounded off)
+	 *      case 2) When the user gets the brightness,
+	 *              the driver returns the brightness 104.
+	 *              Thus the brightness to users is
+	 *                 104 * 100 / 255 = 40.7843.... = 41 (rounded up)
+	 */
+	quotient = brt * 100 / max;
+	remainder = brt * 100 % max;
+	if (remainder > 0)
+		quotient++;
+
+	*val = quotient;
+	return 0;
 }
 
 static void _init_ops(void)
