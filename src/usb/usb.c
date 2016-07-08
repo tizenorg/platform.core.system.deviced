@@ -153,7 +153,7 @@ static usb_mode_e usb_get_mode_int(const char *mode)
 	if (!mode)
 		return USB_MODE_NONE;
 
-	len = sizeof(mode) + 1;
+	len = strlen(mode) + 1;
 	for (i = 0 ; i < ARRAY_SIZE(usb_modes) ; i++)
 		if (!strncmp(mode, usb_modes[i].mode_str, len))
 			return usb_modes[i].mode;
