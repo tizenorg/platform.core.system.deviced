@@ -54,6 +54,9 @@
 %define block_set_permission off
 %endif
 %endif
+%if "%{?profile}" == "common"
+%define battery_module on
+%endif
 
 Name:       deviced
 Summary:    Deviced
