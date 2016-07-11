@@ -644,6 +644,10 @@ void reset_timeout(int timeout)
 	if (trans_table[pm_cur_state][EVENT_TIMEOUT] == pm_cur_state)
 		return;
 
+	if (timeout == ALWAYS_ON_TIMEOUT) {
+		_I("Display Always On !!");
+		return;
+	}
 	if (timeout > 0)
 		timeout_src_id = ecore_timer_add(MSEC_TO_SEC((double)timeout),
 		    (Ecore_Task_Cb)timeout_handler, NULL);
