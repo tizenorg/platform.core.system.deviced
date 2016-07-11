@@ -632,23 +632,40 @@ Eina_Bool timeout_handler(void *data)
 
 void reset_timeout(int timeout)
 {
-	if (!display_conf.timeout_enable)
-		return;
-
-	_I("Reset Timeout (%d)ms", timeout);
 	if (timeout_src_id != 0) {
 		ecore_timer_del(timeout_src_id);
 		timeout_src_id = NULL;
 	}
 
+	if (!display_conf.timeout_enable)
+		return;
+
 	if (trans_table[pm_cur_state][EVENT_TIMEOUT] == pm_cur_state)
 		return;
+
+	_I("Reset Timeout (%d)ms", timeout);
 
 	if (timeout > 0)
 		timeout_src_id = ecore_timer_add(MSEC_TO_SEC((double)timeout),
 		    (Ecore_Task_Cb)timeout_handler, NULL);
 	else if (timeout == 0)
 		states[pm_cur_state].trans(EVENT_TIMEOUT);
+}
+
+void enable_display_timeout(void)
+{
+	if (!display_conf.timeout_enable) {
+		display_conf.timeout_enable = true;
+		reset_timeout(states[pm_cur_state].timeout);
+	}
+}
+
+void disable_display_timeout(void)
+{
+	if (display_conf.timeout_enable) {
+		display_conf.timeout_enable = false;
+		reset_timeout(0);
+	}
 }
 
 /* get configurations from setting */

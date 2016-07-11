@@ -195,6 +195,9 @@ void lcd_on_direct(enum device_flags flags);
 void lcd_off_procedure(enum device_flags flag);
 int check_holdkey_block(enum state_t state);
 
+void enable_display_timeout(void);
+void disable_display_timeout(void);
+
 /* poll.c */
 int check_dimstay(int next_state, int flag);
 
