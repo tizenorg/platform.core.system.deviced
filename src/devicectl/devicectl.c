@@ -136,6 +136,32 @@ static int save_log(char **args)
 	return ret;
 }
 
+static int display_timer(char **args)
+{
+	int ret;
+	char *method;
+
+	if (!args[1] || !args[2] || !args[3])
+		return -EINVAL;
+
+	printf("%s (%s %s)!\n", args[1], args[2], args[3]);
+
+	if (!strncmp(args[3], "on", 3))
+		method = "EnableDisplayTimer";
+	else if (!strncmp(args[3], "off", 4))
+		method = "DisableDisplayTimer";
+	else
+		return -EINVAL;
+
+	ret = dbus_method_async(DEVICED_BUS_NAME,
+		    devices[arg_id].path, devices[arg_id].iface,
+		    method, NULL, NULL);
+	if (ret < 0)
+		printf("failed to display timer %s (%d)", args[3], ret);
+
+	return ret;
+}
+
 static void get_pname(pid_t pid, char *pname)
 {
 	char buf[PATH_MAX];
@@ -299,6 +325,7 @@ static const struct action {
 	{ DEVICE_DISPLAY,   "dumpmode",        4, dump_mode,         "[on|off]"    },
 	{ DEVICE_LED,       "dumpmode",        4, dump_mode,         "[on|off]"    },
 	{ DEVICE_DISPLAY,   "savelog",         3, save_log,          ""            },
+	{ DEVICE_DISPLAY,   "timer",           4, display_timer,     "[on|off]"    },
 	{ DEVICE_USB,       "set",             4, set_usb_mode,      "[sdb|ssh]"   },
 	{ DEVICE_USB,       "unset",           4, unset_usb_mode,    "[sdb|ssh]"   },
 	{ DEVICE_CORE,      "dbusname",        3, save_dbus_name,    ""            },

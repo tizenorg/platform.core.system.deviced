@@ -948,6 +948,20 @@ static DBusMessage *edbus_getcustombrightness(E_DBus_Object *obj, DBusMessage *m
 	return reply;
 }
 
+static DBusMessage *edbus_enable_display_timer(E_DBus_Object *obj, DBusMessage *msg)
+{
+	_I("Display Timer Enabled");
+	enable_display_timeout();
+	return make_reply_message(msg, 0);
+}
+
+static DBusMessage *edbus_disable_display_timer(E_DBus_Object *obj, DBusMessage *msg)
+{
+	_I("Display Timer Disabled");
+	disable_display_timeout();
+	return make_reply_message(msg, 0);
+}
+
 static const struct edbus_method edbus_methods[] = {
 	{ "start",           NULL,  NULL, edbus_start },
 	{ "stop",            NULL,  NULL, edbus_stop },
@@ -981,6 +995,8 @@ static const struct edbus_method edbus_methods[] = {
 	{ "ActorControl",   "sii",   "i", edbus_actorcontrol },
 	{ "CustomBrightness", NULL,  "i", edbus_getcustombrightness },
 	{ "CurrentBrightness", NULL, "i", edbus_getbrightness }, /* deprecated. It is remained for tizen 2.4 */
+	{ "EnableDisplayTimer",  NULL, "i", edbus_enable_display_timer  },
+	{ "DisableDisplayTimer", NULL, "i", edbus_disable_display_timer },
 	/* Add methods here */
 };
 
