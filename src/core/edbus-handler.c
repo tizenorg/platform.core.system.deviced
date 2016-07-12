@@ -313,6 +313,25 @@ int register_edbus_signal_handler(const char *path, const char *interface,
 	return 0;
 }
 
+int unregister_edbus_signal_handler(const char *path, const char *interface,
+		const char *name)
+{
+	dd_list *tmp, *next;
+	struct edbus_list *entry;
+
+	DD_LIST_FOREACH_SAFE(edbus_handler_list, tmp, next, entry) {
+		if (strncmp(entry->signal_name, name, strlen(name)) == 0) {
+			e_dbus_signal_handler_del(edbus_conn, entry->handler);
+			DD_LIST_REMOVE(edbus_handler_list, entry);
+			free(entry->signal_name);
+			free(entry);
+			return 0;
+		}
+	}
+
+	return -1;
+}
+
 int broadcast_edbus_signal(const char *path, const char *interface,
 		const char *name, const char *sig, char *param[])
 {

@@ -126,6 +126,9 @@
 /* IR service */
 #define DEVICED_PATH_IR                     DEVICED_OBJECT_PATH"/Ir"
 #define DEVICED_INTERFACE_IR                DEVICED_INTERFACE_NAME".ir"
+/* USB_HOST_TEST service */
+#define DEVICED_PATH_USB_HOST_TEST          DEVICED_OBJECT_PATH"/UsbHostTest"
+#define DEVICED_INTERFACE_USB_HOST_TEST     DEVICED_INTERFACE_NAME".UsbHostTest"
 
 /* Apps service */
 #define DEVICED_PATH_APPS               DEVICED_OBJECT_PATH"/Apps"
