@@ -2185,7 +2185,45 @@ out:
 	return make_reply_message(msg, ret);
 }
 
-static int add_device_to_iter(struct block_data *data, DBusMessageIter *iter)
+static int add_device_to_iter(struct block_data *data, DBusMessageIter *piter)
+{
+	char *str_null = "";
+
+	if (!data || !piter)
+		return -EINVAL;
+
+	dbus_message_iter_append_basic(piter, DBUS_TYPE_INT32,
+			&(data->block_type));
+	dbus_message_iter_append_basic(piter, DBUS_TYPE_STRING,
+			data->devnode ? &(data->devnode) : &str_null);
+	dbus_message_iter_append_basic(piter, DBUS_TYPE_STRING,
+			data->syspath ? &(data->syspath) : &str_null);
+	dbus_message_iter_append_basic(piter, DBUS_TYPE_STRING,
+			data->fs_usage ? &(data->fs_usage) : &str_null);
+	dbus_message_iter_append_basic(piter, DBUS_TYPE_STRING,
+			data->fs_type ? &(data->fs_type) : &str_null);
+	dbus_message_iter_append_basic(piter, DBUS_TYPE_STRING,
+			data->fs_version ? &(data->fs_version) : &str_null);
+	dbus_message_iter_append_basic(piter, DBUS_TYPE_STRING,
+			data->fs_uuid_enc ? &(data->fs_uuid_enc) : &str_null);
+	dbus_message_iter_append_basic(piter, DBUS_TYPE_INT32,
+			&(data->readonly));
+	dbus_message_iter_append_basic(piter, DBUS_TYPE_STRING,
+			data->mount_point ? &(data->mount_point) : &str_null);
+	dbus_message_iter_append_basic(piter, DBUS_TYPE_INT32,
+			&(data->state));
+	dbus_message_iter_append_basic(piter, DBUS_TYPE_BOOLEAN,
+			&(data->primary));
+	dbus_message_iter_append_basic(piter, DBUS_TYPE_INT32,
+			&(data->flags));
+	dbus_message_iter_append_basic(piter, DBUS_TYPE_INT32,
+			&(data->id));
+
+	return 0;
+}
+
+
+static int add_device_to_struct_iter(struct block_data *data, DBusMessageIter *iter)
 {
 	DBusMessageIter piter;
 	char *str_null = "";
@@ -2194,32 +2232,7 @@ static int add_device_to_iter(struct block_data *data, DBusMessageIter *iter)
 		return -EINVAL;
 
 	dbus_message_iter_open_container(iter, DBUS_TYPE_STRUCT, NULL, &piter);
-	dbus_message_iter_append_basic(&piter, DBUS_TYPE_INT32,
-			&(data->block_type));
-	dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
-			data->devnode ? &(data->devnode) : &str_null);
-	dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
-			data->syspath ? &(data->syspath) : &str_null);
-	dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
-			data->fs_usage ? &(data->fs_usage) : &str_null);
-	dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
-			data->fs_type ? &(data->fs_type) : &str_null);
-	dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
-			data->fs_version ? &(data->fs_version) : &str_null);
-	dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
-			data->fs_uuid_enc ? &(data->fs_uuid_enc) : &str_null);
-	dbus_message_iter_append_basic(&piter, DBUS_TYPE_INT32,
-			&(data->readonly));
-	dbus_message_iter_append_basic(&piter, DBUS_TYPE_STRING,
-			data->mount_point ? &(data->mount_point) : &str_null);
-	dbus_message_iter_append_basic(&piter, DBUS_TYPE_INT32,
-			&(data->state));
-	dbus_message_iter_append_basic(&piter, DBUS_TYPE_BOOLEAN,
-			&(data->primary));
-	dbus_message_iter_append_basic(&piter, DBUS_TYPE_INT32,
-			&(data->flags));
-	dbus_message_iter_append_basic(&piter, DBUS_TYPE_INT32,
-			&(data->id));
+	add_device_to_iter(data, &piter);
 	dbus_message_iter_close_container(iter, &piter);
 
 	return 0;
@@ -2282,7 +2295,7 @@ static DBusMessage *get_device_info(E_DBus_Object *obj,
 		goto out;
 
 	dbus_message_iter_init_append(reply, &iter);
-	add_device_to_iter(data, &iter);
+	add_device_to_struct_iter(data, &iter);
 
 out:
 	return reply;
@@ -2379,7 +2392,7 @@ static DBusMessage *request_get_device_list(E_DBus_Object *obj,
 			break;
 		}
 
-		add_device_to_iter(data, &aiter);
+		add_device_to_struct_iter(data, &aiter);
 	}
 	dbus_message_iter_close_container(&iter, &aiter);
 
@@ -2527,11 +2540,54 @@ out:
 	return reply;
 }
 
+static DBusMessage *request_get_mmc_primary(E_DBus_Object *obj,	DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	struct block_device *bdev;
+	struct block_data *data, nodata = {0,};
+	dd_list *elem;
+	int ret;
+	bool found;
+
+	if (!obj || !msg)
+		return NULL;
+
+	reply = dbus_message_new_method_return(msg);
+	if (!reply)
+		goto out;
+
+	found = false;
+	DD_LIST_FOREACH(block_dev_list, elem, bdev) {
+		data = bdev->data;
+		if (!data)
+			continue;
+		if (data->block_type != BLOCK_MMC_DEV)
+			continue;
+		if (!data->primary)
+			continue;
+		found = true;
+		break;
+	}
+
+	dbus_message_iter_init_append(reply, &iter);
+	if (found)
+		add_device_to_iter(data, &iter);
+	else {
+		nodata.id = -ENODEV;
+		add_device_to_iter(&nodata, &iter);
+	}
+
+out:
+	return reply;
+}
+
 static const struct edbus_method manager_methods[] = {
 	{ "ShowDeviceList", NULL, NULL, request_show_device_list },
 	{ "GetDeviceList" , "s", "a(issssssisibii)" , request_get_device_list },
 	{ "GetDeviceList2", "s", "a(issssssisibi)", request_get_device_list_2 },
 	{ "GetDeviceInfoByID" , "i", "(issssssisibii)" , request_device_info_by_id },
+	{ "GetMmcPrimary" , NULL, "(issssssisibii)" , request_get_mmc_primary },
 };
 
 static const struct edbus_method device_methods[] = {
