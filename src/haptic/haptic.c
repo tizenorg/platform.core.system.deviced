@@ -857,7 +857,7 @@ static int parse_section(struct parse_result *result, void *user_data, int index
 		conf->sound_capture = atoi(result->value);
 	} else if (MATCH(result->name, "level")) {
 		conf->level = atoi(result->value);
-		if (conf->level < 0 || conf->level >= INT_MAX) {
+		if (conf->level < 0 || conf->level > INT_MAX) {
 			_E("You must set level with positive number in integer range");
 			return -EINVAL;
 		}
