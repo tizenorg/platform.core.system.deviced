@@ -1818,7 +1818,6 @@ static void check_seed_status(void)
 			pm_status_flag |= LOWBT_FLAG;
 		}
 	}
-	lcd_on_procedure(LCD_NORMAL, LCD_ON_BY_EVENT);
 
 	/* lock screen check */
 	ret = vconf_get_int(VCONFKEY_IDLE_LOCK_STATE, &lock_state);
@@ -2056,6 +2055,50 @@ static int display_load_config(struct parse_result *result, void *user_data)
 	return 0;
 }
 
+static bool check_wm_ready(void)
+{
+	if (access("/run/.wm_ready", F_OK) == 0) {
+		_I("Window manager is ready");
+		return true;
+	}
+
+	_I("Window manager is not ready");
+	return false;
+}
+
+static gboolean lcd_on_wm_ready(gpointer data)
+{
+	int timeout;
+
+	if (!check_wm_ready())
+		return G_SOURCE_CONTINUE;
+
+	switch (pm_cur_state) {
+	case S_NORMAL:
+	case S_LCDDIM:
+		lcd_on_procedure(LCD_NORMAL, LCD_ON_BY_EVENT);
+		if (display_conf.timeout_enable) {
+			timeout = states[S_NORMAL].timeout;
+			/* check minimun lcd on time */
+			if (timeout < SEC_TO_MSEC(DEFAULT_NORMAL_TIMEOUT))
+				timeout = SEC_TO_MSEC(DEFAULT_NORMAL_TIMEOUT);
+			reset_timeout(timeout);
+		}
+		break;
+	default:
+		break;
+	}
+
+	return G_SOURCE_REMOVE;
+}
+
+static void add_timer_for_wm_ready(void)
+{
+	guint id = g_timeout_add(500/* milliseconds */, lcd_on_wm_ready, NULL);
+	if (id == 0)
+		_E("Failed to add wm_ready timeout");
+}
+
 /**
  * Power manager Main
  *
@@ -2075,6 +2118,7 @@ static void display_init(void *data)
 	int ret, i;
 	unsigned int flags = (WITHOUT_STARTNOTI | FLAG_X_DPMS);
 	int timeout = 0;
+	bool wm_ready;
 
 	_I("Start power manager");
 
@@ -2128,6 +2172,15 @@ static void display_init(void *data)
 #endif
 		init_lcd_operation();
 		check_seed_status();
+
+		/* wm_ready needs to be checked
+		 * since display manager can be launched later than deviced.
+		 * In the case, display cannot be turned on at the first booting */
+		wm_ready = check_wm_ready();
+		if (wm_ready)
+			lcd_on_procedure(LCD_NORMAL, LCD_ON_BY_EVENT);
+		else
+			add_timer_for_wm_ready();
 
 		if (display_conf.lcd_always_on) {
 			_I("LCD always on!");
