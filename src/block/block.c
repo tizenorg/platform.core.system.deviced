@@ -253,18 +253,48 @@ static int block_get_new_id(void)
 static void signal_device_blocked(struct block_device *bdev)
 {
 	struct block_data *data;
-	char *arr[2];
+	char *arr[13];
+	char str_block_type[32];
+	char str_readonly[32];
+	char str_state[32];
+	char str_primary[32];
+	char str_flags[32];
+	char str_id[32];
 	char *str_null = "";
 	const char *object_path;
+	int flags;
 
 	if (!bdev || !bdev->data)
 		return;
 
 	data = bdev->data;
+	flags = 0;
 
-	/* Broadcast outside with Block iface */
-	arr[0] = (data->fs_uuid_enc ? data->fs_uuid_enc : str_null);
-	arr[1] = (data->mount_point ? data->mount_point : str_null);
+	/* Broadcast outside with BlockManager iface */
+	snprintf(str_block_type, sizeof(str_block_type),
+			"%d", data->block_type);
+	arr[0] = str_block_type;
+	arr[1] = (data->devnode ? data->devnode : str_null);
+	arr[2] = (data->syspath ? data->syspath : str_null);
+	arr[3] = (data->fs_usage ? data->fs_usage : str_null);
+	arr[4] = (data->fs_type ? data->fs_type : str_null);
+	arr[5] = (data->fs_version ? data->fs_version : str_null);
+	arr[6] = (data->fs_uuid_enc ? data->fs_uuid_enc : str_null);
+	snprintf(str_readonly, sizeof(str_readonly),
+			"%d", data->readonly);
+	arr[7] = str_readonly;
+	arr[8] = (data->mount_point ? data->mount_point : str_null);
+	snprintf(str_state, sizeof(str_state),
+			"%d", data->state);
+	arr[9] = str_state;
+	snprintf(str_primary, sizeof(str_primary),
+			"%d", data->primary);
+	arr[10] = str_primary;
+	snprintf(str_flags, sizeof(str_flags), "%d", flags);
+	arr[11] = str_flags;
+	snprintf(str_id, sizeof(str_id), "%d", data->id);
+	arr[12] = str_id;
+
 
 	object_path = e_dbus_object_path_get(bdev->object);
 	if (!object_path) {
@@ -275,7 +305,7 @@ static void signal_device_blocked(struct block_device *bdev)
 	broadcast_block_edbus_signal(object_path,
 			DEVICED_INTERFACE_BLOCK,
 			BLOCK_DEVICE_BLOCKED,
-			"ss", arr);
+			"issssssisibii", arr);
 }
 
 static void signal_device_changed(struct block_device *bdev,
@@ -2226,7 +2256,6 @@ static int add_device_to_iter(struct block_data *data, DBusMessageIter *piter)
 static int add_device_to_struct_iter(struct block_data *data, DBusMessageIter *iter)
 {
 	DBusMessageIter piter;
-	char *str_null = "";
 
 	if (!data || !iter)
 		return -EINVAL;
@@ -2547,7 +2576,6 @@ static DBusMessage *request_get_mmc_primary(E_DBus_Object *obj,	DBusMessage *msg
 	struct block_device *bdev;
 	struct block_data *data, nodata = {0,};
 	dd_list *elem;
-	int ret;
 	bool found;
 
 	if (!obj || !msg)
