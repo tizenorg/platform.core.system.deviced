@@ -3,6 +3,7 @@ Description=Enadle sdb at booting time
 DefaultDependencies=no
 
 [Service]
+SmackProcessLabel=System
 ExecStart=/usr/bin/direct_set_debug.sh --sdb-set
 
 [Install]

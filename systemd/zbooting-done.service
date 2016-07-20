@@ -4,6 +4,7 @@ After=default.target
 
 [Service]
 Type=oneshot
+SmackProcessLabel=System
 ExecStart=/usr/bin/dbus-send --type=signal --system /Org/Tizen/System/DeviceD/Core org.tizen.system.deviced.core.BootingDone
 
 [Install]

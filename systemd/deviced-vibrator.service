@@ -4,6 +4,7 @@ After=deviced.service
 
 [Service]
 BusName=org.tizen.system.vibrator
+SmackProcessLabel=System
 ExecStart=/usr/bin/deviced-vibrator
 Restart=always
 RestartSec=0

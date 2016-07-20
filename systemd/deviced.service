@@ -6,6 +6,7 @@ Requires=deviced-pre.service tizen-system-env.service
 [Service]
 EnvironmentFile=-/run/tizen-system-env
 EnvironmentFile=/run/deviced/deviced_env
+SmackProcessLabel=System::Privileged
 ExecStart=/usr/bin/deviced
 Restart=always
 RestartSec=0

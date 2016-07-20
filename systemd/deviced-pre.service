@@ -5,4 +5,5 @@ Before=deviced.service
 
 [Service]
 Type=oneshot
+SmackProcessLabel=System
 ExecStart=/usr/bin/deviced-pre.sh
