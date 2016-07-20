@@ -262,13 +262,14 @@ static void poweroff_idler_cb(void *data)
 	telephony_start();
 
 	pm_lock_internal(INTERNAL_LOCK_POWEROFF, LCD_OFF, STAY_CUR_STATE, 0);
-	poweroff_stop_systemd_service();
 
 	if (val == POWER_OFF_DIRECT || val == POWER_OFF_RESTART) {
 		poweroff_send_broadcast(val);
-		device_notify(DEVICE_NOTIFIER_POWEROFF, &val);
 		system_shutdown_send_system_event();
+		device_notify(DEVICE_NOTIFIER_POWEROFF, &val);
 	}
+
+	poweroff_stop_systemd_service();
 
 	/* TODO for notify. will be removed asap. */
 	vconf_set_int(VCONFKEY_SYSMAN_POWER_OFF_STATUS, val);
