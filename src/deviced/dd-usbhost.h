@@ -248,6 +248,23 @@ int unmount_usb_storage(char *path);
  */
 int format_usb_storage(char *path);
 
+/**
+ * @par Description:
+ *      This API is used to open usb device \n
+ * @param[in] path path to device
+ * @return 0 on success, negative error code if failed
+ * @par Example
+ * @code
+ * ...
+ *
+ * r = open_usb_device(path, &fd);
+ * if (r < 0)
+ * 	printf("failed to open device");
+ *
+ * ...
+ * @endcode
+ */
+int open_usb_device(char *path, int *fd);
 
 /**
  * @} // end of CAPI_SYSTEM_DEVICED_USBHOST_MODULE

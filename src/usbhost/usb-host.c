@@ -448,10 +448,75 @@ static struct uevent_handler uh = {
 	.uevent_func = uevent_usbhost_handler,
 };
 
+enum policy_value {
+	POLICY_ALLOW,
+	POLICY_DENY,
+};
+
+static int get_policy_value(const char *path)
+{
+	/* TODO */
+
+	return POLICY_ALLOW;
+}
+
+static DBusMessage *open_device(E_DBus_Object *obj, DBusMessage *msg)
+{
+	DBusMessageIter iter;
+	DBusMessage *reply;
+	DBusError err;
+	dbus_bool_t dbus_ret;
+	int ret = 0, fd = -1;
+	const char *path;
+	struct device d;
+
+	dbus_error_init(&err);
+
+	dbus_ret = dbus_message_get_args(msg, &err, DBUS_TYPE_STRING, &path);
+	if (!dbus_ret) {
+		_E("Unable to get arguments from message: %s", err.message);
+		ret = -EINVAL;
+		goto out;
+	}
+
+	reply = dbus_message_new_method_return(msg);
+	if (!reply) {
+		_E("Cannot allocate memory for message");
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	ret = get_policy_value(path);
+	switch (ret) {
+	case POLICY_ALLOW:
+		fd = open(path, O_RDWR);
+		if (fd < 0) {
+			ret = -errno;
+			_E("Unable to open file (%s): %m", path);
+		} else
+			ret = 0;
+		break;
+	case POLICY_DENY:
+		ret = -EACCES;
+		break;
+	default:
+		/* ret has error code */
+		break;
+	}
+
+out:
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ret);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_UNIX_FD, &fd);
+
+	return reply;
+}
+
 static const struct edbus_method edbus_methods[] = {
 	{ "PrintDeviceList",   NULL,           NULL, print_device_list }, /* for debugging */
 	{ "GetDeviceList",      "i", "a(siiiiisss)", get_device_list },
 	{ "GetDeviceListCount", "i",            "i", get_device_list_count },
+	{ "OpenDevice",         "s",           "ih", open_device },
 };
 
 static int booting_done(void *data)
