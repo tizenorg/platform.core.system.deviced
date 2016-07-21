@@ -83,9 +83,7 @@
 #define STORAGE_OBJECT_PATH                 "/Org/Tizen/System/Storage"
 #define STORAGE_INTERFACE_NAME              STORAGE_BUS_NAME
 #define DEVICED_PATH_BLOCK                  STORAGE_OBJECT_PATH"/Block"
-#define DEVICED_PATH_BLOCK_DEVICES          DEVICED_PATH_BLOCK"/Devices"
 #define DEVICED_PATH_BLOCK_MANAGER          DEVICED_PATH_BLOCK"/Manager"
-#define DEVICED_INTERFACE_BLOCK             STORAGE_INTERFACE_NAME".Block"
 #define DEVICED_INTERFACE_BLOCK_MANAGER     STORAGE_INTERFACE_NAME".BlockManager"
 /* MMC service: mount/unmount/format mmc operations about mmc */
 #define DEVICED_PATH_MMC                    DEVICED_OBJECT_PATH"/Mmc"
