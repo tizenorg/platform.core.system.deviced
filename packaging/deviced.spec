@@ -15,7 +15,6 @@
 %define ir_module off
 %define led_module off
 %define power_module on
-%define telephony_module off
 %define touchscreen_module off
 %define tzip_module off
 %define usb_module on
@@ -32,7 +31,6 @@
 %define haptic_module on
 %define ir_module on
 %define led_module on
-%define telephony_module on
 %define touchscreen_module on
 %define tzip_module on
 %define usbhost_module on
@@ -40,7 +38,6 @@
 %if "%{?profile}" == "wearable"
 %define battery_module on
 %define haptic_module on
-%define telephony_module on
 %define touchscreen_module on
 %define tzip_module on
 %endif
@@ -93,9 +90,6 @@ BuildRequires:	pkgconfig(capi-system-sensor)
 %if %{?block_module} == on
 BuildRequires:	pkgconfig(storage)
 BuildRequires:	pkgconfig(app2sd)
-%endif
-%if %{?telephony_module} == on
-BuildRequires:  pkgconfig(tapi)
 %endif
 %if %{?tzip_module} == on
 BuildRequires:	pkgconfig(fuse)
@@ -188,7 +182,6 @@ Deviced library for device control (devel)
 	-DIR_MODULE=%{ir_module} \
 	-DLED_MODULE=%{led_module} \
 	-DPOWER_MODULE=%{power_module} \
-	-DTELEPHONY_MODULE=%{telephony_module} \
 	-DTOUCHSCREEN_MODULE=%{touchscreen_module} \
 	-DTZIP_MODULE=%{tzip_module} \
 	-DUSB_MODULE=%{usb_module} \
