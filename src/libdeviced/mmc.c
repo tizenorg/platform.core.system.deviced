@@ -62,7 +62,7 @@ API int mmc_secure_unmount(const char *mount_point)
 			DEVICED_INTERFACE_MMC, METHOD_REQUEST_SECURE_UNMOUNT, "s", arr);
 }
 
-static int get_mmc_primary_devnode(char *path, size_t len)
+static int get_mmc_primary_id()
 {
 	DBusMessage *reply;
 	DBusMessageIter iter;
@@ -72,6 +72,7 @@ static int get_mmc_primary_devnode(char *path, size_t len)
 	char *devnode = NULL;
 	bool primary;
 	int ret;
+	int id;
 
 	param[0] = "mmc";
 	reply = dbus_method_sync_with_reply(
@@ -104,45 +105,20 @@ static int get_mmc_primary_devnode(char *path, size_t len)
 		dbus_message_iter_next(&piter); /* primary */
 		dbus_message_iter_get_basic(&piter, &primary);
 		dbus_message_iter_next(&piter); /* flags */
-		dbus_message_iter_next(&piter); /* storage id */
+		dbus_message_iter_get_basic(&piter, &id); /* storage id */
 		dbus_message_iter_next(&aiter);
 
 		if (type == STORAGE_MMC && primary && devnode)
 			break;
 	}
 
-	if (devnode) {
-		_I("MMC Primary devnode (%s)", devnode);
-		snprintf(path, len, "%s", devnode);
-		ret = 0;
-	} else
+	if (devnode)
+		ret = id;
+	else
 		ret = -ENODEV;
 
 	dbus_message_unref(reply);
 	return ret;
-}
-
-static int get_object_path_mmc(char *path, size_t len)
-{
-	int ret;
-	char devpath[BUF_MAX], *devnode;
-
-	if (!path || len == 0)
-		return -EINVAL;
-
-	ret = get_mmc_primary_devnode(devpath, sizeof(devpath));
-	if (ret < 0) {
-		_E("Failed to get mmc devpath (%d)", ret);
-		return -ENODEV;
-	}
-
-	devnode = strstr(devpath, "mmcblk");
-	if (!devnode)
-		return -EINVAL;
-
-	snprintf(path, len, "%s/%s",
-			DEVICED_PATH_BLOCK_DEVICES, devnode);
-	return 0;
 }
 
 static void mount_mmc_cb(void *data, DBusMessage *msg, DBusError *err)
@@ -179,14 +155,9 @@ API int deviced_request_mount_mmc(struct mmc_contents *mmc_data)
 	void (*mount_cb)(void*, DBusMessage*, DBusError*) = NULL;
 	void *data = NULL;
 	int ret;
-	char path[BUF_MAX] = { 0, };
-	char *param[1];
-
-	ret = get_object_path_mmc(path, sizeof(path));
-	if (ret < 0) {
-		_E("Failed to get object path");
-		return ret;
-	}
+	int id;
+	char buf_id[32];
+	char *param[2];
 
 	if (mmc_data && mmc_data->mmc_cb) {
 		_I("Mount callback exists");
@@ -194,9 +165,15 @@ API int deviced_request_mount_mmc(struct mmc_contents *mmc_data)
 		data = mmc_data;
 	}
 
-	param[0] = "";
-	ret = dbus_method_async_with_reply(STORAGE_BUS_NAME, path,
-			DEVICED_INTERFACE_BLOCK, "Mount", "s", param,
+	id = get_mmc_primary_id();
+	if (id < 0)
+		return id;
+
+	snprintf(buf_id, sizeof(buf_id), "%d", id);
+	param[0] = buf_id;
+	param[1] = "";
+	ret = dbus_method_async_with_reply(STORAGE_BUS_NAME, DEVICED_PATH_BLOCK_MANAGER,
+			DEVICED_INTERFACE_BLOCK_MANAGER, "Mount", "is", param,
 			mount_cb, -1, data);
 
 	_I("Mount Request %s", ret == 0 ? "Success" : "Failed");
@@ -238,18 +215,13 @@ API int deviced_request_unmount_mmc(struct mmc_contents *mmc_data, int option)
 	void (*unmount_cb)(void*, DBusMessage*, DBusError*) = NULL;
 	void *data = NULL;
 	char buf_opt[32];
+	char buf_id[32];
 	int ret;
-	char path[BUF_MAX] = { 0, };
-	char *param[1];
+	int id;
+	char *param[2];
 
 	if (option < 0 || option > 1)
 		return -EINVAL;
-
-	ret = get_object_path_mmc(path, sizeof(path));
-	if (ret < 0) {
-		_E("Failed to get object path");
-		return ret;
-	}
 
 	if (mmc_data && mmc_data->mmc_cb) {
 		_I("Mount callback exists");
@@ -257,10 +229,16 @@ API int deviced_request_unmount_mmc(struct mmc_contents *mmc_data, int option)
 		data = mmc_data;
 	}
 
+	id = get_mmc_primary_id();
+	if (id < 0)
+		return id;
+
+	snprintf(buf_id, sizeof(buf_id), "%d", id);
+	param[0] = buf_id;
 	snprintf(buf_opt, sizeof(buf_opt), "%d", option);
-	param[0] = buf_opt;
-	ret = dbus_method_async_with_reply(STORAGE_BUS_NAME, path,
-			DEVICED_INTERFACE_BLOCK, "Unmount", "i", param,
+	param[1] = buf_opt;
+	ret = dbus_method_async_with_reply(STORAGE_BUS_NAME, DEVICED_PATH_BLOCK_MANAGER,
+			DEVICED_INTERFACE_BLOCK_MANAGER, "Unmount", "ii", param,
 			unmount_cb, -1, data);
 
 	_I("Unmount Request %s", ret == 0 ? "Success" : "Failed");
@@ -307,18 +285,13 @@ API int deviced_format_mmc(struct mmc_contents *mmc_data, int option)
 	void (*format_cb)(void*, DBusMessage*, DBusError*) = NULL;
 	void *data = NULL;
 	char buf_opt[32];
+	char buf_id[32];
 	int ret;
-	char path[BUF_MAX] = { 0, };
-	char *param[1];
+	int id;
+	char *param[2];
 
 	if (option < 0 || option > 1)
 		return -EINVAL;
-
-	ret = get_object_path_mmc(path, sizeof(path));
-	if (ret < 0) {
-		_E("Failed to get object path");
-		return ret;
-	}
 
 	if (mmc_data && mmc_data->mmc_cb) {
 		_I("Mount callback exists");
@@ -326,10 +299,16 @@ API int deviced_format_mmc(struct mmc_contents *mmc_data, int option)
 		data = mmc_data;
 	}
 
+	id = get_mmc_primary_id();
+	if (id < 0)
+		return id;
+
+	snprintf(buf_id, sizeof(buf_id), "%d", id);
+	param[0] = buf_id;
 	snprintf(buf_opt, sizeof(buf_opt), "%d", option);
-	param[0] = buf_opt;
-	ret = dbus_method_async_with_reply(STORAGE_BUS_NAME, path,
-			DEVICED_INTERFACE_BLOCK, "Format", "i", param,
+	param[1] = buf_opt;
+	ret = dbus_method_async_with_reply(STORAGE_BUS_NAME, DEVICED_PATH_BLOCK_MANAGER,
+			DEVICED_INTERFACE_BLOCK_MANAGER, "Format", "ii", param,
 			format_cb, FORMAT_TIMEOUT, data);
 
 	_I("Format Request %s", ret == 0 ? "Success" : "Failed");
