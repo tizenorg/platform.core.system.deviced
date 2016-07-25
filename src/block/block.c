@@ -2226,7 +2226,6 @@ static int add_device_to_iter(struct block_data *data, DBusMessageIter *piter)
 static int add_device_to_struct_iter(struct block_data *data, DBusMessageIter *iter)
 {
 	DBusMessageIter piter;
-	char *str_null = "";
 
 	if (!data || !iter)
 		return -EINVAL;
@@ -2547,7 +2546,6 @@ static DBusMessage *request_get_mmc_primary(E_DBus_Object *obj,	DBusMessage *msg
 	struct block_device *bdev;
 	struct block_data *data, nodata = {0,};
 	dd_list *elem;
-	int ret;
 	bool found;
 
 	if (!obj || !msg)
