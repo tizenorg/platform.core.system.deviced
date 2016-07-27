@@ -19,6 +19,7 @@
 %define tzip_module off
 %define usb_module on
 %define usbhost_module off
+%define usb_host_test_module on
 
 #Just For debugging
 %define sdb_prestart off
@@ -94,6 +95,10 @@ BuildRequires:	pkgconfig(app2sd)
 %if %{?tzip_module} == on
 BuildRequires:	pkgconfig(fuse)
 BuildRequires:	pkgconfig(minizip)
+%endif
+%if %{?usb_host_test_module} == on
+BuildRequires:	pkgconfig(libkmod)
+BuildRequires:	pkgconfig(libusbg)
 %endif
 
 Requires: %{name}-tools = %{version}-%{release}
@@ -186,6 +191,7 @@ Deviced library for device control (devel)
 	-DTZIP_MODULE=%{tzip_module} \
 	-DUSB_MODULE=%{usb_module} \
 	-DUSBHOST_MODULE=%{usbhost_module} \
+	-DUSB_HOST_TEST_MODULE=%{usb_host_test_module} \
 	#eol
 
 %build
@@ -280,6 +286,14 @@ systemctl daemon-reload
 %endif
 %if %{?usbhost_module} == on
 %{_prefix}/lib/udev/rules.d/99-usbhost.rules
+%endif
+%if %{?usb_host_test_module} == on
+%{_sysconfdir}/usb-host-test/test_gadget.gs
+%{_bindir}/usb-host-ffs-test-daemon
+%{_unitdir}/usb-host-ffs-test-daemon.service
+%{_unitdir}/usb-host-test.socket
+%{_sysconfdir}/usb-host-test/descs
+%{_sysconfdir}/usb-host-test/strs
 %endif
 
 %{_unitdir}/sdb-prestart.service

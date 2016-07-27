@@ -39,6 +39,7 @@ enum device_type {
 	DEVICE_PASS,
 	DEVICE_USB,
 	DEVICE_EXTCON,
+	DEVICE_USB_HOST_TEST,
 	DEVICE_MAX,
 	DEVICE_ALL,
 };
@@ -56,6 +57,7 @@ static const struct device {
 	{ DEVICE_PASS,    "pass",    DEVICED_PATH_PASS,    DEVICED_INTERFACE_PASS    },
 	{ DEVICE_USB,     "usb",     DEVICED_PATH_USB,     DEVICED_INTERFACE_USB     },
 	{ DEVICE_EXTCON,  "extcon",  DEVICED_PATH_EXTCON,  DEVICED_INTERFACE_EXTCON  },
+	{ DEVICE_USB_HOST_TEST, "usb-host-test", DEVICED_PATH_USB_HOST_TEST, DEVICED_INTERFACE_USB_HOST_TEST},
 };
 
 static int start_device(char **args)

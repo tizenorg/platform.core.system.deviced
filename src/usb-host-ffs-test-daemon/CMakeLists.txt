@@ -1,0 +1,28 @@
+CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
+PROJECT(usb-host-ffs-test-daemon C)
+
+SET(SRCS
+	usb-host-ffs-test-daemon.c
+)
+
+SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} -g -fno-omit-frame-pointer -finstrument-functions")
+INCLUDE(FindPkgConfig)
+pkg_check_modules(SYSTEMD REQUIRED libsystemd)
+FOREACH(flag ${SYSTEMD_CFLAGS})
+	SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} ${flag}")
+ENDFOREACH(flag)
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${EXTRA_CFLAGS}")
+
+ADD_EXECUTABLE(${PROJECT_NAME} ${SRCS})
+TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${pkgs_LDFLAGS} ${SYSTEMD_LDFLAGS})
+
+ADD_EXECUTABLE(descs_gen descs_gen.c)
+ADD_CUSTOM_COMMAND(OUTPUT descs strs
+	COMMAND ${CMAKE_CURRENT_BINARY_DIR}/descs_gen
+	DEPENDS descs_gen)
+ADD_CUSTOM_TARGET(descs ALL DEPENDS descs strs)
+
+INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/descs DESTINATION /etc/deviced/usb-host-test)
+INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/strs DESTINATION /etc/deviced/usb-host-test)
+INSTALL(TARGETS ${PROJECT_NAME} DESTINATION bin)
+
