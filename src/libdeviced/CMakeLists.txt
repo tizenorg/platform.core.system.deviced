@@ -2,7 +2,6 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 PROJECT(libdeviced C)
 
 SET(LIBDEVICED_SRCS
-	battery.c
 	control.c
 	display.c
 	dbus.c

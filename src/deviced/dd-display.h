@@ -67,22 +67,6 @@ extern "C" {
 #define PM_KEEP_TIMER	0x2	/**< keep timer for unlock */
 
 /**
- * @brief This API is used to get number of displays on the phone.\n
- * @details It returns enum value which is the current number on success.\n
- *	Or a negative value(-1) is returned on failure.
- * @return 0 on success, -1 if failed
- * @par Example
- * @code
- *  ...
- *  ret = display_get_count();
- *  if( ret < 0 )
- *      printf("Fail to get number of displays\n");
- *  ...
- * @endcode
- */
-int display_get_count(void);
-
-/**
  * @brief This API is used to get the max brightness of the display.\n
  * @details It gets the current brightness of the display
  *	by calling device_get_property() function.\n
@@ -102,48 +86,6 @@ int display_get_count(void);
  * @endcode
  */
 int display_get_max_brightness(void);
-
-/**
- * @brief This API is used to get the min brightness of the display.\n
- * @details It gets the current brightness of the display
- *	by calling device_get_property() function.\n
- *	It returns integer value which is the min brightness on success.\n
- *	Or a negative value(-1) is returned on failure
- * @return min brightness value on success, negative if failed
- * @par Example
- * @code
- *  ...
- *  int min_brt;
- *  min_brt = display_get_min_brightness();
- *  if( min_brt < 0 )
- *      printf("Fail to get the min brightness of the display.\n");
- *  else
- *      printf("Min brightness of the display is %d\n", min_brt);
- *  ...
- * @endcode
- */
-int display_get_min_brightness(void);
-
-/**
- * @brief This API is used to get the current brightness of the display.\n
- * @details It gets the current brightness of the display
- *	by calling device_get_property() function.\n
- *	It returns integer value which is the current brightness on success.\n
- *	Or a negative value(-1) is returned on failure.
- * @return current brightness value on success, negative if failed
- * @par Example
- * @code
- *  ...
- *  int cur_brt;
- *  cur_brt = display_get_brightness();
- *  if( cur_brt < 0 )
- *      printf("Fail to get the current brightness of the display.\n");
- *  else
- *      printf("Current brightness of the display is %d\n", cur_brt);
- *  ...
- * @endcode
- */
-int display_get_brightness(void);
 
 /**
  * @brief This API is used to set the current brightness of the display
@@ -169,130 +111,6 @@ int display_get_brightness(void);
  * @endcode
  */
 int display_set_brightness_with_setting(int val);
-
-/**
- * @brief This API is used to set the current brightness of the display.\n
- * @details It sets the current brightness of the display
- *	by calling device_set_property() function.\n
- *	MUST use this API very carefully. \n
- *	you MUST set original brightness by display_release_brightness(),
- *	after you finish your job using this API.
- * @param[in] val brightness value that you want to set
- * @return 0 on success, negative if failed
- * @see display_get_brightness(), display_release_brightness()
- * @par Example
- * @code
- *  ...
- *  if( display_set_brightness(6) < 0 )
- *      printf("Fail to set the current brightness of the display\n");
- *  else
- *      printf("The current brightness of the display is set 6\n");
- *  ...
- * @endcode
- */
-int display_set_brightness(int val);
-
-/**
- * @brief This API is used to release brightness control.\n
- * @details It sets the current brightness of the display
- *	by calling device_set_property() function.\n
- *	MUST call this API after you finished the job
- *	which need to change the brightness.
- * @return 0 on success, negative if failed
- * @see display_set_brightness()
- * @par Example
- * @code
- *  ...
- *  org_val = display_get_brightness();
- *  display_set_brightness(1);
- *  ...
- *  ret = display_release_brightness();
- *  if( ret < 0 )
- *      printf("Fail to release brightness control\n");
- *  ...
- * @endcode
- */
-int display_release_brightness(void);
-
-/**
- * @brief This API is used to get the current state for acl.\n
- * @details It gets the current state for acl
- *	by calling device_get_property() function.\n
- * @return current status for acl(1 on, 0 off) on success, negative if failed
- * @see display_set_acl_status()
- * @par Example
- * @code
- *  ...
- *  int acl_stat;
- *  acl_stat = display_get_acl_status();
- *  if( acl_stat < 0 )
- *      printf("Fail to get the current status for acl.\n");
- *  else
- *      printf("Current status for acl is %d\n", cur_brt);
- *  ...
- * @endcode
- */
-int display_get_acl_status(void);
-
-/**
- * @brief This API is used to set the current status for acl.\n
- * @details It sets the current status for acl
- *	by calling device_set_property() function.\n
- * @param[in] val status for acl(1 on, 0 off) that you want to set
- * @return 0 on success, negative if failed
- * @see display_get_acl_status()
- * @par Example
- * @code
- *  ...
- *  if( display_set_acl_status(0) < 0 )
- *      printf("Fail to set the current status for acl\n");
- *  else
- *      printf("The current status for acl is set 6\n");
- *  ...
- * @endcode
- */
-int display_set_acl_status(int val);
-
-/**
- * @brief This API is used to set frame rate of display.\n
- * @param[in] val frame rate
- * @return 0 on success, negative if failed
- * @par Example
- * @code
- *  ...
- *  if( display_set_frame_rate() < 0 )
- *      printf("Fail to set display frame rate\n");
- *  ...
- * @endcode
- * @todo describe range of val
- */
-int display_set_frame_rate(int val) DEPRECATED;
-
-/**
- * @brief refresh app - setting, video, camera
- */
-enum refresh_app {
-	REFRESH_SETTING,
-	REFRESH_VIDEO,
-	REFRESH_CAMERA,
-	REFRESH_WEB,
-};
-
-/**
- * @brief This API is used to set refresh rate of display.\n
- * @param[in] app caller application type
- * @param[in] val refresh rate
- * @return 0 on success, negative if failed
- * @par Example
- * @code
- *  ...
- *  if( display_set_refresh_rate(REFRESH_SETTING, 60) < 0 )
- *      printf("Fail to set display refresh rate\n");
- *  ...
- * @endcode
- * @todo describe range of val
- */
-int display_set_refresh_rate(enum refresh_app app, int val);
 
 /**
  * @brief This API is used to lock a particular display state

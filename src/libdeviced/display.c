@@ -59,31 +59,6 @@
 #define STR_RESET_TIMER  "resettimer"
 #define STR_KEEP_TIMER   "keeptimer"
 
-API int display_get_count(void)
-{
-	DBusError err;
-	DBusMessage *msg;
-	int ret, ret_val;
-
-	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
-			DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
-			METHOD_GET_DISPLAY_COUNT, NULL, NULL);
-	if (!msg)
-		return -EBADMSG;
-
-	dbus_error_init(&err);
-
-	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
-	if (!ret) {
-		_E("no message : [%s:%s]", err.name, err.message);
-		dbus_error_free(&err);
-		ret_val = -EBADMSG;
-	}
-
-	dbus_message_unref(msg);
-	return ret_val;
-}
-
 API int display_get_max_brightness(void)
 {
 	int ret;
@@ -96,36 +71,6 @@ API int display_get_max_brightness(void)
 
 	_D("get max brightness : %d", ret);
 	return ret;
-}
-
-API int display_get_min_brightness(void)
-{
-	return DISPLAY_MIN_BRIGHTNESS;
-}
-
-API int display_get_brightness(void)
-{
-	DBusError err;
-	DBusMessage *msg;
-	int ret, ret_val;
-
-	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
-			DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
-			METHOD_GET_BRIGHTNESS, NULL, NULL);
-	if (!msg)
-		return -EBADMSG;
-
-	dbus_error_init(&err);
-
-	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
-	if (!ret) {
-		_E("no message : [%s:%s]", err.name, err.message);
-		dbus_error_free(&err);
-		ret_val = -EBADMSG;
-	}
-
-	dbus_message_unref(msg);
-	return ret_val;
 }
 
 API int display_set_brightness_with_setting(int val)
@@ -147,137 +92,6 @@ API int display_set_brightness_with_setting(int val)
 		_E("no message : failed to setting");
 
 	return ret;
-}
-
-API int display_set_brightness(int val)
-{
-	DBusError err;
-	DBusMessage *msg;
-	char str_val[32];
-	char *arr[1];
-	int ret, ret_val;
-
-	snprintf(str_val, sizeof(str_val), "%d", val);
-	arr[0] = str_val;
-
-	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
-			DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
-			METHOD_HOLD_BRIGHTNESS, "i", arr);
-	if (!msg)
-		return -EBADMSG;
-
-	dbus_error_init(&err);
-
-	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
-	if (!ret) {
-		_E("no message : [%s:%s]", err.name, err.message);
-		dbus_error_free(&err);
-		ret_val = -EBADMSG;
-	}
-
-	dbus_message_unref(msg);
-	return ret_val;
-}
-
-API int display_release_brightness(void)
-{
-	DBusError err;
-	DBusMessage *msg;
-	int ret, ret_val;
-
-	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
-			DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
-			METHOD_RELEASE_BRIGHTNESS, NULL, NULL);
-	if (!msg)
-		return -EBADMSG;
-
-	dbus_error_init(&err);
-
-	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
-	if (!ret) {
-		_E("no message : [%s:%s]", err.name, err.message);
-		dbus_error_free(&err);
-		ret_val = -EBADMSG;
-	}
-
-	dbus_message_unref(msg);
-	return ret_val;
-}
-
-API int display_get_acl_status(void)
-{
-	DBusError err;
-	DBusMessage *msg;
-	int ret, ret_val;
-
-	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
-			DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
-			METHOD_GET_ACL_STATUS, NULL, NULL);
-	if (!msg)
-		return -EBADMSG;
-
-	dbus_error_init(&err);
-
-	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
-	if (!ret) {
-		_E("no message : [%s:%s]", err.name, err.message);
-		dbus_error_free(&err);
-		ret_val = -EBADMSG;
-	}
-
-	dbus_message_unref(msg);
-	return ret_val;
-}
-
-API int display_set_acl_status(int val)
-{
-	DBusError err;
-	DBusMessage *msg;
-	char str_val[32];
-	char *arr[1];
-	int ret, ret_val;
-
-	snprintf(str_val, sizeof(str_val), "%d", val);
-	arr[0] = str_val;
-
-	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
-			DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
-			METHOD_SET_ACL_STATUS, "i", arr);
-	if (!msg)
-		return -EBADMSG;
-
-	dbus_error_init(&err);
-
-	ret = dbus_message_get_args(msg, &err, DBUS_TYPE_INT32, &ret_val, DBUS_TYPE_INVALID);
-	if (!ret) {
-		_E("no message : [%s:%s]", err.name, err.message);
-		dbus_error_free(&err);
-		ret_val = -EBADMSG;
-	}
-
-	dbus_message_unref(msg);
-	return ret_val;
-}
-
-API int display_set_refresh_rate(enum refresh_app app, int val)
-{
-	char str_app[32];
-	char str_val[32];
-	char *arr[2];
-
-	snprintf(str_app, sizeof(str_app), "%d", app);
-	arr[0] = str_app;
-	snprintf(str_val, sizeof(str_val), "%d", val);
-	arr[1] = str_val;
-
-	return dbus_method_sync(DEVICED_BUS_NAME,
-			DEVICED_PATH_DISPLAY, DEVICED_INTERFACE_DISPLAY,
-			METHOD_SET_REFRESH_RATE, "ii", arr);
-}
-
-API int display_set_frame_rate(int val)
-{
-	return display_set_refresh_rate(REFRESH_SETTING, val);
 }
 
 static inline char *get_lcd_str(unsigned int val)
@@ -445,9 +259,3 @@ API int display_unlock_state(unsigned int s_bits, unsigned int flag)
 
 	return ret;
 }
-
-API void display_set_timeout(unsigned int normal, unsigned int dim, unsigned int lock)
-{
-	return;
-}
-
