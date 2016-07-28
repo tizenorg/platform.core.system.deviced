@@ -209,10 +209,25 @@ int usb_change_mode(unsigned int mode)
 	return -ENODEV;
 }
 
+static void gadgets_enabled(unsigned int mode, void *data)
+{
+	if (usb_dev && usb_dev->unregister_gadgets_enabled_event)
+		usb_dev->unregister_gadgets_enabled_event(gadgets_enabled);
+	if (mode == USB_GADGET_NONE)
+		mode = (unsigned int)data;
+
+	_I("Real USB configured");
+	usb_state_update_state(USB_CONNECTED, USB_GADGET_NONE);
+	usb_operation_start(mode);
+	usb_state_update_state(USB_CONNECTED, mode);
+	pm_lock_internal(INTERNAL_LOCK_USB,
+			LCD_OFF, STAY_CUR_STATE, 0);
+}
+
 static int usb_state_changed(int status)
 {
 	static int old = -1;	/* to update at the first time */
-	int ret;
+	int ret, cb = -1;
 	unsigned int mode;
 
 	_I("USB state is changed from (%d) to (%d)", old, status);
@@ -223,13 +238,18 @@ static int usb_state_changed(int status)
 	switch (status) {
 	case USB_CONNECTED:
 		_I("USB cable is connected");
-		usb_state_update_state(USB_CONNECTED, USB_GADGET_NONE);
 		mode = usb_state_get_selected_mode();
+		if (usb_dev && usb_dev->register_gadgets_enabled_event)
+			cb = usb_dev->register_gadgets_enabled_event(gadgets_enabled, (void *)mode);
+		else
+			usb_state_update_state(USB_CONNECTED, USB_GADGET_NONE);
 		ret = usb_config_enable(mode);
 		if (ret < 0) {
 			_E("Failed to enable usb config (%d)", ret);
 			break;
 		}
+		if (cb == 0)
+			break;
 		usb_operation_start(mode);
 		usb_state_update_state(USB_CONNECTED, mode);
 		pm_lock_internal(INTERNAL_LOCK_USB,
@@ -237,6 +257,8 @@ static int usb_state_changed(int status)
 		break;
 	case USB_DISCONNECTED:
 		_I("USB cable is disconnected");
+		if (usb_dev && usb_dev->unregister_gadgets_enabled_event)
+			usb_dev->unregister_gadgets_enabled_event(gadgets_enabled);
 		usb_operation_stop(usb_state_get_current_mode());
 		usb_state_update_state(USB_DISCONNECTED, USB_GADGET_NONE);
 		ret = usb_config_disable();
