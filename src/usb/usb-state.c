@@ -66,6 +66,8 @@ static void usb_state_send_system_event(int status)
 
 static void usb_state_set_connection(usb_connection_state_e conn)
 {
+	if (usb_connection != conn)
+		broadcast_usb_state_changed();
 	usb_connection = conn;
 }
 
@@ -181,6 +183,11 @@ void usb_state_update_state(usb_connection_state_e state, unsigned int mode)
 
 	if (old_mode != mode) {
 		vconf_set_int(VCONFKEY_USB_CUR_MODE, mode);
+		broadcast_usb_mode_changed();
+		if (mode == USB_GADGET_NONE)
+			broadcast_usb_config_enabled(DISABLED);
+		else
+			broadcast_usb_config_enabled(ENABLED);
 		usb_mode = mode;
 		old_mode = mode;
 	}

@@ -74,4 +74,16 @@ void usb_state_update_state(usb_connection_state_e state, unsigned int mode);
 int usb_operation_start(unsigned int mode);
 int usb_operation_stop(unsigned int mode);
 
+/* dbus methods/signals (usb-dbus.c) */
+enum {
+	DISABLED,
+	ENABLED,
+};
+
+int usb_dbus_init(void);
+
+void broadcast_usb_config_enabled(int state);
+void broadcast_usb_state_changed(void);
+void broadcast_usb_mode_changed(void);
+
 #endif /* __DEVICED_USB_H__ */
