@@ -293,6 +293,10 @@ static void usb_init(void *data)
 	if (ret < 0)
 		_E("Failed to initialize usb configuation");
 
+	ret = usb_dbus_init();
+	if (ret < 0)
+		_E("Failed to init dbus (%d)", ret);
+
 	usb_state_retrieve_selected_mode();
 
 	add_usb_tethering_handler();
