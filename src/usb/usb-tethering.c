@@ -57,19 +57,19 @@ static void usb_tethering_changed(keynode_t *key, void *data)
 static int usb_tethering_mode_changed(void *data)
 {
 	bool on;
-	char *mode;
+	unsigned int mode;
 	int ret;
 
 	on = (bool)data;
 
 	if (on)
-		mode = USB_MODE_STR_TETHERING;
+		mode = USB_GADGET_RNDIS | USB_GADGET_SDB;
 	else
-		mode = USB_MODE_STR_DEFAULT;
+		mode = USB_GADGET_MTP | USB_GADGET_ACM | USB_GADGET_SDB;
 
 	ret = usb_change_mode(mode);
 	if (ret < 0)
-		_E("Failed to change usb mode to (%s)", mode);
+		_E("Failed to change usb mode to (%d)", mode);
 
 	return ret;
 }
