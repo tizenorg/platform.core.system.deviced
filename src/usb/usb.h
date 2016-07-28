@@ -16,8 +16,10 @@
  * limitations under the License.
  */
 
-#ifndef __USB_CLIENT_H__
-#define __USB_CLIENT_H__
+#ifndef __DEVICED_USB_H__
+#define __DEVICED_USB_H__
+
+#include <hw/usb_client.h>
 
 #define USB_MODE_STR_NONE      "NONE"
 #define USB_MODE_STR_DEFAULT   "DEFAULT"
@@ -52,6 +54,24 @@ struct usb_config_plugin_ops {
 void add_usb_config(const struct usb_config_ops *ops);
 void remove_usb_config(const struct usb_config_ops *ops);
 
-int usb_change_mode(char *name);
+int usb_change_mode(unsigned int mode);
 
-#endif /* __USB_CLIENT_H__ */
+/* Update usb state (usb-state.c) */
+typedef enum {
+	USB_DISCONNECTED,
+	USB_CONNECTED,
+} usb_connection_state_e;
+
+usb_connection_state_e usb_state_get_connection(void);
+void usb_state_retrieve_selected_mode(void);
+void usb_state_set_selected_mode(unsigned int mode);
+unsigned int usb_state_get_current_mode(void);
+unsigned int usb_state_get_selected_mode(void);
+char *usb_state_get_mode_str(unsigned int mode, char *str, size_t len);
+void usb_state_update_state(usb_connection_state_e state, unsigned int mode);
+
+/* usb operations (usb-operation.c) */
+int usb_operation_start(unsigned int mode);
+int usb_operation_stop(unsigned int mode);
+
+#endif /* __DEVICED_USB_H__ */

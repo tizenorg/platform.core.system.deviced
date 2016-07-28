@@ -164,12 +164,19 @@ Deviced library for device control (devel)
 %define DPMS wayland
 %endif
 
+%if 0%{?tizen_build_devel_mode} == 1
+%define engineer_mode on
+%else
+%define engineer_mode off
+%endif
+
 %cmake . \
 	-DTZ_SYS_ETC=%TZ_SYS_ETC \
 	-DCMAKE_INSTALL_PREFIX=%{_prefix} \
 	-DARCH=%{ARCH} \
 	-DARCH_BIT=%{ARCH_BIT} \
 	-DDPMS=%{DPMS} \
+	-DENGINEER_MODE=%{engineer_mode} \
 	-DPROFILE=%{profile} \
 	-DBATTERY_MODULE=%{battery_module} \
 	-DBLOCK_MODULE=%{block_module} \
