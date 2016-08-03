@@ -39,6 +39,7 @@ enum device_type {
 	DEVICE_PASS,
 	DEVICE_USB,
 	DEVICE_EXTCON,
+	DEVICE_POWER,
 	DEVICE_MAX,
 	DEVICE_ALL,
 };
@@ -56,6 +57,7 @@ static const struct device {
 	{ DEVICE_PASS,    "pass",    DEVICED_PATH_PASS,    DEVICED_INTERFACE_PASS    },
 	{ DEVICE_USB,     "usb",     DEVICED_PATH_USB,     DEVICED_INTERFACE_USB     },
 	{ DEVICE_EXTCON,  "extcon",  DEVICED_PATH_EXTCON,  DEVICED_INTERFACE_EXTCON  },
+	{ DEVICE_POWER,   "power",   DEVICED_PATH_POWER,   DEVICED_INTERFACE_POWER   },
 };
 
 static int start_device(char **args)
@@ -287,6 +289,39 @@ static int disable_device(char **args)
 	return 0;
 }
 
+static int power_operation(char **args, char *type)
+{
+	DBusMessage *msg;
+	char *arr[2];
+
+	if (!args[1] || !type)
+		return -EINVAL;
+
+	printf("Power %s device!\n", args[2]);
+
+	arr[0] = type;
+	arr[1] = "0";
+
+	msg = dbus_method_sync_with_reply(DEVICED_BUS_NAME,
+		    devices[arg_id].path, devices[arg_id].iface,
+		    "reboot", "si", arr);
+	if (!msg)
+		return -EBADMSG;
+
+	dbus_message_unref(msg);
+
+	return 0;
+}
+static int power_off(char *args)
+{
+	return power_operation(args, "poweroff");
+}
+
+static int power_reboot(char *args)
+{
+	return power_operation(args, "reboot");
+}
+
 static const struct action {
 	const enum device_type id;
 	const char *action;
@@ -305,6 +340,8 @@ static const struct action {
 	{ DEVICE_CORE,      "devicelist",      3, device_list,       ""            },
 	{ DEVICE_EXTCON,    "enable",          4, enable_device,     "[USB|HEADPHONE|HDMI|DOCK]" },
 	{ DEVICE_EXTCON,    "disable",         4, disable_device,    "[USB|HEADPHONE|HDMI|DOCK]" },
+	{ DEVICE_POWER,     "off",             3, power_off,         ""            },
+	{ DEVICE_POWER,     "reboot",          3, power_reboot,      ""            },
 };
 
 static inline void usage()
